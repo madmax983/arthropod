@@ -41,15 +41,15 @@ impl FrameCapture {
 
         // Copy the texture to the buffer
         encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            wgpu::ImageCopyBuffer {
+            wgpu::TexelCopyBufferInfo {
                 buffer: &buffer,
-                layout: wgpu::ImageDataLayout {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(size.width * 4),
                     rows_per_image: Some(size.height),
@@ -124,15 +124,15 @@ impl FrameCapture {
         });
 
         encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            wgpu::ImageCopyBuffer {
+            wgpu::TexelCopyBufferInfo {
                 buffer: &buffer,
-                layout: wgpu::ImageDataLayout {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(size.width * 4),
                     rows_per_image: Some(size.height),
@@ -153,7 +153,6 @@ impl FrameCapture {
         rx.recv().context("Failed to map buffer")??;
 
         let data = buffer_slice.get_mapped_range().to_vec();
-        drop(buffer_slice);
         buffer.unmap();
 
         Ok(data)

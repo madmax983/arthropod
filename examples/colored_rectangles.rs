@@ -12,7 +12,7 @@ use render_engine::{
     backend::{RenderBackend, WgpuBackend},
     Color, NodeContent, Scene, SceneNode, Transform2D,
 };
-use flux_state::{Computed, Effect, ReadSignal, Runtime, Signal, WriteSignal};
+use flux_state::{Effect, ReadSignal, Runtime, Signal, WriteSignal};
 use std::rc::Rc;
 
 // Rectangle data for hover detection
@@ -40,6 +40,8 @@ impl RectData {
 struct DemoApp {
     window: Window,
     backend: WgpuBackend,
+    // Runtime must be kept alive for signals to work
+    #[allow(dead_code)]
     runtime: Rc<Runtime>,
 
     // State
@@ -254,22 +256,6 @@ fn main() {
         .with_thread_ids(false)
         .with_line_number(true)
         .init();
-
-    // Initialize RenderDoc if enabled
-    #[cfg(feature = "renderdoc")]
-    {
-        use tracing::info;
-        match renderdoc::RenderDoc::<renderdoc::V141>::new() {
-            Ok(mut rd) => {
-                info!("RenderDoc integration initialized");
-                // Start frame capture on first frame
-                rd.start_frame_capture(std::ptr::null(), std::ptr::null());
-            }
-            Err(e) => {
-                tracing::warn!("Failed to initialize RenderDoc: {:?}", e);
-            }
-        }
-    }
 
     println!("Arthropod Phase 1 Integration Demo");
     println!("===================================");

@@ -48,6 +48,8 @@ impl EventLoopImpl {
 /// Windows window implementation.
 pub struct WindowImpl {
     hwnd: HWND,
+    // Keep hinstance alive for window lifetime
+    #[allow(dead_code)]
     hinstance: HINSTANCE,
     id: WindowId,
 }
