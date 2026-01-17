@@ -211,7 +211,7 @@ fn test_effect_tracks_correct_dependencies() {
     let signal2 = Signal::new(Rc::clone(&runtime), 20);
 
     let (read1, write1) = signal1.split();
-    let (read2, write2) = signal2.split();
+    let (_read2, write2) = signal2.split();
 
     let run_count = Rc::new(Cell::new(0));
     let run_count_clone = Rc::clone(&run_count);
