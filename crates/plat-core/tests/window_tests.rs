@@ -1,12 +1,16 @@
 //! Integration tests for window creation and management.
 
-use plat_core::{EventLoop, WindowConfig, Size};
+use plat_core::{EventLoop, Size, WindowConfig};
 
 #[test]
 fn test_create_event_loop() {
     // Test that we can create an event loop
     let event_loop = EventLoop::new();
-    assert!(event_loop.is_ok(), "Failed to create event loop: {:?}", event_loop.err());
+    assert!(
+        event_loop.is_ok(),
+        "Failed to create event loop: {:?}",
+        event_loop.err()
+    );
 }
 
 #[test]
@@ -14,16 +18,22 @@ fn test_create_window_with_default_config() {
     let event_loop = EventLoop::new().expect("Failed to create event loop");
 
     let window = event_loop.create_window(WindowConfig::default());
-    assert!(window.is_ok(), "Failed to create window: {:?}", window.err());
+    assert!(
+        window.is_ok(),
+        "Failed to create window: {:?}",
+        window.err()
+    );
 }
 
 #[test]
 fn test_window_has_unique_id() {
     let event_loop = EventLoop::new().expect("Failed to create event loop");
 
-    let window1 = event_loop.create_window(WindowConfig::default())
+    let window1 = event_loop
+        .create_window(WindowConfig::default())
         .expect("Failed to create first window");
-    let window2 = event_loop.create_window(WindowConfig::default())
+    let window2 = event_loop
+        .create_window(WindowConfig::default())
         .expect("Failed to create second window");
 
     assert_ne!(window1.id(), window2.id(), "Windows should have unique IDs");
@@ -38,7 +48,8 @@ fn test_window_respects_size_config() {
         ..Default::default()
     };
 
-    let window = event_loop.create_window(config)
+    let window = event_loop
+        .create_window(config)
         .expect("Failed to create window");
 
     let size = window.inner_size();
@@ -64,7 +75,8 @@ fn test_window_title() {
         ..Default::default()
     };
 
-    let window = event_loop.create_window(config)
+    let window = event_loop
+        .create_window(config)
         .expect("Failed to create window");
 
     // We can set a title without panicking
@@ -74,12 +86,16 @@ fn test_window_title() {
 #[test]
 fn test_window_scale_factor() {
     let event_loop = EventLoop::new().expect("Failed to create event loop");
-    let window = event_loop.create_window(WindowConfig::default())
+    let window = event_loop
+        .create_window(WindowConfig::default())
         .expect("Failed to create window");
 
     let scale_factor = window.scale_factor();
     assert!(scale_factor > 0.0, "Scale factor should be positive");
-    assert!(scale_factor <= 4.0, "Scale factor shouldn't be unreasonably large");
+    assert!(
+        scale_factor <= 4.0,
+        "Scale factor shouldn't be unreasonably large"
+    );
 }
 
 #[test]
@@ -91,7 +107,8 @@ fn test_window_visibility() {
         ..Default::default()
     };
 
-    let window = event_loop.create_window(config)
+    let window = event_loop
+        .create_window(config)
         .expect("Failed to create window");
 
     // Should be able to show/hide without panicking
@@ -101,10 +118,11 @@ fn test_window_visibility() {
 
 #[test]
 fn test_window_provides_raw_handles() {
-    use raw_window_handle::{HasWindowHandle, HasDisplayHandle};
+    use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
-    let window = event_loop.create_window(WindowConfig::default())
+    let window = event_loop
+        .create_window(WindowConfig::default())
         .expect("Failed to create window");
 
     // Should be able to get raw window and display handles for wgpu

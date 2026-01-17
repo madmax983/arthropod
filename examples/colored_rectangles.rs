@@ -7,12 +7,14 @@
 //! - Reactive state with flux-state
 //! - Animations with anim-graph
 
-use plat_core::{Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent};
-use render_engine::{
-    backend::{RenderBackend, WgpuBackend},
-    Color, NodeContent, Scene, SceneNode, Transform2D,
-};
 use flux_state::{Effect, ReadSignal, Runtime, Signal, WriteSignal};
+use plat_core::{
+    Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
+};
+use render_engine::{
+    Color, NodeContent, Scene, SceneNode, Transform2D,
+    backend::{RenderBackend, WgpuBackend},
+};
 use std::rc::Rc;
 
 // Rectangle data for hover detection
@@ -63,14 +65,19 @@ impl Application for DemoApp {
         // Create window
         let config = WindowConfig {
             title: "Arthropod Phase 1 Demo - Hover Interactive Rectangles".to_string(),
-            size: Size { width: 800, height: 600 },
+            size: Size {
+                width: 800,
+                height: 600,
+            },
             resizable: true,
             decorations: true,
             visible: true,
             ..Default::default()
         };
 
-        let window = event_loop.create_window(config).expect("Failed to create window");
+        let window = event_loop
+            .create_window(config)
+            .expect("Failed to create window");
         let size = window.inner_size();
 
         // Create wgpu backend
@@ -92,8 +99,8 @@ impl Application for DemoApp {
         // This makes them scale with the window
         let rects = vec![
             RectData {
-                x_ratio: 50.0 / 800.0,      // 0.0625
-                y_ratio: 50.0 / 600.0,      // 0.0833
+                x_ratio: 50.0 / 800.0,       // 0.0625
+                y_ratio: 50.0 / 600.0,       // 0.0833
                 width_ratio: 320.0 / 800.0,  // 0.4
                 height_ratio: 240.0 / 600.0, // 0.4
                 base_color: Color::RED,
@@ -116,11 +123,11 @@ impl Application for DemoApp {
                 hover_color: Color::rgba(0.5, 0.5, 1.0, 1.0), // Lighter blue
             },
             RectData {
-                x_ratio: 430.0 / 800.0,      // 0.5375
-                y_ratio: 310.0 / 600.0,      // 0.5167
-                width_ratio: 320.0 / 800.0,  // 0.4
-                height_ratio: 240.0 / 600.0, // 0.4
-                base_color: Color::rgba(1.0, 1.0, 0.0, 1.0), // Yellow
+                x_ratio: 430.0 / 800.0,                       // 0.5375
+                y_ratio: 310.0 / 600.0,                       // 0.5167
+                width_ratio: 320.0 / 800.0,                   // 0.4
+                height_ratio: 240.0 / 600.0,                  // 0.4
+                base_color: Color::rgba(1.0, 1.0, 0.0, 1.0),  // Yellow
                 hover_color: Color::rgba(1.0, 1.0, 0.5, 1.0), // Lighter yellow
             },
         ];
@@ -158,8 +165,19 @@ impl Application for DemoApp {
                     && my >= bounds_y
                     && my <= bounds_y + bounds_height;
 
-                println!("Rect {} - Mouse: ({:.0}, {:.0}), Bounds: ({:.0}, {:.0}, {:.0}x{:.0}), Window: ({:.0}x{:.0}), Hovering: {}",
-                    rect_index, mx, my, bounds_x, bounds_y, bounds_width, bounds_height, win_w, win_h, is_hovering);
+                println!(
+                    "Rect {} - Mouse: ({:.0}, {:.0}), Bounds: ({:.0}, {:.0}, {:.0}x{:.0}), Window: ({:.0}x{:.0}), Hovering: {}",
+                    rect_index,
+                    mx,
+                    my,
+                    bounds_x,
+                    bounds_y,
+                    bounds_width,
+                    bounds_height,
+                    win_w,
+                    win_h,
+                    is_hovering
+                );
 
                 let new_color = if is_hovering { hover_color } else { base_color };
                 write.set(new_color);
@@ -192,7 +210,8 @@ impl Application for DemoApp {
                     println!("RESIZE EVENT: {}x{}", new_size.width, new_size.height);
                     self.backend.resize(new_size.width, new_size.height);
                     // Update window size signal to trigger hover recalculation
-                    self.window_size_write.set((new_size.width as f32, new_size.height as f32));
+                    self.window_size_write
+                        .set((new_size.width as f32, new_size.height as f32));
                     self.window.request_redraw();
                 }
                 WindowEvent::CursorMoved { position } => {
@@ -220,8 +239,18 @@ impl Application for DemoApp {
             let color = self.rect_colors[i].get_untracked(); // Use untracked to avoid dependency in render
             let bounds = rect_data.bounds_for_size(window_width, window_height);
 
-            println!("Rendering rect {} with color: ({:.2}, {:.2}, {:.2}, {:.2}), bounds: ({:.0}, {:.0}, {:.0}x{:.0})",
-                i, color.r, color.g, color.b, color.a, bounds.x, bounds.y, bounds.width, bounds.height);
+            println!(
+                "Rendering rect {} with color: ({:.2}, {:.2}, {:.2}, {:.2}), bounds: ({:.0}, {:.0}, {:.0}x{:.0})",
+                i,
+                color.r,
+                color.g,
+                color.b,
+                color.a,
+                bounds.x,
+                bounds.y,
+                bounds.width,
+                bounds.height
+            );
 
             let rect_node = SceneNode {
                 content: NodeContent::Rect { color },
@@ -247,7 +276,7 @@ fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into())
+                .add_directive(tracing::Level::INFO.into()),
         )
         .with_target(true)
         .with_thread_ids(false)

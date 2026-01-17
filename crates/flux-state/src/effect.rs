@@ -1,7 +1,7 @@
 //! Effects - side effects that run when dependencies change.
 
+use crate::runtime::{NodeId, Runtime};
 use std::rc::Rc;
-use crate::runtime::{Runtime, NodeId};
 
 /// An effect that runs when its dependencies change.
 pub struct Effect {

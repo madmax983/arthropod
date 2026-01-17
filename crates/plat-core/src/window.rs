@@ -56,7 +56,12 @@ pub struct Rect {
 
 impl Rect {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// Check if a point is inside this rectangle.
@@ -138,13 +143,17 @@ impl Window {
 }
 
 impl HasWindowHandle for Window {
-    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
+    fn window_handle(
+        &self,
+    ) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
         self.inner.window_handle()
     }
 }
 
 impl HasDisplayHandle for Window {
-    fn display_handle(&self) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
+    fn display_handle(
+        &self,
+    ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
         self.inner.display_handle()
     }
 }

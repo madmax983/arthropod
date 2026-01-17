@@ -1,7 +1,7 @@
 //! Stub implementation for unsupported platforms.
 
-use crate::{Application, ControlFlow, Event, PlatformError, Window, WindowConfig, WindowId, Size};
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, WindowHandle, DisplayHandle};
+use crate::{Application, ControlFlow, Event, PlatformError, Size, Window, WindowConfig, WindowId};
+use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
 
 pub struct EventLoopImpl;
 

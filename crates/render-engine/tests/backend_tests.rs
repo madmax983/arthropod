@@ -1,15 +1,15 @@
 //! Tests for the wgpu rendering backend.
 
-use render_engine::{
-    backend::WgpuBackend,
-    Color, NodeContent, Scene, SceneNode, Transform2D,
-};
 use plat_core::{Rect, Size};
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, backend::WgpuBackend};
 
 #[test]
 fn test_backend_creation() {
     // Backend should be creatable from window dimensions
-    let _size = Size { width: 800, height: 600 };
+    let _size = Size {
+        width: 800,
+        height: 600,
+    };
 
     // We can't actually create a real wgpu backend without a window,
     // but we can test the constructor exists with the right signature
@@ -20,7 +20,10 @@ fn test_backend_creation() {
 #[test]
 fn test_backend_resize() {
     // Backend should handle resize events
-    let _new_size = Size { width: 1024, height: 768 };
+    let _new_size = Size {
+        width: 1024,
+        height: 768,
+    };
 
     // Verify resize method signature exists
     // Implementation will be tested with actual backend instance
@@ -41,9 +44,7 @@ fn test_render_single_rectangle() {
     let mut scene = Scene::new();
 
     let rect_node = SceneNode {
-        content: NodeContent::Rect {
-            color: Color::RED,
-        },
+        content: NodeContent::Rect { color: Color::RED },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 100.0,
@@ -84,7 +85,9 @@ fn test_render_multiple_rectangles() {
     };
 
     let rect2 = SceneNode {
-        content: NodeContent::Rect { color: Color::GREEN },
+        content: NodeContent::Rect {
+            color: Color::GREEN,
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 150.0,
@@ -119,7 +122,7 @@ fn test_render_respects_visibility() {
             height: 100.0,
         },
         children: vec![],
-        visible: false,  // Not visible
+        visible: false, // Not visible
         opacity: 1.0,
     };
 
@@ -145,7 +148,7 @@ fn test_render_respects_opacity() {
         },
         children: vec![],
         visible: true,
-        opacity: 0.5,  // Half transparent
+        opacity: 0.5, // Half transparent
     };
 
     scene.add_node(root, semi_transparent);
@@ -249,7 +252,10 @@ fn test_clear_color() {
 #[test]
 fn test_render_with_viewport() {
     // Backend should render within viewport bounds
-    let _size = Size { width: 800, height: 600 };
+    let _size = Size {
+        width: 800,
+        height: 600,
+    };
 
     // All rendering should be clipped to viewport
 }

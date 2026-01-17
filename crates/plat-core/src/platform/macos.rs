@@ -1,13 +1,10 @@
 //! macOS platform implementation using Cocoa via objc2.
 
-use crate::{
-    Application, PlatformError, Window, WindowConfig, WindowId, Size,
-};
-use objc2::rc::Retained;
+use crate::{Application, PlatformError, Size, Window, WindowConfig, WindowId};
 use objc2::ClassType;
+use objc2::rc::Retained;
 use objc2_app_kit::{
-    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSWindow,
-    NSWindowStyleMask,
+    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSWindow, NSWindowStyleMask,
 };
 use objc2_foundation::{CGFloat, MainThreadMarker, NSPoint, NSRect, NSSize, NSString};
 use raw_window_handle::{
@@ -38,11 +35,12 @@ impl EventLoopImpl {
         Ok(Self { app, mtm })
     }
 
-    pub fn create_window(&self, config: WindowConfig) -> std::result::Result<Window, PlatformError> {
+    pub fn create_window(
+        &self,
+        config: WindowConfig,
+    ) -> std::result::Result<Window, PlatformError> {
         let window_impl = WindowImpl::new(&config, self.mtm)?;
-        Ok(Window {
-            inner: window_impl,
-        })
+        Ok(Window { inner: window_impl })
     }
 }
 
@@ -53,7 +51,10 @@ pub struct WindowImpl {
 }
 
 impl WindowImpl {
-    fn new(config: &WindowConfig, mtm: MainThreadMarker) -> std::result::Result<Self, PlatformError> {
+    fn new(
+        config: &WindowConfig,
+        mtm: MainThreadMarker,
+    ) -> std::result::Result<Self, PlatformError> {
         let id = WindowId(NEXT_WINDOW_ID.fetch_add(1, Ordering::SeqCst));
 
         // Create window style mask
@@ -153,8 +154,12 @@ impl WindowImpl {
 }
 
 impl HasWindowHandle for WindowImpl {
-    fn window_handle(&self) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
-        let ns_view = self.window.contentView()
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
+        let ns_view = self
+            .window
+            .contentView()
             .ok_or(raw_window_handle::HandleError::Unavailable)?;
         let view_ptr = Retained::as_ptr(&ns_view) as *mut std::ffi::c_void;
 
@@ -164,7 +169,9 @@ impl HasWindowHandle for WindowImpl {
 }
 
 impl HasDisplayHandle for WindowImpl {
-    fn display_handle(&self) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
         let handle = AppKitDisplayHandle::new();
         Ok(unsafe { DisplayHandle::borrow_raw(RawDisplayHandle::AppKit(handle)) })
     }
@@ -179,7 +186,10 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
 
     // Create event loop
     let event_loop = crate::EventLoop {
-        inner: EventLoopImpl { app: app.clone(), mtm },
+        inner: EventLoopImpl {
+            app: app.clone(),
+            mtm,
+        },
     };
 
     // Create application

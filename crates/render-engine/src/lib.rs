@@ -2,12 +2,12 @@
 //!
 //! Provides a retained-mode scene graph with wgpu backend.
 
-mod scene;
-mod node;
 pub mod backend;
+mod node;
+mod scene;
 
-pub use scene::*;
 pub use node::*;
+pub use scene::*;
 
 use thiserror::Error;
 

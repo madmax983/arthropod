@@ -1,8 +1,8 @@
 //! Tests for reactive state primitives: Signal, Computed, Effect, and Runtime.
 
-use flux_state::{Runtime, Signal, Computed, Effect};
-use std::rc::Rc;
+use flux_state::{Computed, Effect, Runtime, Signal};
 use std::cell::Cell;
+use std::rc::Rc;
 
 // ==================== Runtime Tests ====================
 
@@ -108,7 +108,11 @@ fn test_computed_updates_when_dependency_changes() {
     assert_eq!(doubled.get(), 10);
 
     write.set(10);
-    assert_eq!(doubled.get(), 20, "Computed should update when signal changes");
+    assert_eq!(
+        doubled.get(),
+        20,
+        "Computed should update when signal changes"
+    );
 }
 
 #[test]
@@ -129,7 +133,11 @@ fn test_computed_with_multiple_dependencies() {
     assert_eq!(sum.get(), 7);
 
     write_a.set(10);
-    assert_eq!(sum.get(), 14, "Computed should update when any dependency changes");
+    assert_eq!(
+        sum.get(),
+        14,
+        "Computed should update when any dependency changes"
+    );
 }
 
 #[test]

@@ -35,9 +35,11 @@ impl FrameCapture {
         });
 
         // Create a command encoder
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Frame Capture Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Frame Capture Encoder"),
+            });
 
         // Copy the texture to the buffer
         encoder.copy_texture_to_buffer(
@@ -75,9 +77,7 @@ impl FrameCapture {
 
         // Convert to RGBA8 if needed
         let rgba_data: Vec<u8> = match format {
-            wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => {
-                data.to_vec()
-            }
+            wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => data.to_vec(),
             wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
                 // Convert BGRA to RGBA
                 data.chunks(4)
@@ -105,10 +105,7 @@ impl FrameCapture {
     }
 
     /// Capture a texture and return the pixel data
-    pub async fn capture_texture_to_buffer(
-        &self,
-        texture: &wgpu::Texture,
-    ) -> Result<Vec<u8>> {
+    pub async fn capture_texture_to_buffer(&self, texture: &wgpu::Texture) -> Result<Vec<u8>> {
         let size = texture.size();
 
         let buffer_size = (size.width * size.height * 4) as u64;
@@ -119,9 +116,11 @@ impl FrameCapture {
             mapped_at_creation: false,
         });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Frame Capture Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Frame Capture Encoder"),
+            });
 
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {

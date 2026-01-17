@@ -1,10 +1,12 @@
 //! Debug rendering with RenderDoc capture and frame inspection
 
-use arthropod_test::{init_test_tracing, RenderDocCapture};
-use plat_core::{Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent};
+use arthropod_test::{RenderDocCapture, init_test_tracing};
+use plat_core::{
+    Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
+};
 use render_engine::{
-    backend::{RenderBackend, WgpuBackend},
     Color, NodeContent, Scene, SceneNode, Transform2D,
+    backend::{RenderBackend, WgpuBackend},
 };
 
 struct DebugApp {
@@ -32,16 +34,20 @@ impl Application for DebugApp {
 
         let config = WindowConfig {
             title: "Debug Render - RenderDoc Capture".to_string(),
-            size: Size { width: 800, height: 600 },
+            size: Size {
+                width: 800,
+                height: 600,
+            },
             resizable: false,
             decorations: true,
             visible: true,
             ..Default::default()
         };
 
-        let window = event_loop.create_window(config).expect("Failed to create window");
-        let backend = WgpuBackend::new(&window, 800, 600)
-            .expect("Failed to create backend");
+        let window = event_loop
+            .create_window(config)
+            .expect("Failed to create window");
+        let backend = WgpuBackend::new(&window, 800, 600).expect("Failed to create backend");
 
         println!("\nTest configuration:");
         println!("  Window size: 800x600");
@@ -60,7 +66,11 @@ impl Application for DebugApp {
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
-        if let Event::Window { event: WindowEvent::CloseRequested, .. } = event {
+        if let Event::Window {
+            event: WindowEvent::CloseRequested,
+            ..
+        } = event
+        {
             *control_flow = ControlFlow::Exit;
         }
     }

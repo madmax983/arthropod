@@ -45,9 +45,7 @@ impl Easing {
                 // Simplified cubic bezier - full implementation would use iterative solver
                 let t2 = t * t;
                 let t3 = t2 * t;
-                3.0 * (1.0 - t) * (1.0 - t) * t * y1
-                    + 3.0 * (1.0 - t) * t2 * y2
-                    + t3
+                3.0 * (1.0 - t) * (1.0 - t) * t * y1 + 3.0 * (1.0 - t) * t2 * y2 + t3
             }
         }
     }
@@ -127,7 +125,9 @@ impl<T: Animatable> Animation<T> {
     /// Check if animation is complete.
     pub fn is_complete(&self) -> bool {
         match self {
-            Self::Tween { elapsed, duration, .. } => elapsed >= duration,
+            Self::Tween {
+                elapsed, duration, ..
+            } => elapsed >= duration,
             Self::Spring { .. } => {
                 // Spring never truly completes, but we can check if close enough
                 // For now, return false - will implement threshold check later

@@ -1,6 +1,6 @@
 //! Tests for animation primitives and interpolation.
 
-use anim_graph::{Animation, Animatable, Easing};
+use anim_graph::{Animatable, Animation, Easing};
 use render_engine::Color;
 use std::time::Duration;
 
@@ -74,7 +74,10 @@ fn test_easing_ease_in() {
 
     // EaseIn should start slow (t^2)
     let result_at_half = easing.apply(0.5);
-    assert!(result_at_half < 0.5, "EaseIn at 0.5 should be < 0.5 (slow start)");
+    assert!(
+        result_at_half < 0.5,
+        "EaseIn at 0.5 should be < 0.5 (slow start)"
+    );
 
     assert_eq!(easing.apply(0.0), 0.0);
     assert_eq!(easing.apply(1.0), 1.0);
@@ -86,7 +89,10 @@ fn test_easing_ease_out() {
 
     // EaseOut should start fast
     let result_at_half = easing.apply(0.5);
-    assert!(result_at_half > 0.5, "EaseOut at 0.5 should be > 0.5 (fast start)");
+    assert!(
+        result_at_half > 0.5,
+        "EaseOut at 0.5 should be > 0.5 (fast start)"
+    );
 
     assert_eq!(easing.apply(0.0), 0.0);
     assert_eq!(easing.apply(1.0), 1.0);
@@ -111,15 +117,12 @@ fn test_easing_ease_in_out() {
 
 #[test]
 fn test_tween_creation() {
-    let anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     match anim {
-        Animation::Tween { from, to, duration, .. } => {
+        Animation::Tween {
+            from, to, duration, ..
+        } => {
             assert_eq!(from, 0.0);
             assert_eq!(to, 100.0);
             assert_eq!(duration, Duration::from_secs(1));
@@ -130,12 +133,7 @@ fn test_tween_creation() {
 
 #[test]
 fn test_tween_at_start() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     let value = anim.tick(Duration::ZERO);
     assert_eq!(value, 0.0, "Should be at start value");
@@ -143,12 +141,7 @@ fn test_tween_at_start() {
 
 #[test]
 fn test_tween_at_midpoint() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     let value = anim.tick(Duration::from_millis(500));
     assert_eq!(value, 50.0, "Should be halfway through");
@@ -156,12 +149,7 @@ fn test_tween_at_midpoint() {
 
 #[test]
 fn test_tween_at_end() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     let value = anim.tick(Duration::from_secs(1));
     assert_eq!(value, 100.0, "Should be at end value");
@@ -169,12 +157,7 @@ fn test_tween_at_end() {
 
 #[test]
 fn test_tween_clamps_at_end() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     let value = anim.tick(Duration::from_secs(2));
     assert_eq!(value, 100.0, "Should clamp to end value");
@@ -182,25 +165,19 @@ fn test_tween_clamps_at_end() {
 
 #[test]
 fn test_tween_with_ease_in() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::EaseIn,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::EaseIn);
 
     let value = anim.tick(Duration::from_millis(500));
-    assert!(value < 50.0, "EaseIn should be slow at start, value: {}", value);
+    assert!(
+        value < 50.0,
+        "EaseIn should be slow at start, value: {}",
+        value
+    );
 }
 
 #[test]
 fn test_tween_incremental_ticks() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     // Tick in small increments
     let v1 = anim.tick(Duration::from_millis(250));
@@ -233,37 +210,28 @@ fn test_tween_color_animation() {
 
 #[test]
 fn test_tween_not_complete_initially() {
-    let anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
-    assert!(!anim.is_complete(), "Tween should not be complete initially");
+    assert!(
+        !anim.is_complete(),
+        "Tween should not be complete initially"
+    );
 }
 
 #[test]
 fn test_tween_not_complete_during() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     anim.tick(Duration::from_millis(500));
-    assert!(!anim.is_complete(), "Tween should not be complete at midpoint");
+    assert!(
+        !anim.is_complete(),
+        "Tween should not be complete at midpoint"
+    );
 }
 
 #[test]
 fn test_tween_complete_at_end() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     anim.tick(Duration::from_secs(1));
     assert!(anim.is_complete(), "Tween should be complete at end");
@@ -271,12 +239,7 @@ fn test_tween_complete_at_end() {
 
 #[test]
 fn test_tween_complete_after_end() {
-    let mut anim = Animation::tween(
-        0.0_f32,
-        100.0_f32,
-        Duration::from_secs(1),
-        Easing::Linear,
-    );
+    let mut anim = Animation::tween(0.0_f32, 100.0_f32, Duration::from_secs(1), Easing::Linear);
 
     anim.tick(Duration::from_secs(2));
     assert!(anim.is_complete(), "Tween should be complete after end");
@@ -289,7 +252,13 @@ fn test_spring_creation() {
     let anim = Animation::spring(0.0_f32, 100.0_f32, 200.0, 20.0);
 
     match anim {
-        Animation::Spring { current, target, stiffness, damping, .. } => {
+        Animation::Spring {
+            current,
+            target,
+            stiffness,
+            damping,
+            ..
+        } => {
             assert_eq!(current, 0.0);
             assert_eq!(target, 100.0);
             assert_eq!(stiffness, 200.0);

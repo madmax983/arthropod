@@ -26,8 +26,8 @@ struct RuntimeInner {
     effects: HashMap<NodeId, Box<dyn Fn()>>,
 
     // Dependency graph
-    dependencies: HashMap<NodeId, HashSet<NodeId>>,  // node -> its dependencies
-    subscribers: HashMap<NodeId, HashSet<NodeId>>,   // node -> nodes that depend on it
+    dependencies: HashMap<NodeId, HashSet<NodeId>>, // node -> its dependencies
+    subscribers: HashMap<NodeId, HashSet<NodeId>>,  // node -> nodes that depend on it
 
     // Current tracking context
     tracking_context: Option<NodeId>,
@@ -73,10 +73,13 @@ impl Runtime {
         let mut inner = self.inner.borrow_mut();
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
-        inner.computeds.insert(id, ComputedNode {
-            compute,
-            value: None,
-        });
+        inner.computeds.insert(
+            id,
+            ComputedNode {
+                compute,
+                value: None,
+            },
+        );
         id
     }
 
@@ -92,11 +95,13 @@ impl Runtime {
     pub(crate) fn track(&self, source: NodeId) {
         let mut inner = self.inner.borrow_mut();
         if let Some(observer) = inner.tracking_context {
-            inner.dependencies
+            inner
+                .dependencies
                 .entry(observer)
                 .or_default()
                 .insert(source);
-            inner.subscribers
+            inner
+                .subscribers
                 .entry(source)
                 .or_default()
                 .insert(observer);
@@ -116,7 +121,8 @@ impl Runtime {
         // Collect immediate subscribers
         let subs_to_mark: Vec<NodeId> = {
             let inner = self.inner.borrow();
-            inner.subscribers
+            inner
+                .subscribers
                 .get(&source)
                 .map(|subs| subs.iter().copied().collect())
                 .unwrap_or_default()
@@ -134,10 +140,9 @@ impl Runtime {
                     inner.stale.insert(*sub);
 
                     // If it's an effect, schedule it
-                    if inner.effects.contains_key(sub)
-                        && !inner.pending_effects.contains(sub) {
-                            inner.pending_effects.push(*sub);
-                        }
+                    if inner.effects.contains_key(sub) && !inner.pending_effects.contains(sub) {
+                        inner.pending_effects.push(*sub);
+                    }
 
                     // We should recurse for computed values
                     inner.computeds.contains_key(sub)
@@ -253,7 +258,10 @@ impl Runtime {
     {
         let inner = self.inner.borrow();
         let computed = inner.computeds.get(&id).expect("Computed not found");
-        let value = computed.value.as_ref().expect("Computed value not initialized");
+        let value = computed
+            .value
+            .as_ref()
+            .expect("Computed value not initialized");
         f(value.as_ref())
     }
 

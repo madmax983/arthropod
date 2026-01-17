@@ -39,7 +39,10 @@ fn test_window_respects_size_config() {
     // Window should respect the size specified in config
     let event_loop = EventLoop::new().unwrap();
     let config = WindowConfig {
-        size: Size { width: 640, height: 480 },
+        size: Size {
+            width: 640,
+            height: 480,
+        },
         ..Default::default()
     };
 

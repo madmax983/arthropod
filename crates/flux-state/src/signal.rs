@@ -1,8 +1,8 @@
 //! Signal primitive - the atomic unit of reactive state.
 
+use crate::runtime::{NodeId, Runtime};
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::runtime::{Runtime, NodeId};
 
 /// A reactive signal - the atomic unit of state.
 pub struct Signal<T> {
@@ -83,21 +83,24 @@ impl<T: Clone + 'static> ReadSignal<T> {
 impl<T: 'static> WriteSignal<T> {
     /// Set a new value.
     pub fn set(&self, value: T) {
-        self.runtime.with_signal_value(self.id, |v: &dyn std::any::Any| {
-            *v.downcast_ref::<RefCell<T>>()
-                .expect("Type mismatch")
-                .borrow_mut() = value;
-        });
+        self.runtime
+            .with_signal_value(self.id, |v: &dyn std::any::Any| {
+                *v.downcast_ref::<RefCell<T>>()
+                    .expect("Type mismatch")
+                    .borrow_mut() = value;
+            });
         self.runtime.notify(self.id);
     }
 
     /// Update the value with a function.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        self.runtime.with_signal_value(self.id, |v: &dyn std::any::Any| {
-            f(&mut v.downcast_ref::<RefCell<T>>()
-                .expect("Type mismatch")
-                .borrow_mut());
-        });
+        self.runtime
+            .with_signal_value(self.id, |v: &dyn std::any::Any| {
+                f(&mut v
+                    .downcast_ref::<RefCell<T>>()
+                    .expect("Type mismatch")
+                    .borrow_mut());
+            });
         self.runtime.notify(self.id);
     }
 }

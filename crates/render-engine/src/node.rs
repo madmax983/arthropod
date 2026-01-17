@@ -50,10 +50,7 @@ pub enum NodeContent {
     /// Solid color rectangle.
     Rect { color: Color },
     /// Rounded rectangle.
-    RoundedRect {
-        color: Color,
-        corner_radius: f32,
-    },
+    RoundedRect { color: Color, corner_radius: f32 },
 }
 
 /// RGBA color.

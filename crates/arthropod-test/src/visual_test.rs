@@ -14,7 +14,7 @@ pub fn compare_images(image1: &[u8], image2: &[u8], width: u32, height: u32) -> 
 
     for i in 0..total_pixels {
         let idx = i * 4; // RGBA
-        if image1[idx..idx+4] != image2[idx..idx+4] {
+        if image1[idx..idx + 4] != image2[idx..idx + 4] {
             diff_pixels += 1;
         }
     }

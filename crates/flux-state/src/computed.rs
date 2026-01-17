@@ -1,8 +1,8 @@
 //! Computed values - derived reactive state.
 
+use crate::runtime::{NodeId, Runtime};
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::runtime::{Runtime, NodeId};
 
 /// A derived/computed value that automatically tracks dependencies.
 #[derive(Clone)]

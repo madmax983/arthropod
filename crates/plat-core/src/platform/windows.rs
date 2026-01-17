@@ -1,20 +1,18 @@
 //! Windows platform implementation using Win32 APIs.
 
 use crate::{
-    Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent, WindowId,
+    Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent,
+    WindowId,
 };
 use raw_window_handle::{
-    HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
-    Win32WindowHandle, WindowsDisplayHandle, WindowHandle, DisplayHandle,
+    DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
+    Win32WindowHandle, WindowHandle, WindowsDisplayHandle,
 };
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use windows::{
-    core::*,
-    Win32::Foundation::*,
-    Win32::Graphics::Gdi::*,
-    Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::UI::WindowsAndMessaging::*,
+    Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
+    Win32::UI::WindowsAndMessaging::*, core::*,
 };
 
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
@@ -33,15 +31,19 @@ impl EventLoopImpl {
     pub fn new() -> std::result::Result<Self, PlatformError> {
         unsafe {
             let hinstance = GetModuleHandleW(None)
-                .map_err(|e| PlatformError::Initialization(format!("GetModuleHandleW failed: {}", e)))?
+                .map_err(|e| {
+                    PlatformError::Initialization(format!("GetModuleHandleW failed: {}", e))
+                })?
                 .into();
             Ok(Self { hinstance })
         }
     }
 
-    pub fn create_window(&self, config: WindowConfig) -> std::result::Result<Window, PlatformError> {
-        WindowImpl::new(self.hinstance, config)
-            .map(|inner| Window { inner })
+    pub fn create_window(
+        &self,
+        config: WindowConfig,
+    ) -> std::result::Result<Window, PlatformError> {
+        WindowImpl::new(self.hinstance, config).map(|inner| Window { inner })
     }
 }
 
@@ -78,7 +80,11 @@ impl WindowImpl {
 
             let id = WindowId(NEXT_WINDOW_ID.fetch_add(1, Ordering::SeqCst));
 
-            let title: Vec<u16> = config.title.encode_utf16().chain(std::iter::once(0)).collect();
+            let title: Vec<u16> = config
+                .title
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
 
             let hwnd = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
@@ -93,13 +99,18 @@ impl WindowImpl {
                 None,
                 Some(hinstance),
                 None,
-            ).map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
+            )
+            .map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
 
             if config.visible {
                 let _ = ShowWindow(hwnd, SW_SHOW);
             }
 
-            Ok(Self { hwnd, hinstance, id })
+            Ok(Self {
+                hwnd,
+                hinstance,
+                id,
+            })
         }
     }
 
@@ -144,7 +155,9 @@ impl WindowImpl {
 }
 
 impl HasWindowHandle for WindowImpl {
-    fn window_handle(&self) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
         use std::num::NonZeroIsize;
         let handle = Win32WindowHandle::new(NonZeroIsize::new(self.hwnd.0 as isize).unwrap());
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
@@ -152,7 +165,9 @@ impl HasWindowHandle for WindowImpl {
 }
 
 impl HasDisplayHandle for WindowImpl {
-    fn display_handle(&self) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
         let handle = WindowsDisplayHandle::new();
         Ok(unsafe { DisplayHandle::borrow_raw(RawDisplayHandle::Windows(handle)) })
     }
@@ -196,11 +211,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_CLOSE => unsafe {
             let _ = DestroyWindow(hwnd);
             LRESULT(0)
-        }
+        },
         WM_DESTROY => unsafe {
             PostQuitMessage(0);
             LRESULT(0)
-        }
+        },
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
@@ -238,9 +253,8 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
             }
 
             // Dispatch any queued events
-            let events: Vec<Event> = EVENT_QUEUE.with(|queue| {
-                queue.borrow_mut().drain(..).collect()
-            });
+            let events: Vec<Event> =
+                EVENT_QUEUE.with(|queue| queue.borrow_mut().drain(..).collect());
 
             for event in events {
                 app.on_event(event, &mut control_flow);

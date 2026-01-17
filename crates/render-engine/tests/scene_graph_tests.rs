@@ -1,13 +1,16 @@
 //! Tests for scene graph data structures and operations.
 
-use render_engine::{Scene, SceneNode, NodeContent, Color, Transform2D};
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D};
 
 #[test]
 fn test_scene_has_root() {
     let scene = Scene::new();
     let root = scene.root();
 
-    assert!(scene.get_node(root).is_some(), "Scene should have a root node");
+    assert!(
+        scene.get_node(root).is_some(),
+        "Scene should have a root node"
+    );
 }
 
 #[test]
@@ -27,10 +30,7 @@ fn test_get_added_node() {
     let root = scene.root();
 
     let color = Color::RED;
-    let node_id = scene.add_node(
-        root,
-        SceneNode::new(NodeContent::Rect { color })
-    );
+    let node_id = scene.add_node(root, SceneNode::new(NodeContent::Rect { color }));
 
     let node = scene.get_node(node_id);
     assert!(node.is_some(), "Should be able to retrieve added node");
@@ -54,7 +54,7 @@ fn test_modify_node() {
 
     let node_id = scene.add_node(
         root,
-        SceneNode::new(NodeContent::Rect { color: Color::RED })
+        SceneNode::new(NodeContent::Rect { color: Color::RED }),
     );
 
     // Modify the node
@@ -116,13 +116,13 @@ fn test_dirty_tracking_on_add() {
     let mut scene = Scene::new();
     let root = scene.root();
 
-    let node_id = scene.add_node(
-        root,
-        SceneNode::new(NodeContent::Empty)
-    );
+    let node_id = scene.add_node(root, SceneNode::new(NodeContent::Empty));
 
     let dirty = scene.take_dirty();
-    assert!(dirty.contains(&node_id), "Newly added node should be marked dirty");
+    assert!(
+        dirty.contains(&node_id),
+        "Newly added node should be marked dirty"
+    );
 }
 
 #[test]
@@ -130,10 +130,7 @@ fn test_dirty_tracking_manual_mark() {
     let mut scene = Scene::new();
     let root = scene.root();
 
-    let node_id = scene.add_node(
-        root,
-        SceneNode::new(NodeContent::Empty)
-    );
+    let node_id = scene.add_node(root, SceneNode::new(NodeContent::Empty));
 
     // Clear dirty list
     scene.take_dirty();
@@ -142,7 +139,10 @@ fn test_dirty_tracking_manual_mark() {
     scene.mark_dirty(node_id);
 
     let dirty = scene.take_dirty();
-    assert!(dirty.contains(&node_id), "Manually marked node should be in dirty list");
+    assert!(
+        dirty.contains(&node_id),
+        "Manually marked node should be in dirty list"
+    );
 }
 
 #[test]

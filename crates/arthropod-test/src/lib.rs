@@ -10,10 +10,7 @@ pub fn init_test_tracing() {
     use tracing_subscriber::EnvFilter;
 
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env()
-                .add_directive(tracing::Level::DEBUG.into())
-        )
+        .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::DEBUG.into()))
         .with_target(true)
         .with_line_number(true)
         .with_test_writer()
@@ -57,22 +54,24 @@ impl RenderDocCapture {
     /// Start capturing a frame
     pub fn start_capture(&mut self) -> Result<()> {
         if let Some(ref mut rd) = self.rd
-            && !self.capturing {
-                rd.start_frame_capture(std::ptr::null(), std::ptr::null());
-                self.capturing = true;
-                tracing::info!("Started RenderDoc frame capture");
-            }
+            && !self.capturing
+        {
+            rd.start_frame_capture(std::ptr::null(), std::ptr::null());
+            self.capturing = true;
+            tracing::info!("Started RenderDoc frame capture");
+        }
         Ok(())
     }
 
     /// End capturing and save the frame
     pub fn end_capture(&mut self) -> Result<()> {
         if let Some(ref mut rd) = self.rd
-            && self.capturing {
-                rd.end_frame_capture(std::ptr::null(), std::ptr::null());
-                self.capturing = false;
-                tracing::info!("Ended RenderDoc frame capture");
-            }
+            && self.capturing
+        {
+            rd.end_frame_capture(std::ptr::null(), std::ptr::null());
+            self.capturing = false;
+            tracing::info!("Ended RenderDoc frame capture");
+        }
         Ok(())
     }
 

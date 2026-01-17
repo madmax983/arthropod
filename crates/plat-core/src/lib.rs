@@ -9,12 +9,12 @@
 //! - Windows (Win32)
 //! - macOS (Cocoa via objc2)
 
-mod window;
 mod input;
 mod platform;
+mod window;
 
-pub use window::*;
 pub use input::*;
+pub use window::*;
 
 use thiserror::Error;
 

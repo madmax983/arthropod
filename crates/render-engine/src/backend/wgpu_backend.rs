@@ -1,24 +1,24 @@
 //! wgpu rendering backend implementation.
 
-use crate::{Color, Scene, RendererError};
+use crate::{Color, RendererError, Scene};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use tracing::{Level, debug, error, info, instrument, span, warn};
 use wgpu;
-use tracing::{debug, error, info, warn, instrument, span, Level};
 
 /// Per-rectangle instance data (uploaded to GPU as vertex attributes)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct RectInstance {
-    pos: [f32; 2],      // Position (x, y)
-    size: [f32; 2],     // Size (width, height)
-    color: [f32; 4],    // Color (r, g, b, a)
+    pos: [f32; 2],   // Position (x, y)
+    size: [f32; 2],  // Size (width, height)
+    color: [f32; 4], // Color (r, g, b, a)
 }
 
 /// Global uniform data (shared across all rectangles)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Globals {
-    transform: [[f32; 4]; 4],  // 4x4 projection matrix
+    transform: [[f32; 4]; 4], // 4x4 projection matrix
 }
 
 /// wgpu-based rendering backend.
@@ -33,7 +33,7 @@ pub struct WgpuBackend {
     globals_buffer: wgpu::Buffer,
     globals_bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
-    vertex_buffer_capacity: usize,  // Number of instances
+    vertex_buffer_capacity: usize, // Number of instances
     clear_color: Color,
 }
 
@@ -147,19 +147,22 @@ impl WgpuBackend {
         surface.configure(&device, &config);
 
         // Create bind group layout for globals uniform
-        let globals_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Globals Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<Globals>() as u64),
-                },
-                count: None,
-            }],
-        });
+        let globals_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Globals Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<Globals>() as u64
+                        ),
+                    },
+                    count: None,
+                }],
+            });
 
         // Create projection matrix for screen space to NDC conversion
         // Screen space: (0, 0) top-left to (width, height) bottom-right
@@ -263,7 +266,7 @@ impl WgpuBackend {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,  // Disabled culling - negative Y projection flips winding
+                cull_mode: None, // Disabled culling - negative Y projection flips winding
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,
@@ -421,7 +424,8 @@ impl super::RenderBackend for WgpuBackend {
             };
 
             // Update globals buffer with new projection
-            self.queue.write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
+            self.queue
+                .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
         }
     }
 
