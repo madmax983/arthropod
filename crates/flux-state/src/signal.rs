@@ -60,7 +60,7 @@ impl<T: Clone + 'static> ReadSignal<T> {
     pub fn get(&self) -> T {
         self.runtime.track(self.id);
         self.runtime
-            .with_signal_value::<T, T, _>(self.id, |v: &dyn std::any::Any| {
+            .with_signal_value(self.id, |v: &dyn std::any::Any| {
                 v.downcast_ref::<RefCell<T>>()
                     .expect("Type mismatch")
                     .borrow()
@@ -71,7 +71,7 @@ impl<T: Clone + 'static> ReadSignal<T> {
     /// Get the current value without tracking.
     pub fn get_untracked(&self) -> T {
         self.runtime
-            .with_signal_value::<T, T, _>(self.id, |v: &dyn std::any::Any| {
+            .with_signal_value(self.id, |v: &dyn std::any::Any| {
                 v.downcast_ref::<RefCell<T>>()
                     .expect("Type mismatch")
                     .borrow()
@@ -83,7 +83,7 @@ impl<T: Clone + 'static> ReadSignal<T> {
 impl<T: 'static> WriteSignal<T> {
     /// Set a new value.
     pub fn set(&self, value: T) {
-        self.runtime.with_signal_value::<T, (), _>(self.id, |v: &dyn std::any::Any| {
+        self.runtime.with_signal_value(self.id, |v: &dyn std::any::Any| {
             *v.downcast_ref::<RefCell<T>>()
                 .expect("Type mismatch")
                 .borrow_mut() = value;
@@ -93,7 +93,7 @@ impl<T: 'static> WriteSignal<T> {
 
     /// Update the value with a function.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        self.runtime.with_signal_value::<T, (), _>(self.id, |v: &dyn std::any::Any| {
+        self.runtime.with_signal_value(self.id, |v: &dyn std::any::Any| {
             f(&mut v.downcast_ref::<RefCell<T>>()
                 .expect("Type mismatch")
                 .borrow_mut());

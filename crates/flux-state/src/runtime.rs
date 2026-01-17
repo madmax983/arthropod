@@ -134,11 +134,10 @@ impl Runtime {
                     inner.stale.insert(*sub);
 
                     // If it's an effect, schedule it
-                    if inner.effects.contains_key(sub) {
-                        if !inner.pending_effects.contains(sub) {
+                    if inner.effects.contains_key(sub)
+                        && !inner.pending_effects.contains(sub) {
                             inner.pending_effects.push(*sub);
                         }
-                    }
 
                     // We should recurse for computed values
                     inner.computeds.contains_key(sub)
@@ -195,7 +194,7 @@ impl Runtime {
         self.inner.borrow_mut().tracking_context = None;
     }
 
-    pub(crate) fn with_signal_value<T: 'static, R, F>(&self, id: NodeId, f: F) -> R
+    pub(crate) fn with_signal_value<R, F>(&self, id: NodeId, f: F) -> R
     where
         F: FnOnce(&dyn Any) -> R,
     {
@@ -248,7 +247,7 @@ impl Runtime {
         }
     }
 
-    pub(crate) fn with_computed_value<T: 'static, R, F>(&self, id: NodeId, f: F) -> R
+    pub(crate) fn with_computed_value<R, F>(&self, id: NodeId, f: F) -> R
     where
         F: FnOnce(&dyn Any) -> R,
     {

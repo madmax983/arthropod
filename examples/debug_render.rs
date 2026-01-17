@@ -8,6 +8,7 @@ use render_engine::{
 };
 
 struct DebugApp {
+    #[allow(dead_code)]
     window: Window,
     backend: WgpuBackend,
     renderdoc: RenderDocCapture,

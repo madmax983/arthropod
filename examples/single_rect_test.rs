@@ -5,6 +5,7 @@ use plat_core::{Application, ControlFlow, Event, EventLoop, Size, Window, Window
 use render_engine::backend::{RenderBackend, WgpuBackend};
 
 struct TestApp {
+    #[allow(dead_code)]
     window: Window,
     backend: WgpuBackend,
 }

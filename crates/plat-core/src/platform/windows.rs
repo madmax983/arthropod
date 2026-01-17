@@ -21,7 +21,7 @@ static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
 
 // Thread-local event queue for dispatching Win32 messages as Events
 thread_local! {
-    static EVENT_QUEUE: RefCell<Vec<Event>> = RefCell::new(Vec::new());
+    static EVENT_QUEUE: RefCell<Vec<Event>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Windows event loop implementation.

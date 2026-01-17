@@ -15,6 +15,12 @@ pub struct Scene {
     dirty_nodes: Vec<NodeId>,
 }
 
+impl Default for Scene {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scene {
     pub fn new() -> Self {
         let root_id = NodeId(0);

@@ -27,6 +27,12 @@ pub struct RenderDocCapture {
     capturing: bool,
 }
 
+impl Default for RenderDocCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RenderDocCapture {
     /// Try to initialize RenderDoc API
     pub fn new() -> Self {
@@ -50,25 +56,23 @@ impl RenderDocCapture {
 
     /// Start capturing a frame
     pub fn start_capture(&mut self) -> Result<()> {
-        if let Some(ref mut rd) = self.rd {
-            if !self.capturing {
+        if let Some(ref mut rd) = self.rd
+            && !self.capturing {
                 rd.start_frame_capture(std::ptr::null(), std::ptr::null());
                 self.capturing = true;
                 tracing::info!("Started RenderDoc frame capture");
             }
-        }
         Ok(())
     }
 
     /// End capturing and save the frame
     pub fn end_capture(&mut self) -> Result<()> {
-        if let Some(ref mut rd) = self.rd {
-            if self.capturing {
+        if let Some(ref mut rd) = self.rd
+            && self.capturing {
                 rd.end_frame_capture(std::ptr::null(), std::ptr::null());
                 self.capturing = false;
                 tracing::info!("Ended RenderDoc frame capture");
             }
-        }
         Ok(())
     }
 

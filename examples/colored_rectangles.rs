@@ -183,30 +183,27 @@ impl Application for DemoApp {
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
-        match event {
-            Event::Window { event, .. } => {
-                match event {
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit;
-                    }
-                    WindowEvent::Resized(new_size) => {
-                        println!("RESIZE EVENT: {}x{}", new_size.width, new_size.height);
-                        self.backend.resize(new_size.width, new_size.height);
-                        // Update window size signal to trigger hover recalculation
-                        self.window_size_write.set((new_size.width as f32, new_size.height as f32));
-                        self.window.request_redraw();
-                    }
-                    WindowEvent::CursorMoved { position } => {
-                        // Update mouse position signal (triggers color effects)
-                        println!("CursorMoved event: ({:.0}, {:.0})", position.x, position.y);
-                        self.mouse_pos.set((position.x as f32, position.y as f32));
-                        // Request redraw to show updated colors
-                        self.window.request_redraw();
-                    }
-                    _ => {}
+        if let Event::Window { event, .. } = event {
+            match event {
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit;
                 }
+                WindowEvent::Resized(new_size) => {
+                    println!("RESIZE EVENT: {}x{}", new_size.width, new_size.height);
+                    self.backend.resize(new_size.width, new_size.height);
+                    // Update window size signal to trigger hover recalculation
+                    self.window_size_write.set((new_size.width as f32, new_size.height as f32));
+                    self.window.request_redraw();
+                }
+                WindowEvent::CursorMoved { position } => {
+                    // Update mouse position signal (triggers color effects)
+                    println!("CursorMoved event: ({:.0}, {:.0})", position.x, position.y);
+                    self.mouse_pos.set((position.x as f32, position.y as f32));
+                    // Request redraw to show updated colors
+                    self.window.request_redraw();
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 

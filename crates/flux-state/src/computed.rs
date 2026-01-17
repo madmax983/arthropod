@@ -45,7 +45,7 @@ impl<T: Clone + 'static> Computed<T> {
         }
 
         self.runtime
-            .with_computed_value::<T, T, _>(self.id, |v: &dyn std::any::Any| {
+            .with_computed_value(self.id, |v: &dyn std::any::Any| {
                 v.downcast_ref::<RefCell<T>>()
                     .expect("Type mismatch")
                     .borrow()
