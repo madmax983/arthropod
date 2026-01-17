@@ -1,0 +1,80 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/plat-core",
+    "crates/render-engine",
+    "crates/anim-graph",
+    "crates/flux-state",
+    "crates/arthropod",
+    "crates/arthropod-test",
+]
+
+[package]
+name = "arthropod-examples"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Core dependencies
+raw-window-handle = "0.6"
+wgpu = "24.0"
+pollster = "0.4"
+log = "0.4"
+env_logger = "0.11"
+thiserror = "2.0"
+bytemuck = { version = "1.0", features = ["derive"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+# Math
+glam = { version = "0.29", features = ["bytemuck"] }
+
+# Windows platform
+[workspace.dependencies.windows]
+version = "0.59"
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+]
+
+# macOS platform
+[workspace.dependencies.objc2]
+version = "0.5"
+[workspace.dependencies.objc2-foundation]
+version = "0.2"
+[workspace.dependencies.objc2-app-kit]
+version = "0.2"
+
+# Examples live at workspace root
+[[example]]
+name = "colored_rectangles"
+path = "examples/colored_rectangles.rs"
+
+[[example]]
+name = "single_rect_test"
+path = "examples/single_rect_test.rs"
+
+[[example]]
+name = "debug_render"
+path = "examples/debug_render.rs"
+
+[dependencies]
+plat-core = { path = "crates/plat-core" }
+render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
+anim-graph = { path = "crates/anim-graph" }
+flux-state = { path = "crates/flux-state" }
+arthropod-test = { path = "crates/arthropod-test" }
+tracing.workspace = true
+tracing-subscriber.workspace = true

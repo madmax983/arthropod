@@ -1,0 +1,24 @@
+[package]
+name = "render-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rendering engine for Arthropod GUI framework"
+
+[dependencies]
+plat-core = { path = "../plat-core" }
+raw-window-handle.workspace = true
+wgpu.workspace = true
+pollster.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+glam.workspace = true
+
+[features]
+default = []
+renderdoc = ["dep:renderdoc"]
+
+[dependencies.renderdoc]
+version = "0.11"
+optional = true

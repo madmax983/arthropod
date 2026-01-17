@@ -1,0 +1,15 @@
+[package]
+name = "arthropod"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Enterprise-grade cross-platform Rust GUI framework"
+
+[dependencies]
+plat-core = { path = "../plat-core" }
+render-engine = { path = "../render-engine" }
+anim-graph = { path = "../anim-graph" }
+flux-state = { path = "../flux-state" }
+pollster.workspace = true
+log.workspace = true
+env_logger = "0.11"

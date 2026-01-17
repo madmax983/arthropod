@@ -1,0 +1,29 @@
+[package]
+name = "arthropod-test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Testing and debugging utilities for Arthropod"
+
+[dependencies]
+render-engine = { path = "../render-engine" }
+plat-core = { path = "../plat-core" }
+
+# GPU debugging
+wgpu.workspace = true
+renderdoc = "0.11"
+pollster.workspace = true
+
+# Image processing for visual regression tests
+image = "0.25"
+
+# Observability
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Testing
+anyhow = "1.0"
+
+[features]
+default = []
+headless = []  # For CI testing without a window

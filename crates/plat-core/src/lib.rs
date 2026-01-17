@@ -1,0 +1,80 @@
+//! Platform abstraction layer for Arthropod GUI framework.
+//!
+//! This crate provides cross-platform abstractions for:
+//! - Window management
+//! - Input handling (keyboard, mouse)
+//! - GPU surface creation via raw-window-handle
+//!
+//! # Platform Support
+//! - Windows (Win32)
+//! - macOS (Cocoa via objc2)
+
+mod window;
+mod input;
+mod platform;
+
+pub use window::*;
+pub use input::*;
+
+use thiserror::Error;
+
+/// Errors that can occur in plat-core operations.
+#[derive(Error, Debug)]
+pub enum PlatformError {
+    #[error("Failed to create window: {0}")]
+    WindowCreation(String),
+
+    #[error("Platform initialization failed: {0}")]
+    Initialization(String),
+
+    #[error("Event loop error: {0}")]
+    EventLoop(String),
+}
+
+/// Control flow for the event loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ControlFlow {
+    /// Continue running, polling for events.
+    #[default]
+    Poll,
+    /// Wait for events before continuing.
+    Wait,
+    /// Exit the application.
+    Exit,
+}
+
+/// Application trait that users implement.
+pub trait Application: Sized + 'static {
+    /// Called once when the application starts.
+    fn new(event_loop: &EventLoop) -> Self;
+
+    /// Called when an event occurs.
+    fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow);
+
+    /// Called when a redraw is requested for a window.
+    fn on_redraw(&mut self, window_id: WindowId);
+}
+
+/// The event loop - manages window lifecycle and event dispatch.
+pub struct EventLoop {
+    inner: platform::EventLoopImpl,
+}
+
+impl EventLoop {
+    /// Create a new event loop.
+    pub fn new() -> Result<Self, PlatformError> {
+        Ok(Self {
+            inner: platform::EventLoopImpl::new()?,
+        })
+    }
+
+    /// Create a new window.
+    pub fn create_window(&self, config: WindowConfig) -> Result<Window, PlatformError> {
+        self.inner.create_window(config)
+    }
+}
+
+/// Run the application - this is the main entry point.
+pub fn run<A: Application>() -> Result<(), PlatformError> {
+    platform::run::<A>()
+}
