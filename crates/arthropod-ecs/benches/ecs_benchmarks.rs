@@ -11,11 +11,15 @@ use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D};
 use std::rc::Rc;
 
 /// Create a test scene with N rectangles
-fn create_test_scene(n: usize) -> (Scene, FrameworkContext, Vec<Rc<Runtime>>) {
-    let mut scene = Scene::new();
+fn create_test_scene(n: usize) -> (FrameworkContext, Vec<Rc<Runtime>>) {
     let mut context = FrameworkContext::new();
-    let root = scene.root();
     let mut runtimes = Vec::new();
+
+    // Access Scene from World to add nodes
+    let root = {
+        let scene = context.world().resource::<Scene>();
+        scene.root()
+    };
 
     for i in 0..n {
         let runtime = Runtime::new();
@@ -36,7 +40,11 @@ fn create_test_scene(n: usize) -> (Scene, FrameworkContext, Vec<Rc<Runtime>>) {
             opacity: 1.0,
         };
 
-        let node_id = scene.add_node(root, rect_node);
+        let node_id = {
+            let mut scene = context.world_mut().resource_mut::<Scene>();
+            scene.add_node(root, rect_node)
+        };
+
         context
             .spawn(node_id)
             .insert(Renderable)
@@ -45,7 +53,7 @@ fn create_test_scene(n: usize) -> (Scene, FrameworkContext, Vec<Rc<Runtime>>) {
         runtimes.push(runtime);
     }
 
-    (scene, context, runtimes)
+    (context, runtimes)
 }
 
 /// Benchmark ECS update system (reactive signal polling)
@@ -56,10 +64,10 @@ fn benchmark_ecs_update(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-            let (mut scene, mut context, _runtimes) = create_test_scene(size);
+            let (mut context, _runtimes) = create_test_scene(size);
 
             b.iter(|| {
-                context.update(black_box(&mut scene));
+                context.update();
             });
         });
     }
@@ -75,10 +83,10 @@ fn benchmark_ecs_render(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-            let (scene, mut context, _runtimes) = create_test_scene(size);
+            let (mut context, _runtimes) = create_test_scene(size);
 
             b.iter(|| {
-                let instances = context.render(black_box(&scene));
+                let instances = context.render();
                 black_box(instances);
             });
         });
@@ -95,11 +103,11 @@ fn benchmark_full_frame(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-            let (mut scene, mut context, _runtimes) = create_test_scene(size);
+            let (mut context, _runtimes) = create_test_scene(size);
 
             b.iter(|| {
-                context.update(black_box(&mut scene));
-                let instances = context.render(black_box(&scene));
+                context.update();
+                let instances = context.render();
                 black_box(instances);
             });
         });
@@ -116,10 +124,16 @@ fn benchmark_scene_lookups(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
-            let (scene, _context, _runtimes) = create_test_scene(size);
-            let node_ids: Vec<_> = scene.nodes().map(|(id, _)| id).collect();
+            let (context, _runtimes) = create_test_scene(size);
+
+            // Collect node IDs from the scene
+            let node_ids: Vec<_> = {
+                let scene = context.world().resource::<Scene>();
+                scene.nodes().map(|(id, _)| id).collect()
+            };
 
             b.iter(|| {
+                let scene = context.world().resource::<Scene>();
                 for &node_id in &node_ids {
                     let _node = scene.get(black_box(node_id));
                     black_box(_node);
@@ -141,10 +155,14 @@ fn benchmark_entity_spawn(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter_batched(
                 || {
-                    let mut scene = Scene::new();
-                    let context = FrameworkContext::new();
-                    let root = scene.root();
+                    let mut context = FrameworkContext::new();
                     let runtime = Runtime::new();
+
+                    // Create scene nodes
+                    let root = {
+                        let scene = context.world().resource::<Scene>();
+                        scene.root()
+                    };
 
                     let mut node_ids = Vec::new();
                     for i in 0..size {
@@ -161,7 +179,12 @@ fn benchmark_entity_spawn(c: &mut Criterion) {
                             visible: true,
                             opacity: 1.0,
                         };
-                        let node_id = scene.add_node(root, rect_node);
+
+                        let node_id = {
+                            let mut scene = context.world_mut().resource_mut::<Scene>();
+                            scene.add_node(root, rect_node)
+                        };
+
                         node_ids.push(node_id);
                     }
 

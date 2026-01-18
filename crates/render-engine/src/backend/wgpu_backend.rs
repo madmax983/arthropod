@@ -1,5 +1,6 @@
 //! wgpu rendering backend implementation.
 
+use bevy_ecs::prelude::*;
 use crate::{Color, RendererError, Scene};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tracing::{Level, debug, error, info, instrument, span, warn};
@@ -22,6 +23,10 @@ struct Globals {
 }
 
 /// wgpu-based rendering backend.
+///
+/// Can be stored in ECS World as a Resource.
+/// The backend manages GPU resources and performs rendering operations.
+#[derive(Resource)]
 pub struct WgpuBackend {
     #[allow(dead_code)]
     instance: wgpu::Instance,

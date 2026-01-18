@@ -1,28 +1,13 @@
 //! Integration demo: Colored rectangles with reactive state + ECS
 //!
 //! Demonstrates:
-//! - Window creation with plat-core
-//! - Scene graph with render-engine (persistent, not rebuilt each frame)
-//! - wgpu rendering backend
+//! - arthropod::App builder for easy setup
+//! - Scene, Runtime, WgpuBackend managed automatically as ECS Resources
 //! - Reactive state with flux-state
 //! - ECS integration with arthropod-ecs
-//! - Reactive ECS components that automatically update scene nodes
+//! - Hover interactions with reactive color changes
 
-use arthropod_ecs::{FrameworkContext, ReactiveColor, Renderable};
-use flux_state::{Effect, Runtime, Signal, WriteSignal};
-use plat_core::{
-    Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
-};
-use render_engine::{
-    backend::{RenderBackend, WgpuBackend},
-    Color,
-    NodeContent,
-    NodeId,
-    Scene,
-    SceneNode,
-    Transform2D,
-};
-use std::rc::Rc;
+use arthropod::prelude::*;
 use std::time::{Duration, Instant};
 
 /// Performance statistics tracker
@@ -98,8 +83,16 @@ impl PerfStats {
                  self.min(&self.total_times),
                  self.max(&self.total_times));
         println!("║  Frame Rate:  {:>8.1} fps (avg)                        ║",
-                 1.0 / avg_total.as_secs_f64());
-        println!("╚══════════════════════════════════════════════════════╝\n");
+                 1.0 / avg_total.as_secs_f32());
+        println!("╚══════════════════════════════════════════════════════╝");
+    }
+
+    fn clear(&mut self) {
+        self.update_times.clear();
+        self.render_times.clear();
+        self.gpu_times.clear();
+        self.total_times.clear();
+        self.frame_count = 0;
     }
 
     fn avg(&self, times: &[Duration]) -> Duration {
@@ -116,14 +109,6 @@ impl PerfStats {
 
     fn max(&self, times: &[Duration]) -> Duration {
         times.iter().copied().max().unwrap_or(Duration::ZERO)
-    }
-
-    fn clear(&mut self) {
-        self.update_times.clear();
-        self.render_times.clear();
-        self.gpu_times.clear();
-        self.total_times.clear();
-        self.frame_count = 0;
     }
 }
 
@@ -150,19 +135,13 @@ impl RectData {
 }
 
 struct DemoApp {
-    window: Window,
-    backend: WgpuBackend,
+    // App encapsulates Window, WgpuBackend, Scene, Runtime, FrameworkContext
+    app: arthropod::App,
 
-    // ECS Integration
-    scene: Scene,
-    context: FrameworkContext,
-    node_ids: Vec<NodeId>, // NodeIds for updating bounds on resize
+    // NodeIds for updating bounds on resize
+    node_ids: Vec<NodeId>,
 
-    // Runtime must be kept alive for signals to work
-    #[allow(dead_code)]
-    runtime: Rc<Runtime>,
-
-    // State
+    // State signals
     mouse_pos: WriteSignal<(f32, f32)>,
     window_size_write: WriteSignal<(f32, f32)>,
 
@@ -179,7 +158,7 @@ struct DemoApp {
 
 impl Application for DemoApp {
     fn new(event_loop: &EventLoop) -> Self {
-        // Create window
+        // Create window config
         let config = WindowConfig {
             title: "Arthropod Phase 1 Demo - Hover Interactive Rectangles".to_string(),
             size: Size {
@@ -192,17 +171,16 @@ impl Application for DemoApp {
             ..Default::default()
         };
 
-        let window = event_loop
-            .create_window(config)
-            .expect("Failed to create window");
-        let size = window.inner_size();
+        // Create app with App builder - handles Window, WgpuBackend, Scene, Runtime automatically!
+        let mut app = arthropod::AppBuilder::new()
+            .with_window_config(config)
+            .build(event_loop)
+            .expect("Failed to create app");
 
-        // Create wgpu backend
-        let backend = WgpuBackend::new(&window, size.width, size.height)
-            .expect("Failed to create wgpu backend");
+        let size = app.window().unwrap().inner_size();
 
-        // Create reactive runtime
-        let runtime = Runtime::new();
+        // Access Runtime from app
+        let runtime = app.runtime().clone();
 
         // Mouse position signal
         let mouse_signal = Signal::new(runtime.clone(), (0.0f32, 0.0f32));
@@ -249,10 +227,11 @@ impl Application for DemoApp {
             },
         ];
 
-        // Create persistent Scene and ECS FrameworkContext
-        let mut scene = Scene::new();
-        let mut context = FrameworkContext::new();
-        let root = scene.root();
+        // Access Scene from ECS World (Scene is a Resource now!)
+        let root = {
+            let scene = app.world().resource::<Scene>();
+            scene.root()
+        };
 
         // Create scene nodes and ECS entities for each rectangle
         let mut node_ids = Vec::new();
@@ -276,13 +255,16 @@ impl Application for DemoApp {
                 opacity: 1.0,
             };
 
-            // Add node to scene
-            let node_id = scene.add_node(root, rect_node);
+            // Add node to scene (access Scene as Resource)
+            let node_id = {
+                let mut scene = app.world_mut().resource_mut::<Scene>();
+                scene.add_node(root, rect_node)
+            };
+
             node_ids.push(node_id);
 
             // Spawn ECS entity with ReactiveColor component
-            context
-                .spawn(node_id)
+            app.spawn(node_id)
                 .insert(Renderable)
                 .insert(ReactiveColor::new(read));
 
@@ -295,52 +277,48 @@ impl Application for DemoApp {
             let hover_color = rect.hover_color;
             let mouse = read_mouse.clone();
             let window_size = read_window_size.clone();
-            let rect_index = node_ids.len() - 1; // For debug logging
 
             let effect = Effect::new(runtime.clone(), move || {
-                let (mx, my) = mouse.get();
+                let (mouse_x, mouse_y) = mouse.get();
                 let (win_w, win_h) = window_size.get();
 
-                // Calculate bounds for current window size
-                let bounds_x = x_ratio * win_w;
-                let bounds_y = y_ratio * win_h;
-                let bounds_width = width_ratio * win_w;
-                let bounds_height = height_ratio * win_h;
+                // Calculate rectangle bounds
+                let rx = x_ratio * win_w;
+                let ry = y_ratio * win_h;
+                let rw = width_ratio * win_w;
+                let rh = height_ratio * win_h;
 
-                let is_hovering = mx >= bounds_x
-                    && mx <= bounds_x + bounds_width
-                    && my >= bounds_y
-                    && my <= bounds_y + bounds_height;
+                // Check if mouse is hovering
+                let is_hovering = mouse_x >= rx
+                    && mouse_x <= rx + rw
+                    && mouse_y >= ry
+                    && mouse_y <= ry + rh;
 
-                println!(
-                    "Rect {} - Mouse: ({:.0}, {:.0}), Bounds: ({:.0}, {:.0}, {:.0}x{:.0}), Window: ({:.0}x{:.0}), Hovering: {}",
-                    rect_index,
-                    mx,
-                    my,
-                    bounds_x,
-                    bounds_y,
-                    bounds_width,
-                    bounds_height,
-                    win_w,
-                    win_h,
-                    is_hovering
-                );
-
+                // Update color based on hover state
                 let new_color = if is_hovering { hover_color } else { base_color };
-                // Update the signal - ECS system will propagate to scene node
                 write.set(new_color);
             });
 
             hover_effects.push(effect);
         }
 
+        println!("╔══════════════════════════════════════════════════════╗");
+        println!("║      Arthropod Phase 1 Demo - Interactive Rects     ║");
+        println!("╠══════════════════════════════════════════════════════╣");
+        println!("║  Move mouse over rectangles to see them light up!   ║");
+        println!("║  Performance stats shown every 2 seconds             ║");
+        println!("║                                                      ║");
+        println!("║  Architecture:                                       ║");
+        println!("║  ✓ arthropod::App builder (clean API!)              ║");
+        println!("║  ✓ Scene graph as ECS Resource                      ║");
+        println!("║  ✓ Reactive state (flux-state)                      ║");
+        println!("║  ✓ ECS systems (bevy_ecs)                           ║");
+        println!("║  ✓ GPU rendering (wgpu)                             ║");
+        println!("╚══════════════════════════════════════════════════════╝\n");
+
         Self {
-            window,
-            backend,
-            scene,
-            context,
+            app,
             node_ids,
-            runtime,
             mouse_pos: write_mouse,
             window_size_write: write_window_size,
             rects,
@@ -350,114 +328,74 @@ impl Application for DemoApp {
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
-        if let Event::Window { event, .. } = event {
-            match event {
+        match event {
+            Event::Window { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
                 }
                 WindowEvent::Resized(new_size) => {
-                    println!("RESIZE EVENT: {}x{}", new_size.width, new_size.height);
-                    self.backend.resize(new_size.width, new_size.height);
-
-                    // Update window size signal to trigger hover recalculation
+                    // Update window size signal (triggers effects)
                     self.window_size_write
                         .set((new_size.width as f32, new_size.height as f32));
 
-                    // Update scene node bounds for new window size
+                    // Resize GPU backend
+                    self.app.resize(new_size.width, new_size.height);
+
+                    // Update scene node bounds (access Scene as Resource)
+                    let mut scene = self.app.world_mut().resource_mut::<Scene>();
                     for (i, node_id) in self.node_ids.iter().enumerate() {
-                        let bounds = self.rects[i]
-                            .bounds_for_size(new_size.width as f32, new_size.height as f32);
-                        if let Some(node) = self.scene.get_node_mut(*node_id) {
-                            node.bounds = bounds;
+                        if let Some(node) = scene.get_mut(*node_id) {
+                            let rect = &self.rects[i];
+                            node.bounds = rect.bounds_for_size(
+                                new_size.width as f32,
+                                new_size.height as f32,
+                            );
                         }
                     }
-
-                    self.window.request_redraw();
                 }
                 WindowEvent::CursorMoved { position } => {
-                    // Update mouse position signal (triggers color effects)
-                    println!("CursorMoved event: ({:.0}, {:.0})", position.x, position.y);
+                    // Update mouse position signal (triggers effects)
                     self.mouse_pos.set((position.x as f32, position.y as f32));
-                    // Request redraw to show updated colors
-                    self.window.request_redraw();
+
+                    // Request redraw to update visuals
+                    if let Some(window) = self.app.window() {
+                        window.request_redraw();
+                    }
                 }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
 
-    fn on_redraw(&mut self, _window_id: plat_core::WindowId) {
+    fn on_redraw(&mut self, _window_id: WindowId) {
         let frame_start = Instant::now();
 
-        // Update ECS systems - this will poll all ReactiveColor signals
-        // and update the scene node colors automatically
+        // Run ECS update systems (reactive signals, animations, etc.)
         let update_start = Instant::now();
-        self.context.update(&mut self.scene);
+        self.app.update();
         let update_time = update_start.elapsed();
 
-        // Collect renderables from ECS - generates RectInstances
+        // Run ECS render systems (collect instances)
         let render_start = Instant::now();
-        let instances = self.context.render(&self.scene);
         let render_time = render_start.elapsed();
 
-        // Render instances directly using ECS-friendly API
+        // Render to GPU
         let gpu_start = Instant::now();
-        if let Err(e) = self.backend.render_instances(&instances) {
+        if let Err(e) = self.app.render_to_gpu() {
             eprintln!("Render error: {}", e);
         }
         let gpu_time = gpu_start.elapsed();
 
         let total_time = frame_start.elapsed();
 
-        // Record performance statistics
+        // Record performance stats
         self.perf_stats
             .record_frame(update_time, render_time, gpu_time, total_time);
     }
 }
 
 fn main() {
-    // Initialize tracing with pretty formatting and filtering
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .with_target(true)
-        .with_thread_ids(false)
-        .with_line_number(true)
-        .init();
-
-    println!("Arthropod ECS Integration Demo");
-    println!("================================");
-    println!();
-    println!("This demo showcases:");
-    println!("  ✓ Window creation (plat-core)");
-    println!("  ✓ Persistent Scene graph (render-engine)");
-    println!("  ✓ ECS integration (arthropod-ecs with bevy_ecs)");
-    println!("  ✓ Reactive ECS components (ReactiveColor)");
-    println!("  ✓ wgpu rendering backend with ECS-generated instances");
-    println!("  ✓ Reactive state management (flux-state)");
-    println!("  ✓ Mouse input handling");
-    println!("  ✓ Hover interactions with automatic color updates");
-    println!("  ✓ Performance instrumentation & benchmarking");
-    println!();
-    println!("You should see 4 colored rectangles:");
-    println!("  - Red (top-left)");
-    println!("  - Green (top-right)");
-    println!("  - Blue (bottom-left)");
-    println!("  - Yellow (bottom-right)");
-    println!();
-    println!("HOVER OVER THE RECTANGLES to see them change color!");
-    println!("(Colors update via ECS ReactiveColor components)");
-    println!();
-    println!("Performance stats will be reported every 2 seconds showing:");
-    println!("  - ECS Update time (reactive signal polling)");
-    println!("  - ECS Render time (instance collection)");
-    println!("  - GPU Render time (wgpu rendering)");
-    println!("  - Total frame time and FPS");
-    println!();
-    println!("Set RUST_LOG=debug for detailed logs");
-    println!();
-
+    env_logger::init();
     plat_core::run::<DemoApp>().expect("Failed to run application");
 }

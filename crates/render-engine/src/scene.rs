@@ -1,6 +1,7 @@
 //! Scene graph data structures.
 
 use crate::SceneNode;
+use bevy_ecs::prelude::*;
 use std::collections::HashMap;
 
 /// Unique identifier for scene nodes.
@@ -8,6 +9,10 @@ use std::collections::HashMap;
 pub struct NodeId(pub u64);
 
 /// The scene graph - owns all nodes.
+///
+/// Scene can now be stored as an ECS Resource, eliminating the need for
+/// unsafe pointer juggling. Systems access Scene via Res<Scene> and ResMut<Scene>.
+#[derive(Resource)]
 pub struct Scene {
     nodes: HashMap<NodeId, SceneNode>,
     root: NodeId,

@@ -9,6 +9,9 @@ use std::collections::{HashMap, HashSet};
 pub struct NodeId(pub u64);
 
 /// The reactive runtime - manages the dependency graph.
+///
+/// Stored as `Rc<Runtime>` and shared between signals and effects.
+/// NOT a bevy_ecs Resource (uses RefCell, which is !Sync).
 pub struct Runtime {
     inner: RefCell<RuntimeInner>,
 }

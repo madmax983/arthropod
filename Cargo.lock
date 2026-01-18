@@ -3,6 +3,18 @@
 version = 4
 
 [[package]]
+name = "a11y-engine"
+version = "0.1.0"
+dependencies = [
+ "bevy_ecs",
+ "criterion",
+ "log",
+ "plat-core",
+ "render-engine",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,19 +173,24 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 name = "arthropod"
 version = "0.1.0"
 dependencies = [
+ "a11y-engine",
  "anim-graph",
+ "arthropod-ecs",
+ "bevy_ecs",
  "env_logger",
  "flux-state",
  "log",
  "plat-core",
  "pollster",
  "render-engine",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "arthropod-ecs"
 version = "0.1.0"
 dependencies = [
+ "a11y-engine",
  "bevy_ecs",
  "criterion",
  "flux-state",
@@ -186,8 +203,10 @@ name = "arthropod-examples"
 version = "0.1.0"
 dependencies = [
  "anim-graph",
+ "arthropod",
  "arthropod-ecs",
  "arthropod-test",
+ "env_logger",
  "flux-state",
  "plat-core",
  "render-engine",
@@ -2209,6 +2228,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 name = "render-engine"
 version = "0.1.0"
 dependencies = [
+ "bevy_ecs",
  "bytemuck",
  "glam",
  "plat-core",

@@ -1,18 +1,11 @@
 //! Debug rendering with RenderDoc capture and frame inspection
 
+use arthropod::prelude::*;
 use arthropod_test::{RenderDocCapture, init_test_tracing};
-use plat_core::{
-    Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
-};
-use render_engine::{
-    Color, NodeContent, Scene, SceneNode, Transform2D,
-    backend::{RenderBackend, WgpuBackend},
-};
 
 struct DebugApp {
-    #[allow(dead_code)]
-    window: Window,
-    backend: WgpuBackend,
+    app: arthropod::App,
+    node_id: NodeId,
     renderdoc: RenderDocCapture,
     frame_count: u32,
     captured: bool,
@@ -44,10 +37,36 @@ impl Application for DebugApp {
             ..Default::default()
         };
 
-        let window = event_loop
-            .create_window(config)
-            .expect("Failed to create window");
-        let backend = WgpuBackend::new(&window, 800, 600).expect("Failed to create backend");
+        // Create app with App builder
+        let mut app = arthropod::AppBuilder::new()
+            .with_window_config(config)
+            .build(event_loop)
+            .expect("Failed to create app");
+
+        // Set up test scene once (Scene is now a Resource in ECS)
+        let node_id = {
+            let mut scene = app.world_mut().resource_mut::<Scene>();
+            let root = scene.root();
+
+            let test_rect = SceneNode {
+                content: NodeContent::Rect { color: Color::RED },
+                transform: Transform2D::identity(),
+                bounds: Rect {
+                    x: 100.0,
+                    y: 100.0,
+                    width: 200.0,
+                    height: 200.0,
+                },
+                children: vec![],
+                visible: true,
+                opacity: 1.0,
+            };
+
+            scene.add_node(root, test_rect)
+        };
+
+        // Spawn entity with Renderable component
+        app.spawn(node_id).insert(Renderable);
 
         println!("\nTest configuration:");
         println!("  Window size: 800x600");
@@ -57,8 +76,8 @@ impl Application for DebugApp {
         println!("Actual: Check RenderDoc capture to see GPU output\n");
 
         Self {
-            window,
-            backend,
+            app,
+            node_id,
             renderdoc,
             frame_count: 0,
             captured: false,
@@ -75,28 +94,12 @@ impl Application for DebugApp {
         }
     }
 
-    fn on_redraw(&mut self, _window_id: plat_core::WindowId) {
-        // Create test scene
-        let mut scene = Scene::new();
-        let root = scene.root();
+    fn on_redraw(&mut self, _window_id: WindowId) {
+        // Update ECS systems
+        self.app.update();
 
-        let test_rect = SceneNode {
-            content: NodeContent::Rect { color: Color::RED },
-            transform: Transform2D::identity(),
-            bounds: Rect {
-                x: 100.0,
-                y: 100.0,
-                width: 200.0,
-                height: 200.0,
-            },
-            children: vec![],
-            visible: true,
-            opacity: 1.0,
-        };
-
-        scene.add_node(root, test_rect);
-
-        if let Err(e) = self.backend.render(&scene) {
+        // Render to GPU
+        if let Err(e) = self.app.render_to_gpu() {
             eprintln!("Render error: {}", e);
         }
 

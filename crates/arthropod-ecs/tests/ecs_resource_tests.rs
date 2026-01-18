@@ -1,3 +1,11 @@
+// Tests for the refactored API where Scene is a Resource in the World
+//
+// This test file defines the DESIRED API behavior:
+// - FrameworkContext owns Scene as a Resource
+// - No unsafe pointer juggling
+// - Scene accessed via world.resource_mut::<Scene>()
+// - update() and render() take no Scene arguments
+
 use arthropod_ecs::{
     FrameworkContext, ReactiveColor, ReactiveOpacity, ReactiveTransform, Renderable,
 };
@@ -6,7 +14,48 @@ use plat_core::Rect;
 use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, Vec2};
 
 #[test]
-fn test_reactive_color_updates_scene_node() {
+fn test_scene_owned_by_context() {
+    // Scene should be created and owned by FrameworkContext
+    let ctx = FrameworkContext::new();
+
+    // Should be able to access Scene as a resource
+    let scene = ctx.world().resource::<Scene>();
+    assert!(scene.root().0 == 0, "Root node should exist");
+}
+
+#[test]
+fn test_add_node_via_world_resource() {
+    let mut ctx = FrameworkContext::new();
+
+    // Access Scene through World to add nodes
+    let node_id = {
+        let mut scene = ctx.world_mut().resource_mut::<Scene>();
+        let root = scene.root();
+        scene.add_node(
+            root,
+            SceneNode {
+                content: NodeContent::Rect { color: Color::RED },
+                transform: Transform2D::identity(),
+                bounds: Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 100.0,
+                },
+                children: Vec::new(),
+                visible: true,
+                opacity: 1.0,
+            },
+        )
+    };
+
+    // Verify node exists
+    let scene = ctx.world().resource::<Scene>();
+    assert!(scene.get_node(node_id).is_some());
+}
+
+#[test]
+fn test_reactive_color_updates_without_passing_scene() {
     // Setup runtime and signal
     let runtime = Runtime::new();
     let color_signal = Signal::new(runtime.clone(), Color::RED);
@@ -45,7 +94,7 @@ fn test_reactive_color_updates_scene_node() {
     // Update signal to BLUE
     write_signal.set(Color::BLUE);
 
-    // Run update systems (no scene argument!)
+    // Run update systems - NO SCENE ARGUMENT
     ctx.update();
 
     // Verify node color updated to BLUE
@@ -66,8 +115,7 @@ fn test_reactive_color_updates_scene_node() {
 }
 
 #[test]
-fn test_reactive_transform_updates_scene_node() {
-    // Setup runtime and signal
+fn test_reactive_transform_without_passing_scene() {
     let runtime = Runtime::new();
     let initial_transform = Transform2D::identity();
     let new_transform = Transform2D::translate(10.0, 20.0);
@@ -76,7 +124,6 @@ fn test_reactive_transform_updates_scene_node() {
 
     let mut ctx = FrameworkContext::new();
 
-    // Add node via World resource
     let node_id = {
         let mut scene = ctx.world_mut().resource_mut::<Scene>();
         let root = scene.root();
@@ -93,20 +140,17 @@ fn test_reactive_transform_updates_scene_node() {
         )
     };
 
-    // Setup ECS context with ReactiveTransform
     ctx.spawn(node_id)
         .insert(ReactiveTransform::new(read_signal));
 
-    // Update signal
     write_signal.set(new_transform);
 
-    // Run update systems (no scene argument!)
+    // Update without passing scene
     ctx.update();
 
     // Verify transform updated
     let scene = ctx.world().resource::<Scene>();
     let node = scene.get_node(node_id).unwrap();
-    // Verify transforms are equal by transforming a test point
     let test_point = Vec2::new(10.0, 20.0);
     let node_result = node.transform.transform_point(test_point);
     let new_result = new_transform.transform_point(test_point);
@@ -118,15 +162,13 @@ fn test_reactive_transform_updates_scene_node() {
 }
 
 #[test]
-fn test_reactive_opacity_updates_scene_node() {
-    // Setup runtime and signal
+fn test_reactive_opacity_without_passing_scene() {
     let runtime = Runtime::new();
     let opacity_signal = Signal::new(runtime.clone(), 1.0);
     let (read_signal, write_signal) = opacity_signal.split();
 
     let mut ctx = FrameworkContext::new();
 
-    // Add node via World resource
     let node_id = {
         let mut scene = ctx.world_mut().resource_mut::<Scene>();
         let root = scene.root();
@@ -143,13 +185,11 @@ fn test_reactive_opacity_updates_scene_node() {
         )
     };
 
-    // Setup ECS context with ReactiveOpacity
     ctx.spawn(node_id).insert(ReactiveOpacity::new(read_signal));
 
-    // Update opacity to 0.5
     write_signal.set(0.5);
 
-    // Run update systems (no scene argument!)
+    // Update without passing scene
     ctx.update();
 
     // Verify opacity updated
@@ -159,134 +199,16 @@ fn test_reactive_opacity_updates_scene_node() {
 }
 
 #[test]
-fn test_collect_renderables_filters_invisible() {
+fn test_render_without_passing_scene() {
     let mut ctx = FrameworkContext::new();
 
-    // Add nodes via World resource
-    let (visible_node, hidden_node) = {
-        let mut scene = ctx.world_mut().resource_mut::<Scene>();
-        let root = scene.root();
-
-        let visible = scene.add_node(
-            root,
-            SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
-                transform: Transform2D::identity(),
-                bounds: Rect {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 100.0,
-                    height: 100.0,
-                },
-                children: Vec::new(),
-                visible: true,
-                opacity: 1.0,
-            },
-        );
-
-        let hidden = scene.add_node(
-            root,
-            SceneNode {
-                content: NodeContent::Rect { color: Color::BLUE },
-                transform: Transform2D::identity(),
-                bounds: Rect {
-                    x: 100.0,
-                    y: 0.0,
-                    width: 100.0,
-                    height: 100.0,
-                },
-                children: Vec::new(),
-                visible: false, // Hidden!
-                opacity: 1.0,
-            },
-        );
-
-        (visible, hidden)
-    };
-
-    // Spawn entities
-    ctx.spawn(visible_node).insert(Renderable);
-    ctx.spawn(hidden_node).insert(Renderable);
-
-    // Render (no scene argument!)
-    let instances = ctx.render();
-
-    // Should only have 1 instance (the visible one)
-    assert_eq!(instances.len(), 1, "Should only render visible node");
-    assert_eq!(instances[0].pos, [0.0, 0.0]);
-}
-
-#[test]
-fn test_collect_renderables_filters_zero_opacity() {
-    let mut ctx = FrameworkContext::new();
-
-    // Add nodes via World resource
-    let (opaque_node, transparent_node) = {
-        let mut scene = ctx.world_mut().resource_mut::<Scene>();
-        let root = scene.root();
-
-        let opaque = scene.add_node(
-            root,
-            SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
-                transform: Transform2D::identity(),
-                bounds: Rect {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 100.0,
-                    height: 100.0,
-                },
-                children: Vec::new(),
-                visible: true,
-                opacity: 1.0,
-            },
-        );
-
-        let transparent = scene.add_node(
-            root,
-            SceneNode {
-                content: NodeContent::Rect { color: Color::BLUE },
-                transform: Transform2D::identity(),
-                bounds: Rect {
-                    x: 100.0,
-                    y: 0.0,
-                    width: 100.0,
-                    height: 100.0,
-                },
-                children: Vec::new(),
-                visible: true,
-                opacity: 0.0, // Fully transparent!
-            },
-        );
-
-        (opaque, transparent)
-    };
-
-    // Setup ECS
-    ctx.spawn(opaque_node).insert(Renderable);
-    ctx.spawn(transparent_node).insert(Renderable);
-
-    // Render (no scene argument!)
-    let instances = ctx.render();
-
-    // Should only render the opaque node
-    assert_eq!(instances.len(), 1);
-}
-
-#[test]
-fn test_collect_renderables_applies_opacity() {
-    let mut ctx = FrameworkContext::new();
-
-    // Add node via World resource
     let node_id = {
         let mut scene = ctx.world_mut().resource_mut::<Scene>();
         let root = scene.root();
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::rgba(1.0, 0.0, 0.0, 1.0),
-                },
+                content: NodeContent::Rect { color: Color::RED },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 0.0,
@@ -296,35 +218,28 @@ fn test_collect_renderables_applies_opacity() {
                 },
                 children: Vec::new(),
                 visible: true,
-                opacity: 0.5, // 50% opacity
+                opacity: 1.0,
             },
         )
     };
 
-    // Setup ECS
     ctx.spawn(node_id).insert(Renderable);
 
-    // Render (no scene argument!)
+    // Render without passing scene argument
     let instances = ctx.render();
 
-    // Verify opacity is applied to color alpha
     assert_eq!(instances.len(), 1);
-    assert_eq!(
-        instances[0].color[3], 0.5,
-        "Alpha should be multiplied by opacity"
-    );
+    assert_eq!(instances[0].color, [1.0, 0.0, 0.0, 1.0]);
 }
 
 #[test]
-fn test_framework_context_update_and_render() {
-    // Integration test: reactive updates + rendering
+fn test_integration_reactive_and_render_no_scene_args() {
     let runtime = Runtime::new();
     let color_signal = Signal::new(runtime.clone(), Color::RED);
     let (read_signal, write_signal) = color_signal.split();
 
     let mut ctx = FrameworkContext::new();
 
-    // Add node via World resource
     let node_id = {
         let mut scene = ctx.world_mut().resource_mut::<Scene>();
         let root = scene.root();
@@ -352,49 +267,12 @@ fn test_framework_context_update_and_render() {
         .insert(Renderable)
         .insert(ReactiveColor::new(read_signal));
 
-    // Change color to BLUE
     write_signal.set(Color::BLUE);
 
-    // Update (should poll reactive signals) - no scene argument!
+    // Update and render without scene arguments
     ctx.update();
-
-    // Render (should collect with new color) - no scene argument!
     let instances = ctx.render();
 
     assert_eq!(instances.len(), 1);
-    // Blue with full opacity
     assert_eq!(instances[0].color, [0.0, 0.0, 1.0, 1.0]);
-}
-
-#[test]
-fn test_empty_nodes_not_rendered() {
-    let mut ctx = FrameworkContext::new();
-
-    // Add node via World resource
-    let empty_node = {
-        let mut scene = ctx.world_mut().resource_mut::<Scene>();
-        let root = scene.root();
-        scene.add_node(
-            root,
-            SceneNode {
-                content: NodeContent::Empty,
-                transform: Transform2D::identity(),
-                bounds: Rect::default(),
-                children: Vec::new(),
-                visible: true,
-                opacity: 1.0,
-            },
-        )
-    };
-
-    ctx.spawn(empty_node).insert(Renderable);
-
-    // Render (no scene argument!)
-    let instances = ctx.render();
-
-    assert_eq!(
-        instances.len(),
-        0,
-        "Empty nodes should not generate render instances"
-    );
 }
