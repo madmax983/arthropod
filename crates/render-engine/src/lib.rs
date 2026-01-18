@@ -6,6 +6,21 @@ pub mod backend;
 mod node;
 mod scene;
 
+#[cfg(test)]
+mod math_migration_tests;
+
+// Re-export glam types for math operations
+pub use glam::{Affine2, Vec2, Vec3, Vec4};
+
+// Type aliases for transitional API (will become newtype wrappers later)
+/// RGBA color represented as a 4-component vector (r, g, b, a).
+/// Currently uses glam::Vec4 for SIMD performance.
+pub type GlamColor = Vec4;
+
+/// 2D affine transformation matrix.
+/// Currently uses glam::Affine2 for SIMD performance.
+pub type GlamTransform = Affine2;
+
 pub use node::*;
 pub use scene::*;
 
