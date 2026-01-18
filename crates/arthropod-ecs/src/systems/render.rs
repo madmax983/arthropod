@@ -82,10 +82,10 @@ pub fn collect_renderables_system(
                         pos: [node.bounds.x, node.bounds.y],
                         size: [node.bounds.width, node.bounds.height],
                         color: [
-                            color.r,
-                            color.g,
-                            color.b,
-                            color.a * node.opacity, // Apply opacity
+                            color.r(),
+                            color.g(),
+                            color.b(),
+                            color.a() * node.opacity, // Apply opacity
                         ],
                     });
                 }

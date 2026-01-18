@@ -53,42 +53,49 @@ pub enum NodeContent {
     RoundedRect { color: Color, corner_radius: f32 },
 }
 
-/// RGBA color - will be migrated to glam::Vec4 internally.
-/// For now, keeping public fields for backwards compatibility.
+/// RGBA color backed by glam::Vec4 for SIMD performance.
 #[derive(Debug, Clone, Copy)]
-pub struct Color {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
+pub struct Color(pub glam::Vec4);
 
 impl Color {
+    #[inline]
     pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self { r, g, b, a }
+        Self(glam::Vec4::from_array([r, g, b, a]))
     }
 
-    /// Convert to glam::Vec4 for SIMD operations.
+    #[inline]
+    pub fn r(&self) -> f32 {
+        self.0.x
+    }
+
+    #[inline]
+    pub fn g(&self) -> f32 {
+        self.0.y
+    }
+
+    #[inline]
+    pub fn b(&self) -> f32 {
+        self.0.z
+    }
+
+    #[inline]
+    pub fn a(&self) -> f32 {
+        self.0.w
+    }
+
     #[inline]
     pub fn as_vec4(&self) -> glam::Vec4 {
-        glam::Vec4::new(self.r, self.g, self.b, self.a)
+        self.0
     }
 
-    /// Create from glam::Vec4.
     #[inline]
     pub fn from_vec4(v: glam::Vec4) -> Self {
-        Self {
-            r: v.x,
-            g: v.y,
-            b: v.z,
-            a: v.w,
-        }
+        Self(v)
     }
 
-    /// Convert to array [r, g, b, a].
     #[inline]
     pub fn to_array(&self) -> [f32; 4] {
-        [self.r, self.g, self.b, self.a]
+        self.0.to_array()
     }
 
     pub const RED: Self = Self::rgba(1.0, 0.0, 0.0, 1.0);
@@ -98,56 +105,53 @@ impl Color {
     pub const BLACK: Self = Self::rgba(0.0, 0.0, 0.0, 1.0);
 }
 
-/// 2D affine transform - will be migrated to glam::Affine2 internally.
-/// For now, keeping current representation for backwards compatibility.
+/// 2D affine transform backed by glam::Affine2 for SIMD performance.
 #[derive(Debug, Clone, Copy)]
-pub struct Transform2D {
-    pub matrix: [[f32; 3]; 2],
-}
+pub struct Transform2D(pub glam::Affine2);
 
 impl Transform2D {
-    pub const IDENTITY: Self = Self {
-        matrix: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
-    };
+    pub const IDENTITY: Self = Self(glam::Affine2::IDENTITY);
 
+    #[inline]
     pub fn identity() -> Self {
         Self::IDENTITY
     }
 
+    #[inline]
     pub fn translate(x: f32, y: f32) -> Self {
-        Self {
-            matrix: [[1.0, 0.0, x], [0.0, 1.0, y]],
-        }
+        Self(glam::Affine2::from_translation(glam::Vec2::new(x, y)))
     }
 
+    #[inline]
     pub fn scale(sx: f32, sy: f32) -> Self {
-        Self {
-            matrix: [[sx, 0.0, 0.0], [0.0, sy, 0.0]],
-        }
+        Self(glam::Affine2::from_scale(glam::Vec2::new(sx, sy)))
     }
 
-    /// Convert to glam::Affine2 for SIMD operations.
     #[inline]
     pub fn as_affine2(&self) -> glam::Affine2 {
-        // Our matrix is [[m11, m12, m13], [m21, m22, m23]]
-        // glam::Affine2::from_cols expects (x_axis, y_axis, translation)
-        glam::Affine2::from_cols(
-            glam::Vec2::new(self.matrix[0][0], self.matrix[1][0]), // x_axis (m11, m21)
-            glam::Vec2::new(self.matrix[0][1], self.matrix[1][1]), // y_axis (m12, m22)
-            glam::Vec2::new(self.matrix[0][2], self.matrix[1][2]), // translation (m13, m23)
-        )
+        self.0
     }
 
-    /// Create from glam::Affine2.
     #[inline]
     pub fn from_affine2(affine: glam::Affine2) -> Self {
-        let cols = affine.to_cols_array();
-        // glam stores as [m11, m21, m12, m22, m13, m23] (column-major)
-        Self {
-            matrix: [
-                [cols[0], cols[2], cols[4]], // Row 0: m11, m12, m13
-                [cols[1], cols[3], cols[5]], // Row 1: m21, m22, m23
-            ],
-        }
+        Self(affine)
+    }
+
+    /// Transform a point.
+    #[inline]
+    pub fn transform_point(&self, point: glam::Vec2) -> glam::Vec2 {
+        self.0.transform_point2(point)
+    }
+
+    /// Get the translation component.
+    #[inline]
+    pub fn translation(&self) -> glam::Vec2 {
+        self.0.translation
+    }
+
+    /// Compose transforms (self * other).
+    #[inline]
+    pub fn compose(&self, other: &Transform2D) -> Transform2D {
+        Self(self.0 * other.0)
     }
 }

@@ -32,10 +32,10 @@ fn test_color_interpolation() {
     let blue = Color::BLUE;
 
     let purple = red.interpolate(&blue, 0.5);
-    assert_eq!(purple.r, 0.5);
-    assert_eq!(purple.g, 0.0);
-    assert_eq!(purple.b, 0.5);
-    assert_eq!(purple.a, 1.0);
+    assert_eq!(purple.r(), 0.5);
+    assert_eq!(purple.g(), 0.0);
+    assert_eq!(purple.b(), 0.5);
+    assert_eq!(purple.a(), 1.0);
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_color_interpolation_with_alpha() {
     let transparent = Color::rgba(1.0, 0.0, 0.0, 0.0);
 
     let half = opaque.interpolate(&transparent, 0.5);
-    assert_eq!(half.a, 0.5);
+    assert_eq!(half.a(), 0.5);
 }
 
 // ==================== Easing Function Tests ====================
@@ -201,9 +201,9 @@ fn test_tween_color_animation() {
     let color = anim.tick(Duration::from_millis(500));
 
     // Should be purple at midpoint
-    assert_eq!(color.r, 0.5);
-    assert_eq!(color.g, 0.0);
-    assert_eq!(color.b, 0.5);
+    assert_eq!(color.r(), 0.5);
+    assert_eq!(color.g(), 0.0);
+    assert_eq!(color.b(), 0.5);
 }
 
 // ==================== Animation Completion Tests ====================

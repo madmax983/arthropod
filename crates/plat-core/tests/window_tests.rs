@@ -132,3 +132,36 @@ fn test_window_provides_raw_handles() {
     let display_handle = window.display_handle();
     assert!(display_handle.is_ok(), "Failed to get display handle");
 }
+
+#[test]
+fn test_multiple_windows_class_registration() {
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
+    // Create multiple windows to ensure class registration only happens once
+    // Second window should not fail due to duplicate class registration
+    let window1 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 1".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create first window");
+
+    let window2 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 2".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create second window");
+
+    let window3 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 3".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create third window");
+
+    // All windows should have unique IDs
+    assert_ne!(window1.id(), window2.id());
+    assert_ne!(window2.id(), window3.id());
+    assert_ne!(window1.id(), window3.id());
+}

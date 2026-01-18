@@ -1,0 +1,26 @@
+   Compiling plat-core v0.1.0 (C:\Users\markm\arthropod\crates\plat-core)
+error[E0432]: unresolved import `windows::Win32::System::Threading`
+   --> crates\plat-core\src\platform\windows.rs:17:20
+    |
+ 17 |     Win32::System::Threading::INFINITE,
+    |                    ^^^^^^^^^ could not find `Threading` in `System`
+    |
+note: found an item that was configured out
+   --> C:\Users\markm\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.59.0\src\Windows\Win32\System\mod.rs:140:9
+    |
+139 | #[cfg(feature = "Win32_System_Threading")]
+    |       ---------------------------------- the item is gated behind the `Win32_System_Threading` feature
+140 | pub mod Threading;
+    |         ^^^^^^^^^
+
+warning: unused variable: `hdc`
+   --> crates\plat-core\src\platform\windows.rs:269:21
+    |
+269 |                 let hdc = BeginPaint(hwnd, &mut ps);
+    |                     ^^^ help: if this is intentional, prefix it with an underscore: `_hdc`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `plat-core` (lib) generated 1 warning
+error: could not compile `plat-core` (lib) due to 1 previous error; 1 warning emitted

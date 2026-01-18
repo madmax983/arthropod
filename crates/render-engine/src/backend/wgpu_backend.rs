@@ -315,7 +315,7 @@ impl super::RenderBackend for WgpuBackend {
                     instances.push(RectInstance {
                         pos: [node.bounds.x, node.bounds.y],
                         size: [node.bounds.width, node.bounds.height],
-                        color: [color.r, color.g, color.b, color.a * node.opacity],
+                        color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
                 NodeContent::Empty => {}
@@ -377,10 +377,10 @@ impl super::RenderBackend for WgpuBackend {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: self.clear_color.r as f64,
-                            g: self.clear_color.g as f64,
-                            b: self.clear_color.b as f64,
-                            a: self.clear_color.a as f64,
+                            r: self.clear_color.r() as f64,
+                            g: self.clear_color.g() as f64,
+                            b: self.clear_color.b() as f64,
+                            a: self.clear_color.a() as f64,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -506,10 +506,10 @@ impl WgpuBackend {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: self.clear_color.r as f64,
-                            g: self.clear_color.g as f64,
-                            b: self.clear_color.b as f64,
-                            a: self.clear_color.a as f64,
+                            r: self.clear_color.r() as f64,
+                            g: self.clear_color.g() as f64,
+                            b: self.clear_color.b() as f64,
+                            a: self.clear_color.a() as f64,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -687,7 +687,7 @@ mod tests {
                     instances.push(RectInstance {
                         pos: [node.bounds.x, node.bounds.y],
                         size: [node.bounds.width, node.bounds.height],
-                        color: [color.r, color.g, color.b, color.a * node.opacity],
+                        color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
                 NodeContent::Empty => {}

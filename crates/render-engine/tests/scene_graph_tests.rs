@@ -38,9 +38,9 @@ fn test_get_added_node() {
     if let Some(node) = node {
         match node.content {
             NodeContent::Rect { color: c } => {
-                assert_eq!(c.r, color.r);
-                assert_eq!(c.g, color.g);
-                assert_eq!(c.b, color.b);
+                assert_eq!(c.r(), color.r());
+                assert_eq!(c.g(), color.g());
+                assert_eq!(c.b(), color.b());
             }
             _ => panic!("Expected Rect content"),
         }
@@ -67,7 +67,7 @@ fn test_modify_node() {
     let node = scene.get_node(node_id).expect("Node should exist");
     match node.content {
         NodeContent::Rect { color } => {
-            assert_eq!(color.b, 1.0, "Color should be blue");
+            assert_eq!(color.b(), 1.0, "Color should be blue");
         }
         _ => panic!("Expected Rect content"),
     }
@@ -85,8 +85,9 @@ fn test_node_has_transform() {
     let node_id = scene.add_node(root, node);
 
     let retrieved = scene.get_node(node_id).expect("Node should exist");
-    assert_eq!(retrieved.transform.matrix[0][2], 100.0);
-    assert_eq!(retrieved.transform.matrix[1][2], 200.0);
+    let translation = retrieved.transform.translation();
+    assert_eq!(translation.x, 100.0);
+    assert_eq!(translation.y, 200.0);
 }
 
 #[test]
@@ -161,35 +162,44 @@ fn test_take_dirty_clears_list() {
 
 #[test]
 fn test_color_constants() {
-    assert_eq!(Color::RED.r, 1.0);
-    assert_eq!(Color::RED.g, 0.0);
-    assert_eq!(Color::GREEN.g, 1.0);
-    assert_eq!(Color::BLUE.b, 1.0);
-    assert_eq!(Color::WHITE.r, 1.0);
-    assert_eq!(Color::WHITE.g, 1.0);
-    assert_eq!(Color::WHITE.b, 1.0);
-    assert_eq!(Color::BLACK.r, 0.0);
+    assert_eq!(Color::RED.r(), 1.0);
+    assert_eq!(Color::RED.g(), 0.0);
+    assert_eq!(Color::GREEN.g(), 1.0);
+    assert_eq!(Color::BLUE.b(), 1.0);
+    assert_eq!(Color::WHITE.r(), 1.0);
+    assert_eq!(Color::WHITE.g(), 1.0);
+    assert_eq!(Color::WHITE.b(), 1.0);
+    assert_eq!(Color::BLACK.r(), 0.0);
 }
 
 #[test]
 fn test_transform_identity() {
     let t = Transform2D::IDENTITY;
-    assert_eq!(t.matrix[0][0], 1.0);
-    assert_eq!(t.matrix[1][1], 1.0);
-    assert_eq!(t.matrix[0][2], 0.0);
-    assert_eq!(t.matrix[1][2], 0.0);
+    // Test that identity doesn't change points
+    let point = glam::Vec2::new(5.0, 7.0);
+    let transformed = t.transform_point(point);
+    assert_eq!(transformed, point);
 }
 
 #[test]
 fn test_transform_translate() {
     let t = Transform2D::translate(10.0, 20.0);
-    assert_eq!(t.matrix[0][2], 10.0);
-    assert_eq!(t.matrix[1][2], 20.0);
+    let translation = t.translation();
+    assert_eq!(translation.x, 10.0);
+    assert_eq!(translation.y, 20.0);
+
+    // Verify transformation works correctly
+    let point = glam::Vec2::new(5.0, 7.0);
+    let transformed = t.transform_point(point);
+    assert_eq!(transformed, glam::Vec2::new(15.0, 27.0));
 }
 
 #[test]
 fn test_transform_scale() {
     let t = Transform2D::scale(2.0, 3.0);
-    assert_eq!(t.matrix[0][0], 2.0);
-    assert_eq!(t.matrix[1][1], 3.0);
+
+    // Verify scaling works correctly
+    let point = glam::Vec2::new(5.0, 7.0);
+    let transformed = t.transform_point(point);
+    assert_eq!(transformed, glam::Vec2::new(10.0, 21.0));
 }

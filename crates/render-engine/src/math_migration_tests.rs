@@ -16,13 +16,13 @@ mod tests {
         let glam_color = Vec4::new(1.0, 0.5, 0.25, 0.8);
 
         // Verify component access
-        assert_eq!(custom.r, glam_color.x);
-        assert_eq!(custom.g, glam_color.y);
-        assert_eq!(custom.b, glam_color.z);
-        assert_eq!(custom.a, glam_color.w);
+        assert_eq!(custom.r(), glam_color.x);
+        assert_eq!(custom.g(), glam_color.y);
+        assert_eq!(custom.b(), glam_color.z);
+        assert_eq!(custom.a(), glam_color.w);
 
         // Verify array conversion
-        assert_eq!([custom.r, custom.g, custom.b, custom.a], glam_color.to_array());
+        assert_eq!([custom.r(), custom.g(), custom.b(), custom.a()], glam_color.to_array());
     }
 
     #[test]
@@ -30,15 +30,15 @@ mod tests {
         // Test color constants
         let red = Color::RED;
         let glam_red = Vec4::new(1.0, 0.0, 0.0, 1.0);
-        assert_eq!([red.r, red.g, red.b, red.a], glam_red.to_array());
+        assert_eq!([red.r(), red.g(), red.b(), red.a()], glam_red.to_array());
 
         let green = Color::GREEN;
         let glam_green = Vec4::new(0.0, 1.0, 0.0, 1.0);
-        assert_eq!([green.r, green.g, green.b, green.a], glam_green.to_array());
+        assert_eq!([green.r(), green.g(), green.b(), green.a()], glam_green.to_array());
 
         let blue = Color::BLUE;
         let glam_blue = Vec4::new(0.0, 0.0, 1.0, 1.0);
-        assert_eq!([blue.r, blue.g, blue.b, blue.a], glam_blue.to_array());
+        assert_eq!([blue.r(), blue.g(), blue.b(), blue.a()], glam_blue.to_array());
     }
 
     /// Test that Transform2D::identity matches Affine2::IDENTITY
@@ -75,11 +75,9 @@ mod tests {
         let glam_result = glam_transform.transform_point2(point);
         assert_eq!(glam_result, expected);
 
-        // Custom transformation (manual)
-        let custom_x = custom.matrix[0][0] * point.x + custom.matrix[0][1] * point.y + custom.matrix[0][2];
-        let custom_y = custom.matrix[1][0] * point.x + custom.matrix[1][1] * point.y + custom.matrix[1][2];
-        assert_eq!(custom_x, expected.x);
-        assert_eq!(custom_y, expected.y);
+        // Custom transformation
+        let custom_result = custom.transform_point(point);
+        assert_eq!(custom_result, expected);
     }
 
     /// Test that Transform2D::scale matches Affine2::from_scale
@@ -96,11 +94,9 @@ mod tests {
         let glam_result = glam_transform.transform_point2(point);
         assert_eq!(glam_result, expected);
 
-        // Custom transformation (manual)
-        let custom_x = custom.matrix[0][0] * point.x + custom.matrix[0][1] * point.y + custom.matrix[0][2];
-        let custom_y = custom.matrix[1][0] * point.x + custom.matrix[1][1] * point.y + custom.matrix[1][2];
-        assert_eq!(custom_x, expected.x);
-        assert_eq!(custom_y, expected.y);
+        // Custom transformation
+        let custom_result = custom.transform_point(point);
+        assert_eq!(custom_result, expected);
     }
 
     /// Test Vec4 arithmetic (addition)
@@ -154,10 +150,10 @@ mod tests {
         let vec4 = original.as_vec4();
         let roundtrip = Color::from_vec4(vec4);
 
-        assert_eq!(original.r, roundtrip.r);
-        assert_eq!(original.g, roundtrip.g);
-        assert_eq!(original.b, roundtrip.b);
-        assert_eq!(original.a, roundtrip.a);
+        assert_eq!(original.r(), roundtrip.r());
+        assert_eq!(original.g(), roundtrip.g());
+        assert_eq!(original.b(), roundtrip.b());
+        assert_eq!(original.a(), roundtrip.a());
     }
 
     /// Test Transform2D::as_affine2() and from_affine2() round-trip
@@ -168,17 +164,12 @@ mod tests {
         let roundtrip = Transform2D::from_affine2(affine2);
 
         // Verify they transform points identically
-        let point_x = 5.0;
-        let point_y = 7.0;
+        let point = Vec2::new(5.0, 7.0);
 
-        let original_result_x = original.matrix[0][0] * point_x + original.matrix[0][1] * point_y + original.matrix[0][2];
-        let original_result_y = original.matrix[1][0] * point_x + original.matrix[1][1] * point_y + original.matrix[1][2];
+        let original_result = original.transform_point(point);
+        let roundtrip_result = roundtrip.transform_point(point);
 
-        let roundtrip_result_x = roundtrip.matrix[0][0] * point_x + roundtrip.matrix[0][1] * point_y + roundtrip.matrix[0][2];
-        let roundtrip_result_y = roundtrip.matrix[1][0] * point_x + roundtrip.matrix[1][1] * point_y + roundtrip.matrix[1][2];
-
-        assert_eq!(original_result_x, roundtrip_result_x);
-        assert_eq!(original_result_y, roundtrip_result_y);
+        assert_eq!(original_result, roundtrip_result);
     }
 
     /// Test SIMD-accelerated color blending via glam
@@ -195,10 +186,10 @@ mod tests {
 
         // Should be yellow (0.5, 0.5, 0.0, 1.0)
         const EPSILON: f32 = 1e-6;
-        assert!((result.r - 0.5).abs() < EPSILON);
-        assert!((result.g - 0.5).abs() < EPSILON);
-        assert!((result.b - 0.0).abs() < EPSILON);
-        assert!((result.a - 1.0).abs() < EPSILON);
+        assert!((result.r() - 0.5).abs() < EPSILON);
+        assert!((result.g() - 0.5).abs() < EPSILON);
+        assert!((result.b() - 0.0).abs() < EPSILON);
+        assert!((result.a() - 1.0).abs() < EPSILON);
     }
 
     /// Test SIMD-accelerated transform composition via glam
@@ -208,21 +199,15 @@ mod tests {
         let t2 = Transform2D::scale(2.0, 3.0);
 
         // Use glam for SIMD-accelerated composition
-        let a1 = t1.as_affine2();
-        let a2 = t2.as_affine2();
-        let composed = a2 * a1; // Scale after translate
-        let result = Transform2D::from_affine2(composed);
+        let composed = t2.compose(&t1); // Scale after translate
 
         // Verify transformation of a test point
         let point = Vec2::new(5.0, 5.0);
-        let glam_result = composed.transform_point2(point);
+        let result = composed.transform_point(point);
 
-        // Manual calculation with result transform
-        let manual_x = result.matrix[0][0] * point.x + result.matrix[0][1] * point.y + result.matrix[0][2];
-        let manual_y = result.matrix[1][0] * point.x + result.matrix[1][1] * point.y + result.matrix[1][2];
-
+        // Expected: translate (5,5) -> (15, 25), then scale -> (30, 75)
         const EPSILON: f32 = 1e-5;
-        assert!((manual_x - glam_result.x).abs() < EPSILON);
-        assert!((manual_y - glam_result.y).abs() < EPSILON);
+        assert!((result.x - 30.0).abs() < EPSILON);
+        assert!((result.y - 75.0).abs() < EPSILON);
     }
 }
