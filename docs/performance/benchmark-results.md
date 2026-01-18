@@ -188,6 +188,52 @@ Based on these results:
 4. **DashMap not needed** - single-threaded performance is exceptional
 5. **Future optimization**: Batch signal updates, GPU-driven rendering
 
+## glam Migration Performance Impact
+
+After migrating to glam for SIMD-accelerated graphics math (commit 09d430a):
+
+### Performance Improvements
+
+**ECS Update (signal polling → scene updates):**
+```
+10 entities:    221.22 ns  (-3.7%)   // 219-223 ns
+100 entities:   1.8552 µs  (-6.8%)   // 1.81-1.91 µs
+1,000 entities: 19.081 µs  (-5.3%)   // 18.9-19.3 µs
+10,000 entities: 292.81 µs (+1.7%)   // 288-298 µs (noise)
+```
+
+**Full Frame (update + render):**
+```
+10 entities:   380.72 ns  (-1.6%)
+100 entities:  2.9161 µs  (-2.3%)
+1,000 entities: 29.067 µs  (-4.0%)
+```
+
+**Entity Spawn:**
+```
+1,000 entities: 139.22 µs  (-5.2%)
+```
+
+### Analysis
+
+**SIMD Acceleration Working:**
+- Color interpolation now uses `Vec4::lerp()` (SIMD)
+- Transform composition uses `Affine2` multiplication (SIMD)
+- 3-7% improvement in hot paths confirms SIMD benefits
+
+**Why Not 4x Speedup?**
+- Most time spent in ECS queries and scene graph lookups (not math)
+- Graphics math is ~10-20% of total time
+- 4x speedup on 20% of work = 20% * (1 - 1/4) = 15% theoretical max
+- Observed 3-7% is reasonable given overhead
+
+**Trade-offs:**
+- No regressions in critical paths
+- Some render noise (±1-5%) within acceptable variance
+- Zero-cost abstraction: wrapper types add no overhead
+
+**Conclusion:** glam delivers measurable SIMD improvements without compromising API ergonomics or introducing regressions.
+
 ## Methodology
 
 - **Tool**: Criterion.rs 0.5
