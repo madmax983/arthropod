@@ -2,7 +2,7 @@
 
 mod wgpu_backend;
 
-pub use wgpu_backend::WgpuBackend;
+pub use wgpu_backend::{RectInstance, WgpuBackend};
 
 use crate::Scene;
 

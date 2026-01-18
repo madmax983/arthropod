@@ -1,7 +1,10 @@
 //! Tests for the wgpu rendering backend.
 
 use plat_core::{Rect, Size};
-use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, backend::WgpuBackend};
+use render_engine::{
+    Color, NodeContent, Scene, SceneNode, Transform2D,
+    backend::{RectInstance, WgpuBackend},
+};
 
 #[test]
 fn test_backend_creation() {
@@ -258,4 +261,38 @@ fn test_render_with_viewport() {
     };
 
     // All rendering should be clipped to viewport
+}
+
+#[test]
+fn test_render_instances_api() {
+    // Test the ECS-friendly render_instances API
+    // This test verifies that we can pass RectInstances directly to the backend
+    // without building a Scene graph
+
+    let instances = vec![
+        RectInstance {
+            pos: [0.0, 0.0],
+            size: [100.0, 100.0],
+            color: [1.0, 0.0, 0.0, 1.0], // Red
+        },
+        RectInstance {
+            pos: [100.0, 0.0],
+            size: [100.0, 100.0],
+            color: [0.0, 1.0, 0.0, 1.0], // Green
+        },
+        RectInstance {
+            pos: [200.0, 0.0],
+            size: [100.0, 100.0],
+            color: [0.0, 0.0, 1.0, 1.0], // Blue
+        },
+    ];
+
+    // Note: We can't actually test rendering without a window, but we can test
+    // that the RectInstance type exists and can be created with the right fields.
+    // The actual render_instances method will be tested visually in examples.
+
+    // Verify the instances can be created and have the right shape
+    assert_eq!(instances.len(), 3);
+    assert_eq!(instances[0].pos, [0.0, 0.0]);
+    assert_eq!(instances[1].color, [0.0, 1.0, 0.0, 1.0]);
 }

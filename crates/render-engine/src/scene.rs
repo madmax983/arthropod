@@ -63,6 +63,16 @@ impl Scene {
         self.nodes.get_mut(&id)
     }
 
+    /// Get a node by ID (alias for get_node, for ECS compatibility).
+    pub fn get(&self, id: NodeId) -> Option<&SceneNode> {
+        self.get_node(id)
+    }
+
+    /// Get a mutable node by ID (alias for get_node_mut, for ECS compatibility).
+    pub fn get_mut(&mut self, id: NodeId) -> Option<&mut SceneNode> {
+        self.get_node_mut(id)
+    }
+
     /// Mark a node as needing redraw.
     pub fn mark_dirty(&mut self, id: NodeId) {
         if !self.dirty_nodes.contains(&id) {

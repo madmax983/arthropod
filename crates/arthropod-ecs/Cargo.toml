@@ -1,0 +1,15 @@
+[package]
+name = "arthropod-ecs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Arthropod Contributors"]
+license = "MIT OR Apache-2.0"
+description = "ECS integration layer for Arthropod GUI framework"
+
+[dependencies]
+bevy_ecs = "0.15"
+render-engine = { path = "../render-engine" }
+flux-state = { path = "../flux-state" }
+
+[dev-dependencies]
+plat-core = { path = "../plat-core" }

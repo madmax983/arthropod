@@ -1,19 +1,26 @@
-//! Integration demo: Colored rectangles with reactive state
+//! Integration demo: Colored rectangles with reactive state + ECS
 //!
 //! Demonstrates:
 //! - Window creation with plat-core
-//! - Scene graph with render-engine
+//! - Scene graph with render-engine (persistent, not rebuilt each frame)
 //! - wgpu rendering backend
 //! - Reactive state with flux-state
-//! - Animations with anim-graph
+//! - ECS integration with arthropod-ecs
+//! - Reactive ECS components that automatically update scene nodes
 
-use flux_state::{Effect, ReadSignal, Runtime, Signal, WriteSignal};
+use arthropod_ecs::{FrameworkContext, ReactiveColor, Renderable};
+use flux_state::{Effect, Runtime, Signal, WriteSignal};
 use plat_core::{
     Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
 };
 use render_engine::{
-    Color, NodeContent, Scene, SceneNode, Transform2D,
     backend::{RenderBackend, WgpuBackend},
+    Color,
+    NodeContent,
+    NodeId,
+    Scene,
+    SceneNode,
+    Transform2D,
 };
 use std::rc::Rc;
 
@@ -42,6 +49,12 @@ impl RectData {
 struct DemoApp {
     window: Window,
     backend: WgpuBackend,
+
+    // ECS Integration
+    scene: Scene,
+    context: FrameworkContext,
+    node_ids: Vec<NodeId>, // NodeIds for updating bounds on resize
+
     // Runtime must be kept alive for signals to work
     #[allow(dead_code)]
     runtime: Rc<Runtime>,
@@ -49,8 +62,6 @@ struct DemoApp {
     // State
     mouse_pos: WriteSignal<(f32, f32)>,
     window_size_write: WriteSignal<(f32, f32)>,
-    window_size_read: ReadSignal<(f32, f32)>,
-    rect_colors: Vec<ReadSignal<Color>>,
 
     // Static data
     rects: Vec<RectData>,
@@ -132,14 +143,44 @@ impl Application for DemoApp {
             },
         ];
 
-        // Create color signals for each rectangle
-        let mut rect_colors = Vec::new();
+        // Create persistent Scene and ECS FrameworkContext
+        let mut scene = Scene::new();
+        let mut context = FrameworkContext::new();
+        let root = scene.root();
+
+        // Create scene nodes and ECS entities for each rectangle
+        let mut node_ids = Vec::new();
         let mut hover_effects = Vec::new();
+
         for rect in &rects {
+            // Create color signal for this rectangle
             let signal = Signal::new(runtime.clone(), rect.base_color);
             let (read, write) = signal.split();
 
-            // Create an effect that updates color based on hover
+            // Create scene node with initial bounds
+            let bounds = rect.bounds_for_size(size.width as f32, size.height as f32);
+            let rect_node = SceneNode {
+                content: NodeContent::Rect {
+                    color: rect.base_color,
+                },
+                transform: Transform2D::identity(),
+                bounds,
+                children: vec![],
+                visible: true,
+                opacity: 1.0,
+            };
+
+            // Add node to scene
+            let node_id = scene.add_node(root, rect_node);
+            node_ids.push(node_id);
+
+            // Spawn ECS entity with ReactiveColor component
+            context
+                .spawn(node_id)
+                .insert(Renderable)
+                .insert(ReactiveColor::new(read));
+
+            // Create effect that updates color signal based on hover
             let x_ratio = rect.x_ratio;
             let y_ratio = rect.y_ratio;
             let width_ratio = rect.width_ratio;
@@ -148,7 +189,7 @@ impl Application for DemoApp {
             let hover_color = rect.hover_color;
             let mouse = read_mouse.clone();
             let window_size = read_window_size.clone();
-            let rect_index = rect_colors.len(); // For debug logging
+            let rect_index = node_ids.len() - 1; // For debug logging
 
             let effect = Effect::new(runtime.clone(), move || {
                 let (mx, my) = mouse.get();
@@ -180,21 +221,22 @@ impl Application for DemoApp {
                 );
 
                 let new_color = if is_hovering { hover_color } else { base_color };
+                // Update the signal - ECS system will propagate to scene node
                 write.set(new_color);
             });
 
             hover_effects.push(effect);
-            rect_colors.push(read);
         }
 
         Self {
             window,
             backend,
+            scene,
+            context,
+            node_ids,
             runtime,
             mouse_pos: write_mouse,
             window_size_write: write_window_size,
-            window_size_read: read_window_size,
-            rect_colors,
             rects,
             hover_effects,
         }
@@ -209,9 +251,20 @@ impl Application for DemoApp {
                 WindowEvent::Resized(new_size) => {
                     println!("RESIZE EVENT: {}x{}", new_size.width, new_size.height);
                     self.backend.resize(new_size.width, new_size.height);
+
                     // Update window size signal to trigger hover recalculation
                     self.window_size_write
                         .set((new_size.width as f32, new_size.height as f32));
+
+                    // Update scene node bounds for new window size
+                    for (i, node_id) in self.node_ids.iter().enumerate() {
+                        let bounds = self.rects[i]
+                            .bounds_for_size(new_size.width as f32, new_size.height as f32);
+                        if let Some(node) = self.scene.get_node_mut(*node_id) {
+                            node.bounds = bounds;
+                        }
+                    }
+
                     self.window.request_redraw();
                 }
                 WindowEvent::CursorMoved { position } => {
@@ -227,45 +280,33 @@ impl Application for DemoApp {
     }
 
     fn on_redraw(&mut self, _window_id: plat_core::WindowId) {
-        // Rebuild scene from reactive state
-        let mut scene = Scene::new();
-        let root = scene.root();
+        println!("=== REDRAW FRAME ===");
 
-        // Get current window size
-        let (window_width, window_height) = self.window_size_read.get_untracked();
+        // Update ECS systems - this will poll all ReactiveColor signals
+        // and update the scene node colors automatically
+        self.context.update(&mut self.scene);
 
-        // Add rectangles with current colors from signals
-        for (i, rect_data) in self.rects.iter().enumerate() {
-            let color = self.rect_colors[i].get_untracked(); // Use untracked to avoid dependency in render
-            let bounds = rect_data.bounds_for_size(window_width, window_height);
+        // Collect renderables from ECS - generates RectInstances
+        let instances = self.context.render(&self.scene);
 
+        println!("Generated {} render instances", instances.len());
+        for (i, inst) in instances.iter().enumerate() {
             println!(
-                "Rendering rect {} with color: ({:.2}, {:.2}, {:.2}, {:.2}), bounds: ({:.0}, {:.0}, {:.0}x{:.0})",
+                "  Instance {}: pos=({:.0}, {:.0}), size=({:.0}x{:.0}), color=({:.2}, {:.2}, {:.2}, {:.2})",
                 i,
-                color.r,
-                color.g,
-                color.b,
-                color.a,
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height
+                inst.pos[0],
+                inst.pos[1],
+                inst.size[0],
+                inst.size[1],
+                inst.color[0],
+                inst.color[1],
+                inst.color[2],
+                inst.color[3]
             );
-
-            let rect_node = SceneNode {
-                content: NodeContent::Rect { color },
-                transform: Transform2D::identity(),
-                bounds,
-                children: vec![],
-                visible: true,
-                opacity: 1.0,
-            };
-
-            scene.add_node(root, rect_node);
         }
 
-        // Render the scene
-        if let Err(e) = self.backend.render(&scene) {
+        // Render instances directly using ECS-friendly API
+        if let Err(e) = self.backend.render_instances(&instances) {
             eprintln!("Render error: {}", e);
         }
     }
@@ -283,16 +324,18 @@ fn main() {
         .with_line_number(true)
         .init();
 
-    println!("Arthropod Phase 1 Integration Demo");
-    println!("===================================");
+    println!("Arthropod ECS Integration Demo");
+    println!("================================");
     println!();
     println!("This demo showcases:");
     println!("  ✓ Window creation (plat-core)");
-    println!("  ✓ Scene graph (render-engine)");
-    println!("  ✓ wgpu rendering backend with instanced rendering");
+    println!("  ✓ Persistent Scene graph (render-engine)");
+    println!("  ✓ ECS integration (arthropod-ecs with bevy_ecs)");
+    println!("  ✓ Reactive ECS components (ReactiveColor)");
+    println!("  ✓ wgpu rendering backend with ECS-generated instances");
     println!("  ✓ Reactive state management (flux-state)");
     println!("  ✓ Mouse input handling");
-    println!("  ✓ Hover interactions with automatic redraws");
+    println!("  ✓ Hover interactions with automatic color updates");
     println!("  ✓ Structured tracing & observability");
     println!();
     println!("You should see 4 colored rectangles:");
@@ -302,6 +345,7 @@ fn main() {
     println!("  - Yellow (bottom-right)");
     println!();
     println!("HOVER OVER THE RECTANGLES to see them change color!");
+    println!("(Colors update via ECS ReactiveColor components)");
     println!();
     println!("Set RUST_LOG=debug for detailed logs");
     println!();

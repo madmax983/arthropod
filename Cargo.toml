@@ -7,6 +7,7 @@ members = [
     "crates/flux-state",
     "crates/arthropod",
     "crates/arthropod-test",
+    "crates/arthropod-ecs",
 ]
 
 [package]
@@ -76,5 +77,6 @@ render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 anim-graph = { path = "crates/anim-graph" }
 flux-state = { path = "crates/flux-state" }
 arthropod-test = { path = "crates/arthropod-test" }
+arthropod-ecs = { path = "crates/arthropod-ecs" }
 tracing.workspace = true
 tracing-subscriber.workspace = true

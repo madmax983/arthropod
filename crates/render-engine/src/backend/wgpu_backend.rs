@@ -8,10 +8,10 @@ use wgpu;
 /// Per-rectangle instance data (uploaded to GPU as vertex attributes)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct RectInstance {
-    pos: [f32; 2],   // Position (x, y)
-    size: [f32; 2],  // Size (width, height)
-    color: [f32; 4], // Color (r, g, b, a)
+pub struct RectInstance {
+    pub pos: [f32; 2],   // Position (x, y)
+    pub size: [f32; 2],  // Size (width, height)
+    pub color: [f32; 4], // Color (r, g, b, a)
 }
 
 /// Global uniform data (shared across all rectangles)
@@ -431,6 +431,107 @@ impl super::RenderBackend for WgpuBackend {
 
     fn set_clear_color(&mut self, color: Color) {
         self.clear_color = color;
+    }
+}
+
+// Additional WgpuBackend methods (not part of RenderBackend trait)
+impl WgpuBackend {
+    /// Render a collection of rectangle instances directly (ECS-friendly API)
+    ///
+    /// This method accepts pre-computed RectInstances instead of a Scene,
+    /// making it suitable for use with ECS systems that generate instances.
+    ///
+    /// # Arguments
+    ///
+    /// * `instances` - Slice of RectInstance structs to render
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if surface texture acquisition or rendering fails
+    #[instrument(skip(self, instances))]
+    pub fn render_instances(&mut self, instances: &[RectInstance]) -> Result<(), RendererError> {
+        let _span = span!(Level::TRACE, "render_instances").entered();
+
+        if instances.is_empty() {
+            debug!("No instances to render");
+        } else {
+            debug!("Rendering {} instances", instances.len());
+        }
+
+        // Resize vertex buffer if needed
+        if instances.len() > self.vertex_buffer_capacity {
+            let new_capacity = instances.len().next_power_of_two();
+            info!(
+                "Resizing vertex buffer from {} to {} instances",
+                self.vertex_buffer_capacity, new_capacity
+            );
+            self.vertex_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Rect Instance Buffer"),
+                size: (new_capacity * std::mem::size_of::<RectInstance>()) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.vertex_buffer_capacity = new_capacity;
+        }
+
+        // Upload instance data
+        if !instances.is_empty() {
+            let instance_bytes = bytemuck::cast_slice(instances);
+            debug!(
+                "Uploading {} instances ({} bytes)",
+                instances.len(),
+                instance_bytes.len()
+            );
+            self.queue
+                .write_buffer(&self.vertex_buffer, 0, instance_bytes);
+        }
+
+        // Render
+        let output = self.surface.get_current_texture()?;
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: self.clear_color.r as f64,
+                            g: self.clear_color.g as f64,
+                            b: self.clear_color.b as f64,
+                            a: self.clear_color.a as f64,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.globals_bind_group, &[]);
+
+            if !instances.is_empty() {
+                render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+                render_pass.draw(0..6, 0..instances.len() as u32);
+            }
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+        Ok(())
     }
 }
 
