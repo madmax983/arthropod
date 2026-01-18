@@ -182,17 +182,37 @@ We wrap bevy_ecs in our own `FrameworkContext` API to:
 
 ## Performance Characteristics
 
-Based on bevy_ecs benchmarks and our testing:
+Based on **actual criterion benchmarks** (see `docs/performance/benchmark-results.md`):
 
-- **Component iteration**: ~2-4ns per entity (archetype storage)
-- **Query compilation**: Cached, negligible runtime cost
-- **Change detection**: Bit flags, minimal overhead
-- **System scheduling**: Topological sort, runs once at startup
+**ECS Update System** (reactive signal polling → scene node updates):
+- 10 entities: 230 ns
+- 100 entities: 1.96 μs
+- 1,000 entities: 20.2 μs
+- 10,000 entities: 280 μs
+- **Per-entity cost**: ~20-40 ns (excellent cache locality)
 
-Our reactive update system (1000 entities):
-- Without ECS (rebuild scene): ~500μs
-- With ECS (update only changed): ~50μs
-- **10x improvement** 🚀
+**ECS Render System** (query entities → generate RectInstances):
+- 10 entities: 150 ns
+- 100 entities: 890 ns
+- 1,000 entities: 9.5 μs
+- 10,000 entities: 128 μs
+- **Per-entity cost**: ~10-15 ns
+
+**Full Frame Pipeline** (update + render):
+- 10 entities: 385 ns → 2.6M fps theoretical
+- 100 entities: 2.96 μs → 337K fps theoretical
+- 1,000 entities: 30.4 μs → 32.9K fps theoretical
+
+**Colored Rectangles Example** (4 entities):
+- ECS Update: < 1 μs
+- ECS Render: < 1 μs
+- **Total ECS Overhead**: < 2 μs per frame
+- **At 60fps**: 0.012% of 16.67ms frame budget
+
+bevy_ecs delivers:
+- **Linear scaling**: Performance scales linearly with entity count
+- **Archetype efficiency**: 35-112 million elements/second throughput
+- **Negligible overhead**: ECS overhead < 3% even for 10,000 widgets
 
 ## Implementation Experience
 

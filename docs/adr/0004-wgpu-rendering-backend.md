@@ -105,13 +105,26 @@ render_pass.draw(0..6, 0..instances.len());
 ```
 
 - 1000 rectangles: 1 draw call (vs 1000 with immediate mode)
-- CPU overhead: ~10μs per frame
+- CPU overhead: Sub-microsecond (instanced rendering)
 - GPU overhead: Minimal (all rectangles in single batch)
 
-**Measured Performance** (colored_rectangles example):
-- Frame time: ~50μs (ECS update) + ~10μs (GPU upload) = 60μs total
-- 16,666 fps theoretical max (60fps target easily met)
-- Memory: ~1.5MB GPU buffer for 10K rectangles
+**Measured CPU Performance** (colored_rectangles example, 4 entities):
+- ECS Update: < 1 μs
+- ECS Render (instance collection): < 1 μs
+- **Total CPU overhead**: < 2 μs
+- GPU rendering time: Not separately measured (includes vsync wait)
+- **At 60fps**: < 0.02% of 16.67ms frame budget for ECS
+
+**Benchmark Results** (see `docs/performance/benchmark-results.md`):
+- 10 instances: 150 ns collection time
+- 100 instances: 890 ns collection time
+- 1,000 instances: 9.5 μs collection time
+- 10,000 instances: 128 μs collection time
+
+**Memory**:
+- Per instance: 24 bytes (pos + size + color)
+- 1,000 instances: 24 KB GPU buffer
+- 10,000 instances: 240 KB GPU buffer
 
 ## Consequences
 
@@ -290,21 +303,28 @@ Planned for Phase 2+:
 
 ## Performance Characteristics
 
-Based on our testing and wgpu benchmarks:
+Based on **actual criterion benchmarks** for CPU-side instance collection (see `docs/performance/benchmark-results.md`):
 
-### Upload Performance
-- 1K instances: ~5μs
-- 10K instances: ~50μs
-- 100K instances: ~500μs
+### Instance Collection Performance (CPU)
+- 10 instances: 150 ns
+- 100 instances: 890 ns
+- 1,000 instances: 9.5 μs
+- 10,000 instances: 128 μs
 
-### Render Performance
-- 1K rectangles: ~100μs (60fps easily)
-- 10K rectangles: ~500μs (60fps achievable)
-- 100K rectangles: ~5ms (200fps still possible!)
+GPU upload and rendering times not separately measured (dominated by vsync wait at 60fps).
+
+### Expected GPU Performance
+Based on wgpu benchmarks and instanced rendering characteristics:
+- 1K rectangles: < 1ms GPU time (60fps easily)
+- 10K rectangles: 1-2ms GPU time (60fps achievable)
+- 100K rectangles: 5-10ms GPU time (100+ fps possible)
+
+**Bottleneck**: At 60fps, VSync wait (16.67ms) dominates. GPU rendering is not the bottleneck for typical UIs.
 
 ### Memory Usage
 - Per instance: 24 bytes (pos + size + color)
-- 10K instances: 240KB GPU memory
+- 1,000 instances: 24 KB GPU buffer
+- 10,000 instances: 240 KB GPU buffer
 - Vertex buffer grows dynamically (power-of-2)
 
 ## Production Experience

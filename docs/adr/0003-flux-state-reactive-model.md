@@ -197,20 +197,33 @@ context.update(&mut scene);
 
 ## Performance Characteristics
 
-Based on colored_rectangles example (4 rectangles, hover interactions):
+Based on **actual criterion benchmarks** (see `docs/performance/benchmark-results.md`):
 
-**Without reactivity (rebuild scene each frame):**
-- Frame time: ~500μs
-- Allocations: 4 nodes × 60fps = 240 allocations/sec
+**Colored Rectangles Example** (4 entities with ReactiveColor):
+- ECS Update (signal polling): < 1 μs
+- Effects run on signal change: ~100 ns per effect
+- **Total reactive overhead**: < 2 μs per frame at 60fps
 
-**With flux-state + ECS:**
-- Frame time: ~50μs (10x faster)
-- Allocations: Only on actual color change (~2/sec on hover)
+**Benchmark Results** (reactive update system):
+- 10 entities: 230 ns
+- 100 entities: 1.96 μs
+- 1,000 entities: 20.2 μs
+- 10,000 entities: 280 μs
 
-**Memory:**
-- Signal overhead: ~48 bytes per signal
-- Effect overhead: ~64 bytes per effect
-- Runtime: ~128 bytes + subscriber tracking
+**Key Insight**: Reactive updates are **extremely fast**:
+- Per-entity signal poll: ~20-40 ns
+- Only updates when signals change (fine-grained reactivity)
+- No scene rebuilding required (persistent scene graph)
+
+**Memory** (estimated from Rust std types):
+- Signal overhead: ~48 bytes per signal (Rc<Cell<T>> + subscriber list)
+- Effect overhead: ~64 bytes per effect (closure + runtime ref)
+- Runtime: ~128 bytes + subscriber tracking (grows with signals)
+
+**Comparison to Alternatives**:
+- **Rebuild every frame**: Would be ~1-10 μs for scene reconstruction (4 nodes)
+- **Virtual DOM diffing**: Unnecessary - we update exactly what changed
+- **Signals**: Sub-microsecond updates, zero unnecessary work
 
 ## Alternatives Considered
 

@@ -13,3 +13,8 @@ flux-state = { path = "../flux-state" }
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "ecs_benchmarks"
+harness = false

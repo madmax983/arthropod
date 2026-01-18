@@ -23,6 +23,109 @@ use render_engine::{
     Transform2D,
 };
 use std::rc::Rc;
+use std::time::{Duration, Instant};
+
+/// Performance statistics tracker
+struct PerfStats {
+    update_times: Vec<Duration>,
+    render_times: Vec<Duration>,
+    gpu_times: Vec<Duration>,
+    total_times: Vec<Duration>,
+    frame_count: usize,
+    last_report: Instant,
+}
+
+impl PerfStats {
+    fn new() -> Self {
+        Self {
+            update_times: Vec::new(),
+            render_times: Vec::new(),
+            gpu_times: Vec::new(),
+            total_times: Vec::new(),
+            frame_count: 0,
+            last_report: Instant::now(),
+        }
+    }
+
+    fn record_frame(
+        &mut self,
+        update_time: Duration,
+        render_time: Duration,
+        gpu_time: Duration,
+        total_time: Duration,
+    ) {
+        self.update_times.push(update_time);
+        self.render_times.push(render_time);
+        self.gpu_times.push(gpu_time);
+        self.total_times.push(total_time);
+        self.frame_count += 1;
+
+        // Report stats every 2 seconds
+        if self.last_report.elapsed() >= Duration::from_secs(2) {
+            self.report();
+            self.clear();
+            self.last_report = Instant::now();
+        }
+    }
+
+    fn report(&self) {
+        if self.frame_count == 0 {
+            return;
+        }
+
+        let avg_update = self.avg(&self.update_times);
+        let avg_render = self.avg(&self.render_times);
+        let avg_gpu = self.avg(&self.gpu_times);
+        let avg_total = self.avg(&self.total_times);
+
+        println!("\n╔══════════════════════════════════════════════════════╗");
+        println!("║           PERFORMANCE STATS ({} frames)             ║", self.frame_count);
+        println!("╠══════════════════════════════════════════════════════╣");
+        println!("║  ECS Update:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+                 avg_update,
+                 self.min(&self.update_times),
+                 self.max(&self.update_times));
+        println!("║  ECS Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+                 avg_render,
+                 self.min(&self.render_times),
+                 self.max(&self.render_times));
+        println!("║  GPU Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+                 avg_gpu,
+                 self.min(&self.gpu_times),
+                 self.max(&self.gpu_times));
+        println!("║  Total Frame: {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+                 avg_total,
+                 self.min(&self.total_times),
+                 self.max(&self.total_times));
+        println!("║  Frame Rate:  {:>8.1} fps (avg)                        ║",
+                 1.0 / avg_total.as_secs_f64());
+        println!("╚══════════════════════════════════════════════════════╝\n");
+    }
+
+    fn avg(&self, times: &[Duration]) -> Duration {
+        if times.is_empty() {
+            return Duration::ZERO;
+        }
+        let sum: Duration = times.iter().sum();
+        sum / times.len() as u32
+    }
+
+    fn min(&self, times: &[Duration]) -> Duration {
+        times.iter().copied().min().unwrap_or(Duration::ZERO)
+    }
+
+    fn max(&self, times: &[Duration]) -> Duration {
+        times.iter().copied().max().unwrap_or(Duration::ZERO)
+    }
+
+    fn clear(&mut self) {
+        self.update_times.clear();
+        self.render_times.clear();
+        self.gpu_times.clear();
+        self.total_times.clear();
+        self.frame_count = 0;
+    }
+}
 
 // Rectangle data for hover detection
 struct RectData {
@@ -69,6 +172,9 @@ struct DemoApp {
     // Keep effects alive (they dispose on drop)
     #[allow(dead_code)]
     hover_effects: Vec<Effect>,
+
+    // Performance tracking
+    perf_stats: PerfStats,
 }
 
 impl Application for DemoApp {
@@ -239,6 +345,7 @@ impl Application for DemoApp {
             window_size_write: write_window_size,
             rects,
             hover_effects,
+            perf_stats: PerfStats::new(),
         }
     }
 
@@ -280,35 +387,31 @@ impl Application for DemoApp {
     }
 
     fn on_redraw(&mut self, _window_id: plat_core::WindowId) {
-        println!("=== REDRAW FRAME ===");
+        let frame_start = Instant::now();
 
         // Update ECS systems - this will poll all ReactiveColor signals
         // and update the scene node colors automatically
+        let update_start = Instant::now();
         self.context.update(&mut self.scene);
+        let update_time = update_start.elapsed();
 
         // Collect renderables from ECS - generates RectInstances
+        let render_start = Instant::now();
         let instances = self.context.render(&self.scene);
-
-        println!("Generated {} render instances", instances.len());
-        for (i, inst) in instances.iter().enumerate() {
-            println!(
-                "  Instance {}: pos=({:.0}, {:.0}), size=({:.0}x{:.0}), color=({:.2}, {:.2}, {:.2}, {:.2})",
-                i,
-                inst.pos[0],
-                inst.pos[1],
-                inst.size[0],
-                inst.size[1],
-                inst.color[0],
-                inst.color[1],
-                inst.color[2],
-                inst.color[3]
-            );
-        }
+        let render_time = render_start.elapsed();
 
         // Render instances directly using ECS-friendly API
+        let gpu_start = Instant::now();
         if let Err(e) = self.backend.render_instances(&instances) {
             eprintln!("Render error: {}", e);
         }
+        let gpu_time = gpu_start.elapsed();
+
+        let total_time = frame_start.elapsed();
+
+        // Record performance statistics
+        self.perf_stats
+            .record_frame(update_time, render_time, gpu_time, total_time);
     }
 }
 
@@ -336,7 +439,7 @@ fn main() {
     println!("  ✓ Reactive state management (flux-state)");
     println!("  ✓ Mouse input handling");
     println!("  ✓ Hover interactions with automatic color updates");
-    println!("  ✓ Structured tracing & observability");
+    println!("  ✓ Performance instrumentation & benchmarking");
     println!();
     println!("You should see 4 colored rectangles:");
     println!("  - Red (top-left)");
@@ -346,6 +449,12 @@ fn main() {
     println!();
     println!("HOVER OVER THE RECTANGLES to see them change color!");
     println!("(Colors update via ECS ReactiveColor components)");
+    println!();
+    println!("Performance stats will be reported every 2 seconds showing:");
+    println!("  - ECS Update time (reactive signal polling)");
+    println!("  - ECS Render time (instance collection)");
+    println!("  - GPU Render time (wgpu rendering)");
+    println!("  - Total frame time and FPS");
     println!();
     println!("Set RUST_LOG=debug for detailed logs");
     println!();
