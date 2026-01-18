@@ -1,0 +1,22 @@
+[package]
+name = "a11y-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Accessibility engine for Arthropod GUI framework - WCAG 2.1 compliance and screen reader support"
+
+[dependencies]
+log.workspace = true
+thiserror.workspace = true
+plat-core = { path = "../plat-core" }
+render-engine = { path = "../render-engine" }
+bevy_ecs = "0.15"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+# For property-based testing (future)
+# proptest = "1.0"
+
+[[bench]]
+name = "a11y_benchmarks"
+harness = false

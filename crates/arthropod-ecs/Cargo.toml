@@ -10,6 +10,7 @@ description = "ECS integration layer for Arthropod GUI framework"
 bevy_ecs = "0.15"
 render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
+a11y-engine = { path = "../a11y-engine" }
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }

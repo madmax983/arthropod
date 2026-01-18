@@ -37,11 +37,13 @@
 //! use flux_state::Signal;
 //!
 //! # let runtime = flux_state::Runtime::new();
-//! let mut scene = Scene::new();
 //! let mut context = FrameworkContext::new();
 //!
-//! // Create scene node
-//! let node_id = scene.root();
+//! // Access Scene from World to get root node
+//! let node_id = {
+//!     let scene = context.world().resource::<Scene>();
+//!     scene.root()
+//! };
 //!
 //! // Spawn ECS entity linked to scene node
 //! let color_signal = Signal::new(runtime, render_engine::Color::RED);
@@ -50,11 +52,11 @@
 //!     .insert(Renderable)
 //!     .insert(ReactiveColor::new(read_signal));
 //!
-//! // Update reactive systems
-//! context.update(&mut scene);
+//! // Update reactive systems (Scene accessed from World automatically)
+//! context.update();
 //!
-//! // Render and get GPU instances
-//! let instances = context.render(&scene);
+//! // Render and get GPU instances (Scene accessed from World automatically)
+//! let instances = context.render();
 //! ```
 
 pub mod components;
@@ -69,5 +71,11 @@ pub use components::{
 pub use context::FrameworkContext;
 pub use systems::{
     collect_renderables_system, update_reactive_colors_system, update_reactive_opacity_system,
-    update_reactive_transforms_system, RenderCommands, SceneReadResource, SceneResource,
+    update_reactive_transforms_system, RenderCommands,
+};
+
+// Re-export accessibility types
+pub use a11y_engine::{
+    A11yAction, A11yId, A11yNode, A11yRelations, A11yState, A11yTree, AccessibleName,
+    CheckedState, Role,
 };

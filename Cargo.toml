@@ -8,6 +8,7 @@ members = [
     "crates/arthropod",
     "crates/arthropod-test",
     "crates/arthropod-ecs",
+    "crates/a11y-engine",
 ]
 
 [package]
@@ -73,11 +74,13 @@ name = "debug_render"
 path = "examples/debug_render.rs"
 
 [dependencies]
+arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
 render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 anim-graph = { path = "crates/anim-graph" }
 flux-state = { path = "crates/flux-state" }
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
+env_logger.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

@@ -1,3 +1,4 @@
+use a11y_engine::A11yTree;
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::RectInstance, NodeId, Scene};
@@ -5,7 +6,7 @@ use render_engine::{backend::RectInstance, NodeId, Scene};
 use crate::components::SceneNodeRef;
 use crate::systems::{
     collect_renderables_system, update_reactive_colors_system, update_reactive_opacity_system,
-    update_reactive_transforms_system, RenderCommands, SceneReadResource, SceneResource,
+    update_reactive_transforms_system, RenderCommands,
 };
 
 /// Enterprise GUI framework context - wraps ECS World
@@ -27,19 +28,23 @@ use crate::systems::{
 /// use arthropod_ecs::FrameworkContext;
 /// use render_engine::Scene;
 ///
-/// let mut scene = Scene::new();
 /// let mut context = FrameworkContext::new();
 ///
+/// // Access Scene from World to get root node
+/// let node_id = {
+///     let scene = context.world().resource::<Scene>();
+///     scene.root()
+/// };
+///
 /// // Spawn entity linked to scene node
-/// let node_id = scene.root();
 /// context.spawn(node_id)
 ///     .insert(arthropod_ecs::Renderable);
 ///
-/// // Update reactive systems
-/// context.update(&mut scene);
+/// // Update reactive systems (Scene accessed from World automatically)
+/// context.update();
 ///
-/// // Render and get GPU instances
-/// let instances = context.render(&scene);
+/// // Render and get GPU instances (Scene accessed from World automatically)
+/// let instances = context.render();
 /// ```
 pub struct FrameworkContext {
     world: World,
@@ -53,6 +58,8 @@ impl FrameworkContext {
         let mut world = World::new();
 
         // Initialize resources
+        world.insert_resource(Scene::new()); // Scene lives in the World now!
+        world.insert_resource(A11yTree::new()); // A11yTree for accessibility
         world.insert_resource(RenderCommands::default());
 
         Self {
@@ -60,6 +67,16 @@ impl FrameworkContext {
             render_schedule: Self::build_render_schedule(),
             update_schedule: Self::build_update_schedule(),
         }
+    }
+
+    /// Access the ECS World (immutable)
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    /// Access the ECS World (mutable)
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.world
     }
 
     /// Spawn a visual entity linked to a scene node
@@ -94,16 +111,9 @@ impl FrameworkContext {
     /// - Reactive transform updates
     /// - Reactive opacity updates
     ///
-    /// The scene is temporarily inserted as a resource for systems to access.
-    pub fn update(&mut self, scene: &mut Scene) {
-        // SAFETY: The Scene reference is valid for the duration of this method.
-        // We insert it as a resource, run systems synchronously, then immediately remove it.
-        // No references escape this scope.
-        unsafe {
-            self.world.insert_resource(SceneResource::new(scene));
-        }
+    /// Scene is accessed from the World as a Resource (no unsafe code needed!)
+    pub fn update(&mut self) {
         self.update_schedule.run(&mut self.world);
-        self.world.remove_resource::<SceneResource>();
     }
 
     /// Run all render systems and return render commands
@@ -112,15 +122,10 @@ impl FrameworkContext {
     /// and generates RectInstance data for the GPU backend.
     ///
     /// Returns a Vec of RectInstances that can be passed to WgpuBackend::render_instances.
-    pub fn render(&mut self, scene: &Scene) -> Vec<RectInstance> {
-        // SAFETY: The Scene reference is valid for the duration of this method.
-        // We insert it as a resource, run systems synchronously, then immediately remove it.
-        // No references escape this scope.
-        unsafe {
-            self.world.insert_resource(SceneReadResource::new(scene));
-        }
+    ///
+    /// Scene is accessed from the World as a Resource (no unsafe code needed!)
+    pub fn render(&mut self) -> Vec<RectInstance> {
         self.render_schedule.run(&mut self.world);
-        self.world.remove_resource::<SceneReadResource>();
 
         // Extract render commands
         let commands = self.world.resource::<RenderCommands>();
