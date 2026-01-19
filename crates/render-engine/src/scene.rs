@@ -79,6 +79,23 @@ impl Scene {
         self.get_node_mut(id)
     }
 
+    /// Re-parent a node from old parent to new parent.
+    pub fn reparent_node(&mut self, child_id: NodeId, old_parent: NodeId, new_parent: NodeId) {
+        // Remove child from old parent
+        if let Some(old_parent_node) = self.nodes.get_mut(&old_parent) {
+            old_parent_node.children.retain(|&id| id != child_id);
+        }
+
+        // Add child to new parent
+        if let Some(new_parent_node) = self.nodes.get_mut(&new_parent) {
+            new_parent_node.children.push(child_id);
+        }
+
+        // Mark both parents as dirty
+        self.mark_dirty(old_parent);
+        self.mark_dirty(new_parent);
+    }
+
     /// Mark a node as needing redraw.
     pub fn mark_dirty(&mut self, id: NodeId) {
         if !self.dirty_nodes.contains(&id) {
