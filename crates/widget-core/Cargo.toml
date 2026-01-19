@@ -17,3 +17,8 @@ bevy_ecs = "0.15"
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "widget_pipeline_bench"
+harness = false

@@ -92,12 +92,22 @@ path = "examples/single_rect_test.rs"
 name = "debug_render"
 path = "examples/debug_render.rs"
 
+[[example]]
+name = "form_demo"
+path = "examples/form_demo.rs"
+
+[[example]]
+name = "widget_gallery"
+path = "examples/widget_gallery.rs"
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
 render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 anim-graph = { path = "crates/anim-graph" }
+widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
+glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
 arthropod-mcp = { path = "crates/arthropod-mcp" }

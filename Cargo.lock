@@ -209,11 +209,13 @@ dependencies = [
  "arthropod-test",
  "env_logger",
  "flux-state",
+ "glam",
  "plat-core",
  "render-engine",
  "serde_json",
  "tracing",
  "tracing-subscriber",
+ "widget-core",
 ]
 
 [[package]]
@@ -3442,6 +3444,7 @@ version = "0.1.0"
 dependencies = [
  "arthropod-ecs",
  "bevy_ecs",
+ "criterion",
  "flux-state",
  "glam",
  "layout-engine",

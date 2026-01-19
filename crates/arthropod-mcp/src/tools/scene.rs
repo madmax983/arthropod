@@ -89,6 +89,7 @@ impl Tool for ListNodesTool {
                 let node_type = match &node.content {
                     NodeContent::Rect { .. } => "Rect",
                     NodeContent::RoundedRect { .. } => "RoundedRect",
+                    NodeContent::Text { .. } => "Text",
                     NodeContent::Empty => "Empty",
                 };
                 if node_type != content_type {
@@ -111,6 +112,7 @@ impl Tool for ListNodesTool {
             let content_type = match &node.content {
                 NodeContent::Rect { .. } => "Rect",
                 NodeContent::RoundedRect { .. } => "RoundedRect",
+                NodeContent::Text { .. } => "Text",
                 NodeContent::Empty => "Empty",
             };
 
@@ -160,6 +162,7 @@ struct NodeDetail {
 enum NodeContentData {
     Rect { color: [f32; 4] },
     RoundedRect { color: [f32; 4], corner_radius: f32 },
+    Text { color: [f32; 4] },
     Empty,
 }
 
@@ -201,6 +204,9 @@ impl Tool for GetNodeTool {
             } => NodeContentData::RoundedRect {
                 color: [color.r(), color.g(), color.b(), color.a()],
                 corner_radius: *corner_radius,
+            },
+            NodeContent::Text { color, .. } => NodeContentData::Text {
+                color: [color.r(), color.g(), color.b(), color.a()],
             },
             NodeContent::Empty => NodeContentData::Empty,
         };
@@ -297,6 +303,7 @@ impl Tool for QueryHierarchyTool {
             let content_type = match &node.content {
                 NodeContent::Rect { .. } => "Rect",
                 NodeContent::RoundedRect { .. } => "RoundedRect",
+                NodeContent::Text { .. } => "Text",
                 NodeContent::Empty => "Empty",
             };
 
@@ -516,6 +523,10 @@ impl Tool for UpdateNodeTool {
                 NodeContent::RoundedRect {
                     color: node_color, ..
                 } => {
+                    *node_color = color;
+                    updated_fields.push("color");
+                }
+                NodeContent::Text { color: node_color, .. } => {
                     *node_color = color;
                     updated_fields.push("color");
                 }
