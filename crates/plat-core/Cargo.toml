@@ -9,6 +9,7 @@ description = "Platform abstraction layer for Arthropod GUI framework"
 raw-window-handle.workspace = true
 log.workspace = true
 thiserror.workspace = true
+serde = { version = "1.0", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows.workspace = true

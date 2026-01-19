@@ -1,8 +1,10 @@
 //! Scene node types.
 
 use crate::NodeId;
+use serde::{Deserialize, Serialize};
 
 /// A node in the scene graph.
+#[derive(Serialize, Deserialize)]
 pub struct SceneNode {
     /// Visual content of this node.
     pub content: NodeContent,
@@ -43,7 +45,7 @@ impl SceneNode {
 }
 
 /// The visual content a node can have.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeContent {
     /// Empty container (for grouping).
     Empty,
@@ -56,6 +58,25 @@ pub enum NodeContent {
 /// RGBA color backed by glam::Vec4 for SIMD performance.
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub glam::Vec4);
+
+impl Serialize for Color {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.to_array().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let arr = <[f32; 4]>::deserialize(deserializer)?;
+        Ok(Color(glam::Vec4::from_array(arr)))
+    }
+}
 
 impl Color {
     #[inline]
@@ -108,6 +129,34 @@ impl Color {
 /// 2D affine transform backed by glam::Affine2 for SIMD performance.
 #[derive(Debug, Clone, Copy)]
 pub struct Transform2D(pub glam::Affine2);
+
+impl Serialize for Transform2D {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as 6 floats: [m11, m12, m21, m22, tx, ty]
+        let mat = self.0.matrix2;
+        let trans = self.0.translation;
+        [mat.x_axis.x, mat.x_axis.y, mat.y_axis.x, mat.y_axis.y, trans.x, trans.y]
+            .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Transform2D {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let arr = <[f32; 6]>::deserialize(deserializer)?;
+        let mat = glam::Mat2::from_cols(
+            glam::Vec2::new(arr[0], arr[1]),
+            glam::Vec2::new(arr[2], arr[3]),
+        );
+        let trans = glam::Vec2::new(arr[4], arr[5]);
+        Ok(Transform2D(glam::Affine2::from_mat2_translation(mat, trans)))
+    }
+}
 
 impl Transform2D {
     pub const IDENTITY: Self = Self(glam::Affine2::IDENTITY);

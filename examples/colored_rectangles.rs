@@ -8,6 +8,7 @@
 //! - Hover interactions with reactive color changes
 
 use arthropod::prelude::*;
+use arthropod_mcp::{connect_to_mcp_server, AppConnection};
 use std::time::{Duration, Instant};
 
 /// Performance statistics tracker
@@ -154,6 +155,12 @@ struct DemoApp {
 
     // Performance tracking
     perf_stats: PerfStats,
+
+    // MCP connection for remote debugging (optional)
+    mcp_connection: Option<AppConnection>,
+
+    // Frame counter for periodic MCP updates
+    mcp_update_counter: u32,
 }
 
 impl Application for DemoApp {
@@ -316,6 +323,14 @@ impl Application for DemoApp {
         println!("║  ✓ GPU rendering (wgpu)                             ║");
         println!("╚══════════════════════════════════════════════════════╝\n");
 
+        // Try to connect to MCP server (optional - don't fail if server isn't running)
+        let mcp_connection = connect_to_mcp_server("colored_rectangles").ok();
+        if mcp_connection.is_some() {
+            println!("✓ Connected to MCP server for remote debugging");
+        } else {
+            println!("⚠ MCP server not available (run 'cargo run --bin arthropod-mcp' to enable remote debugging)");
+        }
+
         Self {
             app,
             node_ids,
@@ -324,6 +339,8 @@ impl Application for DemoApp {
             rects,
             hover_effects,
             perf_stats: PerfStats::new(),
+            mcp_connection,
+            mcp_update_counter: 0,
         }
     }
 
@@ -375,6 +392,18 @@ impl Application for DemoApp {
         let update_start = Instant::now();
         self.app.update();
         let update_time = update_start.elapsed();
+
+        // Send scene updates to MCP server periodically (every 60 frames = ~1 second at 60fps)
+        self.mcp_update_counter += 1;
+        if self.mcp_update_counter >= 60 {
+            self.mcp_update_counter = 0;
+            if let Some(connection) = &mut self.mcp_connection {
+                let scene = self.app.world().resource::<render_engine::Scene>();
+                if let Ok(scene_json) = scene.serialize_to_json() {
+                    let _ = connection.send_scene_update(scene_json);
+                }
+            }
+        }
 
         // Run ECS render systems (collect instances)
         let render_start = Instant::now();

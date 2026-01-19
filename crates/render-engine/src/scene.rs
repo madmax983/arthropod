@@ -2,10 +2,11 @@
 
 use crate::SceneNode;
 use bevy_ecs::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Unique identifier for scene nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NodeId(pub u64);
 
 /// The scene graph - owns all nodes.
@@ -93,5 +94,28 @@ impl Scene {
     /// Iterate over all nodes in the scene.
     pub fn nodes(&self) -> impl Iterator<Item = (NodeId, &SceneNode)> {
         self.nodes.iter().map(|(id, node)| (*id, node))
+    }
+
+    /// Serialize the scene to JSON for MCP debugging
+    pub fn serialize_to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+        use serde_json::json;
+
+        let nodes: Vec<_> = self.nodes.iter().map(|(id, node)| {
+            json!({
+                "id": id.0,
+                "content": node.content,
+                "transform": node.transform,
+                "bounds": node.bounds,
+                "children": node.children,
+                "visible": node.visible,
+                "opacity": node.opacity,
+            })
+        }).collect();
+
+        Ok(json!({
+            "root": self.root.0,
+            "nodes": nodes,
+            "node_count": self.nodes.len(),
+        }))
     }
 }
