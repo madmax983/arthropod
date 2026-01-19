@@ -53,6 +53,31 @@ pub enum NodeContent {
     Rect { color: Color },
     /// Rounded rectangle.
     RoundedRect { color: Color, corner_radius: f32 },
+    /// Text content with shaped glyphs.
+    Text {
+        /// Shaped text from text-engine
+        shaped_text: ShapedTextData,
+        /// Text color
+        color: Color,
+    },
+}
+
+/// Serializable shaped text data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShapedTextData {
+    pub glyphs: Vec<ShapedGlyphData>,
+    pub bounds_width: f32,
+    pub bounds_height: f32,
+}
+
+/// Serializable glyph data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShapedGlyphData {
+    pub glyph_id: u16,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub x_advance: f32,
+    pub y_advance: f32,
 }
 
 /// RGBA color backed by glam::Vec4 for SIMD performance.

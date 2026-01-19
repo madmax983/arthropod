@@ -323,6 +323,9 @@ impl super::RenderBackend for WgpuBackend {
                         color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
+                NodeContent::Text { .. } => {
+                    // TODO: Render text via separate text pipeline
+                }
                 NodeContent::Empty => {}
             }
         }
@@ -694,6 +697,9 @@ mod tests {
                         size: [node.bounds.width, node.bounds.height],
                         color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
+                }
+                NodeContent::Text { .. } => {
+                    // TODO: Render text via separate text pipeline
                 }
                 NodeContent::Empty => {}
             }
