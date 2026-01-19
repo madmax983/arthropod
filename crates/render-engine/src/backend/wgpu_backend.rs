@@ -1,7 +1,7 @@
 //! wgpu rendering backend implementation.
 
-use bevy_ecs::prelude::*;
 use crate::{Color, RendererError, Scene};
+use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tracing::{Level, debug, error, info, instrument, span, warn};
 use wgpu;

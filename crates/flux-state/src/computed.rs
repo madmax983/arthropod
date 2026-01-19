@@ -1,31 +1,30 @@
 //! Computed values - derived reactive state.
 
 use crate::runtime::{NodeId, Runtime};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A derived/computed value that automatically tracks dependencies.
 #[derive(Clone)]
 pub struct Computed<T> {
     id: NodeId,
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: Clone + 'static> Computed<T> {
+impl<T: Clone + 'static + Send> Computed<T> {
     /// Create a new computed value.
-    pub fn new<F>(runtime: Rc<Runtime>, compute: F) -> Self
+    pub fn new<F>(runtime: Arc<Runtime>, compute: F) -> Self
     where
-        F: Fn() -> T + 'static,
+        F: Fn() -> T + 'static + Send,
     {
         let id = runtime.create_computed(Box::new(move || {
-            Box::new(RefCell::new(compute())) as Box<dyn std::any::Any>
+            Box::new(Mutex::new(compute())) as Box<dyn std::any::Any + Send>
         }));
 
         // Initialize the value by computing it once
         let result = Self {
             id,
-            runtime: Rc::clone(&runtime),
+            runtime: Arc::clone(&runtime),
             _marker: std::marker::PhantomData,
         };
 
@@ -46,9 +45,10 @@ impl<T: Clone + 'static> Computed<T> {
 
         self.runtime
             .with_computed_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<RefCell<T>>()
+                v.downcast_ref::<Mutex<T>>()
                     .expect("Type mismatch")
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .clone()
             })
     }

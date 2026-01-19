@@ -10,13 +10,12 @@ use raw_window_handle::{
 };
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::sync::Once;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::Once;
 use windows::{
     Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::System::Threading::INFINITE,
-    Win32::UI::WindowsAndMessaging::*, core::*,
+    Win32::System::Threading::INFINITE, Win32::UI::WindowsAndMessaging::*, core::*,
 };
 
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
@@ -318,9 +317,9 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
             let _wait_result = if control_flow == ControlFlow::Wait {
                 // Wait indefinitely for messages (0% CPU when idle)
                 MsgWaitForMultipleObjectsEx(
-                    None,           // No handles to wait for
-                    INFINITE,       // Wait forever
-                    QS_ALLINPUT,    // Wake on any input
+                    None,        // No handles to wait for
+                    INFINITE,    // Wait forever
+                    QS_ALLINPUT, // Wake on any input
                     MWMO_INPUTAVAILABLE,
                 )
             } else {
@@ -328,7 +327,7 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
                 // Don't use sleep timeout - it adds to frame time, not replaces it
                 MsgWaitForMultipleObjectsEx(
                     None,
-                    0,              // Non-blocking (wgpu present will V-Sync)
+                    0, // Non-blocking (wgpu present will V-Sync)
                     QS_ALLINPUT,
                     MWMO_INPUTAVAILABLE,
                 )
@@ -352,9 +351,8 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
 
             // Only redraw windows that are actually dirty
             // This prevents unnecessary rendering when nothing has changed
-            let dirty_windows: Vec<WindowId> = DIRTY_WINDOWS.with(|dirty| {
-                dirty.borrow_mut().drain().collect()
-            });
+            let dirty_windows: Vec<WindowId> =
+                DIRTY_WINDOWS.with(|dirty| dirty.borrow_mut().drain().collect());
 
             for window_id in dirty_windows {
                 app.on_redraw(window_id);

@@ -8,7 +8,7 @@
 
 use arthropod_ecs::FrameworkContext;
 use hashbrown::HashMap;
-use render_engine::{backend::RectInstance, NodeId, Scene};
+use render_engine::{NodeId, Scene, backend::RectInstance};
 use std::time::{Duration, Instant};
 
 use crate::registry::SignalRegistry;

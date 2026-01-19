@@ -1,15 +1,18 @@
 //! Tests for reactive state primitives: Signal, Computed, Effect, and Runtime.
 
 use flux_state::{Computed, Effect, Runtime, Signal};
-use std::cell::Cell;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 // ==================== Runtime Tests ====================
 
 #[test]
 fn test_runtime_creation() {
     let runtime = Runtime::new();
-    assert!(Rc::strong_count(&runtime) >= 1, "Runtime should be created");
+    assert!(
+        Arc::strong_count(&runtime) >= 1,
+        "Runtime should be created"
+    );
 }
 
 // ==================== Signal Tests ====================
@@ -17,7 +20,7 @@ fn test_runtime_creation() {
 #[test]
 fn test_signal_creation_and_get() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 42);
+    let signal = Signal::new(Arc::clone(&runtime), 42);
     let (read, _write) = signal.split();
 
     assert_eq!(read.get(), 42);
@@ -26,7 +29,7 @@ fn test_signal_creation_and_get() {
 #[test]
 fn test_signal_set_and_get() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 0);
+    let signal = Signal::new(Arc::clone(&runtime), 0);
     let (read, write) = signal.split();
 
     write.set(100);
@@ -36,7 +39,7 @@ fn test_signal_set_and_get() {
 #[test]
 fn test_signal_update() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, write) = signal.split();
 
     write.update(|v| *v += 5);
@@ -46,7 +49,7 @@ fn test_signal_update() {
 #[test]
 fn test_signal_get_untracked() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 42);
+    let signal = Signal::new(Arc::clone(&runtime), 42);
     let (read, _write) = signal.split();
 
     // Should get value without tracking dependency
@@ -56,8 +59,8 @@ fn test_signal_get_untracked() {
 #[test]
 fn test_multiple_signals() {
     let runtime = Runtime::new();
-    let signal1 = Signal::new(Rc::clone(&runtime), 10);
-    let signal2 = Signal::new(Rc::clone(&runtime), 20);
+    let signal1 = Signal::new(Arc::clone(&runtime), 10);
+    let signal2 = Signal::new(Arc::clone(&runtime), 20);
 
     let (read1, _) = signal1.split();
     let (read2, _) = signal2.split();
@@ -69,7 +72,7 @@ fn test_multiple_signals() {
 #[test]
 fn test_signal_with_string() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), "Hello".to_string());
+    let signal = Signal::new(Arc::clone(&runtime), "Hello".to_string());
     let (read, write) = signal.split();
 
     assert_eq!(read.get(), "Hello");
@@ -83,10 +86,10 @@ fn test_signal_with_string() {
 #[test]
 fn test_computed_basic() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, _) = signal.split();
 
-    let doubled = Computed::new(Rc::clone(&runtime), {
+    let doubled = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() * 2
     });
@@ -97,10 +100,10 @@ fn test_computed_basic() {
 #[test]
 fn test_computed_updates_when_dependency_changes() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 5);
+    let signal = Signal::new(Arc::clone(&runtime), 5);
     let (read, write) = signal.split();
 
-    let doubled = Computed::new(Rc::clone(&runtime), {
+    let doubled = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() * 2
     });
@@ -118,13 +121,13 @@ fn test_computed_updates_when_dependency_changes() {
 #[test]
 fn test_computed_with_multiple_dependencies() {
     let runtime = Runtime::new();
-    let a = Signal::new(Rc::clone(&runtime), 3);
-    let b = Signal::new(Rc::clone(&runtime), 4);
+    let a = Signal::new(Arc::clone(&runtime), 3);
+    let b = Signal::new(Arc::clone(&runtime), 4);
 
     let (read_a, write_a) = a.split();
     let (read_b, _write_b) = b.split();
 
-    let sum = Computed::new(Rc::clone(&runtime), {
+    let sum = Computed::new(Arc::clone(&runtime), {
         let read_a = read_a.clone();
         let read_b = read_b.clone();
         move || read_a.get() + read_b.get()
@@ -143,15 +146,15 @@ fn test_computed_with_multiple_dependencies() {
 #[test]
 fn test_computed_chain() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 2);
+    let signal = Signal::new(Arc::clone(&runtime), 2);
     let (read, write) = signal.split();
 
-    let doubled = Computed::new(Rc::clone(&runtime), {
+    let doubled = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() * 2
     });
 
-    let quadrupled = Computed::new(Rc::clone(&runtime), {
+    let quadrupled = Computed::new(Arc::clone(&runtime), {
         let doubled = doubled.clone();
         move || doubled.get() * 2
     });
@@ -167,130 +170,150 @@ fn test_computed_chain() {
 #[test]
 fn test_effect_runs_initially() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, _) = signal.split();
 
-    let run_count = Rc::new(Cell::new(0));
-    let run_count_clone = Rc::clone(&run_count);
+    let run_count = Arc::new(AtomicI32::new(0));
+    let run_count_clone = Arc::clone(&run_count);
 
-    let _effect = Effect::new(Rc::clone(&runtime), move || {
+    let _effect = Effect::new(Arc::clone(&runtime), move || {
         let _ = read.get();
-        run_count_clone.set(run_count_clone.get() + 1);
+        run_count_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    assert_eq!(run_count.get(), 1, "Effect should run once initially");
+    assert_eq!(
+        run_count.load(Ordering::Relaxed),
+        1,
+        "Effect should run once initially"
+    );
 }
 
 #[test]
 fn test_effect_runs_when_dependency_changes() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, write) = signal.split();
 
-    let run_count = Rc::new(Cell::new(0));
-    let run_count_clone = Rc::clone(&run_count);
+    let run_count = Arc::new(AtomicI32::new(0));
+    let run_count_clone = Arc::clone(&run_count);
 
-    let _effect = Effect::new(Rc::clone(&runtime), move || {
+    let _effect = Effect::new(Arc::clone(&runtime), move || {
         let _ = read.get();
-        run_count_clone.set(run_count_clone.get() + 1);
+        run_count_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    assert_eq!(run_count.get(), 1, "Initial run");
+    assert_eq!(run_count.load(Ordering::Relaxed), 1, "Initial run");
 
     write.set(20);
-    assert_eq!(run_count.get(), 2, "Effect should run when signal changes");
+    assert_eq!(
+        run_count.load(Ordering::Relaxed),
+        2,
+        "Effect should run when signal changes"
+    );
 
     write.set(30);
-    assert_eq!(run_count.get(), 3, "Effect should run again");
+    assert_eq!(
+        run_count.load(Ordering::Relaxed),
+        3,
+        "Effect should run again"
+    );
 }
 
 #[test]
 fn test_effect_tracks_correct_dependencies() {
     let runtime = Runtime::new();
-    let signal1 = Signal::new(Rc::clone(&runtime), 10);
-    let signal2 = Signal::new(Rc::clone(&runtime), 20);
+    let signal1 = Signal::new(Arc::clone(&runtime), 10);
+    let signal2 = Signal::new(Arc::clone(&runtime), 20);
 
     let (read1, write1) = signal1.split();
     let (_read2, write2) = signal2.split();
 
-    let run_count = Rc::new(Cell::new(0));
-    let run_count_clone = Rc::clone(&run_count);
+    let run_count = Arc::new(AtomicI32::new(0));
+    let run_count_clone = Arc::clone(&run_count);
 
     // Effect only depends on signal1
-    let _effect = Effect::new(Rc::clone(&runtime), move || {
+    let _effect = Effect::new(Arc::clone(&runtime), move || {
         let _ = read1.get();
-        run_count_clone.set(run_count_clone.get() + 1);
+        run_count_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    assert_eq!(run_count.get(), 1, "Initial run");
+    assert_eq!(run_count.load(Ordering::Relaxed), 1, "Initial run");
 
     write1.set(100);
-    assert_eq!(run_count.get(), 2, "Should run when signal1 changes");
+    assert_eq!(
+        run_count.load(Ordering::Relaxed),
+        2,
+        "Should run when signal1 changes"
+    );
 
     write2.set(200);
-    assert_eq!(run_count.get(), 2, "Should NOT run when signal2 changes");
+    assert_eq!(
+        run_count.load(Ordering::Relaxed),
+        2,
+        "Should NOT run when signal2 changes"
+    );
 }
 
 #[test]
 fn test_effect_with_computed() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 5);
+    let signal = Signal::new(Arc::clone(&runtime), 5);
     let (read, write) = signal.split();
 
-    let doubled = Computed::new(Rc::clone(&runtime), {
+    let doubled = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() * 2
     });
 
-    let run_count = Rc::new(Cell::new(0));
-    let last_value = Rc::new(Cell::new(0));
+    let run_count = Arc::new(AtomicI32::new(0));
+    let last_value = Arc::new(AtomicI32::new(0));
 
-    let run_count_clone = Rc::clone(&run_count);
-    let last_value_clone = Rc::clone(&last_value);
+    let run_count_clone = Arc::clone(&run_count);
+    let last_value_clone = Arc::clone(&last_value);
 
-    let _effect = Effect::new(Rc::clone(&runtime), move || {
+    let _effect = Effect::new(Arc::clone(&runtime), move || {
         let value = doubled.get();
-        run_count_clone.set(run_count_clone.get() + 1);
-        last_value_clone.set(value);
+        run_count_clone.fetch_add(1, Ordering::Relaxed);
+        last_value_clone.store(value, Ordering::Relaxed);
     });
 
-    assert_eq!(run_count.get(), 1);
-    assert_eq!(last_value.get(), 10);
+    assert_eq!(run_count.load(Ordering::Relaxed), 1);
+    assert_eq!(last_value.load(Ordering::Relaxed), 10);
 
     write.set(10);
-    assert_eq!(run_count.get(), 2);
-    assert_eq!(last_value.get(), 20);
+    assert_eq!(run_count.load(Ordering::Relaxed), 2);
+    assert_eq!(last_value.load(Ordering::Relaxed), 20);
 }
 
 #[test]
 fn test_multiple_effects_on_same_signal() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 0);
+    let signal = Signal::new(Arc::clone(&runtime), 0);
     let (read, write) = signal.split();
 
-    let count1 = Rc::new(Cell::new(0));
-    let count2 = Rc::new(Cell::new(0));
+    let count1 = Arc::new(AtomicI32::new(0));
+    let count2 = Arc::new(AtomicI32::new(0));
 
-    let count1_clone = Rc::clone(&count1);
-    let count2_clone = Rc::clone(&count2);
+    let count1_clone = Arc::clone(&count1);
+    let count2_clone = Arc::clone(&count2);
 
     let read1 = read.clone();
-    let _effect1 = Effect::new(Rc::clone(&runtime), move || {
+    let _effect1 = Effect::new(Arc::clone(&runtime), move || {
         let _ = read1.get();
-        count1_clone.set(count1_clone.get() + 1);
+        count1_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    let _effect2 = Effect::new(Rc::clone(&runtime), move || {
+    let _effect2 = Effect::new(Arc::clone(&runtime), move || {
         let _ = read.get();
-        count2_clone.set(count2_clone.get() + 1);
+        count2_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    assert_eq!(count1.get(), 1);
-    assert_eq!(count2.get(), 1);
+    assert_eq!(count1.load(Ordering::Relaxed), 1);
+    assert_eq!(count2.load(Ordering::Relaxed), 1);
 
     write.set(10);
-    assert_eq!(count1.get(), 2, "Both effects should run");
-    assert_eq!(count2.get(), 2, "Both effects should run");
+    assert_eq!(count1.load(Ordering::Relaxed), 2, "Both effects should run");
+    assert_eq!(count2.load(Ordering::Relaxed), 2, "Both effects should run");
 }
 
 // ==================== Complex Dependency Graph Tests ====================
@@ -298,21 +321,21 @@ fn test_multiple_effects_on_same_signal() {
 #[test]
 fn test_diamond_dependency() {
     let runtime = Runtime::new();
-    let source = Signal::new(Rc::clone(&runtime), 1);
+    let source = Signal::new(Arc::clone(&runtime), 1);
     let (read, write) = source.split();
 
     // Diamond: source -> left/right -> result
-    let left = Computed::new(Rc::clone(&runtime), {
+    let left = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() + 10
     });
 
-    let right = Computed::new(Rc::clone(&runtime), {
+    let right = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() + 20
     });
 
-    let result = Computed::new(Rc::clone(&runtime), {
+    let result = Computed::new(Arc::clone(&runtime), {
         let left = left.clone();
         let right = right.clone();
         move || left.get() + right.get()
@@ -327,25 +350,28 @@ fn test_diamond_dependency() {
 #[test]
 fn test_effect_doesnt_run_if_dependencies_dont_change() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, write) = signal.split();
 
-    let run_count = Rc::new(Cell::new(0));
-    let run_count_clone = Rc::clone(&run_count);
+    let run_count = Arc::new(AtomicI32::new(0));
+    let run_count_clone = Arc::clone(&run_count);
 
-    let _effect = Effect::new(Rc::clone(&runtime), move || {
+    let _effect = Effect::new(Arc::clone(&runtime), move || {
         let _ = read.get();
-        run_count_clone.set(run_count_clone.get() + 1);
+        run_count_clone.fetch_add(1, Ordering::Relaxed);
     });
 
-    assert_eq!(run_count.get(), 1);
+    assert_eq!(run_count.load(Ordering::Relaxed), 1);
 
     // Set to same value
     write.set(10);
 
     // Effect should still run (we notify on any set, even if value doesn't change)
     // This is a design choice - can be optimized later
-    assert!(run_count.get() >= 1, "Effect behavior on same-value set");
+    assert!(
+        run_count.load(Ordering::Relaxed) >= 1,
+        "Effect behavior on same-value set"
+    );
 }
 
 // ==================== Edge Cases ====================
@@ -353,7 +379,7 @@ fn test_effect_doesnt_run_if_dependencies_dont_change() {
 #[test]
 fn test_signal_clone() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 42);
+    let signal = Signal::new(Arc::clone(&runtime), 42);
     let (read1, _) = signal.split();
     let read2 = read1.clone();
 
@@ -364,10 +390,10 @@ fn test_signal_clone() {
 #[test]
 fn test_computed_clone() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 10);
+    let signal = Signal::new(Arc::clone(&runtime), 10);
     let (read, _) = signal.split();
 
-    let computed = Computed::new(Rc::clone(&runtime), {
+    let computed = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() * 2
     });
@@ -381,20 +407,20 @@ fn test_computed_clone() {
 #[test]
 fn test_deeply_nested_dependencies() {
     let runtime = Runtime::new();
-    let signal = Signal::new(Rc::clone(&runtime), 1);
+    let signal = Signal::new(Arc::clone(&runtime), 1);
     let (read, write) = signal.split();
 
-    let c1 = Computed::new(Rc::clone(&runtime), {
+    let c1 = Computed::new(Arc::clone(&runtime), {
         let read = read.clone();
         move || read.get() + 1
     });
 
-    let c2 = Computed::new(Rc::clone(&runtime), {
+    let c2 = Computed::new(Arc::clone(&runtime), {
         let c1 = c1.clone();
         move || c1.get() + 1
     });
 
-    let c3 = Computed::new(Rc::clone(&runtime), {
+    let c3 = Computed::new(Arc::clone(&runtime), {
         let c2 = c2.clone();
         move || c2.get() + 1
     });

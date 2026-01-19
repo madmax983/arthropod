@@ -7,7 +7,10 @@ fn test_all_tools_registered() {
     let info = server.get_info();
 
     // Verify server has tools capability
-    assert!(info.capabilities.tools.is_some(), "Server should have tools capability");
+    assert!(
+        info.capabilities.tools.is_some(),
+        "Server should have tools capability"
+    );
 
     println!("Server info: {:?}", info);
     println!("Capabilities: {:?}", info.capabilities);
@@ -23,5 +26,8 @@ fn test_server_initialization() {
     let info = server.get_info();
 
     assert_eq!(info.server_info.name, "rmcp");
-    assert_eq!(info.instructions, Some("Arthropod MCP server - GUI framework testing and automation".to_string()));
+    assert_eq!(
+        info.instructions,
+        Some("Arthropod MCP server - GUI framework testing and automation".to_string())
+    );
 }

@@ -22,7 +22,10 @@ mod tests {
         assert_eq!(custom.a(), glam_color.w);
 
         // Verify array conversion
-        assert_eq!([custom.r(), custom.g(), custom.b(), custom.a()], glam_color.to_array());
+        assert_eq!(
+            [custom.r(), custom.g(), custom.b(), custom.a()],
+            glam_color.to_array()
+        );
     }
 
     #[test]
@@ -34,11 +37,17 @@ mod tests {
 
         let green = Color::GREEN;
         let glam_green = Vec4::new(0.0, 1.0, 0.0, 1.0);
-        assert_eq!([green.r(), green.g(), green.b(), green.a()], glam_green.to_array());
+        assert_eq!(
+            [green.r(), green.g(), green.b(), green.a()],
+            glam_green.to_array()
+        );
 
         let blue = Color::BLUE;
         let glam_blue = Vec4::new(0.0, 0.0, 1.0, 1.0);
-        assert_eq!([blue.r(), blue.g(), blue.b(), blue.a()], glam_blue.to_array());
+        assert_eq!(
+            [blue.r(), blue.g(), blue.b(), blue.a()],
+            glam_blue.to_array()
+        );
     }
 
     /// Test that Transform2D::identity matches Affine2::IDENTITY

@@ -165,3 +165,14 @@ fn test_multiple_windows_class_registration() {
     assert_ne!(window2.id(), window3.id());
     assert_ne!(window1.id(), window3.id());
 }
+
+#[test]
+fn test_window_request_redraw() {
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create window");
+
+    // Should be able to request redraw without panicking
+    window.request_redraw();
+}

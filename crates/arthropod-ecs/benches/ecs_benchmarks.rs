@@ -8,10 +8,10 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use flux_state::{Runtime, Signal};
 use plat_core::Rect;
 use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Create a test scene with N rectangles
-fn create_test_scene(n: usize) -> (FrameworkContext, Vec<Rc<Runtime>>) {
+fn create_test_scene(n: usize) -> (FrameworkContext, Vec<Arc<Runtime>>) {
     let mut context = FrameworkContext::new();
     let mut runtimes = Vec::new();
 

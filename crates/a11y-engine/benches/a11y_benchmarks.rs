@@ -3,7 +3,7 @@
 //! Measures key operations to ensure < 100 μs overhead per frame.
 
 use a11y_engine::{A11yNode, A11yTree, AccessibleName, Role};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use plat_core::Rect;
 
 /// Benchmark adding nodes to the tree

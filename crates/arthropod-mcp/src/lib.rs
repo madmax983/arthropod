@@ -39,9 +39,12 @@ pub mod tools;
 
 // Re-export main types
 pub use context::McpFrameworkContext;
-pub use live::{start_tcp_server, connect_to_mcp_server, AppMessage, ServerMessage, ConnectedApp, AppConnection, MCP_PORT};
-pub use protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
-pub use registry::{SignalRegistry, SignalEntry};
+pub use live::{
+    AppConnection, AppMessage, ConnectedApp, MCP_PORT, ServerMessage, connect_to_mcp_server,
+    start_tcp_server,
+};
+pub use protocol::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
+pub use registry::{SignalEntry, SignalRegistry};
 pub use server::ArthropodServer;
 pub use tools::{Tool, ToolRegistry};
 

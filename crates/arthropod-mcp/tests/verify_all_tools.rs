@@ -32,7 +32,11 @@ async fn verify_all_tools() {
         // DISABLED: test_create_scene, test_assert_node_state, test_verify_render_output, test_setup_reactive_chain
     ];
 
-    assert_eq!(expected_tools.len(), 14, "Should have exactly 14 tools enabled");
+    assert_eq!(
+        expected_tools.len(),
+        14,
+        "Should have exactly 14 tools enabled"
+    );
 
     println!("\n✓ 14 tools are enabled (6 disabled due to JSON Schema issues):");
     for (i, tool) in expected_tools.iter().enumerate() {

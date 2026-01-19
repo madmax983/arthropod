@@ -100,17 +100,21 @@ impl Scene {
     pub fn serialize_to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         use serde_json::json;
 
-        let nodes: Vec<_> = self.nodes.iter().map(|(id, node)| {
-            json!({
-                "id": id.0,
-                "content": node.content,
-                "transform": node.transform,
-                "bounds": node.bounds,
-                "children": node.children,
-                "visible": node.visible,
-                "opacity": node.opacity,
+        let nodes: Vec<_> = self
+            .nodes
+            .iter()
+            .map(|(id, node)| {
+                json!({
+                    "id": id.0,
+                    "content": node.content,
+                    "transform": node.transform,
+                    "bounds": node.bounds,
+                    "children": node.children,
+                    "visible": node.visible,
+                    "opacity": node.opacity,
+                })
             })
-        }).collect();
+            .collect();
 
         Ok(json!({
             "root": self.root.0,

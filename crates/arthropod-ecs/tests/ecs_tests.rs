@@ -112,7 +112,8 @@ fn test_reactive_transform_updates_scene_node() {
     let new_result = new_transform.transform_point(test_point);
 
     assert!(
-        (node_result.x - new_result.x).abs() < 0.001 && (node_result.y - new_result.y).abs() < 0.001,
+        (node_result.x - new_result.x).abs() < 0.001
+            && (node_result.y - new_result.y).abs() < 0.001,
         "Transform mismatch"
     );
 }

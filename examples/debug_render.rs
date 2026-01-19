@@ -5,6 +5,7 @@ use arthropod_test::{RenderDocCapture, init_test_tracing};
 
 struct DebugApp {
     app: arthropod::App,
+    #[allow(dead_code)]
     node_id: NodeId,
     renderdoc: RenderDocCapture,
     frame_count: u32,

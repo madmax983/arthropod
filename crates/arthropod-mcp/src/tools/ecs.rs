@@ -2,11 +2,11 @@
 
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use arthropod_ecs::{Renderable, SceneNodeRef};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ============================================================================
 // ecs.query_entities
@@ -82,7 +82,7 @@ impl Tool for QueryEntitiesTool {
         for (entity, node_ref, renderable) in query.iter(world) {
             let mut components = Vec::new();
 
-            if let Some(_) = node_ref {
+            if node_ref.is_some() {
                 components.push("SceneNodeRef".to_string());
             }
 
@@ -91,16 +91,22 @@ impl Tool for QueryEntitiesTool {
             }
 
             // Check filters
-            if !params.with_components.is_empty() {
-                if !params.with_components.iter().all(|c| components.contains(c)) {
-                    continue;
-                }
+            if !params.with_components.is_empty()
+                && !params
+                    .with_components
+                    .iter()
+                    .all(|c| components.contains(c))
+            {
+                continue;
             }
 
-            if !params.without_components.is_empty() {
-                if params.without_components.iter().any(|c| components.contains(c)) {
-                    continue;
-                }
+            if !params.without_components.is_empty()
+                && params
+                    .without_components
+                    .iter()
+                    .any(|c| components.contains(c))
+            {
+                continue;
             }
 
             entities.push(EntityData {
@@ -236,7 +242,7 @@ impl Tool for CountEntitiesTool {
         for (_entity, node_ref, renderable) in query.iter(world) {
             let mut components = Vec::new();
 
-            if let Some(_) = node_ref {
+            if node_ref.is_some() {
                 components.push("SceneNodeRef".to_string());
             }
 
@@ -245,7 +251,10 @@ impl Tool for CountEntitiesTool {
             }
 
             if params.with_components.is_empty()
-                || params.with_components.iter().all(|c| components.contains(c))
+                || params
+                    .with_components
+                    .iter()
+                    .all(|c| components.contains(c))
             {
                 count += 1;
             }
@@ -519,7 +528,12 @@ mod tests {
         assert!(total >= 2);
         assert!(linked >= 2);
         assert_eq!(
-            result.get("broken_links").unwrap().as_array().unwrap().len(),
+            result
+                .get("broken_links")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
             0
         );
     }

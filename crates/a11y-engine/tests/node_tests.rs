@@ -136,10 +136,7 @@ fn test_node_default() {
     let node = A11yNode::default();
 
     assert_eq!(node.role, Role::Group); // Default to generic group
-    assert!(matches!(
-        node.name,
-        AccessibleName::ComputedFromChildren
-    ));
+    assert!(matches!(node.name, AccessibleName::ComputedFromChildren));
     assert!(node.description.is_none());
     assert!(node.actions.is_empty());
     assert!(node.children.is_empty());

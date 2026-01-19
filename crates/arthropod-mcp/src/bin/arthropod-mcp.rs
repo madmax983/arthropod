@@ -9,7 +9,7 @@
 //! cargo run --bin arthropod-mcp
 //! ```
 
-use arthropod_mcp::{ArthropodServer, McpFrameworkContext, start_tcp_server, MCP_PORT};
+use arthropod_mcp::{ArthropodServer, MCP_PORT, McpFrameworkContext, start_tcp_server};
 use render_engine::{Color, NodeContent, SceneNode};
 use rmcp::ServiceExt;
 use tokio::io::{stdin, stdout};
@@ -26,7 +26,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Start TCP server for live app connections
     let connected_app = start_tcp_server();
-    tracing::info!("TCP server listening on localhost:{} for app connections", MCP_PORT);
+    tracing::info!(
+        "TCP server listening on localhost:{} for app connections",
+        MCP_PORT
+    );
 
     // Create framework context (used as fallback when no app is connected)
     let mut context = McpFrameworkContext::new();
@@ -69,9 +72,7 @@ fn setup_test_scene(ctx: &mut McpFrameworkContext) {
         let background = scene.add_node(root, bg_node);
 
         // Red rectangle
-        let mut rect1_node = SceneNode::new(NodeContent::Rect {
-            color: Color::RED,
-        });
+        let mut rect1_node = SceneNode::new(NodeContent::Rect { color: Color::RED });
         rect1_node.bounds = plat_core::Rect::new(100.0, 100.0, 200.0, 150.0);
         rect1_node.visible = true;
         rect1_node.opacity = 1.0;

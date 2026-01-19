@@ -22,15 +22,10 @@ pub const MCP_PORT: u16 = 7777;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AppMessage {
     /// App registration
-    Register {
-        name: String,
-        pid: u32,
-    },
+    Register { name: String, pid: u32 },
 
     /// Scene state update (full scene serialized as JSON)
-    SceneUpdate {
-        scene: Value,
-    },
+    SceneUpdate { scene: Value },
 
     /// Keep-alive heartbeat
     Heartbeat,
@@ -98,10 +93,7 @@ pub fn start_tcp_server() -> Arc<Mutex<Option<ConnectedApp>>> {
 }
 
 /// Handle a connection from an Arthropod app
-fn handle_app_connection(
-    stream: TcpStream,
-    connected_app: Arc<Mutex<Option<ConnectedApp>>>,
-) {
+fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<ConnectedApp>>>) {
     let mut reader = BufReader::new(stream.try_clone().expect("Failed to clone stream"));
     let mut line = String::new();
 
@@ -131,7 +123,10 @@ fn handle_app_connection(
             }
             Ok(AppMessage::SceneUpdate { scene }) => {
                 if let Some(app) = connected_app.lock().unwrap().as_mut() {
-                    let node_count = scene.get("node_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let node_count = scene
+                        .get("node_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
                     app.scene = Some(scene);
                     tracing::info!("Scene state updated from app - {} nodes", node_count);
                 }
@@ -167,12 +162,13 @@ pub fn connect_to_mcp_server(app_name: impl Into<String>) -> Result<AppConnectio
         name: app_name.clone(),
         pid,
     };
-    writeln!(&mut stream_clone, "{}", serde_json::to_string(&register_msg).unwrap())?;
+    writeln!(
+        &mut stream_clone,
+        "{}",
+        serde_json::to_string(&register_msg).unwrap()
+    )?;
 
-    Ok(AppConnection {
-        stream,
-        app_name,
-    })
+    Ok(AppConnection { stream, app_name })
 }
 
 /// Handle for an app connected to the MCP server

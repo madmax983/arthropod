@@ -5,6 +5,7 @@ use arthropod::prelude::*;
 
 struct TestApp {
     app: arthropod::App,
+    #[allow(dead_code)]
     node_id: NodeId,
 }
 

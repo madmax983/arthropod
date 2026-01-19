@@ -5,8 +5,10 @@ use crate::live::ConnectedApp;
 use crate::tools::Tool as ArthropodTool;
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo, Implementation, ProtocolVersion};
-use rmcp::{tool, tool_router, tool_handler, ErrorData as McpError, ServerHandler};
+use rmcp::model::{
+    CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo,
+};
+use rmcp::{ErrorData as McpError, ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -149,6 +151,12 @@ pub struct ArthropodServer {
     tool_router: ToolRouter<Self>,
 }
 
+impl Default for ArthropodServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[tool_router]
 impl ArthropodServer {
     pub fn new() -> Self {
@@ -167,7 +175,10 @@ impl ArthropodServer {
         }
     }
 
-    pub fn with_live_app(context: McpFrameworkContext, connected_app: Arc<Mutex<Option<ConnectedApp>>>) -> Self {
+    pub fn with_live_app(
+        context: McpFrameworkContext,
+        connected_app: Arc<Mutex<Option<ConnectedApp>>>,
+    ) -> Self {
         Self {
             context: Arc::new(Mutex::new(context)),
             connected_app,
@@ -199,33 +210,42 @@ impl ArthropodServer {
     // ========================================================================
 
     #[tool(description = "List all scene nodes with optional filtering")]
-    async fn scene_list_nodes(&self, params: Parameters<ListNodesParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_list_nodes(
+        &self,
+        params: Parameters<ListNodesParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut output = self.get_source_banner();
 
         // Check if we have live scene data
-        if let Some(app) = self.connected_app.lock().unwrap().as_ref() {
-            if let Some(scene_json) = &app.scene {
-                // Use live scene data
-                if let Some(nodes) = scene_json.get("nodes") {
-                    let filtered_nodes = nodes.as_array()
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .filter(|node| {
-                            if params.0.visible_only {
-                                node.get("visible").and_then(|v| v.as_bool()).unwrap_or(true)
-                            } else {
-                                true
-                            }
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>();
+        if let Some(app) = self.connected_app.lock().unwrap().as_ref()
+            && let Some(scene_json) = &app.scene
+        {
+            // Use live scene data
+            if let Some(nodes) = scene_json.get("nodes") {
+                let filtered_nodes = nodes
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter(|node| {
+                        if params.0.visible_only {
+                            node.get("visible")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(true)
+                        } else {
+                            true
+                        }
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
 
-                    output.push_str(&serde_json::to_string_pretty(&serde_json::json!({
+                output.push_str(
+                    &serde_json::to_string_pretty(&serde_json::json!({
                         "nodes": filtered_nodes,
                         "count": filtered_nodes.len(),
-                    })).unwrap());
-                    return Ok(CallToolResult::success(vec![Content::text(output)]));
-                }
+                    }))
+                    .unwrap(),
+                );
+                return Ok(CallToolResult::success(vec![Content::text(output)]));
             }
         }
 
@@ -245,7 +265,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Get detailed information about a specific scene node")]
-    async fn scene_get_node(&self, params: Parameters<GetNodeParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_get_node(
+        &self,
+        params: Parameters<GetNodeParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::scene::GetNodeTool;
 
@@ -262,7 +285,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Query the scene hierarchy tree")]
-    async fn scene_query_hierarchy(&self, params: Parameters<QueryHierarchyParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_query_hierarchy(
+        &self,
+        params: Parameters<QueryHierarchyParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::scene::QueryHierarchyTool;
 
@@ -278,7 +304,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Find all nodes at a specific screen position")]
-    async fn scene_find_nodes_at_position(&self, params: Parameters<FindNodesAtPositionParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_find_nodes_at_position(
+        &self,
+        params: Parameters<FindNodesAtPositionParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::scene::FindNodesAtPositionTool;
 
@@ -294,7 +323,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Update properties of a scene node")]
-    async fn scene_update_node(&self, params: Parameters<UpdateNodeParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_update_node(
+        &self,
+        params: Parameters<UpdateNodeParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::scene::UpdateNodeTool;
 
@@ -310,7 +342,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Mark a node as dirty to trigger re-render")]
-    async fn scene_mark_dirty(&self, params: Parameters<MarkDirtyParams>) -> Result<CallToolResult, McpError> {
+    async fn scene_mark_dirty(
+        &self,
+        params: Parameters<MarkDirtyParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::scene::MarkDirtyTool;
 
@@ -330,7 +365,10 @@ impl ArthropodServer {
     // ========================================================================
 
     #[tool(description = "Query entities by components")]
-    async fn ecs_query_entities(&self, params: Parameters<QueryEntitiesParams>) -> Result<CallToolResult, McpError> {
+    async fn ecs_query_entities(
+        &self,
+        params: Parameters<QueryEntitiesParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::ecs::QueryEntitiesTool;
 
@@ -347,7 +385,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Get detailed entity information")]
-    async fn ecs_get_entity(&self, params: Parameters<GetEntityParams>) -> Result<CallToolResult, McpError> {
+    async fn ecs_get_entity(
+        &self,
+        params: Parameters<GetEntityParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::ecs::GetEntityTool;
 
@@ -363,7 +404,10 @@ impl ArthropodServer {
     }
 
     #[tool(description = "Count entities matching filter")]
-    async fn ecs_count_entities(&self, params: Parameters<CountEntitiesParams>) -> Result<CallToolResult, McpError> {
+    async fn ecs_count_entities(
+        &self,
+        params: Parameters<CountEntitiesParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::ecs::CountEntitiesTool;
 
@@ -443,7 +487,10 @@ impl ArthropodServer {
     // }
 
     #[tool(description = "Get current signal value")]
-    async fn state_get_signal(&self, params: Parameters<GetSignalParams>) -> Result<CallToolResult, McpError> {
+    async fn state_get_signal(
+        &self,
+        params: Parameters<GetSignalParams>,
+    ) -> Result<CallToolResult, McpError> {
         let mut ctx = self.context.lock().unwrap();
         let tool = crate::tools::state::GetSignalTool;
 
@@ -562,7 +609,9 @@ impl ServerHandler for ArthropodServer {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation::from_build_env(),
-            instructions: Some("Arthropod MCP server - GUI framework testing and automation".to_string()),
+            instructions: Some(
+                "Arthropod MCP server - GUI framework testing and automation".to_string(),
+            ),
         }
     }
 }

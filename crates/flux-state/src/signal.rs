@@ -1,13 +1,12 @@
 //! Signal primitive - the atomic unit of reactive state.
 
 use crate::runtime::{NodeId, Runtime};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A reactive signal - the atomic unit of state.
 pub struct Signal<T> {
     id: NodeId,
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -15,7 +14,7 @@ pub struct Signal<T> {
 #[derive(Clone)]
 pub struct ReadSignal<T> {
     id: NodeId,
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -23,14 +22,14 @@ pub struct ReadSignal<T> {
 #[derive(Clone)]
 pub struct WriteSignal<T> {
     id: NodeId,
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: 'static> Signal<T> {
+impl<T: 'static + Send> Signal<T> {
     /// Create a new signal with an initial value.
-    pub fn new(runtime: Rc<Runtime>, value: T) -> Self {
-        let id = runtime.create_signal(Box::new(RefCell::new(value)));
+    pub fn new(runtime: Arc<Runtime>, value: T) -> Self {
+        let id = runtime.create_signal(Box::new(Mutex::new(value)));
         Self {
             id,
             runtime,
@@ -43,27 +42,28 @@ impl<T: 'static> Signal<T> {
         (
             ReadSignal {
                 id: self.id,
-                runtime: Rc::clone(&self.runtime),
+                runtime: Arc::clone(&self.runtime),
                 _marker: std::marker::PhantomData,
             },
             WriteSignal {
                 id: self.id,
-                runtime: Rc::clone(&self.runtime),
+                runtime: Arc::clone(&self.runtime),
                 _marker: std::marker::PhantomData,
             },
         )
     }
 }
 
-impl<T: Clone + 'static> ReadSignal<T> {
+impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// Get the current value (tracks dependency).
     pub fn get(&self) -> T {
         self.runtime.track(self.id);
         self.runtime
             .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<RefCell<T>>()
+                v.downcast_ref::<Mutex<T>>()
                     .expect("Type mismatch")
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .clone()
             })
     }
@@ -72,22 +72,24 @@ impl<T: Clone + 'static> ReadSignal<T> {
     pub fn get_untracked(&self) -> T {
         self.runtime
             .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<RefCell<T>>()
+                v.downcast_ref::<Mutex<T>>()
                     .expect("Type mismatch")
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .clone()
             })
     }
 }
 
-impl<T: 'static> WriteSignal<T> {
+impl<T: 'static + Send> WriteSignal<T> {
     /// Set a new value.
     pub fn set(&self, value: T) {
         self.runtime
             .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                *v.downcast_ref::<RefCell<T>>()
+                *v.downcast_ref::<Mutex<T>>()
                     .expect("Type mismatch")
-                    .borrow_mut() = value;
+                    .lock()
+                    .unwrap() = value;
             });
         self.runtime.notify(self.id);
     }
@@ -97,9 +99,10 @@ impl<T: 'static> WriteSignal<T> {
         self.runtime
             .with_signal_value(self.id, |v: &dyn std::any::Any| {
                 f(&mut v
-                    .downcast_ref::<RefCell<T>>()
+                    .downcast_ref::<Mutex<T>>()
                     .expect("Type mismatch")
-                    .borrow_mut());
+                    .lock()
+                    .unwrap());
             });
         self.runtime.notify(self.id);
     }

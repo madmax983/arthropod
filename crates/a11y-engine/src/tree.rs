@@ -2,8 +2,8 @@
 //!
 //! Manages the accessibility node hierarchy and synchronization with platform bridges.
 
-use bevy_ecs::prelude::Resource;
 use crate::node::{A11yId, A11yNode, Role};
+use bevy_ecs::prelude::Resource;
 use std::collections::{HashMap, HashSet};
 
 /// Accessibility tree - manages accessible nodes and platform synchronization
@@ -140,10 +140,10 @@ impl A11yTree {
         };
 
         // Remove from parent's children
-        if let Some(parent_id) = node.parent {
-            if let Some(parent) = self.nodes.get_mut(&parent_id) {
-                parent.children.retain(|child_id| *child_id != id);
-            }
+        if let Some(parent_id) = node.parent
+            && let Some(parent) = self.nodes.get_mut(&parent_id)
+        {
+            parent.children.retain(|child_id| *child_id != id);
         }
 
         // Recursively remove children
@@ -227,4 +227,3 @@ mod tests {
         assert_eq!(tree.node_count(), 2);
     }
 }
-

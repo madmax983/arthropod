@@ -1,197 +1,240 @@
 //! Tests for macOS platform backend.
 //!
-//! These tests only run on macOS.
+//! These tests only run on macOS and mirror the Windows tests.
 
 #![cfg(target_os = "macos")]
 
-use plat_core::{EventLoop, Size, Window, WindowConfig};
+use plat_core::{EventLoop, Position, Size, WindowConfig};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 
 #[test]
 fn test_create_event_loop() {
-    // Should be able to create an event loop
     let event_loop = EventLoop::new();
-    assert!(event_loop.is_ok());
+    assert!(
+        event_loop.is_ok(),
+        "Failed to create event loop: {:?}",
+        event_loop.err()
+    );
 }
 
 #[test]
 fn test_create_window_with_default_config() {
-    // Should be able to create a window with default configuration
-    let event_loop = EventLoop::new().unwrap();
-    let config = WindowConfig::default();
-    let window = Window::new(&event_loop, config);
-    assert!(window.is_ok());
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
+    let window = event_loop.create_window(WindowConfig::default());
+    assert!(
+        window.is_ok(),
+        "Failed to create window: {:?}",
+        window.err()
+    );
 }
 
 #[test]
 fn test_window_has_unique_id() {
-    // Each window should have a unique ID
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
 
-    let window1 = Window::new(&event_loop, WindowConfig::default()).unwrap();
-    let window2 = Window::new(&event_loop, WindowConfig::default()).unwrap();
+    let window1 = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create first window");
+    let window2 = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create second window");
 
-    assert_ne!(window1.id(), window2.id());
+    assert_ne!(window1.id(), window2.id(), "Windows should have unique IDs");
 }
 
 #[test]
 fn test_window_respects_size_config() {
-    // Window should respect the size specified in config
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
     let config = WindowConfig {
-        size: Size {
-            width: 640,
-            height: 480,
-        },
+        size: Size::new(640, 480),
         ..Default::default()
     };
 
-    let window = Window::new(&event_loop, config).unwrap();
-    let size = window.inner_size();
+    let window = event_loop
+        .create_window(config)
+        .expect("Failed to create window");
 
+    let size = window.inner_size();
     // Note: macOS might adjust window size, so we check it's reasonable
-    assert!(size.width > 0);
-    assert!(size.height > 0);
+    assert!(
+        size.width > 0 && size.height > 0,
+        "Window size should be positive: {}x{}",
+        size.width,
+        size.height
+    );
 }
 
 #[test]
 fn test_window_title() {
-    // Window should have the specified title
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
     let config = WindowConfig {
-        title: "Test Window".to_string(),
+        title: "Test Window".into(),
         ..Default::default()
     };
 
-    let window = Window::new(&event_loop, config);
-    assert!(window.is_ok());
-    // Note: We can't easily read back the title on macOS without additional APIs,
-    // but we verify the window creates successfully with a title
+    let window = event_loop
+        .create_window(config)
+        .expect("Failed to create window");
+
+    // We can set a title without panicking
+    window.set_title("New Title");
 }
 
 #[test]
 fn test_window_scale_factor() {
-    // Window should have a valid scale factor (1.0 or 2.0 on Retina displays)
-    let event_loop = EventLoop::new().unwrap();
-    let window = Window::new(&event_loop, WindowConfig::default()).unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create window");
 
     let scale_factor = window.scale_factor();
-    assert!(scale_factor >= 1.0);
-    assert!(scale_factor <= 3.0); // Reasonable upper bound for Retina displays
+    assert!(scale_factor > 0.0, "Scale factor should be positive");
+    assert!(
+        scale_factor <= 4.0,
+        "Scale factor shouldn't be unreasonably large"
+    );
 }
 
 #[test]
 fn test_window_visibility() {
-    // Window visibility should be configurable
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
 
-    // Initially visible
-    let config_visible = WindowConfig {
-        visible: true,
-        ..Default::default()
-    };
-    let window_visible = Window::new(&event_loop, config_visible);
-    assert!(window_visible.is_ok());
-
-    // Initially hidden
-    let config_hidden = WindowConfig {
+    let config = WindowConfig {
         visible: false,
         ..Default::default()
     };
-    let window_hidden = Window::new(&event_loop, config_hidden);
-    assert!(window_hidden.is_ok());
+
+    let window = event_loop
+        .create_window(config)
+        .expect("Failed to create window");
+
+    // Should be able to show/hide without panicking
+    window.set_visible(true);
+    window.set_visible(false);
 }
 
 #[test]
 fn test_window_provides_raw_handles() {
-    // Window should provide valid raw window and display handles
-    let event_loop = EventLoop::new().unwrap();
-    let window = Window::new(&event_loop, WindowConfig::default()).unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create window");
 
-    // Should be able to get window handle
+    // Should be able to get raw window and display handles for wgpu
     let window_handle = window.window_handle();
-    assert!(window_handle.is_ok());
+    assert!(window_handle.is_ok(), "Failed to get window handle");
 
     // Should be an AppKit handle
     match window_handle.unwrap().as_raw() {
-        RawWindowHandle::AppKit(_) => {
-            // Expected for macOS
-        }
+        RawWindowHandle::AppKit(_) => {} // Expected for macOS
         _ => panic!("Expected AppKit window handle"),
     }
 
-    // Should be able to get display handle
     let display_handle = window.display_handle();
-    assert!(display_handle.is_ok());
+    assert!(display_handle.is_ok(), "Failed to get display handle");
 
     // Should be an AppKit display handle
     match display_handle.unwrap().as_raw() {
-        RawDisplayHandle::AppKit(_) => {
-            // Expected for macOS
-        }
+        RawDisplayHandle::AppKit(_) => {} // Expected for macOS
         _ => panic!("Expected AppKit display handle"),
     }
 }
 
 #[test]
 fn test_window_request_redraw() {
-    // Should be able to request a redraw without panicking
-    let event_loop = EventLoop::new().unwrap();
-    let window = Window::new(&event_loop, WindowConfig::default()).unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig::default())
+        .expect("Failed to create window");
 
-    window.request_redraw(); // Should not panic
+    // Should be able to request redraw without panicking
+    window.request_redraw();
 }
 
 #[test]
 fn test_window_decorations() {
-    // Window should support decoration configuration
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
 
     let config_decorated = WindowConfig {
         decorations: true,
         ..Default::default()
     };
-    let window_decorated = Window::new(&event_loop, config_decorated);
+    let window_decorated = event_loop.create_window(config_decorated);
     assert!(window_decorated.is_ok());
 
     let config_undecorated = WindowConfig {
         decorations: false,
         ..Default::default()
     };
-    let window_undecorated = Window::new(&event_loop, config_undecorated);
+    let window_undecorated = event_loop.create_window(config_undecorated);
     assert!(window_undecorated.is_ok());
 }
 
 #[test]
 fn test_window_resizable() {
-    // Window should support resizable configuration
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
 
     let config_resizable = WindowConfig {
         resizable: true,
         ..Default::default()
     };
-    let window_resizable = Window::new(&event_loop, config_resizable);
+    let window_resizable = event_loop.create_window(config_resizable);
     assert!(window_resizable.is_ok());
 
     let config_fixed = WindowConfig {
         resizable: false,
         ..Default::default()
     };
-    let window_fixed = Window::new(&event_loop, config_fixed);
+    let window_fixed = event_loop.create_window(config_fixed);
     assert!(window_fixed.is_ok());
 }
 
 #[test]
+fn test_window_with_position() {
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
+    let config = WindowConfig {
+        position: Some(Position::new(100, 100)),
+        ..Default::default()
+    };
+
+    let window = event_loop.create_window(config);
+    assert!(
+        window.is_ok(),
+        "Failed to create window with position: {:?}",
+        window.err()
+    );
+}
+
+#[test]
 fn test_multiple_windows() {
-    // Should be able to create multiple windows
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
 
-    let window1 = Window::new(&event_loop, WindowConfig::default()).unwrap();
-    let window2 = Window::new(&event_loop, WindowConfig::default()).unwrap();
-    let window3 = Window::new(&event_loop, WindowConfig::default()).unwrap();
+    let window1 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 1".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create first window");
 
-    // All should have unique IDs
+    let window2 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 2".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create second window");
+
+    let window3 = event_loop
+        .create_window(WindowConfig {
+            title: "Window 3".into(),
+            ..Default::default()
+        })
+        .expect("Failed to create third window");
+
+    // All windows should have unique IDs
     assert_ne!(window1.id(), window2.id());
     assert_ne!(window2.id(), window3.id());
     assert_ne!(window1.id(), window3.id());

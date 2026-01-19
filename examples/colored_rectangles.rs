@@ -8,7 +8,7 @@
 //! - Hover interactions with reactive color changes
 
 use arthropod::prelude::*;
-use arthropod_mcp::{connect_to_mcp_server, AppConnection};
+use arthropod_mcp::{AppConnection, connect_to_mcp_server};
 use std::time::{Duration, Instant};
 
 /// Performance statistics tracker
@@ -65,26 +65,39 @@ impl PerfStats {
         let avg_total = self.avg(&self.total_times);
 
         println!("\n╔══════════════════════════════════════════════════════╗");
-        println!("║           PERFORMANCE STATS ({} frames)             ║", self.frame_count);
+        println!(
+            "║           PERFORMANCE STATS ({} frames)             ║",
+            self.frame_count
+        );
         println!("╠══════════════════════════════════════════════════════╣");
-        println!("║  ECS Update:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
-                 avg_update,
-                 self.min(&self.update_times),
-                 self.max(&self.update_times));
-        println!("║  ECS Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
-                 avg_render,
-                 self.min(&self.render_times),
-                 self.max(&self.render_times));
-        println!("║  GPU Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
-                 avg_gpu,
-                 self.min(&self.gpu_times),
-                 self.max(&self.gpu_times));
-        println!("║  Total Frame: {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
-                 avg_total,
-                 self.min(&self.total_times),
-                 self.max(&self.total_times));
-        println!("║  Frame Rate:  {:>8.1} fps (avg)                        ║",
-                 1.0 / avg_total.as_secs_f32());
+        println!(
+            "║  ECS Update:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+            avg_update,
+            self.min(&self.update_times),
+            self.max(&self.update_times)
+        );
+        println!(
+            "║  ECS Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+            avg_render,
+            self.min(&self.render_times),
+            self.max(&self.render_times)
+        );
+        println!(
+            "║  GPU Render:  {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+            avg_gpu,
+            self.min(&self.gpu_times),
+            self.max(&self.gpu_times)
+        );
+        println!(
+            "║  Total Frame: {:>8.2?} (avg) {:>8.2?} (min) {:>8.2?} (max) ║",
+            avg_total,
+            self.min(&self.total_times),
+            self.max(&self.total_times)
+        );
+        println!(
+            "║  Frame Rate:  {:>8.1} fps (avg)                        ║",
+            1.0 / avg_total.as_secs_f32()
+        );
         println!("╚══════════════════════════════════════════════════════╝");
     }
 
@@ -296,10 +309,8 @@ impl Application for DemoApp {
                 let rh = height_ratio * win_h;
 
                 // Check if mouse is hovering
-                let is_hovering = mouse_x >= rx
-                    && mouse_x <= rx + rw
-                    && mouse_y >= ry
-                    && mouse_y <= ry + rh;
+                let is_hovering =
+                    mouse_x >= rx && mouse_x <= rx + rw && mouse_y >= ry && mouse_y <= ry + rh;
 
                 // Update color based on hover state
                 let new_color = if is_hovering { hover_color } else { base_color };
@@ -328,7 +339,9 @@ impl Application for DemoApp {
         if mcp_connection.is_some() {
             println!("✓ Connected to MCP server for remote debugging");
         } else {
-            println!("⚠ MCP server not available (run 'cargo run --bin arthropod-mcp' to enable remote debugging)");
+            println!(
+                "⚠ MCP server not available (run 'cargo run --bin arthropod-mcp' to enable remote debugging)"
+            );
         }
 
         Self {
@@ -344,6 +357,7 @@ impl Application for DemoApp {
         }
     }
 
+    #[allow(clippy::single_match)]
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
         match event {
             Event::Window { event, .. } => match event {
@@ -363,10 +377,8 @@ impl Application for DemoApp {
                     for (i, node_id) in self.node_ids.iter().enumerate() {
                         if let Some(node) = scene.get_mut(*node_id) {
                             let rect = &self.rects[i];
-                            node.bounds = rect.bounds_for_size(
-                                new_size.width as f32,
-                                new_size.height as f32,
-                            );
+                            node.bounds =
+                                rect.bounds_for_size(new_size.width as f32, new_size.height as f32);
                         }
                     }
                 }

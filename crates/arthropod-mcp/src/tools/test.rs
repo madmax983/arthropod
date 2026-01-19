@@ -2,12 +2,12 @@
 
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use arthropod_ecs::{ReactiveColor, Renderable};
 use flux_state::Signal;
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -188,7 +188,10 @@ impl Tool for CreateSceneTool {
                 NodeContentSpec::Rect { color } => NodeContent::Rect {
                     color: Color::rgba(color[0], color[1], color[2], color[3]),
                 },
-                NodeContentSpec::RoundedRect { color, corner_radius } => NodeContent::RoundedRect {
+                NodeContentSpec::RoundedRect {
+                    color,
+                    corner_radius,
+                } => NodeContent::RoundedRect {
                     color: Color::rgba(color[0], color[1], color[2], color[3]),
                     corner_radius: *corner_radius,
                 },
@@ -342,23 +345,23 @@ impl Tool for AssertNodeStateTool {
         let mut failures = Vec::new();
 
         // Check visibility
-        if let Some(expected_visible) = params.expected.visible {
-            if node.visible != expected_visible {
-                failures.push(format!(
-                    "visible: expected {}, got {}",
-                    expected_visible, node.visible
-                ));
-            }
+        if let Some(expected_visible) = params.expected.visible
+            && node.visible != expected_visible
+        {
+            failures.push(format!(
+                "visible: expected {}, got {}",
+                expected_visible, node.visible
+            ));
         }
 
         // Check opacity
-        if let Some(expected_opacity) = params.expected.opacity {
-            if (node.opacity - expected_opacity).abs() > params.tolerance {
-                failures.push(format!(
-                    "opacity: expected {}, got {} (tolerance: {})",
-                    expected_opacity, node.opacity, params.tolerance
-                ));
-            }
+        if let Some(expected_opacity) = params.expected.opacity
+            && (node.opacity - expected_opacity).abs() > params.tolerance
+        {
+            failures.push(format!(
+                "opacity: expected {}, got {} (tolerance: {})",
+                expected_opacity, node.opacity, params.tolerance
+            ));
         }
 
         // Check bounds
@@ -574,14 +577,14 @@ impl Tool for VerifyRenderOutputTool {
         let mut failures = Vec::new();
 
         // Check expected count
-        if let Some(expected_count) = params.expected_count {
-            if instances.len() != expected_count {
-                failures.push(format!(
-                    "instance_count: expected {}, got {}",
-                    expected_count,
-                    instances.len()
-                ));
-            }
+        if let Some(expected_count) = params.expected_count
+            && instances.len() != expected_count
+        {
+            failures.push(format!(
+                "instance_count: expected {}, got {}",
+                expected_count,
+                instances.len()
+            ));
         }
 
         // Check individual instances
@@ -726,7 +729,12 @@ impl Tool for SetupReactiveChainTool {
         match params.signal_type.as_str() {
             "color" => {
                 let color_array: [f32; 4] = serde_json::from_value(params.initial_value)?;
-                let color = Color::rgba(color_array[0], color_array[1], color_array[2], color_array[3]);
+                let color = Color::rgba(
+                    color_array[0],
+                    color_array[1],
+                    color_array[2],
+                    color_array[3],
+                );
 
                 let runtime = flux_state::Runtime::new();
                 let signal = Signal::new(runtime, color);
@@ -955,10 +963,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
-        assert_eq!(
-            result.get("failures").unwrap().as_array().unwrap().len(),
-            0
-        );
+        assert_eq!(result.get("failures").unwrap().as_array().unwrap().len(), 0);
     }
 
     #[test]
@@ -1162,10 +1167,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
-        assert_eq!(
-            result.get("failures").unwrap().as_array().unwrap().len(),
-            0
-        );
+        assert_eq!(result.get("failures").unwrap().as_array().unwrap().len(), 0);
     }
 
     #[test]

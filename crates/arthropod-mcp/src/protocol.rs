@@ -137,7 +137,10 @@ impl JsonRpcError {
 
     /// Custom application error (code >= -32000)
     pub fn application_error(code: i32, message: impl Into<String>) -> Self {
-        assert!(code >= -32000 && code <= -32099, "Application error codes must be in range [-32099, -32000]");
+        assert!(
+            (-32099..=-32000).contains(&code),
+            "Application error codes must be in range [-32099, -32000]"
+        );
         Self {
             code,
             message: message.into(),
@@ -181,10 +184,7 @@ mod tests {
 
     #[test]
     fn test_error_response_serialization() {
-        let response = JsonRpcResponse::error(
-            1,
-            JsonRpcError::method_not_found("test.method"),
-        );
+        let response = JsonRpcResponse::error(1, JsonRpcError::method_not_found("test.method"));
 
         let serialized = serde_json::to_string(&response).unwrap();
         let deserialized: JsonRpcResponse = serde_json::from_str(&serialized).unwrap();

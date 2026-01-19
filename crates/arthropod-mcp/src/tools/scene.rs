@@ -2,10 +2,10 @@
 
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use render_engine::{NodeContent, NodeId};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ============================================================================
 // scene.list_nodes
@@ -73,8 +73,8 @@ impl Tool for ListNodesTool {
     }
 
     fn execute(&self, params: Value, ctx: &mut McpFrameworkContext) -> Result<Value> {
-        let params: ListNodesParams = serde_json::from_value(params)
-            .map_err(|e| anyhow!("Invalid parameters: {}", e))?;
+        let params: ListNodesParams =
+            serde_json::from_value(params).map_err(|e| anyhow!("Invalid parameters: {}", e))?;
 
         let scene = ctx.scene();
         let mut nodes = Vec::new();
@@ -98,7 +98,10 @@ impl Tool for ListNodesTool {
 
             if let Some(parent_id) = params.filter.parent_id {
                 // Find parent by checking which node has this as a child
-                let parent = scene.nodes().find(|(_, n)| n.children.contains(&node_id)).map(|(id, _)| id);
+                let parent = scene
+                    .nodes()
+                    .find(|(_, n)| n.children.contains(&node_id))
+                    .map(|(id, _)| id);
                 match parent {
                     Some(pid) if pid.0 == parent_id => {}
                     _ => continue,
@@ -192,7 +195,10 @@ impl Tool for GetNodeTool {
             NodeContent::Rect { color } => NodeContentData::Rect {
                 color: [color.r(), color.g(), color.b(), color.a()],
             },
-            NodeContent::RoundedRect { color, corner_radius } => NodeContentData::RoundedRect {
+            NodeContent::RoundedRect {
+                color,
+                corner_radius,
+            } => NodeContentData::RoundedRect {
                 color: [color.r(), color.g(), color.b(), color.a()],
                 corner_radius: *corner_radius,
             },
@@ -200,7 +206,8 @@ impl Tool for GetNodeTool {
         };
 
         // Find parent by checking which node has this as a child
-        let parent_id = scene.nodes()
+        let parent_id = scene
+            .nodes()
             .find(|(_, n)| n.children.contains(&node_id))
             .map(|(id, _)| id.0);
         let children: Vec<u64> = node.children.iter().map(|c| c.0).collect();
@@ -335,7 +342,8 @@ impl Tool for FindNodesAtPositionTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema {
             name: self.name().to_string(),
-            description: "Find nodes intersecting a screen position (sorted by z-index)".to_string(),
+            description: "Find nodes intersecting a screen position (sorted by z-index)"
+                .to_string(),
             parameters: json!({
                 "type": "object",
                 "required": ["x", "y"],
@@ -470,19 +478,23 @@ impl Tool for UpdateNodeTool {
         if let Some(bounds_update) = params.updates.bounds {
             let mut new_bounds = node.bounds;
             if let Some(x) = bounds_update.x {
-                new_bounds = plat_core::Rect::new(x, new_bounds.y, new_bounds.width, new_bounds.height);
+                new_bounds =
+                    plat_core::Rect::new(x, new_bounds.y, new_bounds.width, new_bounds.height);
                 updated_fields.push("bounds.x");
             }
             if let Some(y) = bounds_update.y {
-                new_bounds = plat_core::Rect::new(new_bounds.x, y, new_bounds.width, new_bounds.height);
+                new_bounds =
+                    plat_core::Rect::new(new_bounds.x, y, new_bounds.width, new_bounds.height);
                 updated_fields.push("bounds.y");
             }
             if let Some(width) = bounds_update.width {
-                new_bounds = plat_core::Rect::new(new_bounds.x, new_bounds.y, width, new_bounds.height);
+                new_bounds =
+                    plat_core::Rect::new(new_bounds.x, new_bounds.y, width, new_bounds.height);
                 updated_fields.push("bounds.width");
             }
             if let Some(height) = bounds_update.height {
-                new_bounds = plat_core::Rect::new(new_bounds.x, new_bounds.y, new_bounds.width, height);
+                new_bounds =
+                    plat_core::Rect::new(new_bounds.x, new_bounds.y, new_bounds.width, height);
                 updated_fields.push("bounds.height");
             }
             node.bounds = new_bounds;
@@ -501,7 +513,9 @@ impl Tool for UpdateNodeTool {
                     *node_color = color;
                     updated_fields.push("color");
                 }
-                NodeContent::RoundedRect { color: node_color, .. } => {
+                NodeContent::RoundedRect {
+                    color: node_color, ..
+                } => {
                     *node_color = color;
                     updated_fields.push("color");
                 }
@@ -658,7 +672,9 @@ mod tests {
         let tool = FindNodesAtPositionTool;
 
         // Point inside first rect
-        let result = tool.execute(json!({"x": 50.0, "y": 50.0}), &mut ctx).unwrap();
+        let result = tool
+            .execute(json!({"x": 50.0, "y": 50.0}), &mut ctx)
+            .unwrap();
         let nodes = result.get("nodes").unwrap().as_array().unwrap();
 
         // Should find at least one node (rect2 is hidden so not counted)

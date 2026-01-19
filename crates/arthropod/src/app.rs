@@ -8,10 +8,10 @@ use bevy_ecs::{prelude::*, world::EntityWorldMut};
 use flux_state::Runtime;
 use plat_core::{EventLoop, Window, WindowConfig};
 use render_engine::{
-    backend::{RectInstance, RenderBackend, WgpuBackend},
     NodeId,
+    backend::{RectInstance, RenderBackend, WgpuBackend},
 };
-use std::rc::Rc;
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Errors that can occur during app creation or execution
@@ -121,7 +121,7 @@ pub struct App {
 
     /// Reactive runtime (also stored in World as Resource for signals)
     #[allow(dead_code)]
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
 }
 
 impl App {
@@ -129,8 +129,8 @@ impl App {
     ///
     /// Internal constructor used by AppBuilder.
     fn new_with_backend(window: Option<Window>, backend: Option<WgpuBackend>) -> Self {
-        // Create reactive runtime (Runtime::new() already returns Rc<Runtime>)
-        // Runtime uses RefCell (!Sync), so we keep it in App and provide accessor methods
+        // Create reactive runtime (Runtime::new() already returns Arc<Runtime>)
+        // Runtime uses Mutex (thread-safe), so we keep it in App and provide accessor methods
         let runtime = Runtime::new();
 
         // Create ECS context (Scene is already inserted as Resource)
@@ -293,7 +293,7 @@ impl App {
     /// let runtime = app.runtime();
     /// let signal = Signal::new(runtime.clone(), 42);
     /// ```
-    pub fn runtime(&self) -> &Rc<Runtime> {
+    pub fn runtime(&self) -> &Arc<Runtime> {
         &self.runtime
     }
 }

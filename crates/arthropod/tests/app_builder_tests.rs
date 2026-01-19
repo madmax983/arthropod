@@ -68,7 +68,9 @@ fn test_app_spawn_with_reactive_components() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::GREEN },
+                content: NodeContent::Rect {
+                    color: Color::GREEN,
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect::default(),
                 children: Vec::new(),

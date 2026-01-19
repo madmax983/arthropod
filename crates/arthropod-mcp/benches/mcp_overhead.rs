@@ -2,7 +2,7 @@
 //!
 //! Ensures all MCP operations stay under 1ms budget for typical scenes (1000 nodes).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 fn bench_placeholder(c: &mut Criterion) {
     c.bench_function("placeholder", |b| {

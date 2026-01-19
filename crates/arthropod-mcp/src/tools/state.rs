@@ -2,11 +2,11 @@
 
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use flux_state::Signal;
 use render_engine::Color;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ============================================================================
 // state.register_signal
@@ -63,13 +63,19 @@ impl Tool for RegisterSignalTool {
         match params.signal_type.as_str() {
             "color" => {
                 let color_array: [f32; 4] = serde_json::from_value(params.initial_value)?;
-                let color = Color::rgba(color_array[0], color_array[1], color_array[2], color_array[3]);
+                let color = Color::rgba(
+                    color_array[0],
+                    color_array[1],
+                    color_array[2],
+                    color_array[3],
+                );
 
                 let runtime = flux_state::Runtime::new();
                 let signal = Signal::new(runtime, color);
                 let (read, write) = signal.split();
 
-                ctx.signal_registry_mut().register_color(params.name.clone(), read, write);
+                ctx.signal_registry_mut()
+                    .register_color(params.name.clone(), read, write);
             }
             "f32" => {
                 let value: f32 = serde_json::from_value(params.initial_value)?;
@@ -78,7 +84,8 @@ impl Tool for RegisterSignalTool {
                 let signal = Signal::new(runtime, value);
                 let (read, write) = signal.split();
 
-                ctx.signal_registry_mut().register_f32(params.name.clone(), read, write);
+                ctx.signal_registry_mut()
+                    .register_f32(params.name.clone(), read, write);
             }
             "bool" => {
                 let value: bool = serde_json::from_value(params.initial_value)?;
@@ -87,7 +94,8 @@ impl Tool for RegisterSignalTool {
                 let signal = Signal::new(runtime, value);
                 let (read, write) = signal.split();
 
-                ctx.signal_registry_mut().register_bool(params.name.clone(), read, write);
+                ctx.signal_registry_mut()
+                    .register_bool(params.name.clone(), read, write);
             }
             _ => return Err(anyhow!("Unknown signal type: {}", params.signal_type)),
         }
@@ -150,7 +158,12 @@ impl Tool for SetSignalTool {
         let old_value = match signal_type {
             "color" => {
                 let color_array: [f32; 4] = serde_json::from_value(params.value)?;
-                let color = Color::rgba(color_array[0], color_array[1], color_array[2], color_array[3]);
+                let color = Color::rgba(
+                    color_array[0],
+                    color_array[1],
+                    color_array[2],
+                    color_array[3],
+                );
                 let old = ctx.signal_registry_mut().set_color(&params.name, color)?;
                 json!([old.r(), old.g(), old.b(), old.a()])
             }
@@ -329,7 +342,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("status").unwrap().as_str().unwrap(), "registered");
+        assert_eq!(
+            result.get("status").unwrap().as_str().unwrap(),
+            "registered"
+        );
         assert!(ctx.signal_registry().contains("test_color"));
     }
 
@@ -349,7 +365,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("status").unwrap().as_str().unwrap(), "registered");
+        assert_eq!(
+            result.get("status").unwrap().as_str().unwrap(),
+            "registered"
+        );
         assert!(ctx.signal_registry().contains("opacity"));
     }
 

@@ -2,7 +2,7 @@
 //!
 //! Allows registering named signals that can be controlled via MCP tools.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use flux_state::{ReadSignal, WriteSignal};
 use hashbrown::HashMap;
 use render_engine::Color;
@@ -26,7 +26,6 @@ pub enum SignalEntry {
         read: ReadSignal<bool>,
         write: WriteSignal<bool>,
     },
-
     // More types can be added as needed
 }
 
@@ -44,18 +43,31 @@ impl SignalRegistry {
     }
 
     /// Register a color signal
-    pub fn register_color(&mut self, name: String, read: ReadSignal<Color>, write: WriteSignal<Color>) {
-        self.entries.insert(name, SignalEntry::ColorSignal { read, write });
+    pub fn register_color(
+        &mut self,
+        name: String,
+        read: ReadSignal<Color>,
+        write: WriteSignal<Color>,
+    ) {
+        self.entries
+            .insert(name, SignalEntry::ColorSignal { read, write });
     }
 
     /// Register an f32 signal
     pub fn register_f32(&mut self, name: String, read: ReadSignal<f32>, write: WriteSignal<f32>) {
-        self.entries.insert(name, SignalEntry::F32Signal { read, write });
+        self.entries
+            .insert(name, SignalEntry::F32Signal { read, write });
     }
 
     /// Register a bool signal
-    pub fn register_bool(&mut self, name: String, read: ReadSignal<bool>, write: WriteSignal<bool>) {
-        self.entries.insert(name, SignalEntry::BoolSignal { read, write });
+    pub fn register_bool(
+        &mut self,
+        name: String,
+        read: ReadSignal<bool>,
+        write: WriteSignal<bool>,
+    ) {
+        self.entries
+            .insert(name, SignalEntry::BoolSignal { read, write });
     }
 
     /// Set a color signal value

@@ -138,8 +138,15 @@ impl Serialize for Transform2D {
         // Serialize as 6 floats: [m11, m12, m21, m22, tx, ty]
         let mat = self.0.matrix2;
         let trans = self.0.translation;
-        [mat.x_axis.x, mat.x_axis.y, mat.y_axis.x, mat.y_axis.y, trans.x, trans.y]
-            .serialize(serializer)
+        [
+            mat.x_axis.x,
+            mat.x_axis.y,
+            mat.y_axis.x,
+            mat.y_axis.y,
+            trans.x,
+            trans.y,
+        ]
+        .serialize(serializer)
     }
 }
 
@@ -154,7 +161,9 @@ impl<'de> Deserialize<'de> for Transform2D {
             glam::Vec2::new(arr[2], arr[3]),
         );
         let trans = glam::Vec2::new(arr[4], arr[5]);
-        Ok(Transform2D(glam::Affine2::from_mat2_translation(mat, trans)))
+        Ok(Transform2D(glam::Affine2::from_mat2_translation(
+            mat, trans,
+        )))
     }
 }
 

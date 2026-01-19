@@ -76,6 +76,6 @@ pub use systems::{
 
 // Re-export accessibility types
 pub use a11y_engine::{
-    A11yAction, A11yId, A11yNode, A11yRelations, A11yState, A11yTree, AccessibleName,
-    CheckedState, Role,
+    A11yAction, A11yId, A11yNode, A11yRelations, A11yState, A11yTree, AccessibleName, CheckedState,
+    Role,
 };

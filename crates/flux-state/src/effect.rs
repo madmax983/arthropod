@@ -1,19 +1,19 @@
 //! Effects - side effects that run when dependencies change.
 
 use crate::runtime::{NodeId, Runtime};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// An effect that runs when its dependencies change.
 pub struct Effect {
     id: NodeId,
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
 }
 
 impl Effect {
     /// Create a new effect.
-    pub fn new<F>(runtime: Rc<Runtime>, effect_fn: F) -> Self
+    pub fn new<F>(runtime: Arc<Runtime>, effect_fn: F) -> Self
     where
-        F: Fn() + 'static,
+        F: Fn() + 'static + Send,
     {
         let id = runtime.create_effect(Box::new(effect_fn));
 
