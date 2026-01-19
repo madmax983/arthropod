@@ -8,6 +8,7 @@ pub mod container;
 pub mod text;
 pub mod button;
 pub mod text_input;
+pub mod form;
 pub mod validation;
 pub mod context;
 
@@ -16,6 +17,7 @@ pub use container::Container;
 pub use text::Text;
 pub use button::Button;
 pub use text_input::TextInput;
+pub use form::Form;
 pub use context::WidgetContext;
 
 #[cfg(test)]
