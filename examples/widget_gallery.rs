@@ -8,9 +8,12 @@
 //!
 //! Run with: cargo run --example widget_gallery
 
-use widget_core::{Container, Text, Button, TextInput, Form, Widget, WidgetContext};
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
+use widget_core::{
+    Button, Container, FlexDirection, FlexStyle, Form, NodeContent, Text, TextInput, Widget,
+    WidgetContext,
+};
 
 fn main() {
     println!("=== Arthropod Widget Gallery ===\n");
@@ -53,7 +56,10 @@ fn main() {
     println!("   ✓ Built button widget (node: {:?})", button_id);
 
     ctx.trigger_click(button_id);
-    println!("   ✓ Simulated click (count: {})", clicked_count.load(std::sync::atomic::Ordering::SeqCst));
+    println!(
+        "   ✓ Simulated click (count: {})",
+        clicked_count.load(std::sync::atomic::Ordering::SeqCst)
+    );
 
     println!("\n4. TextInput Widget");
     println!("   - Single-line text input with validation");
@@ -71,42 +77,49 @@ fn main() {
     let input_id = input.build(&mut ctx);
     println!("   ✓ Built text input (node: {:?})", input_id);
     println!("   ✓ Has placeholder: {}", ctx.has_placeholder(input_id));
-    println!("   ✓ Has validation error: {}", ctx.has_validation_error(input_id));
+    println!(
+        "   ✓ Has validation error: {}",
+        ctx.has_validation_error(input_id)
+    );
 
     println!("\n5. Container Widget - Row Layout");
     println!("   - Horizontal arrangement of children");
-    let row = Container::row()
-        .gap(10.0)
-        .child(Text::new("Item 1"))
-        .child(Text::new("Item 2"))
-        .child(Text::new("Item 3"));
+    let row = Container::row((
+        Text::new("Item 1"),
+        Text::new("Item 2"),
+        Text::new("Item 3"),
+    ))
+    .gap(10.0);
     let row_id = row.build(&mut ctx);
     let row_node = ctx.scene().get_node(row_id).unwrap();
-    println!("   ✓ Built row container with {} children", row_node.children.len());
+    println!(
+        "   ✓ Built row container with {} children",
+        row_node.children.len()
+    );
 
     println!("\n6. Container Widget - Column Layout");
     println!("   - Vertical arrangement of children");
-    let column = Container::column()
+    let column = Container::column((Text::new("First"), Text::new("Second"), Text::new("Third")))
         .gap(12.0)
-        .padding(16.0)
-        .child(Text::new("First"))
-        .child(Text::new("Second"))
-        .child(Text::new("Third"));
+        .padding(16.0);
     let column_id = column.build(&mut ctx);
     let column_node = ctx.scene().get_node(column_id).unwrap();
-    println!("   ✓ Built column container with {} children", column_node.children.len());
+    println!(
+        "   ✓ Built column container with {} children",
+        column_node.children.len()
+    );
 
     println!("\n7. Nested Containers");
     println!("   - Complex layouts with nested rows and columns");
-    let nested = Container::column()
-        .child(Text::new("Header").size(20.0))
-        .child(
-            Container::row()
-                .gap(8.0)
-                .child(Button::new("Action 1").secondary())
-                .child(Button::new("Action 2").secondary())
-        )
-        .child(Text::new("Footer"));
+    let nested = Container::column((
+        Text::new("Header").size(20.0),
+        Container::row((
+            Button::new("Action 1").secondary(),
+            Button::new("Action 2").secondary(),
+        ))
+        .gap(8.0),
+        Text::new("Footer"),
+    ));
     let nested_id = nested.build(&mut ctx);
     let nested_node = ctx.scene().get_node(nested_id).unwrap();
     println!("   ✓ Built nested layout (depth: 2 levels)");
@@ -117,18 +130,35 @@ fn main() {
     let username = Signal::new(runtime.clone(), String::new());
     let email = Signal::new(runtime.clone(), String::new());
 
-    let form = Form::new()
-        .field("username", TextInput::new(username)
-            .placeholder("Username")
-            .validator(|s| if s.len() >= 3 { Ok(()) } else { Err("Too short".to_string()) }))
-        .field("email", TextInput::new(email)
-            .placeholder("Email")
-            .validator(|s| if s.contains('@') { Ok(()) } else { Err("Invalid email".to_string()) }))
-        .gap(12.0)
-        .on_submit(|data| {
-            println!("   📧 Form submitted: {:?}", data);
-            Ok(())
-        });
+    let form = Form::new((
+        (
+            "username",
+            TextInput::new(username)
+                .placeholder("Username")
+                .validator(|s| {
+                    if s.len() >= 3 {
+                        Ok(())
+                    } else {
+                        Err("Too short".to_string())
+                    }
+                }),
+        ),
+        (
+            "email",
+            TextInput::new(email).placeholder("Email").validator(|s| {
+                if s.contains('@') {
+                    Ok(())
+                } else {
+                    Err("Invalid email".to_string())
+                }
+            }),
+        ),
+    ))
+    .gap(12.0)
+    .on_submit(|data| {
+        println!("   📧 Form submitted: {:?}", data);
+        Ok(())
+    });
     let form_id = form.build(&mut ctx);
     let form_node = ctx.scene().get_node(form_id).unwrap();
     println!("   ✓ Built form with {} fields", form_node.children.len());
@@ -154,15 +184,19 @@ fn main() {
     println!("    - Performance test with many widgets");
     let start = std::time::Instant::now();
 
-    let mut large_container = Container::column();
+    // For dynamic content (loops), create container manually and reparent children
+    let large_id = ctx.create_node(ctx.root(), NodeContent::Empty);
+    let column_style = FlexStyle {
+        direction: FlexDirection::Column,
+        ..Default::default()
+    };
+    ctx.set_layout_style(large_id, column_style);
+
     for i in 0..100 {
-        large_container = large_container.child(
-            Container::row()
-                .child(Text::new(format!("Item {}", i)))
-                .child(Button::new("Click"))
-        );
+        let row = Container::row((Text::new(format!("Item {}", i)), Button::new("Click")));
+        let row_id = row.build(&mut ctx);
+        ctx.reparent_to(row_id, large_id);
     }
-    let large_id = large_container.build(&mut ctx);
     let elapsed = start.elapsed();
 
     let large_node = ctx.scene().get_node(large_id).unwrap();

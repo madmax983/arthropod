@@ -2,7 +2,7 @@
 
 use hashbrown::HashMap;
 use swash::FontRef;
-use swash::scale::{ScaleContext, Render, Source, StrikeWith};
+use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno::Format;
 
 /// Texture coordinates in atlas (0.0-1.0 normalized)
@@ -63,8 +63,16 @@ impl GlyphAtlas {
     }
 
     /// Get texture coordinates for a glyph, rasterizing if not cached
-    pub fn get_or_rasterize(&mut self, glyph_id: u16, font_size: u16, font_data: &[u8]) -> TexCoords {
-        let key = GlyphKey { glyph_id, font_size };
+    pub fn get_or_rasterize(
+        &mut self,
+        glyph_id: u16,
+        font_size: u16,
+        font_data: &[u8],
+    ) -> TexCoords {
+        let key = GlyphKey {
+            glyph_id,
+            font_size,
+        };
 
         // Check cache first
         if let Some(cached) = self.cache.get(&key) {
@@ -75,11 +83,14 @@ impl GlyphAtlas {
         let coords = self.rasterize_glyph(glyph_id, font_size, font_data);
 
         // Cache it
-        self.cache.insert(key, CachedGlyph {
-            coords,
-            width: 0, // TODO: store actual dimensions
-            height: 0,
-        });
+        self.cache.insert(
+            key,
+            CachedGlyph {
+                coords,
+                width: 0, // TODO: store actual dimensions
+                height: 0,
+            },
+        );
 
         coords
     }
@@ -101,7 +112,8 @@ impl GlyphAtlas {
         };
 
         // Create scaler
-        let mut scaler = self.scale_context
+        let mut scaler = self
+            .scale_context
             .builder(font)
             .size(font_size as f32)
             .hint(true)

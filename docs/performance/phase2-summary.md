@@ -70,10 +70,10 @@ Phase 2 implemented the complete widget system for Arthropod, including layout e
 
 **Example**:
 ```rust
-Container::column()
-    .gap(10.0)
-    .child(Text::new("Hello"))
-    .child(Text::new("World"))
+Container::column((
+    Text::new("Hello"),
+    Text::new("World"),
+)).gap(10.0)
 ```
 
 ### Phase 2.5: Button Widget ✅
@@ -125,13 +125,13 @@ TextInput::new(email_signal)
 
 **Example**:
 ```rust
-Form::new()
-    .field("name", TextInput::new(name).validator(required))
-    .field("email", TextInput::new(email).validator(validate_email))
-    .on_submit(|data| {
-        println!("Name: {}", data.get("name").unwrap());
-        Ok(())
-    })
+Form::new((
+    ("name", TextInput::new(name).validator(required)),
+    ("email", TextInput::new(email).validator(validate_email)),
+)).on_submit(|data| {
+    println!("Name: {}", data.get("name").unwrap());
+    Ok(())
+})
 ```
 
 ### Phase 2.8: Integration Examples & Benchmarks ✅
@@ -190,7 +190,7 @@ Form::new()
 ### Hybrid Scene + ECS Integration
 ```rust
 // 1. Build widget (creates scene nodes)
-let widget = Container::column().child(Text::new("Hello"));
+let widget = Container::column(Text::new("Hello"));
 let node_id = widget.build(&mut ctx);
 
 // 2. ECS components track state

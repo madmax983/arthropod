@@ -1,7 +1,7 @@
 //! Text shaping using rustybuzz
 
+use crate::{ShapedGlyph, ShapedText, TextBounds};
 use rustybuzz as rb;
-use crate::{ShapedText, ShapedGlyph, TextBounds};
 
 /// Text shaper
 pub struct TextShaper {
@@ -52,7 +52,7 @@ impl TextShaper {
             glyphs.push(ShapedGlyph {
                 glyph_id: info.glyph_id as u16,
                 x_offset: x + x_offset,
-                y_offset: y_offset,
+                y_offset,
                 x_advance,
                 y_advance,
                 cluster: info.cluster,

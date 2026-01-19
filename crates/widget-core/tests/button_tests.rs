@@ -1,8 +1,8 @@
 //! Button widget tests - Written FIRST following TDD
 
-use widget_core::{Button, WidgetContext, Widget};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use widget_core::{Button, Widget, WidgetContext};
 
 #[test]
 fn test_button_creates_node() {
@@ -48,10 +48,9 @@ fn test_button_click_callback() {
     let clicked = Arc::new(AtomicBool::new(false));
     let clicked_clone = clicked.clone();
 
-    let button = Button::new("Click Me")
-        .on_click(move || {
-            clicked_clone.store(true, Ordering::SeqCst);
-        });
+    let button = Button::new("Click Me").on_click(move || {
+        clicked_clone.store(true, Ordering::SeqCst);
+    });
 
     let node_id = button.build(&mut ctx);
 
@@ -62,20 +61,25 @@ fn test_button_click_callback() {
     ctx.trigger_click(node_id);
 
     // Callback should have been called
-    assert!(clicked.load(Ordering::SeqCst), "Click callback should be called");
+    assert!(
+        clicked.load(Ordering::SeqCst),
+        "Click callback should be called"
+    );
 }
 
 #[test]
 fn test_button_with_themed_style() {
     let mut ctx = WidgetContext::new_test();
 
-    let button = Button::new("Themed")
-        .primary(); // Use primary style
+    let button = Button::new("Themed").primary(); // Use primary style
 
     let node_id = button.build(&mut ctx);
 
     // Should have background styling
-    assert!(ctx.has_background_color(node_id), "Button should have background");
+    assert!(
+        ctx.has_background_color(node_id),
+        "Button should have background"
+    );
 }
 
 #[test]
@@ -114,15 +118,17 @@ fn test_button_disabled_state() {
     ctx.trigger_click(node_id);
 
     // Callback should NOT be called
-    assert!(!clicked.load(Ordering::SeqCst), "Disabled button should not respond to clicks");
+    assert!(
+        !clicked.load(Ordering::SeqCst),
+        "Disabled button should not respond to clicks"
+    );
 }
 
 #[test]
 fn test_button_with_padding() {
     let mut ctx = WidgetContext::new_test();
 
-    let button = Button::new("Padded")
-        .padding(20.0);
+    let button = Button::new("Padded").padding(20.0);
 
     let node_id = button.build(&mut ctx);
 
@@ -140,10 +146,9 @@ fn test_multiple_buttons() {
 
     for i in 0..5 {
         let clicks_clone = clicks.clone();
-        let button = Button::new(format!("Button {}", i))
-            .on_click(move || {
-                clicks_clone.lock().unwrap().push(i);
-            });
+        let button = Button::new(format!("Button {}", i)).on_click(move || {
+            clicks_clone.lock().unwrap().push(i);
+        });
 
         let node_id = button.build(&mut ctx);
         button_ids.push(node_id);

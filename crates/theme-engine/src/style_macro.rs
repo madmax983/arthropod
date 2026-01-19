@@ -3,7 +3,7 @@
 //! Provides a declarative API for styling components using design tokens.
 //! Currently a placeholder for future CSS-like macro implementation.
 
-use crate::{TokenValue, Color};
+use crate::{Color, TokenValue};
 
 /// Style properties for UI components
 ///

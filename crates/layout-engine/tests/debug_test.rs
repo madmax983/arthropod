@@ -1,6 +1,6 @@
 //! Debug test to understand taffy behavior
 
-use layout_engine::{LayoutEngine, FlexStyle, FlexDirection, LayoutConstraints};
+use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 
 #[test]
 fn debug_flex_grow() {

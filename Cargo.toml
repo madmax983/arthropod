@@ -14,6 +14,7 @@ members = [
     "crates/layout-engine",
     "crates/text-engine",
     "crates/widget-core",
+    "crates/widget-macros",
 ]
 
 [package]
@@ -99,6 +100,10 @@ path = "examples/form_demo.rs"
 [[example]]
 name = "widget_gallery"
 path = "examples/widget_gallery.rs"
+
+[[example]]
+name = "macro_demo"
+path = "examples/macro_demo.rs"
 
 [dependencies]
 arthropod = { path = "crates/arthropod" }

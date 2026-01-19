@@ -1,6 +1,6 @@
 //! Flexbox layout tests - Written FIRST following TDD
 
-use layout_engine::{LayoutEngine, FlexStyle, FlexDirection, LayoutConstraints};
+use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 
 #[test]
 fn test_flex_row_distributes_space() {

@@ -7,10 +7,10 @@ use text_engine::ShapedText;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GlyphInstance {
-    pub pos: [f32; 2],           // Position (x, y)
-    pub size: [f32; 2],          // Size (width, height)
-    pub color: [f32; 4],         // Color (r, g, b, a)
-    pub tex_coords: [f32; 4],    // Texture coords (u0, v0, u1, v1)
+    pub pos: [f32; 2],        // Position (x, y)
+    pub size: [f32; 2],       // Size (width, height)
+    pub color: [f32; 4],      // Color (r, g, b, a)
+    pub tex_coords: [f32; 4], // Texture coords (u0, v0, u1, v1)
 }
 
 /// Text renderer manages glyph atlas and instance generation

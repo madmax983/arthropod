@@ -1,0 +1,19 @@
+[package]
+name = "widget-macros"
+version = "0.1.0"
+edition = "2021"
+authors = ["Arthropod Contributors"]
+license = "MIT OR Apache-2.0"
+description = "Procedural macros for automatic widget macro generation"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+heck = "0.5"  # For case conversion (PascalCase -> snake_case)
+
+[dev-dependencies]
+trybuild = "1.0"

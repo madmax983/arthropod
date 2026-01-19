@@ -12,6 +12,7 @@ text-engine = { path = "../text-engine" }
 layout-engine = { path = "../layout-engine" }
 flux-state = { path = "../flux-state" }
 arthropod-ecs = { path = "../arthropod-ecs" }
+widget-macros = { path = "../widget-macros" }
 glam = "0.29"
 bevy_ecs = "0.15"
 

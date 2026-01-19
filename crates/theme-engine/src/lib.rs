@@ -15,13 +15,13 @@
 //! Layer 1: SystemTheme { mica_available: true, accent: Color }
 //! ```
 
-pub mod system_theme;
 pub mod design_tokens;
 pub mod style_macro;
+pub mod system_theme;
 
-pub use system_theme::{SystemTheme, BackgroundMaterial, WindowsMaterial, MacOSMaterial};
 pub use design_tokens::{DesignTokens, TokenValue};
-pub use style_macro::{Style, Padding};
+pub use style_macro::{Padding, Style};
+pub use system_theme::{BackgroundMaterial, MacOSMaterial, SystemTheme, WindowsMaterial};
 
 /// Common color type
 pub type Color = glam::Vec4;

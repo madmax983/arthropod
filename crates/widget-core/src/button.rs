@@ -1,10 +1,11 @@
 //! Button widget - interactive clickable button
 
-use crate::{Widget, WidgetContext, Text};
-use render_engine::{NodeId, NodeContent, Color};
-use layout_engine::FlexDirection;
+use crate::{Text, Widget, WidgetContext};
 use glam::Vec4;
+use layout_engine::FlexDirection;
+use render_engine::{Color, NodeContent, NodeId};
 use std::sync::Arc;
+use widget_macros::{WidgetEnum, WidgetMacro};
 
 /// Button widget with hover and click interactions
 ///
@@ -16,20 +17,39 @@ use std::sync::Arc;
 /// let button = Button::new("Click Me")
 ///     .primary()
 ///     .on_click(|| println!("Clicked!"));
+///
+/// // With generated macro:
+/// // btn!("Click Me")
+/// // btn!("Save", primary, on_click: || save())
+/// // btn!("Cancel", disabled, padding: 20.0)
 /// ```
+#[derive(WidgetMacro)]
+#[widget_macro(name = "btn", alias = "button")]
 pub struct Button {
+    #[positional]
     text: String,
+
+    #[callback]
     on_click: Option<Arc<dyn Fn() + Send + Sync>>,
+
+    #[method_flag(primary, secondary)]
     style: ButtonStyle,
+
+    #[param(default = 12.0)]
     padding: f32,
+
+    #[flag]
     disabled: bool,
 }
 
 /// Button visual style
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default, WidgetEnum)]
 pub enum ButtonStyle {
+    #[flag]
     Primary,
+    #[flag]
     Secondary,
+    #[default]
     Default,
 }
 
@@ -92,7 +112,7 @@ impl Button {
         match self.style {
             ButtonStyle::Primary => Vec4::new(1.0, 1.0, 1.0, 1.0), // White on primary
             ButtonStyle::Secondary => Vec4::new(1.0, 1.0, 1.0, 1.0), // White on secondary
-            ButtonStyle::Default => Vec4::new(0.0, 0.0, 0.0, 1.0),  // Black on default
+            ButtonStyle::Default => Vec4::new(0.0, 0.0, 0.0, 1.0), // Black on default
         }
     }
 }
@@ -110,8 +130,7 @@ impl Widget for Button {
 
         // Create text child
         let text_color = self.get_text_color();
-        let text_widget = Text::new(self.text.clone())
-            .color(text_color);
+        let text_widget = Text::new(self.text.clone()).color(text_color);
         let text_id = text_widget.build(ctx);
 
         // Re-parent text to button

@@ -1,9 +1,9 @@
 //! Form widget tests - Written FIRST following TDD
 
-use widget_core::{Form, TextInput, WidgetContext, Widget};
 use flux_state::{Runtime, Signal};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use widget_core::{Form, TextInput, Widget, WidgetContext};
 
 // Helper validators
 fn required(s: &str) -> Result<(), String> {
@@ -38,8 +38,8 @@ fn test_form_creates_node() {
     let runtime = Runtime::new();
 
     let name = Signal::new(runtime.clone(), String::new());
-    let form = Form::new()
-        .field("name", TextInput::new(name));
+    // Tuple-based fields (compile-time typed)
+    let form = Form::new((("name", TextInput::new(name)),));
 
     let node_id = form.build(&mut ctx);
 
@@ -55,15 +55,20 @@ fn test_form_builds_child_fields() {
     let name = Signal::new(runtime.clone(), String::new());
     let email = Signal::new(runtime.clone(), String::new());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name))
-        .field("email", TextInput::new(email));
+    let form = Form::new((
+        ("name", TextInput::new(name)),
+        ("email", TextInput::new(email)),
+    ));
 
     let node_id = form.build(&mut ctx);
 
     // Should have 2 field children
     let form_node = ctx.scene().get_node(node_id).unwrap();
-    assert_eq!(form_node.children.len(), 2, "Form should have 2 field children");
+    assert_eq!(
+        form_node.children.len(),
+        2,
+        "Form should have 2 field children"
+    );
 }
 
 #[test]
@@ -74,9 +79,10 @@ fn test_form_aggregates_field_errors() {
     let name = Signal::new(runtime.clone(), String::new()); // Empty, will fail
     let email = Signal::new(runtime.clone(), "invalid".to_string()); // No @, will fail
 
-    let form = Form::new()
-        .field("name", TextInput::new(name).validator(required))
-        .field("email", TextInput::new(email).validator(validate_email));
+    let form = Form::new((
+        ("name", TextInput::new(name).validator(required)),
+        ("email", TextInput::new(email).validator(validate_email)),
+    ));
 
     let node_id = form.build(&mut ctx);
 
@@ -87,7 +93,10 @@ fn test_form_aggregates_field_errors() {
     let field_errors = ctx.get_form_field_errors(node_id);
     assert_eq!(field_errors.len(), 2, "Should have 2 field errors");
     assert!(field_errors.contains_key("name"), "Should have name error");
-    assert!(field_errors.contains_key("email"), "Should have email error");
+    assert!(
+        field_errors.contains_key("email"),
+        "Should have email error"
+    );
 }
 
 #[test]
@@ -98,9 +107,10 @@ fn test_form_valid_when_all_fields_pass() {
     let name = Signal::new(runtime.clone(), "John Doe".to_string());
     let email = Signal::new(runtime.clone(), "john@example.com".to_string());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name).validator(required))
-        .field("email", TextInput::new(email).validator(validate_email));
+    let form = Form::new((
+        ("name", TextInput::new(name).validator(required)),
+        ("email", TextInput::new(email).validator(validate_email)),
+    ));
 
     let node_id = form.build(&mut ctx);
 
@@ -121,9 +131,8 @@ fn test_form_submit_callback() {
 
     let name = Signal::new(runtime.clone(), "John".to_string());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name).validator(required))
-        .on_submit(move |_data| {
+    let form =
+        Form::new((("name", TextInput::new(name).validator(required)),)).on_submit(move |_data| {
             submitted_clone.store(true, Ordering::SeqCst);
             Ok(())
         });
@@ -137,7 +146,10 @@ fn test_form_submit_callback() {
     ctx.trigger_submit(node_id);
 
     // Callback should have been called
-    assert!(submitted.load(Ordering::SeqCst), "Submit callback should be called");
+    assert!(
+        submitted.load(Ordering::SeqCst),
+        "Submit callback should be called"
+    );
 }
 
 #[test]
@@ -149,9 +161,8 @@ fn test_form_submit_only_when_valid() {
 
     let name = Signal::new(runtime.clone(), String::new()); // Invalid (empty)
 
-    let form = Form::new()
-        .field("name", TextInput::new(name).validator(required))
-        .on_submit(move |_data| {
+    let form =
+        Form::new((("name", TextInput::new(name).validator(required)),)).on_submit(move |_data| {
             submitted_clone.store(true, Ordering::SeqCst);
             Ok(())
         });
@@ -165,7 +176,10 @@ fn test_form_submit_only_when_valid() {
     ctx.trigger_submit(node_id);
 
     // Callback should NOT be called (form is invalid)
-    assert!(!submitted.load(Ordering::SeqCst), "Submit should not be called when invalid");
+    assert!(
+        !submitted.load(Ordering::SeqCst),
+        "Submit should not be called when invalid"
+    );
 }
 
 #[test]
@@ -175,8 +189,7 @@ fn test_form_validation_updates_dynamically() {
 
     let name = Signal::new(runtime.clone(), String::new()); // Start invalid
 
-    let form = Form::new()
-        .field("name", TextInput::new(name).validator(required));
+    let form = Form::new((("name", TextInput::new(name).validator(required)),));
 
     let node_id = form.build(&mut ctx);
 
@@ -210,14 +223,14 @@ fn test_form_submit_receives_field_data() {
 
     let name = Signal::new(runtime.clone(), "John Doe".to_string());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name))
-        .on_submit(move |data| {
+    let form = Form::new((("name", TextInput::new(name)),)).on_submit(
+        move |data: std::collections::HashMap<String, String>| {
             if let Some(name_value) = data.get("name") {
                 *received_name_clone.lock().unwrap() = name_value.clone();
             }
             Ok(())
-        });
+        },
+    );
 
     let node_id = form.build(&mut ctx);
 
@@ -226,7 +239,10 @@ fn test_form_submit_receives_field_data() {
 
     // Should have received the field data
     let received = received_name.lock().unwrap();
-    assert_eq!(*received, "John Doe", "Should receive field data in callback");
+    assert_eq!(
+        *received, "John Doe",
+        "Should receive field data in callback"
+    );
 }
 
 #[test]
@@ -237,8 +253,10 @@ fn test_form_with_multiple_validators_per_field() {
     // Password with multiple validation rules
     let password = Signal::new(runtime.clone(), "ab".to_string()); // Too short
 
-    let form = Form::new()
-        .field("password", TextInput::new(password).validator(min_length(8)));
+    let form = Form::new(((
+        "password",
+        TextInput::new(password).validator(min_length(8)),
+    ),));
 
     let node_id = form.build(&mut ctx);
 
@@ -246,7 +264,10 @@ fn test_form_with_multiple_validators_per_field() {
     assert!(!ctx.is_form_valid(node_id), "Should be invalid (too short)");
 
     let errors = ctx.get_form_field_errors(node_id);
-    assert!(errors.contains_key("password"), "Should have password error");
+    assert!(
+        errors.contains_key("password"),
+        "Should have password error"
+    );
     assert_eq!(
         errors.get("password").unwrap(),
         "Must be at least 8 characters"
@@ -259,11 +280,11 @@ fn test_form_without_fields() {
     let submitted = Arc::new(AtomicBool::new(false));
     let submitted_clone = submitted.clone();
 
-    let form = Form::new()
-        .on_submit(move |_data| {
-            submitted_clone.store(true, Ordering::SeqCst);
-            Ok(())
-        });
+    // Empty form using empty tuple
+    let form = Form::new(()).on_submit(move |_data| {
+        submitted_clone.store(true, Ordering::SeqCst);
+        Ok(())
+    });
 
     let node_id = form.build(&mut ctx);
 
@@ -284,12 +305,10 @@ fn test_form_submit_error_handling() {
 
     let name = Signal::new(runtime.clone(), "John".to_string());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name))
-        .on_submit(move |_data| {
-            submit_count_clone.fetch_add(1, Ordering::SeqCst);
-            Err("Server error".to_string())
-        });
+    let form = Form::new((("name", TextInput::new(name)),)).on_submit(move |_data| {
+        submit_count_clone.fetch_add(1, Ordering::SeqCst);
+        Err("Server error".to_string())
+    });
 
     let node_id = form.build(&mut ctx);
 
@@ -315,10 +334,11 @@ fn test_form_layout_vertical() {
     let name = Signal::new(runtime.clone(), String::new());
     let email = Signal::new(runtime.clone(), String::new());
 
-    let form = Form::new()
-        .field("name", TextInput::new(name))
-        .field("email", TextInput::new(email))
-        .gap(16.0);
+    let form = Form::new((
+        ("name", TextInput::new(name)),
+        ("email", TextInput::new(email)),
+    ))
+    .gap(16.0);
 
     let node_id = form.build(&mut ctx);
 

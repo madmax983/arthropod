@@ -4,8 +4,8 @@
 //! Provides glyph runs for rendering.
 
 pub mod font_manager;
-pub mod shaper;
 pub mod glyph_cache;
+pub mod shaper;
 
 pub use font_manager::FontManager;
 pub use shaper::TextShaper;

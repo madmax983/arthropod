@@ -1,7 +1,7 @@
 //! Layout engine benchmarks
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use layout_engine::{LayoutEngine, FlexStyle, FlexDirection, LayoutConstraints};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 
 fn create_flex_tree(size: usize) -> (LayoutEngine, layout_engine::NodeId) {
     let mut engine = LayoutEngine::new();
@@ -26,22 +26,18 @@ fn bench_flexbox_layout(c: &mut Criterion) {
     let mut group = c.benchmark_group("layout");
 
     for size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("flexbox", size),
-            size,
-            |b, &size| {
-                let (mut engine, root) = create_flex_tree(size);
-                let constraints = LayoutConstraints {
-                    max_width: Some(800.0),
-                    max_height: Some(600.0),
-                    ..Default::default()
-                };
+        group.bench_with_input(BenchmarkId::new("flexbox", size), size, |b, &size| {
+            let (mut engine, root) = create_flex_tree(size);
+            let constraints = LayoutConstraints {
+                max_width: Some(800.0),
+                max_height: Some(600.0),
+                ..Default::default()
+            };
 
-                b.iter(|| {
-                    engine.compute_layout(black_box(root), black_box(constraints.clone()));
-                });
-            },
-        );
+            b.iter(|| {
+                engine.compute_layout(black_box(root), black_box(constraints.clone()));
+            });
+        });
     }
 
     group.finish();

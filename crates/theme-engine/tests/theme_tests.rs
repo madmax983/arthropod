@@ -2,7 +2,7 @@
 //!
 //! Following TDD: These tests are written BEFORE implementation
 
-use theme_engine::{SystemTheme, DesignTokens, BackgroundMaterial, Color};
+use theme_engine::{BackgroundMaterial, Color, DesignTokens, SystemTheme};
 
 #[test]
 #[cfg(target_os = "windows")]
@@ -46,7 +46,10 @@ fn test_design_tokens_from_system() {
 
     // Should have resolved surface tokens
     // The exact material depends on platform/OS version, but should be Some
-    assert!(matches!(tokens.surface_primary, theme_engine::TokenValue::Material(_)));
+    assert!(matches!(
+        tokens.surface_primary,
+        theme_engine::TokenValue::Material(_)
+    ));
 }
 
 #[test]
@@ -85,7 +88,9 @@ fn test_windows_material_types() {
     assert!(theme.available_materials.len() > 0);
 
     // Should include at least Acrylic (available on Win10+)
-    let has_acrylic = theme.available_materials.iter()
+    let has_acrylic = theme
+        .available_materials
+        .iter()
         .any(|m| matches!(m, BackgroundMaterial::Windows(_)));
     assert!(has_acrylic, "Should support at least one Windows material");
 }

@@ -1,6 +1,6 @@
 //! Text shaping tests - Written FIRST following TDD
 
-use text_engine::{TextEngine, ShapedText};
+use text_engine::{ShapedText, TextEngine};
 
 #[test]
 fn test_simple_text_shaping() {
@@ -20,8 +20,14 @@ fn test_simple_text_shaping() {
     }
 
     // Bounds should be reasonable for 16px text
-    assert!(shaped.bounds.width > 50.0, "Text should have reasonable width");
-    assert!(shaped.bounds.height > 10.0, "Text should have reasonable height");
+    assert!(
+        shaped.bounds.width > 50.0,
+        "Text should have reasonable width"
+    );
+    assert!(
+        shaped.bounds.height > 10.0,
+        "Text should have reasonable height"
+    );
 }
 
 #[test]
@@ -53,10 +59,10 @@ fn test_unicode_text_shaping() {
 
     // Test with various Unicode characters
     let texts = vec![
-        "Hello 世界",      // Latin + CJK
-        "مرحبا",           // Arabic (RTL)
-        "Привет",          // Cyrillic
-        "Hello! 🌍",       // Emoji
+        "Hello 世界", // Latin + CJK
+        "مرحبا",      // Arabic (RTL)
+        "Привет",     // Cyrillic
+        "Hello! 🌍",  // Emoji
     ];
 
     for text in texts {

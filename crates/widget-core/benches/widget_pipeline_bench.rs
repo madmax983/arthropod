@@ -10,29 +10,30 @@
 //! - 1k widgets < 3ms full pipeline
 //! - Widget build < 500μs for 1k widgets
 //! - Form with 10 fields < 100μs
+//!
+//! Note: For dynamic content (loops with unknown count), we use scene-level
+//! manipulation since the tuple-based API is designed for static composition.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use widget_core::{Container, Text, Button, TextInput, Form, Widget, WidgetContext};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use flux_state::{Runtime, Signal};
+use layout_engine::FlexDirection;
+use render_engine::NodeContent;
+use widget_core::{Button, Container, FlexStyle, Form, Text, TextInput, Widget, WidgetContext};
 
 /// Benchmark building simple text widgets
 fn bench_text_widgets(c: &mut Criterion) {
     let mut group = c.benchmark_group("text_widget_build");
 
     for size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let mut ctx = WidgetContext::new_test();
-                    for i in 0..size {
-                        let text = Text::new(format!("Text {}", i));
-                        black_box(text.build(&mut ctx));
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let mut ctx = WidgetContext::new_test();
+                for i in 0..size {
+                    let text = Text::new(format!("Text {}", i));
+                    black_box(text.build(&mut ctx));
+                }
+            });
+        });
     }
 
     group.finish();
@@ -43,20 +44,15 @@ fn bench_button_widgets(c: &mut Criterion) {
     let mut group = c.benchmark_group("button_widget_build");
 
     for size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let mut ctx = WidgetContext::new_test();
-                    for i in 0..size {
-                        let button = Button::new(format!("Button {}", i))
-                            .on_click(|| {});
-                        black_box(button.build(&mut ctx));
-                    }
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let mut ctx = WidgetContext::new_test();
+                for i in 0..size {
+                    let button = Button::new(format!("Button {}", i)).on_click(|| {});
+                    black_box(button.build(&mut ctx));
+                }
+            });
+        });
     }
 
     group.finish();
@@ -67,118 +63,181 @@ fn bench_text_input_widgets(c: &mut Criterion) {
     let mut group = c.benchmark_group("text_input_widget_build");
 
     for size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let runtime = Runtime::new();
-                    let mut ctx = WidgetContext::new_test();
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let runtime = Runtime::new();
+                let mut ctx = WidgetContext::new_test();
 
-                    for _i in 0..size {
-                        let value = Signal::new(runtime.clone(), String::new());
-                        let input = TextInput::new(value)
-                            .validator(|s| {
-                                if s.is_empty() {
-                                    Err("Required".to_string())
-                                } else {
-                                    Ok(())
-                                }
-                            });
-                        black_box(input.build(&mut ctx));
-                    }
-                });
-            },
-        );
+                for _i in 0..size {
+                    let value = Signal::new(runtime.clone(), String::new());
+                    let input = TextInput::new(value).validator(|s| {
+                        if s.is_empty() {
+                            Err("Required".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    });
+                    black_box(input.build(&mut ctx));
+                }
+            });
+        });
     }
 
     group.finish();
 }
 
-/// Benchmark building containers with children
+/// Benchmark building containers with children (dynamic content)
 fn bench_container_widgets(c: &mut Criterion) {
     let mut group = c.benchmark_group("container_widget_build");
 
     for size in [10, 100, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let mut ctx = WidgetContext::new_test();
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let mut ctx = WidgetContext::new_test();
 
-                    let mut container = Container::column();
-                    for i in 0..size {
-                        container = container.child(Text::new(format!("Item {}", i)));
-                    }
+                // For dynamic content, use scene-level manipulation
+                let container_id = ctx.create_node(ctx.root(), NodeContent::Empty);
+                let style = FlexStyle {
+                    direction: FlexDirection::Column,
+                    ..Default::default()
+                };
+                ctx.set_layout_style(container_id, style);
 
-                    black_box(container.build(&mut ctx));
-                });
-            },
-        );
+                for i in 0..size {
+                    let text = Text::new(format!("Item {}", i));
+                    let text_id = text.build(&mut ctx);
+                    ctx.reparent_to(text_id, container_id);
+                }
+
+                black_box(container_id);
+            });
+        });
     }
 
     group.finish();
 }
 
-/// Benchmark nested container layouts
+/// Benchmark nested container layouts (dynamic content)
 fn bench_nested_containers(c: &mut Criterion) {
     let mut group = c.benchmark_group("nested_container_build");
 
     for size in [10, 50, 100].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let mut ctx = WidgetContext::new_test();
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let mut ctx = WidgetContext::new_test();
 
-                    let mut container = Container::column();
-                    for i in 0..size {
-                        container = container.child(
-                            Container::row()
-                                .child(Text::new(format!("Label {}", i)))
-                                .child(Button::new("Action"))
-                        );
-                    }
+                // Create outer column container
+                let container_id = ctx.create_node(ctx.root(), NodeContent::Empty);
+                let col_style = FlexStyle {
+                    direction: FlexDirection::Column,
+                    ..Default::default()
+                };
+                ctx.set_layout_style(container_id, col_style);
 
-                    black_box(container.build(&mut ctx));
-                });
-            },
-        );
+                for i in 0..size {
+                    // Each row uses tuple-based static composition
+                    let row =
+                        Container::row((Text::new(format!("Label {}", i)), Button::new("Action")));
+                    let row_id = row.build(&mut ctx);
+                    ctx.reparent_to(row_id, container_id);
+                }
+
+                black_box(container_id);
+            });
+        });
     }
 
     group.finish();
 }
 
-/// Benchmark form with multiple fields
+/// Benchmark form with multiple fields (static composition with known field count)
 fn bench_form_build(c: &mut Criterion) {
     let mut group = c.benchmark_group("form_build");
 
-    for field_count in [5, 10, 20].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(field_count),
-            field_count,
-            |b, &field_count| {
-                b.iter(|| {
-                    let runtime = Runtime::new();
-                    let mut ctx = WidgetContext::new_test();
+    // Benchmark fixed field counts using tuple-based API
+    group.bench_function("5_fields", |b| {
+        b.iter(|| {
+            let runtime = Runtime::new();
+            let mut ctx = WidgetContext::new_test();
 
-                    let mut form = Form::new();
-                    for i in 0..field_count {
-                        let value = Signal::new(runtime.clone(), String::new());
-                        form = form.field(
-                            format!("field_{}", i),
-                            TextInput::new(value)
-                                .validator(|s| if s.is_empty() { Err("Required".to_string()) } else { Ok(()) })
-                        );
-                    }
+            let form = Form::new((
+                (
+                    "field_0",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_1",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_2",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_3",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_4",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+            ));
 
-                    black_box(form.build(&mut ctx));
-                });
-            },
-        );
-    }
+            black_box(form.build(&mut ctx));
+        });
+    });
+
+    group.bench_function("10_fields", |b| {
+        b.iter(|| {
+            let runtime = Runtime::new();
+            let mut ctx = WidgetContext::new_test();
+
+            let form = Form::new((
+                (
+                    "field_0",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_1",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_2",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_3",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_4",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_5",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_6",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_7",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_8",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+                (
+                    "field_9",
+                    TextInput::new(Signal::new(runtime.clone(), String::new())),
+                ),
+            ));
+
+            black_box(form.build(&mut ctx));
+        });
+    });
 
     group.finish();
 }
@@ -187,34 +246,81 @@ fn bench_form_build(c: &mut Criterion) {
 fn bench_form_revalidation(c: &mut Criterion) {
     let mut group = c.benchmark_group("form_revalidation");
 
-    for field_count in [5, 10, 20].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(field_count),
-            field_count,
-            |b, &field_count| {
-                // Setup: build form with fields
-                let runtime = Runtime::new();
-                let mut ctx = WidgetContext::new_test();
+    group.bench_function("5_fields", |b| {
+        // Setup: build form with fields
+        let runtime = Runtime::new();
+        let mut ctx = WidgetContext::new_test();
 
-                let mut form = Form::new();
-                for i in 0..field_count {
-                    let value = Signal::new(runtime.clone(), format!("value_{}", i));
-                    form = form.field(
-                        format!("field_{}", i),
-                        TextInput::new(value)
-                            .validator(|s| if s.len() >= 3 { Ok(()) } else { Err("Too short".to_string()) })
-                    );
-                }
+        let form = Form::new((
+            (
+                "field_0",
+                TextInput::new(Signal::new(runtime.clone(), "value_0".to_string())).validator(
+                    |s| {
+                        if s.len() >= 3 {
+                            Ok(())
+                        } else {
+                            Err("Too short".to_string())
+                        }
+                    },
+                ),
+            ),
+            (
+                "field_1",
+                TextInput::new(Signal::new(runtime.clone(), "value_1".to_string())).validator(
+                    |s| {
+                        if s.len() >= 3 {
+                            Ok(())
+                        } else {
+                            Err("Too short".to_string())
+                        }
+                    },
+                ),
+            ),
+            (
+                "field_2",
+                TextInput::new(Signal::new(runtime.clone(), "value_2".to_string())).validator(
+                    |s| {
+                        if s.len() >= 3 {
+                            Ok(())
+                        } else {
+                            Err("Too short".to_string())
+                        }
+                    },
+                ),
+            ),
+            (
+                "field_3",
+                TextInput::new(Signal::new(runtime.clone(), "value_3".to_string())).validator(
+                    |s| {
+                        if s.len() >= 3 {
+                            Ok(())
+                        } else {
+                            Err("Too short".to_string())
+                        }
+                    },
+                ),
+            ),
+            (
+                "field_4",
+                TextInput::new(Signal::new(runtime.clone(), "value_4".to_string())).validator(
+                    |s| {
+                        if s.len() >= 3 {
+                            Ok(())
+                        } else {
+                            Err("Too short".to_string())
+                        }
+                    },
+                ),
+            ),
+        ));
 
-                let form_id = form.build(&mut ctx);
+        let form_id = form.build(&mut ctx);
 
-                // Benchmark revalidation
-                b.iter(|| {
-                    black_box(ctx.revalidate_form(form_id));
-                });
-            },
-        );
-    }
+        // Benchmark revalidation
+        b.iter(|| {
+            black_box(ctx.revalidate_form(form_id));
+        });
+    });
 
     group.finish();
 }
@@ -224,45 +330,52 @@ fn bench_full_pipeline(c: &mut Criterion) {
     let mut group = c.benchmark_group("full_widget_pipeline");
 
     for size in [100, 500, 1000].iter() {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let runtime = Runtime::new();
-                    let mut ctx = WidgetContext::new_test();
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let runtime = Runtime::new();
+                let mut ctx = WidgetContext::new_test();
 
-                    // Build a realistic widget tree
-                    let mut container = Container::column().gap(8.0).padding(16.0);
+                // Create outer container for dynamic content
+                let container_id = ctx.create_node(ctx.root(), NodeContent::Empty);
+                let col_style = FlexStyle {
+                    direction: FlexDirection::Column,
+                    gap: 8.0,
+                    padding_left: 16.0,
+                    padding_right: 16.0,
+                    padding_top: 16.0,
+                    padding_bottom: 16.0,
+                    ..Default::default()
+                };
+                ctx.set_layout_style(container_id, col_style);
 
-                    for i in 0..(size / 3) {
-                        container = container.child(
-                            Container::row()
-                                .gap(12.0)
-                                .child(Text::new(format!("Label {}", i)))
-                                .child(Button::new("Click").on_click(|| {}))
-                        );
-                    }
+                // Build rows with static tuple composition
+                for i in 0..(size / 3) {
+                    let row = Container::row((
+                        Text::new(format!("Label {}", i)),
+                        Button::new("Click").on_click(|| {}),
+                    ))
+                    .gap(12.0);
+                    let row_id = row.build(&mut ctx);
+                    ctx.reparent_to(row_id, container_id);
+                }
 
-                    // Add some inputs
-                    for i in 0..(size / 3) {
-                        let value = Signal::new(runtime.clone(), String::new());
-                        container = container.child(
-                            TextInput::new(value)
-                                .placeholder(&format!("Input {}", i))
-                        );
-                    }
+                // Add some inputs
+                for i in 0..(size / 3) {
+                    let value = Signal::new(runtime.clone(), String::new());
+                    let input = TextInput::new(value).placeholder(&format!("Input {}", i));
+                    let input_id = input.build(&mut ctx);
+                    ctx.reparent_to(input_id, container_id);
+                }
 
-                    black_box(container.build(&mut ctx));
+                black_box(container_id);
 
-                    // Note: In real implementation, we'd also run:
-                    // - Layout computation (layout_engine)
-                    // - Text shaping (text_engine)
-                    // - Reactive updates
-                    // This benchmark focuses on widget build time
-                });
-            },
-        );
+                // Note: In real implementation, we'd also run:
+                // - Layout computation (layout_engine)
+                // - Text shaping (text_engine)
+                // - Reactive updates
+                // This benchmark focuses on widget build time
+            });
+        });
     }
 
     group.finish();

@@ -3,8 +3,8 @@
 //! Resolves semantic tokens (surface_primary, text_primary, etc.) from SystemTheme.
 //! Provides consistent design language across the application.
 
-use crate::{Color, SystemTheme, BackgroundMaterial};
 use crate::system_theme::WindowsMaterial;
+use crate::{BackgroundMaterial, Color, SystemTheme};
 
 /// A token value that can be either a color or a material
 #[derive(Debug, Clone, PartialEq)]
@@ -109,9 +109,10 @@ impl DesignTokens {
             .iter()
             .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Mica)))
             .or_else(|| {
-                theme.available_materials.iter().find(|m| {
-                    matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic))
-                })
+                theme
+                    .available_materials
+                    .iter()
+                    .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic)))
             })
             .cloned()
             .unwrap_or_else(|| {
@@ -135,9 +136,10 @@ impl DesignTokens {
             .iter()
             .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::MicaAlt)))
             .or_else(|| {
-                theme.available_materials.iter().find(|m| {
-                    matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic))
-                })
+                theme
+                    .available_materials
+                    .iter()
+                    .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic)))
             })
             .cloned()
             .unwrap_or_else(|| {
@@ -235,15 +237,13 @@ mod tests {
 
     #[test]
     fn test_design_tokens_spacing_scale() {
-        let theme = SystemTheme::query().unwrap_or_else(|_| {
-            SystemTheme {
-                accent_color: Color::new(0.0, 0.5, 1.0, 1.0),
-                is_dark_mode: false,
-                supports_transparency: false,
-                available_materials: vec![],
-                text_color: Color::new(0.0, 0.0, 0.0, 1.0),
-                text_secondary_color: Color::new(0.5, 0.5, 0.5, 1.0),
-            }
+        let theme = SystemTheme::query().unwrap_or_else(|_| SystemTheme {
+            accent_color: Color::new(0.0, 0.5, 1.0, 1.0),
+            is_dark_mode: false,
+            supports_transparency: false,
+            available_materials: vec![],
+            text_color: Color::new(0.0, 0.0, 0.0, 1.0),
+            text_secondary_color: Color::new(0.5, 0.5, 0.5, 1.0),
         });
 
         let tokens = DesignTokens::from_system(&theme);

@@ -8,10 +8,7 @@ use taffy::prelude::*;
 pub mod cache;
 
 /// Re-export common types
-pub use taffy::{
-    style::FlexDirection as TaffyFlexDirection,
-    geometry::Size,
-};
+pub use taffy::{geometry::Size, style::FlexDirection as TaffyFlexDirection};
 
 /// Layout engine wrapping taffy with caching
 pub struct LayoutEngine {
@@ -106,12 +103,12 @@ impl LayoutEngine {
         self.taffy.set_style(root.0, updated_style).unwrap();
 
         let available_space = Size {
-            width: constraints.max_width.map_or(AvailableSpace::MaxContent, |w| {
-                AvailableSpace::Definite(w)
-            }),
-            height: constraints.max_height.map_or(AvailableSpace::MaxContent, |h| {
-                AvailableSpace::Definite(h)
-            }),
+            width: constraints
+                .max_width
+                .map_or(AvailableSpace::MaxContent, AvailableSpace::Definite),
+            height: constraints
+                .max_height
+                .map_or(AvailableSpace::MaxContent, AvailableSpace::Definite),
         };
 
         self.taffy.compute_layout(root.0, available_space).unwrap();
@@ -119,13 +116,11 @@ impl LayoutEngine {
 
     /// Get computed layout for a node
     pub fn get_layout(&self, node: NodeId) -> Option<ComputedLayout> {
-        self.taffy.layout(node.0).ok().map(|layout| {
-            ComputedLayout {
-                x: layout.location.x,
-                y: layout.location.y,
-                width: layout.size.width,
-                height: layout.size.height,
-            }
+        self.taffy.layout(node.0).ok().map(|layout| ComputedLayout {
+            x: layout.location.x,
+            y: layout.location.y,
+            width: layout.size.width,
+            height: layout.size.height,
         })
     }
 }

@@ -1,7 +1,7 @@
 //! TextInput widget tests - Written FIRST following TDD
 
-use widget_core::{TextInput, WidgetContext, Widget};
 use flux_state::{Runtime, Signal};
+use widget_core::{TextInput, Widget, WidgetContext};
 
 #[test]
 fn test_text_input_creates_node() {
@@ -118,14 +118,13 @@ fn test_text_input_validation() {
     let runtime = Runtime::new();
 
     let value = Signal::new(runtime.clone(), "ab".to_string());
-    let input = TextInput::new(value)
-        .validator(|s| {
-            if s.len() < 3 {
-                Err("Too short".to_string())
-            } else {
-                Ok(())
-            }
-        });
+    let input = TextInput::new(value).validator(|s| {
+        if s.len() < 3 {
+            Err("Too short".to_string())
+        } else {
+            Ok(())
+        }
+    });
 
     let node_id = input.build(&mut ctx);
 
@@ -143,14 +142,13 @@ fn test_text_input_validation_passes() {
     let runtime = Runtime::new();
 
     let value = Signal::new(runtime.clone(), "Hello".to_string());
-    let input = TextInput::new(value)
-        .validator(|s| {
-            if s.len() < 3 {
-                Err("Too short".to_string())
-            } else {
-                Ok(())
-            }
-        });
+    let input = TextInput::new(value).validator(|s| {
+        if s.len() < 3 {
+            Err("Too short".to_string())
+        } else {
+            Ok(())
+        }
+    });
 
     let node_id = input.build(&mut ctx);
 
@@ -172,7 +170,10 @@ fn test_text_input_focus() {
 
     // Focus the input
     ctx.focus_node(node_id);
-    assert!(ctx.is_focused(node_id), "Should be focused after focus_node");
+    assert!(
+        ctx.is_focused(node_id),
+        "Should be focused after focus_node"
+    );
 
     // Blur the input
     ctx.blur_node(node_id);
@@ -185,8 +186,7 @@ fn test_text_input_placeholder() {
     let runtime = Runtime::new();
 
     let value = Signal::new(runtime.clone(), String::new());
-    let input = TextInput::new(value)
-        .placeholder("Enter text...");
+    let input = TextInput::new(value).placeholder("Enter text...");
 
     let node_id = input.build(&mut ctx);
 
@@ -200,8 +200,7 @@ fn test_text_input_readonly() {
     let runtime = Runtime::new();
 
     let value = Signal::new(runtime.clone(), "Hello".to_string());
-    let input = TextInput::new(value)
-        .readonly(true);
+    let input = TextInput::new(value).readonly(true);
 
     let node_id = input.build(&mut ctx);
     ctx.focus_node(node_id);
@@ -220,8 +219,7 @@ fn test_text_input_max_length() {
     let runtime = Runtime::new();
 
     let value = Signal::new(runtime.clone(), "Hello".to_string());
-    let input = TextInput::new(value)
-        .max_length(6);
+    let input = TextInput::new(value).max_length(6);
 
     let node_id = input.build(&mut ctx);
     ctx.focus_node(node_id);

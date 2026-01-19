@@ -2,17 +2,17 @@
 //!
 //! Provides API for widgets to build scene nodes and configure components.
 
-use render_engine::{Scene, NodeId, NodeContent, SceneNode};
-use layout_engine::{FlexStyle, FlexDirection};
+use crate::validation::Validator;
 use arthropod_ecs::FrameworkContext;
+use flux_state::ReadSignal;
+use glam::Vec4;
+use layout_engine::{FlexDirection, FlexStyle};
+use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use glam::Vec4;
-use flux_state::ReadSignal;
-use crate::validation::Validator;
 
-use flux_state::WriteSignal;
 use crate::form::{FormData, SubmitCallback};
+use flux_state::WriteSignal;
 
 /// Text input state for a node
 #[derive(Clone)]
@@ -136,6 +136,19 @@ impl WidgetContext {
         self.scene.reparent_node(child_id, old_parent, new_parent);
     }
 
+    /// Re-parent a node to a new parent (finds and removes from current parent)
+    ///
+    /// This is a convenience method for WidgetTuple implementations.
+    pub fn reparent_to(&mut self, child_id: NodeId, new_parent: NodeId) {
+        // Find current parent
+        if let Some(current_parent) = self.scene.find_parent(child_id) {
+            if current_parent != new_parent {
+                self.scene
+                    .reparent_node(child_id, current_parent, new_parent);
+            }
+        }
+    }
+
     /// Add hover state tracking to a node
     pub fn add_hover_state(&mut self, node_id: NodeId) {
         self.hover_states.insert(node_id);
@@ -197,13 +210,16 @@ impl WidgetContext {
         max_length: Option<usize>,
     ) {
         let cursor_position = read_signal.get_untracked().len();
-        self.text_input_states.insert(node_id, TextInputState {
-            read_signal,
-            write_signal,
-            cursor_position,
-            readonly,
-            max_length,
-        });
+        self.text_input_states.insert(
+            node_id,
+            TextInputState {
+                read_signal,
+                write_signal,
+                cursor_position,
+                readonly,
+                max_length,
+            },
+        );
     }
 
     /// Focus a node
@@ -225,7 +241,9 @@ impl WidgetContext {
 
     /// Get cursor position for a text input
     pub fn get_cursor_position(&self, node_id: NodeId) -> Option<usize> {
-        self.text_input_states.get(&node_id).map(|state| state.cursor_position)
+        self.text_input_states
+            .get(&node_id)
+            .map(|state| state.cursor_position)
     }
 
     /// Send a character to focused input
@@ -325,22 +343,27 @@ impl WidgetContext {
         validator: Validator,
         initial_result: Result<(), String>,
     ) {
-        self.validators.insert(node_id, ValidationState {
-            validator,
-            error: initial_result.err(),
-        });
+        self.validators.insert(
+            node_id,
+            ValidationState {
+                validator,
+                error: initial_result.err(),
+            },
+        );
     }
 
     /// Check if node has validation error
     pub fn has_validation_error(&self, node_id: NodeId) -> bool {
-        self.validators.get(&node_id)
+        self.validators
+            .get(&node_id)
             .and_then(|state| state.error.as_ref())
             .is_some()
     }
 
     /// Get validation error for a node
     pub fn get_validation_error(&self, node_id: NodeId) -> Option<String> {
-        self.validators.get(&node_id)
+        self.validators
+            .get(&node_id)
             .and_then(|state| state.error.clone())
     }
 
@@ -356,7 +379,8 @@ impl WidgetContext {
 
     /// Get current value of a text input (for testing)
     pub fn get_text_input_value(&self, node_id: NodeId) -> Option<String> {
-        self.text_input_states.get(&node_id)
+        self.text_input_states
+            .get(&node_id)
             .map(|state| state.read_signal.get_untracked())
     }
 
@@ -367,17 +391,21 @@ impl WidgetContext {
         field_mapping: HashMap<String, NodeId>,
         on_submit: Option<SubmitCallback>,
     ) {
-        self.form_states.insert(node_id, FormState {
-            field_mapping,
-            is_valid: true, // Will be updated by revalidate_form
-            on_submit,
-            submit_error: None,
-        });
+        self.form_states.insert(
+            node_id,
+            FormState {
+                field_mapping,
+                is_valid: true, // Will be updated by revalidate_form
+                on_submit,
+                submit_error: None,
+            },
+        );
     }
 
     /// Check if form is valid
     pub fn is_form_valid(&self, node_id: NodeId) -> bool {
-        self.form_states.get(&node_id)
+        self.form_states
+            .get(&node_id)
             .map(|state| state.is_valid)
             .unwrap_or(true)
     }
@@ -466,14 +494,16 @@ impl WidgetContext {
 
     /// Check if form has submit error
     pub fn has_submit_error(&self, node_id: NodeId) -> bool {
-        self.form_states.get(&node_id)
+        self.form_states
+            .get(&node_id)
             .and_then(|state| state.submit_error.as_ref())
             .is_some()
     }
 
     /// Get submit error for a form
     pub fn get_submit_error(&self, node_id: NodeId) -> Option<String> {
-        self.form_states.get(&node_id)
+        self.form_states
+            .get(&node_id)
             .and_then(|state| state.submit_error.clone())
     }
 }

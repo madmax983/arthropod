@@ -94,6 +94,7 @@ impl SystemTheme {
     }
 
     /// Default theme for unsupported platforms
+    #[allow(dead_code)]
     pub(crate) fn default_theme() -> Self {
         Self {
             accent_color: Color::new(0.0, 0.47, 0.84, 1.0), // Default blue
@@ -107,8 +108,8 @@ impl SystemTheme {
 
     #[cfg(target_os = "windows")]
     fn query_windows() -> Result<Self> {
-        use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
         use windows::Win32::Foundation::BOOL;
+        use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
 
         // Query accent color from DWM
         let accent_color = unsafe {
@@ -183,8 +184,11 @@ impl SystemTheme {
 
     #[cfg(target_os = "windows")]
     fn query_accent_color_from_registry() -> Option<Color> {
-        use windows::Win32::System::Registry::{RegOpenKeyExW, RegQueryValueExW, RegCloseKey, HKEY_CURRENT_USER, KEY_READ, REG_VALUE_TYPE};
         use windows::core::HSTRING;
+        use windows::Win32::System::Registry::{
+            RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ,
+            REG_VALUE_TYPE,
+        };
 
         unsafe {
             let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows\\DWM");
@@ -223,11 +227,15 @@ impl SystemTheme {
 
     #[cfg(target_os = "windows")]
     fn query_windows_dark_mode() -> bool {
-        use windows::Win32::System::Registry::{RegOpenKeyExW, RegQueryValueExW, RegCloseKey, HKEY_CURRENT_USER, KEY_READ, REG_VALUE_TYPE};
         use windows::core::HSTRING;
+        use windows::Win32::System::Registry::{
+            RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ,
+            REG_VALUE_TYPE,
+        };
 
         unsafe {
-            let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
+            let subkey =
+                HSTRING::from("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
             let mut hkey = Default::default();
 
             if RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, 0, KEY_READ, &mut hkey).is_ok() {

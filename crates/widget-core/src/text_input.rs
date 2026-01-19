@@ -1,15 +1,45 @@
 //! TextInput widget - single-line text input field
 
-use crate::{Widget, WidgetContext, Text, validation::Validator};
-use render_engine::{NodeId, NodeContent, Color};
-use layout_engine::FlexDirection;
-use flux_state::{Signal, ReadSignal, WriteSignal};
+use crate::{validation::Validator, Text, Widget, WidgetContext};
+use flux_state::{ReadSignal, Signal, WriteSignal};
 use glam::Vec4;
+use layout_engine::FlexDirection;
+use render_engine::{Color, NodeContent, NodeId};
+use widget_macros::Widget;
 
 /// TextInput widget with cursor, selection, and validation
 ///
-/// # Example
+/// Use the `input!` macro for declarative construction:
+/// ```no_run
+/// use widget_core::input;
+/// use flux_state::{Runtime, Signal};
 ///
+/// let runtime = Runtime::new();
+///
+/// // Basic input
+/// let value1 = Signal::new(runtime.clone(), String::new());
+/// let input1 = input!(value1);
+///
+/// // With placeholder
+/// let value2 = Signal::new(runtime.clone(), String::new());
+/// let input2 = input!(value2, placeholder: "Enter name...");
+///
+/// // With validator
+/// let value3 = Signal::new(runtime.clone(), String::new());
+/// let input3 = input!(value3, placeholder: "Email", validator: |s| {
+///     if s.contains('@') { Ok(()) } else { Err("Invalid email".into()) }
+/// });
+///
+/// // Multiple options
+/// let value4 = Signal::new(runtime, String::new());
+/// let input4 = input!(value4,
+///     placeholder: "Password",
+///     max_length: 32,
+///     padding: 12.0
+/// );
+/// ```
+///
+/// Or use the builder pattern directly:
 /// ```no_run
 /// use widget_core::TextInput;
 /// use flux_state::{Runtime, Signal};
@@ -27,14 +57,24 @@ use glam::Vec4;
 ///         }
 ///     });
 /// ```
+#[derive(Widget)]
+#[widget(name = "input", positional_type = "Signal<String>")]
 pub struct TextInput {
+    // Internal: stores split signal (not exposed in macro)
     read_signal: ReadSignal<String>,
     write_signal: WriteSignal<String>,
+
+    #[param]
     placeholder: Option<String>,
+    #[callback]
     validator: Option<Validator>,
+    #[flag]
     readonly: bool,
+    #[param]
     max_length: Option<usize>,
+    #[param]
     width: Option<f32>,
+    #[param]
     padding: f32,
 }
 
@@ -129,8 +169,7 @@ impl Widget for TextInput {
             Vec4::new(0.0, 0.0, 0.0, 1.0) // Black for value
         };
 
-        let text_widget = Text::new(display_text)
-            .color(text_color);
+        let text_widget = Text::new(display_text).color(text_color);
         let text_id = text_widget.build(ctx);
 
         // Re-parent text to input
@@ -150,7 +189,13 @@ impl Widget for TextInput {
         ctx.set_layout_style(input_node, layout_style);
 
         // Add input state tracking
-        ctx.add_text_input_state(input_node, self.read_signal.clone(), self.write_signal.clone(), self.readonly, self.max_length);
+        ctx.add_text_input_state(
+            input_node,
+            self.read_signal.clone(),
+            self.write_signal.clone(),
+            self.readonly,
+            self.max_length,
+        );
 
         // Add validator if present
         if let Some(validator) = &self.validator {

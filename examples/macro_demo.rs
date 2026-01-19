@@ -1,15 +1,16 @@
-//! Form Demo - Complete demonstration of Form, TextInput, and Button widgets
+//! Widget Macro DSL Demo - Form Example
 //!
-//! This example shows:
-//! - Form with multiple validated fields
-//! - TextInput with different validators
-//! - Button with submit handling
-//! - Dynamic validation and error display
+//! This example demonstrates the same functionality as form_demo.rs,
+//! but using the declarative widget macros:
+//! - `form!` - Form widget with named fields
+//! - `txt!` - Text widget
+//! - `btn!` - Button widget
+//! - `col!` / `row!` - Layout containers
 //!
-//! Run with: cargo run --example form_demo
+//! Run with: cargo run --example macro_demo
 
 use flux_state::{Runtime, Signal};
-use widget_core::{Form, TextInput, Widget, WidgetContext};
+use widget_core::{TextInput, Widget, WidgetContext, btn, col, form, row, txt};
 
 // Validators
 fn required(s: &str) -> Result<(), String> {
@@ -39,7 +40,7 @@ fn min_length(min: usize) -> impl Fn(&str) -> Result<(), String> {
 }
 
 fn main() {
-    println!("=== Arthropod Form Demo ===\n");
+    println!("=== Arthropod Form Demo (with Macros) ===\n");
 
     // Create runtime for reactive state
     let runtime = Runtime::new();
@@ -49,52 +50,55 @@ fn main() {
     let email = Signal::new(runtime.clone(), String::new());
     let password = Signal::new(runtime.clone(), String::new());
 
-    println!("Creating form with 3 fields:");
+    println!("Creating form with 3 fields using macros:");
     println!("  - Name (required)");
     println!("  - Email (required, must be valid email)");
     println!("  - Password (required, minimum 8 characters)\n");
 
-    // Create form using tuple-based fields (compile-time typed)
-    let form = Form::new((
-        (
-            "name",
-            TextInput::new(name)
-                .placeholder("Enter your name")
-                .validator(required),
-        ),
-        (
-            "email",
-            TextInput::new(email)
-                .placeholder("your.email@example.com")
-                .validator(|s| {
-                    required(s)?;
-                    validate_email(s)
-                }),
-        ),
-        (
-            "password",
-            TextInput::new(password)
-                .placeholder("Password (min 8 chars)")
-                .validator(|s| {
-                    required(s)?;
-                    min_length(8)(s)
-                }),
-        ),
-    ))
-    .gap(16.0)
-    .padding(20.0)
-    .on_submit(|data| {
-        println!("\n✅ Form submitted successfully!");
-        println!("Data received:");
-        for (field, value) in data {
-            println!("  {}: {}", field, value);
+    // Create form using macros!
+    // The form! macro accepts a tuple of (name, widget) pairs
+    let user_form = form!(
+        [
+            (
+                "name",
+                TextInput::new(name)
+                    .placeholder("Enter your name")
+                    .validator(required)
+            ),
+            (
+                "email",
+                TextInput::new(email)
+                    .placeholder("your.email@example.com")
+                    .validator(|s| {
+                        required(s)?;
+                        validate_email(s)
+                    })
+            ),
+            (
+                "password",
+                TextInput::new(password)
+                    .placeholder("Password (min 8 chars)")
+                    .validator(|s| {
+                        required(s)?;
+                        min_length(8)(s)
+                    })
+            ),
+        ],
+        gap: 16.0,
+        padding: 20.0,
+        on_submit: |data| {
+            println!("\n✅ Form submitted successfully!");
+            println!("Data received:");
+            for (field, value) in data {
+                println!("  {}: {}", field, value);
+            }
+            Ok(())
         }
-        Ok(())
-    });
+    );
 
     // Build the form
     let mut ctx = WidgetContext::new_test();
-    let form_node = form.build(&mut ctx);
+    let form_node = user_form.build(&mut ctx);
 
     println!("✓ Form built successfully!");
     println!("  Form node ID: {:?}", form_node);
@@ -192,14 +196,14 @@ fn main() {
     let runtime2 = Runtime::new();
     let invalid_email = Signal::new(runtime2.clone(), "not-an-email".to_string());
 
-    let invalid_form = Form::new(((
-        "email",
-        TextInput::new(invalid_email).validator(validate_email),
-    ),))
-    .on_submit(|_| {
-        println!("This should not be called!");
-        Ok(())
-    });
+    // Create form with macro
+    let invalid_form = form!(
+        [("email", TextInput::new(invalid_email).validator(validate_email))],
+        on_submit: |_| {
+            println!("This should not be called!");
+            Ok(())
+        }
+    );
 
     let mut ctx2 = WidgetContext::new_test();
     let invalid_form_node = invalid_form.build(&mut ctx2);
@@ -222,12 +226,36 @@ fn main() {
     ctx2.trigger_submit(invalid_form_node);
     println!("Submit was blocked (form is invalid) ✓");
 
+    // ========================
+    // Bonus: Show other macros
+    // ========================
+    println!("\n--- Bonus: Other Widget Macros ---\n");
+
+    // Text macros
+    let _title = txt!("Form Demo", size: 24.0);
+    println!("txt!(\"Form Demo\", size: 24.0) - styled text");
+
+    // Button macros
+    let _submit_btn = btn!("Submit", primary, on_click: || println!("Submitted!"));
+    println!("btn!(\"Submit\", primary, on_click: ...) - primary button");
+
+    // Layout composition
+    let _layout = col!(
+        [
+            txt!("Registration Form", size: 20.0),
+            row!([btn!("Submit", primary), btn!("Cancel", secondary),], gap: 8.0),
+        ],
+        gap: 16.0,
+        padding: 20.0
+    );
+    println!("col!([txt!(...), row!([btn!(...), btn!(...)], ...)], ...) - nested layout");
+
     println!("\n=== Form Demo Complete ===");
     println!("\nKey features demonstrated:");
-    println!("  ✓ Form with multiple validated fields");
-    println!("  ✓ TextInput with custom validators");
+    println!("  ✓ form! macro with named fields");
+    println!("  ✓ TextInput with validators");
     println!("  ✓ Dynamic validation (revalidate after input)");
     println!("  ✓ Submit-only-when-valid enforcement");
     println!("  ✓ Submit callback with form data");
-    println!("  ✓ Error handling and display");
+    println!("  ✓ txt!, btn!, col!, row! macros for composition");
 }

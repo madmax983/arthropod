@@ -26,7 +26,9 @@ pub fn update_reactive_colors_system(
                     color: new_color,
                     corner_radius,
                 },
-                NodeContent::Text { ref shaped_text, .. } => NodeContent::Text {
+                NodeContent::Text {
+                    ref shaped_text, ..
+                } => NodeContent::Text {
                     shaped_text: shaped_text.clone(),
                     color: new_color,
                 },

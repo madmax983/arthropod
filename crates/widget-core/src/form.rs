@@ -1,8 +1,8 @@
 //! Form widget - container for input fields with validation and submission
 
-use crate::{Widget, WidgetContext};
-use render_engine::{NodeId, NodeContent, Color};
+use crate::{NamedWidgetTuple, Widget, WidgetContext};
 use layout_engine::FlexDirection;
+use render_engine::{Color, NodeContent, NodeId};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -12,54 +12,72 @@ pub type FormData = HashMap<String, String>;
 /// Form submit callback type
 pub type SubmitCallback = Arc<dyn Fn(FormData) -> Result<(), String> + Send + Sync>;
 
-/// Form widget that aggregates child input fields
+/// Form widget that aggregates child input fields with validation and submission
 ///
-/// # Example
-///
+/// Use the `form!` macro for declarative construction:
 /// ```no_run
-/// use widget_core::{Form, TextInput};
+/// use widget_core::form;
+/// use widget_core::TextInput;
 /// use flux_state::{Runtime, Signal};
 ///
 /// let runtime = Runtime::new();
 /// let name = Signal::new(runtime.clone(), String::new());
 /// let email = Signal::new(runtime.clone(), String::new());
 ///
-/// let form = Form::new()
-///     .field("name", TextInput::new(name))
-///     .field("email", TextInput::new(email))
-///     .on_submit(|data| {
-///         println!("Submitted: {:?}", data);
-///         Ok(())
-///     });
+/// // Form with tuple-based fields (compile-time typed)
+/// let form1 = form!([
+///     ("name", TextInput::new(name)),
+///     ("email", TextInput::new(email)),
+/// ]);
+///
+/// // Form with options
+/// let runtime2 = Runtime::new();
+/// let username = Signal::new(runtime2.clone(), String::new());
+/// let user_email = Signal::new(runtime2.clone(), String::new());
+///
+/// let form2 = form!([
+///     ("username", TextInput::new(username)),
+///     ("email", TextInput::new(user_email)),
+/// ], gap: 16.0, padding: 20.0);
 /// ```
-pub struct Form {
-    fields: Vec<(String, Box<dyn Widget>)>,
+///
+/// Or use the builder pattern directly:
+/// ```no_run
+/// use widget_core::Form;
+/// use widget_core::TextInput;
+/// use flux_state::{Runtime, Signal};
+///
+/// let runtime = Runtime::new();
+/// let name = Signal::new(runtime.clone(), String::new());
+/// let email = Signal::new(runtime.clone(), String::new());
+///
+/// let form = Form::new((
+///     ("name", TextInput::new(name)),
+///     ("email", TextInput::new(email)),
+/// ));
+/// ```
+pub struct Form<F: NamedWidgetTuple> {
+    fields: F,
     on_submit: Option<SubmitCallback>,
     gap: f32,
     padding: f32,
 }
 
-impl Form {
-    /// Create a new form
-    pub fn new() -> Self {
+impl<F: NamedWidgetTuple> Form<F> {
+    /// Create a new form with named fields
+    pub fn new(fields: F) -> Self {
         Self {
-            fields: Vec::new(),
+            fields,
             on_submit: None,
             gap: 12.0,
             padding: 16.0,
         }
     }
 
-    /// Add a field to the form
-    pub fn field(mut self, name: impl Into<String>, widget: impl Widget + 'static) -> Self {
-        self.fields.push((name.into(), Box::new(widget)));
-        self
-    }
-
     /// Set submit callback
-    pub fn on_submit<F>(mut self, callback: F) -> Self
+    pub fn on_submit<Cb>(mut self, callback: Cb) -> Self
     where
-        F: Fn(FormData) -> Result<(), String> + Send + Sync + 'static,
+        Cb: Fn(FormData) -> Result<(), String> + Send + Sync + 'static,
     {
         self.on_submit = Some(Arc::new(callback));
         self
@@ -78,13 +96,7 @@ impl Form {
     }
 }
 
-impl Default for Form {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Widget for Form {
+impl<F: NamedWidgetTuple> Widget for Form<F> {
     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
         // Create form container
         let form_node = ctx.create_node(
@@ -94,21 +106,8 @@ impl Widget for Form {
             },
         );
 
-        // Build all fields and collect their IDs
-        let mut field_mapping = HashMap::new();
-        let mut field_ids = Vec::new();
-
-        for (field_name, field_widget) in &self.fields {
-            let field_id = field_widget.build(ctx);
-            field_ids.push(field_id);
-            field_mapping.insert(field_name.clone(), field_id);
-        }
-
-        // Re-parent fields to form
-        let root_id = ctx.root();
-        for field_id in &field_ids {
-            ctx.reparent_node(*field_id, root_id, form_node);
-        }
+        // Build all fields using NamedWidgetTuple trait
+        let field_mapping = self.fields.build_all_named(ctx, form_node);
 
         // Configure layout (vertical column)
         let layout_style = layout_engine::FlexStyle {
@@ -124,15 +123,63 @@ impl Widget for Form {
         ctx.set_layout_style(form_node, layout_style);
 
         // Add form state tracking
-        ctx.add_form_state(
-            form_node,
-            field_mapping,
-            self.on_submit.clone(),
-        );
+        ctx.add_form_state(form_node, field_mapping, self.on_submit.clone());
 
         // Initial validation
         ctx.revalidate_form(form_node);
 
         form_node
     }
+}
+
+/// Create a form with named fields
+///
+/// # Example
+///
+/// ```no_run
+/// use widget_core::{form, TextInput};
+/// use flux_state::{Runtime, Signal};
+///
+/// let runtime = Runtime::new();
+/// let name = Signal::new(runtime.clone(), String::new());
+/// let email = Signal::new(runtime.clone(), String::new());
+///
+/// // Basic form
+/// let form1 = form!([
+///     ("name", TextInput::new(name)),
+///     ("email", TextInput::new(email)),
+/// ]);
+/// ```
+#[macro_export]
+macro_rules! form {
+    // Fields only - wrap as tuple of pairs
+    ([$(($name:expr, $widget:expr)),* $(,)?]) => {{
+        $crate::Form::new(($(($name, $widget),)*))
+    }};
+
+    // Fields + params
+    ([$(($name:expr, $widget:expr)),* $(,)?], $($rest:tt)*) => {{
+        let widget = $crate::Form::new(($(($name, $widget),)*));
+        $crate::__form_apply!(widget, $($rest)*)
+    }};
+}
+
+/// Helper macro for applying form! parameters
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __form_apply {
+    ($w:expr,) => { $w };
+    ($w:expr) => { $w };
+    ($w:expr, , $($rest:tt)*) => { $crate::__form_apply!($w, $($rest)*) };
+
+    // Named parameters
+    ($w:expr, gap: $v:expr $(, $($rest:tt)*)?) => {
+        $crate::__form_apply!($w.gap($v), $($($rest)*)?)
+    };
+    ($w:expr, padding: $v:expr $(, $($rest:tt)*)?) => {
+        $crate::__form_apply!($w.padding($v), $($($rest)*)?)
+    };
+    ($w:expr, on_submit: $v:expr $(, $($rest:tt)*)?) => {
+        $crate::__form_apply!($w.on_submit($v), $($($rest)*)?)
+    };
 }

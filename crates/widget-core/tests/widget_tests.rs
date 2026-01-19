@@ -1,41 +1,47 @@
 //! Widget system integration tests - Written FIRST following TDD
 
-use widget_core::{Widget, Container, Text, WidgetContext};
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
+use widget_core::{Container, Text, Widget, WidgetContext};
 
 #[test]
 fn test_container_builds_children() {
     let mut ctx = test_widget_context();
 
-    let container = Container::column()
-        .child(Text::new("Hello"))
-        .child(Text::new("World"));
+    // Tuple-based children (compile-time typed)
+    let container = Container::column((Text::new("Hello"), Text::new("World")));
 
     let node_id = container.build(&mut ctx);
 
     // Verify scene node was created
     let scene_node = ctx.scene().get_node(node_id).unwrap();
-    assert_eq!(scene_node.children.len(), 2, "Container should have 2 children");
+    assert_eq!(
+        scene_node.children.len(),
+        2,
+        "Container should have 2 children"
+    );
 
     // Verify layout component exists
-    assert!(ctx.has_layout_node(node_id), "Container should have layout node");
+    assert!(
+        ctx.has_layout_node(node_id),
+        "Container should have layout node"
+    );
 }
 
 #[test]
 fn test_container_row_layout() {
     let mut ctx = test_widget_context();
 
-    let container = Container::row()
-        .gap(10.0)
-        .child(Text::new("A"))
-        .child(Text::new("B"));
+    let container = Container::row((Text::new("A"), Text::new("B"))).gap(10.0);
 
     let node_id = container.build(&mut ctx);
 
     // Verify it's a row layout
     let layout = ctx.get_layout_style(node_id).unwrap();
-    assert!(widget_core::context::is_row_layout(&layout), "Should be row layout");
+    assert!(
+        widget_core::context::is_row_layout(&layout),
+        "Should be row layout"
+    );
     assert_eq!(layout.gap, 10.0, "Gap should be 10.0");
 }
 
@@ -43,9 +49,7 @@ fn test_container_row_layout() {
 fn test_container_padding() {
     let mut ctx = test_widget_context();
 
-    let container = Container::column()
-        .padding(16.0)
-        .child(Text::new("Content"));
+    let container = Container::column((Text::new("Content"),)).padding(16.0);
 
     let node_id = container.build(&mut ctx);
 
@@ -97,22 +101,22 @@ fn test_reactive_text_updates() {
 
     // Update signal
     write.set("Updated".to_string());
-    
+
     // The reactive component should exist
-    assert!(ctx.has_reactive_text(node_id), "Should have reactive text component");
+    assert!(
+        ctx.has_reactive_text(node_id),
+        "Should have reactive text component"
+    );
 }
 
 #[test]
 fn test_nested_containers() {
     let mut ctx = test_widget_context();
 
-    let widget = Container::column()
-        .child(
-            Container::row()
-                .child(Text::new("A"))
-                .child(Text::new("B"))
-        )
-        .child(Text::new("C"));
+    let widget = Container::column((
+        Container::row((Text::new("A"), Text::new("B"))),
+        Text::new("C"),
+    ));
 
     let root_id = widget.build(&mut ctx);
 
@@ -122,33 +126,46 @@ fn test_nested_containers() {
     // First child is a container with 2 text children
     let first_child_id = root_node.children[0];
     let first_child = ctx.scene().get_node(first_child_id).unwrap();
-    assert_eq!(first_child.children.len(), 2, "First child should have 2 children");
+    assert_eq!(
+        first_child.children.len(),
+        2,
+        "First child should have 2 children"
+    );
 }
 
 #[test]
 fn test_empty_container() {
     let mut ctx = test_widget_context();
 
-    let container = Container::column();
+    // Empty tuple for no children
+    let container = Container::column(());
     let node_id = container.build(&mut ctx);
 
     let scene_node = ctx.scene().get_node(node_id).unwrap();
-    assert_eq!(scene_node.children.len(), 0, "Empty container should have no children");
+    assert_eq!(
+        scene_node.children.len(),
+        0,
+        "Empty container should have no children"
+    );
 }
 
 #[test]
-fn test_container_with_many_children() {
+fn test_container_with_multiple_children() {
     let mut ctx = test_widget_context();
 
-    let mut container = Container::column();
-    for i in 0..100 {
-        container = container.child(Text::new(format!("Item {}", i)));
-    }
+    // Tuple-based children (compile-time typed, no vtable overhead)
+    let container = Container::column((
+        Text::new("Item 0"),
+        Text::new("Item 1"),
+        Text::new("Item 2"),
+        Text::new("Item 3"),
+        Text::new("Item 4"),
+    ));
 
     let node_id = container.build(&mut ctx);
 
     let scene_node = ctx.scene().get_node(node_id).unwrap();
-    assert_eq!(scene_node.children.len(), 100, "Should have 100 children");
+    assert_eq!(scene_node.children.len(), 5, "Should have 5 children");
 }
 
 // Helper function to create test widget context

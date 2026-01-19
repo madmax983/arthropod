@@ -1,10 +1,14 @@
 //! Text widget - displays shaped text
 
 use crate::{Widget, WidgetContext};
-use render_engine::{NodeId, NodeContent, node::{ShapedTextData, ShapedGlyphData}, Color};
 use flux_state::ReadSignal;
-use text_engine::TextEngine;
 use glam::Vec4;
+use render_engine::{
+    node::{ShapedGlyphData, ShapedTextData},
+    Color, NodeContent, NodeId,
+};
+use text_engine::TextEngine;
+use widget_macros::WidgetMacro;
 
 /// Text widget
 ///
@@ -20,10 +24,22 @@ use glam::Vec4;
 /// let text = Text::new("Hello World")
 ///     .size(20.0)
 ///     .color(Vec4::ONE);
+///
+/// // With generated macro:
+/// // txt!("Hello World")
+/// // txt!("Title", size: 20.0, color: Vec4::ONE)
+/// // txt!(@signal, size: 20.0)  // Reactive
 /// ```
+#[derive(WidgetMacro)]
+#[widget_macro(name = "txt")]
 pub struct Text {
+    #[positional(reactive)]
     content: TextContent,
+
+    #[param(default = 16.0, setter = "size")]
     font_size: f32,
+
+    #[param]
     color: Vec4,
 }
 
@@ -81,29 +97,28 @@ impl Widget for Text {
 
         // Convert to serializable format
         let shaped_data = ShapedTextData {
-            glyphs: shaped.glyphs.iter().map(|g| ShapedGlyphData {
-                glyph_id: g.glyph_id,
-                x_offset: g.x_offset,
-                y_offset: g.y_offset,
-                x_advance: g.x_advance,
-                y_advance: g.y_advance,
-            }).collect(),
+            glyphs: shaped
+                .glyphs
+                .iter()
+                .map(|g| ShapedGlyphData {
+                    glyph_id: g.glyph_id,
+                    x_offset: g.x_offset,
+                    y_offset: g.y_offset,
+                    x_advance: g.x_advance,
+                    y_advance: g.y_advance,
+                })
+                .collect(),
             bounds_width: shaped.bounds.width,
             bounds_height: shaped.bounds.height,
         };
 
         // Create text node
-        let node_id = ctx.create_node(
+        ctx.create_node(
             ctx.root(),
             NodeContent::Text {
                 shaped_text: shaped_data,
                 color: Color::rgba(self.color.x, self.color.y, self.color.z, self.color.w),
             },
-        );
-
-        // If reactive, store signal for updates
-        // (This would be done via ECS components in full implementation)
-
-        node_id
+        )
     }
 }

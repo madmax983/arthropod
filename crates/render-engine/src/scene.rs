@@ -79,6 +79,16 @@ impl Scene {
         self.get_node_mut(id)
     }
 
+    /// Find the parent of a node (O(n) search).
+    pub fn find_parent(&self, child_id: NodeId) -> Option<NodeId> {
+        for (id, node) in &self.nodes {
+            if node.children.contains(&child_id) {
+                return Some(*id);
+            }
+        }
+        None
+    }
+
     /// Re-parent a node from old parent to new parent.
     pub fn reparent_node(&mut self, child_id: NodeId, old_parent: NodeId, new_parent: NodeId) {
         // Remove child from old parent

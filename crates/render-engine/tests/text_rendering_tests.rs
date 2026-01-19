@@ -1,8 +1,8 @@
 //! Text rendering integration tests - Written FIRST following TDD
 
 use render_engine::backend::text::{GlyphAtlas, TextRenderer};
-use text_engine::TextEngine;
 use std::time::Instant;
+use text_engine::TextEngine;
 
 #[test]
 fn test_glyph_atlas_caching() {
@@ -53,14 +53,40 @@ fn test_glyph_atlas_packing() {
         let coords = atlas.get_or_rasterize(glyph_id, 16, &font_data);
 
         // All texture coordinates should be in [0, 1] range
-        assert!(coords.u0 >= 0.0 && coords.u0 <= 1.0, "u0 out of range: {}", coords.u0);
-        assert!(coords.v0 >= 0.0 && coords.v0 <= 1.0, "v0 out of range: {}", coords.v0);
-        assert!(coords.u1 >= 0.0 && coords.u1 <= 1.0, "u1 out of range: {}", coords.u1);
-        assert!(coords.v1 >= 0.0 && coords.v1 <= 1.0, "v1 out of range: {}", coords.v1);
+        assert!(
+            coords.u0 >= 0.0 && coords.u0 <= 1.0,
+            "u0 out of range: {}",
+            coords.u0
+        );
+        assert!(
+            coords.v0 >= 0.0 && coords.v0 <= 1.0,
+            "v0 out of range: {}",
+            coords.v0
+        );
+        assert!(
+            coords.u1 >= 0.0 && coords.u1 <= 1.0,
+            "u1 out of range: {}",
+            coords.u1
+        );
+        assert!(
+            coords.v1 >= 0.0 && coords.v1 <= 1.0,
+            "v1 out of range: {}",
+            coords.v1
+        );
 
         // u1 should be >= u0, v1 should be >= v0 (allow equality for small glyphs)
-        assert!(coords.u1 >= coords.u0, "u1 ({}) should be >= u0 ({})", coords.u1, coords.u0);
-        assert!(coords.v1 >= coords.v0, "v1 ({}) should be >= v0 ({})", coords.v1, coords.v0);
+        assert!(
+            coords.u1 >= coords.u0,
+            "u1 ({}) should be >= u0 ({})",
+            coords.u1,
+            coords.u0
+        );
+        assert!(
+            coords.v1 >= coords.v0,
+            "v1 ({}) should be >= v0 ({})",
+            coords.v1,
+            coords.v0
+        );
     }
 }
 
@@ -109,11 +135,7 @@ fn test_text_renderer_empty_text() {
     let mut engine = TextEngine::new();
     let shaped = engine.shape_text("", 16.0);
 
-    let instances = renderer.generate_instances(
-        &shaped,
-        glam::Vec2::ZERO,
-        glam::Vec4::ONE,
-    );
+    let instances = renderer.generate_instances(&shaped, glam::Vec2::ZERO, glam::Vec4::ONE);
 
     // Empty text should produce no instances
     assert_eq!(instances.len(), 0);

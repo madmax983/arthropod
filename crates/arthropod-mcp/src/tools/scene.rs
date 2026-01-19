@@ -526,7 +526,9 @@ impl Tool for UpdateNodeTool {
                     *node_color = color;
                     updated_fields.push("color");
                 }
-                NodeContent::Text { color: node_color, .. } => {
+                NodeContent::Text {
+                    color: node_color, ..
+                } => {
                     *node_color = color;
                     updated_fields.push("color");
                 }
