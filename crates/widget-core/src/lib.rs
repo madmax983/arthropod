@@ -7,12 +7,15 @@ pub mod widget_trait;
 pub mod container;
 pub mod text;
 pub mod button;
+pub mod text_input;
+pub mod validation;
 pub mod context;
 
 pub use widget_trait::Widget;
 pub use container::Container;
 pub use text::Text;
 pub use button::Button;
+pub use text_input::TextInput;
 pub use context::WidgetContext;
 
 #[cfg(test)]

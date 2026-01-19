@@ -8,6 +8,26 @@ use arthropod_ecs::FrameworkContext;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use glam::Vec4;
+use flux_state::ReadSignal;
+use crate::validation::Validator;
+
+use flux_state::WriteSignal;
+
+/// Text input state for a node
+#[derive(Clone)]
+pub struct TextInputState {
+    pub read_signal: ReadSignal<String>,
+    pub write_signal: WriteSignal<String>,
+    pub cursor_position: usize,
+    pub readonly: bool,
+    pub max_length: Option<usize>,
+}
+
+/// Validation state for a node
+pub struct ValidationState {
+    pub validator: Validator,
+    pub error: Option<String>,
+}
 
 /// Widget building context
 ///
@@ -24,6 +44,10 @@ pub struct WidgetContext {
     hover_states: HashSet<NodeId>,
     clickables: HashMap<NodeId, Arc<dyn Fn() + Send + Sync>>,
     background_colors: HashMap<NodeId, Vec4>,
+    text_input_states: HashMap<NodeId, TextInputState>,
+    focused_node: Option<NodeId>,
+    validators: HashMap<NodeId, ValidationState>,
+    placeholders: HashSet<NodeId>,
 }
 
 impl WidgetContext {
@@ -36,6 +60,10 @@ impl WidgetContext {
             hover_states: HashSet::new(),
             clickables: HashMap::new(),
             background_colors: HashMap::new(),
+            text_input_states: HashMap::new(),
+            focused_node: None,
+            validators: HashMap::new(),
+            placeholders: HashSet::new(),
         }
     }
 
@@ -146,6 +174,179 @@ impl WidgetContext {
         } else {
             self.hover_states.remove(&node_id);
         }
+    }
+
+    /// Add text input state to a node
+    pub fn add_text_input_state(
+        &mut self,
+        node_id: NodeId,
+        read_signal: ReadSignal<String>,
+        write_signal: WriteSignal<String>,
+        readonly: bool,
+        max_length: Option<usize>,
+    ) {
+        let cursor_position = read_signal.get_untracked().len();
+        self.text_input_states.insert(node_id, TextInputState {
+            read_signal,
+            write_signal,
+            cursor_position,
+            readonly,
+            max_length,
+        });
+    }
+
+    /// Focus a node
+    pub fn focus_node(&mut self, node_id: NodeId) {
+        self.focused_node = Some(node_id);
+    }
+
+    /// Check if node is focused
+    pub fn is_focused(&self, node_id: NodeId) -> bool {
+        self.focused_node == Some(node_id)
+    }
+
+    /// Blur a node
+    pub fn blur_node(&mut self, node_id: NodeId) {
+        if self.focused_node == Some(node_id) {
+            self.focused_node = None;
+        }
+    }
+
+    /// Get cursor position for a text input
+    pub fn get_cursor_position(&self, node_id: NodeId) -> Option<usize> {
+        self.text_input_states.get(&node_id).map(|state| state.cursor_position)
+    }
+
+    /// Send a character to focused input
+    pub fn send_char(&mut self, c: char) {
+        if let Some(focused_id) = self.focused_node {
+            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
+                if state.readonly {
+                    return;
+                }
+
+                let mut current_value = state.read_signal.get_untracked();
+
+                // Check max_length
+                if let Some(max_len) = state.max_length {
+                    if current_value.len() >= max_len {
+                        return;
+                    }
+                }
+
+                // Insert character at cursor position
+                current_value.insert(state.cursor_position, c);
+                state.cursor_position += 1;
+
+                // Update signal
+                state.write_signal.set(current_value);
+            }
+        }
+    }
+
+    /// Send backspace to focused input
+    pub fn send_backspace(&mut self) {
+        if let Some(focused_id) = self.focused_node {
+            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
+                if state.readonly {
+                    return;
+                }
+
+                if state.cursor_position > 0 {
+                    let mut current_value = state.read_signal.get_untracked();
+                    current_value.remove(state.cursor_position - 1);
+                    state.cursor_position -= 1;
+
+                    // Update signal
+                    state.write_signal.set(current_value);
+                }
+            }
+        }
+    }
+
+    /// Send delete to focused input
+    pub fn send_delete(&mut self) {
+        if let Some(focused_id) = self.focused_node {
+            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
+                if state.readonly {
+                    return;
+                }
+
+                let current_value = state.read_signal.get_untracked();
+                if state.cursor_position < current_value.len() {
+                    let mut new_value = current_value;
+                    new_value.remove(state.cursor_position);
+
+                    // Update signal
+                    state.write_signal.set(new_value);
+                }
+            }
+        }
+    }
+
+    /// Send left arrow key to focused input
+    pub fn send_key_left(&mut self) {
+        if let Some(focused_id) = self.focused_node {
+            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
+                if state.cursor_position > 0 {
+                    state.cursor_position -= 1;
+                }
+            }
+        }
+    }
+
+    /// Send right arrow key to focused input
+    pub fn send_key_right(&mut self) {
+        if let Some(focused_id) = self.focused_node {
+            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
+                let current_value = state.read_signal.get_untracked();
+                if state.cursor_position < current_value.len() {
+                    state.cursor_position += 1;
+                }
+            }
+        }
+    }
+
+    /// Set validator for a node
+    pub fn set_validator(
+        &mut self,
+        node_id: NodeId,
+        validator: Validator,
+        initial_result: Result<(), String>,
+    ) {
+        self.validators.insert(node_id, ValidationState {
+            validator,
+            error: initial_result.err(),
+        });
+    }
+
+    /// Check if node has validation error
+    pub fn has_validation_error(&self, node_id: NodeId) -> bool {
+        self.validators.get(&node_id)
+            .and_then(|state| state.error.as_ref())
+            .is_some()
+    }
+
+    /// Get validation error for a node
+    pub fn get_validation_error(&self, node_id: NodeId) -> Option<String> {
+        self.validators.get(&node_id)
+            .and_then(|state| state.error.clone())
+    }
+
+    /// Add placeholder marker to a node
+    pub fn add_placeholder(&mut self, node_id: NodeId) {
+        self.placeholders.insert(node_id);
+    }
+
+    /// Check if node has placeholder
+    pub fn has_placeholder(&self, node_id: NodeId) -> bool {
+        self.placeholders.contains(&node_id)
+    }
+
+    /// Get current value of a text input (for testing)
+    pub fn get_text_input_value(&self, node_id: NodeId) -> Option<String> {
+        self.text_input_states.get(&node_id)
+            .map(|state| state.read_signal.get_untracked())
     }
 }
 
