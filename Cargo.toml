@@ -13,6 +13,7 @@ members = [
     "crates/theme-engine",
     "crates/layout-engine",
     "crates/text-engine",
+    "crates/widget-core",
 ]
 
 [package]

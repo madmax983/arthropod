@@ -3,7 +3,7 @@
 //! Provides a retained-mode scene graph with wgpu backend.
 
 pub mod backend;
-mod node;
+pub mod node;
 mod scene;
 
 #[cfg(test)]

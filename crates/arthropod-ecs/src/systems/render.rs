@@ -46,6 +46,9 @@ pub fn collect_renderables_system(
                         ],
                     });
                 }
+                NodeContent::Text { .. } => {
+                    // TODO: Generate text instances (Phase 2.3 continuation)
+                }
                 NodeContent::Empty => {
                     // Empty nodes have no visual representation
                 }

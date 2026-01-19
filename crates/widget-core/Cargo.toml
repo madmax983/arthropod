@@ -1,0 +1,19 @@
+[package]
+name = "widget-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Arthropod Contributors"]
+license = "MIT OR Apache-2.0"
+description = "Core widget system for Arthropod GUI framework"
+
+[dependencies]
+render-engine = { path = "../render-engine" }
+text-engine = { path = "../text-engine" }
+layout-engine = { path = "../layout-engine" }
+flux-state = { path = "../flux-state" }
+arthropod-ecs = { path = "../arthropod-ecs" }
+glam = "0.29"
+bevy_ecs = "0.15"
+
+[dev-dependencies]
+plat-core = { path = "../plat-core" }
