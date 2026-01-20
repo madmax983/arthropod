@@ -32,6 +32,11 @@ pub fn update_reactive_colors_system(
                     shaped_text: shaped_text.clone(),
                     color: new_color,
                 },
+                NodeContent::RawText { ref text, font_size, .. } => NodeContent::RawText {
+                    text: text.clone(),
+                    font_size,
+                    color: new_color,
+                },
                 NodeContent::Empty => NodeContent::Empty,
             };
         }

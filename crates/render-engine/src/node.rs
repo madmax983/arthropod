@@ -60,6 +60,16 @@ pub enum NodeContent {
         /// Text color
         color: Color,
     },
+    /// Raw text that will be shaped during rendering
+    /// This avoids issues with FontSystem/CacheKey mismatches
+    RawText {
+        /// The text string to render
+        text: String,
+        /// Font size
+        font_size: f32,
+        /// Text color
+        color: Color,
+    },
 }
 
 /// Serializable shaped text data

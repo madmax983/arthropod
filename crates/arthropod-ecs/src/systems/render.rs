@@ -49,6 +49,9 @@ pub fn collect_renderables_system(
                 NodeContent::Text { .. } => {
                     // TODO: Generate text instances (Phase 2.3 continuation)
                 }
+                NodeContent::RawText { .. } => {
+                    // Raw text is handled directly in wgpu_backend during rendering
+                }
                 NodeContent::Empty => {
                     // Empty nodes have no visual representation
                 }

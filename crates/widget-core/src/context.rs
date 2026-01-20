@@ -425,6 +425,11 @@ impl WidgetContext {
         errors
     }
 
+    /// Get form state for a form node
+    pub fn get_form_state(&self, node_id: NodeId) -> Option<&FormState> {
+        self.form_states.get(&node_id)
+    }
+
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
         // Re-run validators on all fields with current values
@@ -506,9 +511,96 @@ impl WidgetContext {
             .get(&node_id)
             .and_then(|state| state.submit_error.clone())
     }
+
+    /// Check if node is a text input
+    pub fn is_text_input(&self, node_id: NodeId) -> bool {
+        self.text_input_states.contains_key(&node_id)
+    }
+
+    /// Check if node is clickable (alias for has_clickable)
+    pub fn is_clickable(&self, node_id: NodeId) -> bool {
+        self.has_clickable(node_id)
+    }
+
+    /// Get the currently focused node
+    pub fn focused_node(&self) -> Option<NodeId> {
+        self.focused_node
+    }
+
+    /// Take ownership of the scene (consumes self)
+    pub fn into_scene(self) -> Scene {
+        self.scene
+    }
 }
 
 /// Helper to check if a FlexStyle is a row layout
 pub fn is_row_layout(style: &FlexStyle) -> bool {
     style.direction == FlexDirection::Row
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flux_state::{Runtime, Signal};
+    use render_engine::{Color, NodeContent};
+
+    #[test]
+    fn test_is_text_input_returns_false_for_non_input_nodes() {
+        let ctx = WidgetContext::new_test();
+        let node_id = ctx.scene().root();
+        assert!(!ctx.is_text_input(node_id));
+    }
+
+    #[test]
+    fn test_is_text_input_returns_true_after_adding_input_state() {
+        let mut ctx = WidgetContext::new_test();
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, String::new());
+        let (read, write) = signal.split();
+
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        ctx.add_text_input_state(node_id, read, write, false, None);
+
+        assert!(ctx.is_text_input(node_id));
+    }
+
+    #[test]
+    fn test_is_clickable_returns_false_for_non_clickable_nodes() {
+        let ctx = WidgetContext::new_test();
+        let node_id = ctx.scene().root();
+        assert!(!ctx.is_clickable(node_id));
+    }
+
+    #[test]
+    fn test_is_clickable_returns_true_after_adding_clickable() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        ctx.add_clickable(node_id, Arc::new(|| {}));
+
+        assert!(ctx.is_clickable(node_id));
+    }
+
+    #[test]
+    fn test_focused_node_returns_none_initially() {
+        let ctx = WidgetContext::new_test();
+        assert_eq!(ctx.focused_node(), None);
+    }
+
+    #[test]
+    fn test_focused_node_returns_some_after_focusing() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        ctx.focus_node(node_id);
+
+        assert_eq!(ctx.focused_node(), Some(node_id));
+    }
+
+    #[test]
+    fn test_into_scene_consumes_context_and_returns_scene() {
+        let ctx = WidgetContext::new_test();
+        let root_id = ctx.scene().root();
+
+        let scene = ctx.into_scene();
+        assert_eq!(scene.root(), root_id);
+    }
 }

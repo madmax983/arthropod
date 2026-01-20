@@ -1,9 +1,7 @@
 //! Glyph atlas for caching rasterized glyphs in a texture
 
 use hashbrown::HashMap;
-use swash::FontRef;
-use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::zeno::Format;
+use cosmic_text::{CacheKey, FontSystem, SwashCache};
 
 /// Texture coordinates in atlas (0.0-1.0 normalized)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -12,13 +10,6 @@ pub struct TexCoords {
     pub v0: f32,
     pub u1: f32,
     pub v1: f32,
-}
-
-/// Cache key for glyphs
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct GlyphKey {
-    glyph_id: u16,
-    font_size: u16,
 }
 
 /// Cached glyph entry
@@ -34,21 +25,21 @@ struct CachedGlyph {
 pub struct GlyphAtlas {
     width: u32,
     height: u32,
-    cache: HashMap<GlyphKey, CachedGlyph>,
+    cache: HashMap<CacheKey, CachedGlyph>,
     // Simple row packer
     current_x: u32,
     current_y: u32,
     row_height: u32,
-    // Texture data (RGBA8)
+    // Texture data (R8 - single alpha channel)
     texture_data: Vec<u8>,
-    // Scale context for rasterization
-    scale_context: ScaleContext,
+    // cosmic-text's swash cache for rasterization
+    swash_cache: SwashCache,
 }
 
 impl GlyphAtlas {
     /// Create a new glyph atlas
     pub fn new(width: u32, height: u32) -> Self {
-        let texture_data = vec![0u8; (width * height * 4) as usize];
+        let texture_data = vec![0u8; (width * height) as usize];
 
         Self {
             width,
@@ -58,33 +49,27 @@ impl GlyphAtlas {
             current_y: 0,
             row_height: 0,
             texture_data,
-            scale_context: ScaleContext::new(),
+            swash_cache: SwashCache::new(),
         }
     }
 
     /// Get texture coordinates for a glyph, rasterizing if not cached
     pub fn get_or_rasterize(
         &mut self,
-        glyph_id: u16,
-        font_size: u16,
-        font_data: &[u8],
+        cache_key: CacheKey,
+        font_system: &mut FontSystem,
     ) -> TexCoords {
-        let key = GlyphKey {
-            glyph_id,
-            font_size,
-        };
-
         // Check cache first
-        if let Some(cached) = self.cache.get(&key) {
+        if let Some(cached) = self.cache.get(&cache_key) {
             return cached.coords;
         }
 
-        // Rasterize glyph
-        let coords = self.rasterize_glyph(glyph_id, font_size, font_data);
+        // Rasterize glyph using cosmic-text
+        let coords = self.rasterize_glyph(cache_key, font_system);
 
         // Cache it
         self.cache.insert(
-            key,
+            cache_key,
             CachedGlyph {
                 coords,
                 width: 0, // TODO: store actual dimensions
@@ -96,38 +81,9 @@ impl GlyphAtlas {
     }
 
     /// Rasterize a glyph and pack it into the atlas
-    fn rasterize_glyph(&mut self, glyph_id: u16, font_size: u16, font_data: &[u8]) -> TexCoords {
-        // Parse font
-        let font = match FontRef::from_index(font_data, 0) {
-            Some(font) => font,
-            None => {
-                // Return zero coords if font can't be parsed
-                return TexCoords {
-                    u0: 0.0,
-                    v0: 0.0,
-                    u1: 0.0,
-                    v1: 0.0,
-                };
-            }
-        };
-
-        // Create scaler
-        let mut scaler = self
-            .scale_context
-            .builder(font)
-            .size(font_size as f32)
-            .hint(true)
-            .build();
-
-        // Render glyph
-        let image = match Render::new(&[
-            Source::ColorOutline(0),
-            Source::ColorBitmap(StrikeWith::BestFit),
-            Source::Outline,
-        ])
-        .format(Format::Alpha)
-        .render(&mut scaler, glyph_id)
-        {
+    fn rasterize_glyph(&mut self, cache_key: CacheKey, font_system: &mut FontSystem) -> TexCoords {
+        // Rasterize using cosmic-text's SwashCache
+        let image = match self.swash_cache.get_image(font_system, cache_key) {
             Some(img) => img,
             None => {
                 // Return valid small coords for missing glyphs (1x1 pixel)
@@ -140,8 +96,8 @@ impl GlyphAtlas {
             }
         };
 
-        let glyph_width = image.placement.width;
-        let glyph_height = image.placement.height;
+        let glyph_width = image.placement.width as u32;
+        let glyph_height = image.placement.height as u32;
 
         // Check if we need to move to next row
         if self.current_x + glyph_width > self.width {
@@ -165,20 +121,18 @@ impl GlyphAtlas {
         let u1 = (x + glyph_width) as f32 / self.width as f32;
         let v1 = (y + glyph_height) as f32 / self.height as f32;
 
-        // Copy glyph data to texture (convert alpha to RGBA)
+        // Copy glyph data to texture (R8 format - just alpha channel)
+        // cosmic-text's image data is already in alpha format
         for row in 0..glyph_height {
             for col in 0..glyph_width {
                 let src_idx = (row * glyph_width + col) as usize;
                 let dst_x = x + col;
                 let dst_y = y + row;
-                let dst_idx = ((dst_y * self.width + dst_x) * 4) as usize;
+                let dst_idx = (dst_y * self.width + dst_x) as usize;
 
-                if dst_idx + 3 < self.texture_data.len() && src_idx < image.data.len() {
+                if dst_idx < self.texture_data.len() && src_idx < image.data.len() {
                     let alpha = image.data[src_idx];
-                    self.texture_data[dst_idx] = 255; // R
-                    self.texture_data[dst_idx + 1] = 255; // G
-                    self.texture_data[dst_idx + 2] = 255; // B
-                    self.texture_data[dst_idx + 3] = alpha; // A
+                    self.texture_data[dst_idx] = alpha; // R8: single alpha channel
                 }
             }
         }

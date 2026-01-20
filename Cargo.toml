@@ -112,6 +112,7 @@ render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 anim-graph = { path = "crates/anim-graph" }
 widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
+text-engine = { path = "crates/text-engine" }
 glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }

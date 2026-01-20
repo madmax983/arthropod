@@ -7,8 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "Text shaping and rendering engine for Arthropod GUI framework"
 
 [dependencies]
-rustybuzz = "0.20"
-swash = "0.1"
+cosmic-text = "0.12"
 unicode-bidi = "0.3"
 unicode-segmentation = "1.12"
 glam = "0.29"

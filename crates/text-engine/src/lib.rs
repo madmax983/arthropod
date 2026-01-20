@@ -1,31 +1,30 @@
 //! Text Engine - Font loading, shaping, and text layout
 //!
-//! Uses rustybuzz for text shaping and swash for font rasterization.
+//! Uses cosmic-text for integrated text shaping and rasterization.
 //! Provides glyph runs for rendering.
 
-pub mod font_manager;
-pub mod glyph_cache;
-pub mod shaper;
+use cosmic_text::{Attrs, Buffer, CacheKeyFlags, FontSystem, Metrics, Shaping};
 
-pub use font_manager::FontManager;
-pub use shaper::TextShaper;
-
-/// Text engine combining font management and shaping
+/// Text engine using cosmic-text
 pub struct TextEngine {
-    font_manager: FontManager,
-    shaper: TextShaper,
+    font_system: FontSystem,
+    buffer: Buffer,
 }
 
 /// A shaped glyph with position and metrics
 #[derive(Debug, Clone)]
 pub struct ShapedGlyph {
-    pub glyph_id: u16,
+    pub cache_key: CacheKey,  // cosmic-text cache key for rasterization
+    pub glyph_id: u16,        // kept for compatibility
     pub x_offset: f32,
     pub y_offset: f32,
     pub x_advance: f32,
     pub y_advance: f32,
     pub cluster: u32,
 }
+
+// Re-export CacheKey for convenience
+pub use cosmic_text::CacheKey;
 
 /// Shaped text result
 #[derive(Debug, Clone)]
@@ -44,18 +43,22 @@ pub struct TextBounds {
 }
 
 impl TextEngine {
-    /// Create a new text engine
+    /// Create a new text engine with system fonts
     pub fn new() -> Self {
-        let font_manager = FontManager::new();
-        let shaper = TextShaper::new();
+        let mut font_system = FontSystem::new();
+
+        // Create a buffer for shaping text
+        let metrics = Metrics::new(16.0, 20.0);
+        let mut buffer = Buffer::new(&mut font_system, metrics);
+        buffer.set_size(&mut font_system, None, None);
 
         Self {
-            font_manager,
-            shaper,
+            font_system,
+            buffer,
         }
     }
 
-    /// Shape text with the default font
+    /// Shape text with the specified font size
     ///
     /// # Example
     ///
@@ -75,16 +78,59 @@ impl TextEngine {
             };
         }
 
-        // Get default font
-        let font_data = self.font_manager.default_font();
+        // Update metrics for this font size
+        let metrics = Metrics::new(font_size, font_size * 1.2);
+        self.buffer.set_metrics(&mut self.font_system, metrics);
 
-        // Shape text
-        self.shaper.shape(text, font_data, font_size)
+        // Set text and shape
+        self.buffer.set_text(&mut self.font_system, text, Attrs::new(), Shaping::Advanced);
+
+        // Extract glyphs from the shaped buffer
+        let mut glyphs = Vec::new();
+        let mut max_width = 0.0f32;
+        let mut max_height = 0.0f32;
+
+        for run in self.buffer.layout_runs() {
+            for glyph in run.glyphs.iter() {
+                let x_end = glyph.x + glyph.w;
+                max_width = max_width.max(x_end);
+                max_height = max_height.max(font_size);
+
+                // Construct CacheKey from glyph properties
+                let (cache_key, _x_bin, _y_bin) = CacheKey::new(
+                    glyph.font_id,
+                    glyph.glyph_id,
+                    glyph.font_size,
+                    (glyph.x_offset, glyph.y_offset).into(),
+                    CacheKeyFlags::empty(),
+                );
+
+                glyphs.push(ShapedGlyph {
+                    cache_key,
+                    glyph_id: glyph.glyph_id as u16,
+                    x_offset: glyph.x,
+                    y_offset: glyph.y,
+                    x_advance: glyph.w,
+                    y_advance: 0.0,
+                    cluster: glyph.start as u32,
+                });
+            }
+        }
+
+        ShapedText {
+            glyphs,
+            bounds: TextBounds {
+                x: 0.0,
+                y: 0.0,
+                width: max_width,
+                height: max_height,
+            },
+        }
     }
 
-    /// Get the font manager
-    pub fn font_manager(&mut self) -> &mut FontManager {
-        &mut self.font_manager
+    /// Get access to the font system for advanced operations
+    pub fn font_system(&mut self) -> &mut FontSystem {
+        &mut self.font_system
     }
 }
 
@@ -103,5 +149,21 @@ mod tests {
         let engine = TextEngine::new();
         // Just verify it can be created
         drop(engine);
+    }
+
+    #[test]
+    fn test_shape_text() {
+        let mut engine = TextEngine::new();
+        let shaped = engine.shape_text("Hello", 16.0);
+        assert!(!shaped.glyphs.is_empty());
+        assert!(shaped.bounds.width > 0.0);
+    }
+
+    #[test]
+    fn test_shape_special_chars() {
+        let mut engine = TextEngine::new();
+        let shaped = engine.shape_text("test.com-123", 16.0);
+        // Should have glyphs for period and hyphen
+        assert!(shaped.glyphs.len() >= 12); // "test.com-123" = 12 characters
     }
 }
