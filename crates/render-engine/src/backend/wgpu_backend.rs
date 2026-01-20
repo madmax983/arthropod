@@ -1,7 +1,7 @@
 //! wgpu rendering backend implementation.
 
 use crate::backend::text::TextRenderer;
-use crate::{Color, NodeContent, RendererError, Scene};
+use crate::{Color, RendererError, Scene};
 use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tracing::{Level, debug, error, info, instrument, span, warn};
@@ -714,14 +714,14 @@ impl super::RenderBackend for WgpuBackend {
                 // Upload atlas texture to GPU (after rasterization)
                 let atlas_data = self.text_renderer.atlas().texture_data();
                 self.queue.write_texture(
-                    wgpu::ImageCopyTexture {
+                    wgpu::TexelCopyTextureInfo {
                         texture: &self.glyph_texture,
                         mip_level: 0,
                         origin: wgpu::Origin3d::ZERO,
                         aspect: wgpu::TextureAspect::All,
                     },
                     atlas_data,
-                    wgpu::ImageDataLayout {
+                    wgpu::TexelCopyBufferLayout {
                         offset: 0,
                         bytes_per_row: Some(1024), // R8 format: 1 byte per pixel
                         rows_per_image: Some(1024),
@@ -1053,6 +1053,9 @@ mod tests {
                     });
                 }
                 NodeContent::Text { .. } => {
+                    // TODO: Render text via separate text pipeline
+                }
+                NodeContent::RawText { .. } => {
                     // TODO: Render text via separate text pipeline
                 }
                 NodeContent::Empty => {}
