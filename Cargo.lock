@@ -177,13 +177,17 @@ dependencies = [
  "anim-graph",
  "arthropod-ecs",
  "bevy_ecs",
+ "criterion",
  "env_logger",
  "flux-state",
+ "glam",
+ "layout-engine",
  "log",
  "plat-core",
  "pollster",
  "render-engine",
  "thiserror 2.0.17",
+ "widget-core",
 ]
 
 [[package]]
@@ -194,6 +198,8 @@ dependencies = [
  "bevy_ecs",
  "criterion",
  "flux-state",
+ "glam",
+ "layout-engine",
  "plat-core",
  "render-engine",
 ]
@@ -2228,6 +2234,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 name = "plat-core"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "log",
  "objc2",
  "objc2-app-kit",
@@ -2574,6 +2581,7 @@ dependencies = [
  "bevy_ecs",
  "bytemuck",
  "cosmic-text",
+ "criterion",
  "glam",
  "hashbrown 0.15.5",
  "plat-core",

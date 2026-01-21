@@ -59,10 +59,9 @@ pub use layout_engine::{FlexDirection, FlexStyle};
 // Re-export node content for advanced use cases
 pub use render_engine::NodeContent;
 
-// Re-export derive macros
-pub use widget_macros::{Widget as WidgetDerive, WidgetEnum};
-// Keep old name for backwards compatibility
-pub use widget_macros::WidgetMacro;
+// Re-export derive macros - Widget derive coexists with Widget trait (different namespaces)
+pub use widget_macros::Widget;
+pub use widget_macros::WidgetEnum;
 
 // Re-export generated macros from this crate
 // (txt!, btn!, col!, row! are defined via #[derive] and #[macro_export])

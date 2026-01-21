@@ -204,6 +204,84 @@ pub enum Key {
 }
 
 impl Key {
+    /// Convert a key to its character representation (US keyboard layout).
+    ///
+    /// Returns `Some(char)` for keys that produce printable characters,
+    /// `None` for special keys (Enter, Tab, arrows, function keys, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `shift` - Whether the Shift key is held (affects character output)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use plat_core::Key;
+    ///
+    /// assert_eq!(Key::A.to_char(false), Some('a'));
+    /// assert_eq!(Key::A.to_char(true), Some('A'));
+    /// assert_eq!(Key::Key1.to_char(true), Some('!'));
+    /// assert_eq!(Key::Enter.to_char(false), None);
+    /// ```
+    pub fn to_char(&self, shift: bool) -> Option<char> {
+        match self {
+            // Letters
+            Key::A => Some(if shift { 'A' } else { 'a' }),
+            Key::B => Some(if shift { 'B' } else { 'b' }),
+            Key::C => Some(if shift { 'C' } else { 'c' }),
+            Key::D => Some(if shift { 'D' } else { 'd' }),
+            Key::E => Some(if shift { 'E' } else { 'e' }),
+            Key::F => Some(if shift { 'F' } else { 'f' }),
+            Key::G => Some(if shift { 'G' } else { 'g' }),
+            Key::H => Some(if shift { 'H' } else { 'h' }),
+            Key::I => Some(if shift { 'I' } else { 'i' }),
+            Key::J => Some(if shift { 'J' } else { 'j' }),
+            Key::K => Some(if shift { 'K' } else { 'k' }),
+            Key::L => Some(if shift { 'L' } else { 'l' }),
+            Key::M => Some(if shift { 'M' } else { 'm' }),
+            Key::N => Some(if shift { 'N' } else { 'n' }),
+            Key::O => Some(if shift { 'O' } else { 'o' }),
+            Key::P => Some(if shift { 'P' } else { 'p' }),
+            Key::Q => Some(if shift { 'Q' } else { 'q' }),
+            Key::R => Some(if shift { 'R' } else { 'r' }),
+            Key::S => Some(if shift { 'S' } else { 's' }),
+            Key::T => Some(if shift { 'T' } else { 't' }),
+            Key::U => Some(if shift { 'U' } else { 'u' }),
+            Key::V => Some(if shift { 'V' } else { 'v' }),
+            Key::W => Some(if shift { 'W' } else { 'w' }),
+            Key::X => Some(if shift { 'X' } else { 'x' }),
+            Key::Y => Some(if shift { 'Y' } else { 'y' }),
+            Key::Z => Some(if shift { 'Z' } else { 'z' }),
+            // Numbers (with shift symbols)
+            Key::Key0 => Some(if shift { ')' } else { '0' }),
+            Key::Key1 => Some(if shift { '!' } else { '1' }),
+            Key::Key2 => Some(if shift { '@' } else { '2' }),
+            Key::Key3 => Some(if shift { '#' } else { '3' }),
+            Key::Key4 => Some(if shift { '$' } else { '4' }),
+            Key::Key5 => Some(if shift { '%' } else { '5' }),
+            Key::Key6 => Some(if shift { '^' } else { '6' }),
+            Key::Key7 => Some(if shift { '&' } else { '7' }),
+            Key::Key8 => Some(if shift { '*' } else { '8' }),
+            Key::Key9 => Some(if shift { '(' } else { '9' }),
+            // Space
+            Key::Space => Some(' '),
+            // Punctuation
+            Key::Period => Some(if shift { '>' } else { '.' }),
+            Key::Comma => Some(if shift { '<' } else { ',' }),
+            Key::Minus => Some(if shift { '_' } else { '-' }),
+            Key::Equal => Some(if shift { '+' } else { '=' }),
+            Key::Semicolon => Some(if shift { ':' } else { ';' }),
+            Key::Quote => Some(if shift { '"' } else { '\'' }),
+            Key::Slash => Some(if shift { '?' } else { '/' }),
+            Key::Backslash => Some(if shift { '|' } else { '\\' }),
+            Key::BracketLeft => Some(if shift { '{' } else { '[' }),
+            Key::BracketRight => Some(if shift { '}' } else { ']' }),
+            Key::Backtick => Some(if shift { '~' } else { '`' }),
+            // Non-character keys
+            _ => None,
+        }
+    }
+
     /// Convert Windows virtual key code to Key enum
     #[cfg(target_os = "windows")]
     pub(crate) fn from_vk(vk: u32) -> Self {
@@ -272,6 +350,103 @@ impl Key {
             0xDD => Key::BracketRight, // ]
             0xC0 => Key::Backtick,   // `
             _ => Key::Unknown,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_char_lowercase_letters() {
+        assert_eq!(Key::A.to_char(false), Some('a'));
+        assert_eq!(Key::M.to_char(false), Some('m'));
+        assert_eq!(Key::Z.to_char(false), Some('z'));
+    }
+
+    #[test]
+    fn test_to_char_uppercase_letters() {
+        assert_eq!(Key::A.to_char(true), Some('A'));
+        assert_eq!(Key::M.to_char(true), Some('M'));
+        assert_eq!(Key::Z.to_char(true), Some('Z'));
+    }
+
+    #[test]
+    fn test_to_char_numbers_no_shift() {
+        assert_eq!(Key::Key0.to_char(false), Some('0'));
+        assert_eq!(Key::Key1.to_char(false), Some('1'));
+        assert_eq!(Key::Key5.to_char(false), Some('5'));
+        assert_eq!(Key::Key9.to_char(false), Some('9'));
+    }
+
+    #[test]
+    fn test_to_char_numbers_with_shift() {
+        assert_eq!(Key::Key1.to_char(true), Some('!'));
+        assert_eq!(Key::Key2.to_char(true), Some('@'));
+        assert_eq!(Key::Key3.to_char(true), Some('#'));
+        assert_eq!(Key::Key4.to_char(true), Some('$'));
+        assert_eq!(Key::Key5.to_char(true), Some('%'));
+        assert_eq!(Key::Key6.to_char(true), Some('^'));
+        assert_eq!(Key::Key7.to_char(true), Some('&'));
+        assert_eq!(Key::Key8.to_char(true), Some('*'));
+        assert_eq!(Key::Key9.to_char(true), Some('('));
+        assert_eq!(Key::Key0.to_char(true), Some(')'));
+    }
+
+    #[test]
+    fn test_to_char_punctuation() {
+        assert_eq!(Key::Period.to_char(false), Some('.'));
+        assert_eq!(Key::Period.to_char(true), Some('>'));
+        assert_eq!(Key::Comma.to_char(false), Some(','));
+        assert_eq!(Key::Comma.to_char(true), Some('<'));
+        assert_eq!(Key::Minus.to_char(false), Some('-'));
+        assert_eq!(Key::Minus.to_char(true), Some('_'));
+        assert_eq!(Key::Equal.to_char(false), Some('='));
+        assert_eq!(Key::Equal.to_char(true), Some('+'));
+    }
+
+    #[test]
+    fn test_to_char_brackets() {
+        assert_eq!(Key::BracketLeft.to_char(false), Some('['));
+        assert_eq!(Key::BracketLeft.to_char(true), Some('{'));
+        assert_eq!(Key::BracketRight.to_char(false), Some(']'));
+        assert_eq!(Key::BracketRight.to_char(true), Some('}'));
+    }
+
+    #[test]
+    fn test_to_char_space() {
+        assert_eq!(Key::Space.to_char(false), Some(' '));
+        assert_eq!(Key::Space.to_char(true), Some(' '));
+    }
+
+    #[test]
+    fn test_to_char_non_printable_returns_none() {
+        assert_eq!(Key::Enter.to_char(false), None);
+        assert_eq!(Key::Tab.to_char(false), None);
+        assert_eq!(Key::Backspace.to_char(false), None);
+        assert_eq!(Key::Escape.to_char(false), None);
+        assert_eq!(Key::Shift.to_char(false), None);
+        assert_eq!(Key::Control.to_char(false), None);
+        assert_eq!(Key::Alt.to_char(false), None);
+        assert_eq!(Key::F1.to_char(false), None);
+        assert_eq!(Key::Left.to_char(false), None);
+        assert_eq!(Key::Up.to_char(false), None);
+    }
+
+    #[test]
+    fn test_to_char_all_letters_covered() {
+        let letters = [
+            Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G,
+            Key::H, Key::I, Key::J, Key::K, Key::L, Key::M, Key::N,
+            Key::O, Key::P, Key::Q, Key::R, Key::S, Key::T, Key::U,
+            Key::V, Key::W, Key::X, Key::Y, Key::Z,
+        ];
+        for (i, key) in letters.iter().enumerate() {
+            let expected_lower = (b'a' + i as u8) as char;
+            let expected_upper = (b'A' + i as u8) as char;
+            assert_eq!(key.to_char(false), Some(expected_lower));
+            assert_eq!(key.to_char(true), Some(expected_upper));
         }
     }
 }

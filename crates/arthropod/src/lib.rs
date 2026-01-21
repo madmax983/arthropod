@@ -36,7 +36,11 @@
 //! All resources are managed automatically by the `App` - no manual lifetime management required.
 
 pub mod app;
+pub mod event_dispatcher;
+pub mod layout;
 pub mod prelude;
 
 // Re-export main types
 pub use app::{App, AppBuilder, AppError};
+pub use event_dispatcher::{DispatchResult, EventDispatcher};
+pub use layout::{auto_layout, layout_widget_tree};

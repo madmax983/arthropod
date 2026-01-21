@@ -5,7 +5,7 @@ use glam::Vec4;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
 use std::sync::Arc;
-use widget_macros::{WidgetEnum, WidgetMacro};
+use crate::WidgetEnum;
 
 /// Button widget with hover and click interactions
 ///
@@ -23,8 +23,8 @@ use widget_macros::{WidgetEnum, WidgetMacro};
 /// // btn!("Save", primary, on_click: || save())
 /// // btn!("Cancel", disabled, padding: 20.0)
 /// ```
-#[derive(WidgetMacro)]
-#[widget_macro(name = "btn", alias = "button")]
+#[derive(Widget)]
+#[widget(name = "btn", alias = "button")]
 pub struct Button {
     #[positional]
     text: String,

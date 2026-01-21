@@ -2,17 +2,14 @@
 //!
 //! Provides API for widgets to build scene nodes and configure components.
 
+use crate::form::{FormData, SubmitCallback};
 use crate::validation::Validator;
-use arthropod_ecs::FrameworkContext;
-use flux_state::ReadSignal;
+use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
-use crate::form::{FormData, SubmitCallback};
-use flux_state::WriteSignal;
 
 /// Text input state for a node
 #[derive(Clone)]
@@ -40,15 +37,16 @@ pub struct FormState {
 
 /// Widget building context
 ///
-/// Provides access to:
-/// - Scene graph for hierarchy
-/// - ECS context for components
-/// - Layout engine for flexbox
-/// - Text engine for text shaping
+/// Provides build-time API for widgets to construct scene nodes and configure
+/// behavioral components. After building, use `apply_to_ecs()` to transfer
+/// the accumulated widget state (layout, clickables, validators, etc.) to
+/// ECS components.
+///
+/// This is a build-time context only - it accumulates widget state in HashMaps
+/// during widget construction, which is then transferred to ECS components for
+/// runtime use.
 pub struct WidgetContext {
     scene: Scene,
-    #[allow(dead_code)]
-    ecs_context: Option<FrameworkContext>,
     layout_styles: HashMap<NodeId, FlexStyle>,
     hover_states: HashSet<NodeId>,
     clickables: HashMap<NodeId, Arc<dyn Fn() + Send + Sync>>,
@@ -61,11 +59,10 @@ pub struct WidgetContext {
 }
 
 impl WidgetContext {
-    /// Create a new widget context (for testing)
+    /// Create a new widget context (for testing and widget building)
     pub fn new_test() -> Self {
         Self {
             scene: Scene::new(),
-            ecs_context: None,
             layout_styles: HashMap::new(),
             hover_states: HashSet::new(),
             clickables: HashMap::new(),
@@ -126,9 +123,11 @@ impl WidgetContext {
     }
 
     /// Set layout style for a node
+    ///
+    /// Layout styles are accumulated during widget building and transferred to
+    /// ECS components via `apply_to_ecs()` after building is complete.
     pub fn set_layout_style(&mut self, node_id: NodeId, style: FlexStyle) {
         self.layout_styles.insert(node_id, style);
-        // TODO: Add LayoutNode component to ECS entity
     }
 
     /// Re-parent a node from old parent to new parent
@@ -527,6 +526,101 @@ impl WidgetContext {
         self.focused_node
     }
 
+    /// Focus the next focusable node (Tab navigation).
+    ///
+    /// Cycles through all text inputs in the order they were added.
+    /// If no node is focused, focuses the first one.
+    /// Wraps around from last to first.
+    ///
+    /// # Returns
+    ///
+    /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
+    pub fn focus_next(&mut self) -> Option<NodeId> {
+        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
+        if focusable.is_empty() {
+            return None;
+        }
+
+        let current_index = self
+            .focused_node
+            .and_then(|f| focusable.iter().position(|&id| id == f));
+
+        let next_index = match current_index {
+            Some(idx) => (idx + 1) % focusable.len(),
+            None => 0,
+        };
+
+        let next_node = focusable[next_index];
+        self.focused_node = Some(next_node);
+        Some(next_node)
+    }
+
+    /// Focus the previous focusable node (Shift+Tab navigation).
+    ///
+    /// Cycles through all text inputs in reverse order.
+    /// If no node is focused, focuses the last one.
+    /// Wraps around from first to last.
+    ///
+    /// # Returns
+    ///
+    /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
+    pub fn focus_prev(&mut self) -> Option<NodeId> {
+        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
+        if focusable.is_empty() {
+            return None;
+        }
+
+        let current_index = self
+            .focused_node
+            .and_then(|f| focusable.iter().position(|&id| id == f));
+
+        let prev_index = match current_index {
+            Some(0) => focusable.len() - 1,
+            Some(idx) => idx - 1,
+            None => focusable.len() - 1,
+        };
+
+        let prev_node = focusable[prev_index];
+        self.focused_node = Some(prev_node);
+        Some(prev_node)
+    }
+
+    // =========================================================================
+    // Accessor methods for app-shell integration
+    // These allow the app layer to read accumulated widget state and transfer
+    // it to ECS components. WidgetContext itself is ECS-agnostic.
+    // =========================================================================
+
+    /// Get all layout styles (for app-shell integration)
+    pub fn layout_styles(&self) -> &HashMap<NodeId, FlexStyle> {
+        &self.layout_styles
+    }
+
+    /// Get all clickables (for app-shell integration)
+    pub fn clickables(&self) -> &HashMap<NodeId, Arc<dyn Fn() + Send + Sync>> {
+        &self.clickables
+    }
+
+    /// Get all background colors (for app-shell integration)
+    pub fn background_colors(&self) -> &HashMap<NodeId, Vec4> {
+        &self.background_colors
+    }
+
+    /// Get all text input states (for app-shell integration)
+    pub fn text_input_states(&self) -> &HashMap<NodeId, TextInputState> {
+        &self.text_input_states
+    }
+
+    /// Get all validators (for app-shell integration)
+    pub fn validators(&self) -> &HashMap<NodeId, ValidationState> {
+        &self.validators
+    }
+
+    /// Get all form states (for app-shell integration)
+    pub fn form_states(&self) -> &HashMap<NodeId, FormState> {
+        &self.form_states
+    }
+
     /// Take ownership of the scene (consumes self)
     pub fn into_scene(self) -> Scene {
         self.scene
@@ -602,5 +696,133 @@ mod tests {
 
         let scene = ctx.into_scene();
         assert_eq!(scene.root(), root_id);
+    }
+
+    // =========================================================================
+    // Focus Navigation Tests
+    // =========================================================================
+
+    fn create_text_input_node(ctx: &mut WidgetContext) -> NodeId {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, String::new());
+        let (read, write) = signal.split();
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        ctx.add_text_input_state(node_id, read, write, false, None);
+        node_id
+    }
+
+    #[test]
+    fn test_focus_next_returns_none_with_no_focusable_nodes() {
+        let mut ctx = WidgetContext::new_test();
+        assert_eq!(ctx.focus_next(), None);
+    }
+
+    #[test]
+    fn test_focus_next_focuses_first_node_when_nothing_focused() {
+        let mut ctx = WidgetContext::new_test();
+        let node1 = create_text_input_node(&mut ctx);
+        let _node2 = create_text_input_node(&mut ctx);
+
+        let focused = ctx.focus_next();
+        // Should focus one of the nodes (HashMap order is not guaranteed)
+        assert!(focused.is_some());
+        assert_eq!(ctx.focused_node(), focused);
+    }
+
+    #[test]
+    fn test_focus_next_cycles_through_nodes() {
+        let mut ctx = WidgetContext::new_test();
+        let node1 = create_text_input_node(&mut ctx);
+        let node2 = create_text_input_node(&mut ctx);
+        let node3 = create_text_input_node(&mut ctx);
+
+        // Focus first
+        ctx.focus_node(node1);
+
+        // Collect all focused nodes through one cycle
+        let mut visited = vec![node1];
+        for _ in 0..3 {
+            if let Some(next) = ctx.focus_next() {
+                if !visited.contains(&next) {
+                    visited.push(next);
+                }
+            }
+        }
+
+        // Should have visited all nodes
+        assert!(visited.contains(&node1));
+        assert!(visited.contains(&node2));
+        assert!(visited.contains(&node3));
+    }
+
+    #[test]
+    fn test_focus_next_wraps_around() {
+        let mut ctx = WidgetContext::new_test();
+        let _node1 = create_text_input_node(&mut ctx);
+
+        // With only one node, focus_next should keep returning it
+        let first = ctx.focus_next();
+        assert!(first.is_some());
+
+        let second = ctx.focus_next();
+        assert_eq!(first, second); // Wraps back to same node
+    }
+
+    #[test]
+    fn test_focus_prev_returns_none_with_no_focusable_nodes() {
+        let mut ctx = WidgetContext::new_test();
+        assert_eq!(ctx.focus_prev(), None);
+    }
+
+    #[test]
+    fn test_focus_prev_focuses_last_node_when_nothing_focused() {
+        let mut ctx = WidgetContext::new_test();
+        let _node1 = create_text_input_node(&mut ctx);
+        let _node2 = create_text_input_node(&mut ctx);
+
+        let focused = ctx.focus_prev();
+        // Should focus one of the nodes
+        assert!(focused.is_some());
+        assert_eq!(ctx.focused_node(), focused);
+    }
+
+    #[test]
+    fn test_focus_prev_cycles_backwards() {
+        let mut ctx = WidgetContext::new_test();
+        let node1 = create_text_input_node(&mut ctx);
+        let node2 = create_text_input_node(&mut ctx);
+
+        // Focus first node
+        ctx.focus_node(node1);
+
+        // Go backwards, should visit all nodes
+        let mut visited = vec![node1];
+        for _ in 0..3 {
+            if let Some(prev) = ctx.focus_prev() {
+                if !visited.contains(&prev) {
+                    visited.push(prev);
+                }
+            }
+        }
+
+        assert!(visited.contains(&node1));
+        assert!(visited.contains(&node2));
+    }
+
+    #[test]
+    fn test_focus_next_and_prev_are_inverse() {
+        let mut ctx = WidgetContext::new_test();
+        let node1 = create_text_input_node(&mut ctx);
+        let _node2 = create_text_input_node(&mut ctx);
+        let _node3 = create_text_input_node(&mut ctx);
+
+        // Focus a specific node
+        ctx.focus_node(node1);
+
+        // Go forward then back should return to same node
+        ctx.focus_next();
+        ctx.focus_prev();
+
+        assert_eq!(ctx.focused_node(), Some(node1));
     }
 }

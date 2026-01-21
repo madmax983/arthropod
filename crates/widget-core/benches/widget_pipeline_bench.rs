@@ -428,6 +428,91 @@ fn bench_text_input_editing(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark focus navigation (Tab/Shift+Tab)
+fn bench_focus_navigation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("focus_navigation");
+
+    // Setup context with multiple text inputs
+    for count in [5, 10, 50, 100].iter() {
+        group.bench_with_input(BenchmarkId::from_parameter(count), count, |b, &count| {
+            let runtime = Runtime::new();
+            let mut ctx = WidgetContext::new_test();
+
+            // Create multiple text inputs
+            for _ in 0..count {
+                let value = Signal::new(runtime.clone(), String::new());
+                let input = TextInput::new(value);
+                let input_id = input.build(&mut ctx);
+                // Make sure the first one is focused
+                if ctx.focused_node().is_none() {
+                    ctx.focus_node(input_id);
+                }
+            }
+
+            b.iter(|| {
+                black_box(ctx.focus_next());
+            });
+        });
+    }
+
+    group.finish();
+}
+
+/// Benchmark focus_prev specifically
+fn bench_focus_prev(c: &mut Criterion) {
+    let mut group = c.benchmark_group("focus_prev");
+
+    let runtime = Runtime::new();
+    let mut ctx = WidgetContext::new_test();
+
+    // Create 20 text inputs
+    for _ in 0..20 {
+        let value = Signal::new(runtime.clone(), String::new());
+        let input = TextInput::new(value);
+        let input_id = input.build(&mut ctx);
+        ctx.focus_node(input_id);
+    }
+
+    group.bench_function("20_inputs", |b| {
+        b.iter(|| {
+            black_box(ctx.focus_prev());
+        });
+    });
+
+    group.finish();
+}
+
+/// Benchmark focus cycling (full round-trip)
+fn bench_focus_cycle(c: &mut Criterion) {
+    let mut group = c.benchmark_group("focus_cycle");
+
+    let runtime = Runtime::new();
+    let mut ctx = WidgetContext::new_test();
+    let mut first_id = None;
+
+    // Create 10 text inputs
+    for _ in 0..10 {
+        let value = Signal::new(runtime.clone(), String::new());
+        let input = TextInput::new(value);
+        let input_id = input.build(&mut ctx);
+        if first_id.is_none() {
+            first_id = Some(input_id);
+            ctx.focus_node(input_id);
+        }
+    }
+
+    group.bench_function("full_cycle_10", |b| {
+        b.iter(|| {
+            // Cycle through all 10 inputs
+            for _ in 0..10 {
+                black_box(ctx.focus_next());
+            }
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_text_widgets,
@@ -439,5 +524,8 @@ criterion_group!(
     bench_form_revalidation,
     bench_full_pipeline,
     bench_text_input_editing,
+    bench_focus_navigation,
+    bench_focus_prev,
+    bench_focus_cycle,
 );
 criterion_main!(benches);

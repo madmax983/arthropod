@@ -90,7 +90,6 @@ impl Tool for ListNodesTool {
                     NodeContent::Rect { .. } => "Rect",
                     NodeContent::RoundedRect { .. } => "RoundedRect",
                     NodeContent::Text { .. } => "Text",
-                    NodeContent::RawText { .. } => "RawText",
                     NodeContent::Empty => "Empty",
                 };
                 if node_type != content_type {
@@ -114,7 +113,6 @@ impl Tool for ListNodesTool {
                 NodeContent::Rect { .. } => "Rect",
                 NodeContent::RoundedRect { .. } => "RoundedRect",
                 NodeContent::Text { .. } => "Text",
-                NodeContent::RawText { .. } => "RawText",
                 NodeContent::Empty => "Empty",
             };
 
@@ -164,8 +162,7 @@ struct NodeDetail {
 enum NodeContentData {
     Rect { color: [f32; 4] },
     RoundedRect { color: [f32; 4], corner_radius: f32 },
-    Text { color: [f32; 4] },
-    RawText { text: String, font_size: f32, color: [f32; 4] },
+    Text { text: String, font_size: f32, color: [f32; 4] },
     Empty,
 }
 
@@ -208,10 +205,7 @@ impl Tool for GetNodeTool {
                 color: [color.r(), color.g(), color.b(), color.a()],
                 corner_radius: *corner_radius,
             },
-            NodeContent::Text { color, .. } => NodeContentData::Text {
-                color: [color.r(), color.g(), color.b(), color.a()],
-            },
-            NodeContent::RawText { text, font_size, color } => NodeContentData::RawText {
+            NodeContent::Text { text, font_size, color } => NodeContentData::Text {
                 text: text.clone(),
                 font_size: *font_size,
                 color: [color.r(), color.g(), color.b(), color.a()],
@@ -312,7 +306,6 @@ impl Tool for QueryHierarchyTool {
                 NodeContent::Rect { .. } => "Rect",
                 NodeContent::RoundedRect { .. } => "RoundedRect",
                 NodeContent::Text { .. } => "Text",
-                NodeContent::RawText { .. } => "RawText",
                 NodeContent::Empty => "Empty",
             };
 
@@ -536,12 +529,6 @@ impl Tool for UpdateNodeTool {
                     updated_fields.push("color");
                 }
                 NodeContent::Text {
-                    color: node_color, ..
-                } => {
-                    *node_color = color;
-                    updated_fields.push("color");
-                }
-                NodeContent::RawText {
                     color: node_color, ..
                 } => {
                     *node_color = color;

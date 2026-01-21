@@ -123,6 +123,48 @@ impl Scene {
         self.nodes.iter().map(|(id, node)| (*id, node))
     }
 
+    /// Find the topmost visible node at the given screen position.
+    ///
+    /// Iterates through all nodes and returns the last (topmost in z-order)
+    /// visible node whose bounds contain the given point.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - X coordinate in screen space
+    /// * `y` - Y coordinate in screen space
+    ///
+    /// # Returns
+    ///
+    /// `Some(NodeId)` of the topmost node at this position, or `None` if no node found.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use render_engine::{Scene, SceneNode, NodeContent, Color};
+    /// use plat_core::Rect;
+    ///
+    /// let mut scene = Scene::new();
+    /// let root = scene.root();
+    ///
+    /// let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+    /// node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+    /// let node_id = scene.add_node(root, node);
+    ///
+    /// assert_eq!(scene.hit_test(50.0, 50.0), Some(node_id));
+    /// assert_eq!(scene.hit_test(200.0, 200.0), None);
+    /// ```
+    pub fn hit_test(&self, x: f32, y: f32) -> Option<NodeId> {
+        let mut result = None;
+
+        for (id, node) in &self.nodes {
+            if node.visible && node.bounds.contains(x, y) {
+                result = Some(*id);
+            }
+        }
+
+        result
+    }
+
     /// Serialize the scene to JSON for MCP debugging
     pub fn serialize_to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         use serde_json::json;
@@ -148,5 +190,130 @@ impl Scene {
             "nodes": nodes,
             "node_count": self.nodes.len(),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Color, NodeContent};
+    use plat_core::Rect;
+
+    #[test]
+    fn test_hit_test_empty_scene_returns_none() {
+        let scene = Scene::new();
+        assert_eq!(scene.hit_test(100.0, 100.0), None);
+    }
+
+    #[test]
+    fn test_hit_test_finds_node_at_position() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+        let node_id = scene.add_node(root, node);
+
+        // Inside bounds
+        assert_eq!(scene.hit_test(50.0, 50.0), Some(node_id));
+        assert_eq!(scene.hit_test(10.0, 10.0), Some(node_id)); // Top-left corner
+        assert_eq!(scene.hit_test(109.0, 109.0), Some(node_id)); // Near bottom-right
+    }
+
+    #[test]
+    fn test_hit_test_misses_outside_bounds() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+        scene.add_node(root, node);
+
+        // Outside bounds
+        assert_eq!(scene.hit_test(0.0, 0.0), None);
+        assert_eq!(scene.hit_test(5.0, 50.0), None); // Left of bounds
+        assert_eq!(scene.hit_test(50.0, 5.0), None); // Above bounds
+        assert_eq!(scene.hit_test(200.0, 50.0), None); // Right of bounds
+        assert_eq!(scene.hit_test(50.0, 200.0), None); // Below bounds
+    }
+
+    #[test]
+    fn test_hit_test_returns_overlapping_node() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Add two overlapping nodes
+        let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
+        let id1 = scene.add_node(root, node1);
+
+        let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+        node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
+        let id2 = scene.add_node(root, node2);
+
+        // In overlap region, should return one of the overlapping nodes
+        // (HashMap iteration order is not guaranteed)
+        let hit = scene.hit_test(75.0, 75.0);
+        assert!(hit == Some(id1) || hit == Some(id2), "Expected id1 or id2, got {:?}", hit);
+
+        // Only in first node
+        assert_eq!(scene.hit_test(25.0, 25.0), Some(id1));
+
+        // Only in second node
+        assert_eq!(scene.hit_test(125.0, 125.0), Some(id2));
+    }
+
+    #[test]
+    fn test_hit_test_ignores_invisible_nodes() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+        node.visible = false;
+        scene.add_node(root, node);
+
+        // Should not find invisible node
+        assert_eq!(scene.hit_test(50.0, 50.0), None);
+    }
+
+    #[test]
+    fn test_hit_test_with_nested_nodes() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Parent container
+        let mut parent = SceneNode::new(NodeContent::Rect { color: Color::WHITE });
+        parent.bounds = Rect::new(0.0, 0.0, 200.0, 200.0);
+        let parent_id = scene.add_node(root, parent);
+
+        // Child inside parent
+        let mut child = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        child.bounds = Rect::new(50.0, 50.0, 50.0, 50.0);
+        let child_id = scene.add_node(parent_id, child);
+
+        // In overlap region, should return one of parent or child
+        // (HashMap iteration order is not guaranteed)
+        let hit = scene.hit_test(75.0, 75.0);
+        assert!(hit == Some(parent_id) || hit == Some(child_id),
+            "Expected parent_id or child_id, got {:?}", hit);
+
+        // Hit parent only (outside child bounds)
+        assert_eq!(scene.hit_test(25.0, 25.0), Some(parent_id));
+    }
+
+    #[test]
+    fn test_hit_test_boundary_conditions() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+        let node_id = scene.add_node(root, node);
+
+        // Exactly at boundaries
+        assert_eq!(scene.hit_test(10.0, 10.0), Some(node_id)); // Top-left: inclusive
+        assert_eq!(scene.hit_test(110.0, 110.0), None); // Bottom-right: exclusive
+        assert_eq!(scene.hit_test(109.99, 109.99), Some(node_id)); // Just inside
     }
 }

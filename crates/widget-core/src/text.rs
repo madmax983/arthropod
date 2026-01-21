@@ -1,14 +1,9 @@
-//! Text widget - displays shaped text
+//! Text widget - displays text
 
 use crate::{Widget, WidgetContext};
 use flux_state::ReadSignal;
 use glam::Vec4;
-use render_engine::{
-    node::{ShapedGlyphData, ShapedTextData},
-    Color, NodeContent, NodeId,
-};
-use text_engine::TextEngine;
-use widget_macros::WidgetMacro;
+use render_engine::{Color, NodeContent, NodeId};
 
 /// Text widget
 ///
@@ -30,8 +25,8 @@ use widget_macros::WidgetMacro;
 /// // txt!("Title", size: 20.0, color: Vec4::ONE)
 /// // txt!(@signal, size: 20.0)  // Reactive
 /// ```
-#[derive(WidgetMacro)]
-#[widget_macro(name = "txt")]
+#[derive(Widget)]
+#[widget(name = "txt")]
 pub struct Text {
     #[positional(reactive)]
     content: TextContent,
@@ -91,32 +86,12 @@ impl Widget for Text {
             }
         };
 
-        // Shape the text
-        let mut text_engine = TextEngine::new();
-        let shaped = text_engine.shape_text(&text_string, self.font_size);
-
-        // Convert to serializable format
-        let shaped_data = ShapedTextData {
-            glyphs: shaped
-                .glyphs
-                .iter()
-                .map(|g| ShapedGlyphData {
-                    glyph_id: g.glyph_id,
-                    x_offset: g.x_offset,
-                    y_offset: g.y_offset,
-                    x_advance: g.x_advance,
-                    y_advance: g.y_advance,
-                })
-                .collect(),
-            bounds_width: shaped.bounds.width,
-            bounds_height: shaped.bounds.height,
-        };
-
-        // Create text node
+        // Create text node with raw text (backend will shape it during rendering)
         ctx.create_node(
             ctx.root(),
             NodeContent::Text {
-                shaped_text: shaped_data,
+                text: text_string,
+                font_size: self.font_size,
                 color: Color::rgba(self.color.x, self.color.y, self.color.z, self.color.w),
             },
         )

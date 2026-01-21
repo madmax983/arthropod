@@ -50,12 +50,12 @@ We implement a **derive macro system** that automatically generates declarative 
 ┌─────────────────────────────────────────────────────────────────┐
 │  Widget Structs with Derives (widget-core)                      │
 │                                                                  │
-│  #[derive(WidgetMacro)]                                         │
-│  #[widget_macro(name = "txt")]                                  │
+│  #[derive(Widget)]                               │
+│  #[widget(name = "txt")]                                        │
 │  pub struct Text { ... }                                        │
 │                                                                  │
-│  #[derive(WidgetMacro)]                                         │
-│  #[widget_macro(name = "col", constructor = "column")]          │
+│  #[derive(Widget)]                               │
+│  #[widget(name = "col", constructor = "column")]                │
 │  pub struct Container<C: WidgetTuple> { ... }                   │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ trait bounds
@@ -136,9 +136,9 @@ macro_rules! col {
 
 | Attribute | Description | Example |
 |-----------|-------------|---------|
-| `#[widget_macro(name = "x")]` | Macro name | `name = "txt"` |
-| `#[widget_macro(alias = "y")]` | Macro alias | `alias = "text"` |
-| `#[widget_macro(constructor = "x")]` | Constructor method | `constructor = "column"` |
+| `#[widget(name = "x")]` | Macro name | `name = "txt"` |
+| `#[widget(alias = "y")]` | Macro alias | `alias = "text"` |
+| `#[widget(constructor = "x")]` | Constructor method | `constructor = "column"` |
 
 **Field-Level:**
 
@@ -159,8 +159,8 @@ macro_rules! col {
 **Display Widget (Text):**
 
 ```rust
-#[derive(WidgetMacro)]
-#[widget_macro(name = "txt", alias = "text")]
+#[derive(Widget)]
+#[widget(name = "txt", alias = "text")]
 pub struct Text {
     #[positional(reactive)]
     content: TextContent,
@@ -181,8 +181,8 @@ txt!(@signal, size: 20.0)               // Text::reactive(signal).size(20.0)
 **Container Widget:**
 
 ```rust
-#[derive(WidgetMacro)]
-#[widget_macro(name = "col", alias = "column", constructor = "column")]
+#[derive(Widget)]
+#[widget(name = "col", alias = "column", constructor = "column")]
 pub struct Container<C: WidgetTuple> {
     #[widget_children]
     children: C,
@@ -202,8 +202,8 @@ col!([child1, child2], gap: 10.0)       // Container::column((child1, child2)).g
 **Form Widget (Named Children):**
 
 ```rust
-#[derive(WidgetMacro)]
-#[widget_macro(name = "form")]
+#[derive(Widget)]
+#[widget(name = "form")]
 pub struct Form<F: NamedWidgetTuple> {
     #[named_children]
     fields: F,

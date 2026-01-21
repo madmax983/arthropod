@@ -164,3 +164,196 @@ fn test_app_provides_convenient_spawn() {
     // Entity should exist in World
     assert!(app.world().get_entity(entity).is_ok());
 }
+
+// =============================================================================
+// Widget Integration Tests (TDD - written first, implementation follows)
+// =============================================================================
+
+#[test]
+fn test_integrate_widgets_transfers_layout_styles() {
+    // Setup: Create WidgetContext with a widget that has layout style
+    use layout_engine::FlexStyle;
+    use std::collections::HashMap;
+    use widget_core::WidgetContext;
+
+    let mut widget_ctx = WidgetContext::new_test();
+
+    // Create a node in widget context and set layout style
+    let widget_node = widget_ctx.create_node(
+        widget_ctx.root(),
+        NodeContent::Rect { color: Color::RED },
+    );
+    widget_ctx.set_layout_style(widget_node, FlexStyle::default());
+
+    // Create app
+    let mut app = AppBuilder::new()
+        .with_window_config(WindowConfig::default())
+        .build_headless()
+        .expect("Failed to create app");
+
+    // Copy widget node to app scene and create mapping
+    let app_node = {
+        let mut scene = app.world_mut().resource_mut::<Scene>();
+        let root = scene.root();
+        scene.add_node(
+            root,
+            SceneNode {
+                content: NodeContent::Rect { color: Color::RED },
+                transform: Transform2D::identity(),
+                bounds: Rect::default(),
+                children: Vec::new(),
+                visible: true,
+                opacity: 1.0,
+            },
+        )
+    };
+
+    // Spawn entity for the node
+    app.spawn(app_node).insert(Renderable);
+
+    // Create node mapping (widget NodeId -> app NodeId)
+    let mut node_map = HashMap::new();
+    node_map.insert(widget_node, app_node);
+
+    // ACT: Integrate widgets into app
+    app.integrate_widgets(&widget_ctx, &node_map);
+
+    // ASSERT: LayoutStyle component should exist on the entity
+    use arthropod_ecs::components::LayoutStyle;
+    let has_layout = app
+        .world_mut()
+        .query::<(&SceneNodeRef, &LayoutStyle)>()
+        .iter(app.world())
+        .any(|(scene_ref, _)| scene_ref.0 == app_node);
+
+    assert!(has_layout, "Entity should have LayoutStyle component after integration");
+}
+
+#[test]
+fn test_integrate_widgets_transfers_clickables() {
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use widget_core::WidgetContext;
+
+    let mut widget_ctx = WidgetContext::new_test();
+
+    // Create a clickable node
+    let widget_node = widget_ctx.create_node(
+        widget_ctx.root(),
+        NodeContent::Rect { color: Color::BLUE },
+    );
+
+    // Add clickable with a callback we can verify
+    let clicked = Arc::new(AtomicBool::new(false));
+    let clicked_clone = clicked.clone();
+    widget_ctx.add_clickable(widget_node, Arc::new(move || {
+        clicked_clone.store(true, Ordering::SeqCst);
+    }));
+
+    // Create app and copy node
+    let mut app = AppBuilder::new()
+        .with_window_config(WindowConfig::default())
+        .build_headless()
+        .expect("Failed to create app");
+
+    let app_node = {
+        let mut scene = app.world_mut().resource_mut::<Scene>();
+        let root = scene.root();
+        scene.add_node(
+            root,
+            SceneNode {
+                content: NodeContent::Rect { color: Color::BLUE },
+                transform: Transform2D::identity(),
+                bounds: Rect::default(),
+                children: Vec::new(),
+                visible: true,
+                opacity: 1.0,
+            },
+        )
+    };
+
+    app.spawn(app_node).insert(Renderable);
+
+    let mut node_map = HashMap::new();
+    node_map.insert(widget_node, app_node);
+
+    // ACT: Integrate widgets
+    app.integrate_widgets(&widget_ctx, &node_map);
+
+    // ASSERT: Clickable component should exist and callback should work
+    use arthropod_ecs::components::Clickable;
+    let clickable = app
+        .world_mut()
+        .query::<(&SceneNodeRef, &Clickable)>()
+        .iter(app.world())
+        .find(|(scene_ref, _)| scene_ref.0 == app_node)
+        .map(|(_, c)| c.callback.clone());
+
+    assert!(clickable.is_some(), "Entity should have Clickable component");
+
+    // Invoke the callback and verify it works
+    if let Some(callback) = clickable {
+        callback();
+        assert!(clicked.load(Ordering::SeqCst), "Clickable callback should have been invoked");
+    }
+}
+
+#[test]
+fn test_integrate_widgets_transfers_background_colors() {
+    use glam::Vec4;
+    use std::collections::HashMap;
+    use widget_core::WidgetContext;
+
+    let mut widget_ctx = WidgetContext::new_test();
+
+    // Create a node with background color
+    let widget_node = widget_ctx.create_node(
+        widget_ctx.root(),
+        NodeContent::Rect { color: Color::GREEN },
+    );
+    widget_ctx.set_background_color(widget_node, Vec4::new(0.5, 0.5, 0.5, 1.0));
+
+    // Create app
+    let mut app = AppBuilder::new()
+        .with_window_config(WindowConfig::default())
+        .build_headless()
+        .expect("Failed to create app");
+
+    let app_node = {
+        let mut scene = app.world_mut().resource_mut::<Scene>();
+        let root = scene.root();
+        scene.add_node(
+            root,
+            SceneNode {
+                content: NodeContent::Rect { color: Color::GREEN },
+                transform: Transform2D::identity(),
+                bounds: Rect::default(),
+                children: Vec::new(),
+                visible: true,
+                opacity: 1.0,
+            },
+        )
+    };
+
+    app.spawn(app_node).insert(Renderable);
+
+    let mut node_map = HashMap::new();
+    node_map.insert(widget_node, app_node);
+
+    // ACT
+    app.integrate_widgets(&widget_ctx, &node_map);
+
+    // ASSERT
+    use arthropod_ecs::components::BackgroundColor;
+    let bg_color = app
+        .world_mut()
+        .query::<(&SceneNodeRef, &BackgroundColor)>()
+        .iter(app.world())
+        .find(|(scene_ref, _)| scene_ref.0 == app_node)
+        .map(|(_, bg)| bg.0);
+
+    assert!(bg_color.is_some(), "Entity should have BackgroundColor component");
+    let color = bg_color.unwrap();
+    assert!((color.x - 0.5).abs() < 0.001, "Background color R should be 0.5");
+}

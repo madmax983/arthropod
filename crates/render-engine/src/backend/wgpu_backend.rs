@@ -501,7 +501,6 @@ impl super::RenderBackend for WgpuBackend {
         println!("🎬 Render frame: {} total nodes in scene", total_nodes);
 
         let mut instances = Vec::new();
-        let mut text_nodes = Vec::new(); // (node, shaped_text, color)
         let mut raw_text_nodes = Vec::new(); // (node, text, font_size, color)
         let mut rect_count = 0;
         for (_node_id, node) in scene.nodes() {
@@ -523,15 +522,9 @@ impl super::RenderBackend for WgpuBackend {
                         color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
-                NodeContent::Text { shaped_text, color } => {
-                    // Collect text nodes for separate text rendering pass
-                    println!("  📄 Found Text node: {} glyphs at ({}, {})",
-                             shaped_text.glyphs.len(), node.bounds.x, node.bounds.y);
-                    text_nodes.push((node, shaped_text, color));
-                }
-                NodeContent::RawText { text, font_size, color } => {
-                    // Collect raw text nodes to be shaped during rendering
-                    println!("  📝 Found RawText node: '{}' at ({}, {})",
+                NodeContent::Text { text, font_size, color } => {
+                    // Collect text nodes to be shaped during rendering
+                    println!("  📝 Found Text node: '{}' at ({}, {})",
                              text, node.bounds.x, node.bounds.y);
                     raw_text_nodes.push((node, text, *font_size, color));
                 }
@@ -652,61 +645,7 @@ impl super::RenderBackend for WgpuBackend {
                 }
             }
 
-            if !text_nodes.is_empty() {
-                println!("📝 Rendering {} (old-style) text nodes", text_nodes.len());
-                // Generate glyph instances from text nodes using TextRenderer
-                for (node, shaped_text, color) in &text_nodes {
-                    println!("  Text node at ({}, {}) with {} glyphs",
-                             node.bounds.x, node.bounds.y, shaped_text.glyphs.len());
-                    // Convert ShapedTextData to text_engine::ShapedText
-                    let shaped = text_engine::ShapedText {
-                        glyphs: shaped_text.glyphs.iter().map(|g| {
-                            // Create a temporary CacheKey for this glyph
-                            // The actual rasterization will use the proper font system
-                            use text_engine::CacheKey;
-                            use cosmic_text::CacheKeyFlags;
-                            let (cache_key, _, _) = CacheKey::new(
-                                cosmic_text::fontdb::ID::dummy(),  // Will be resolved by font system
-                                g.glyph_id,
-                                16.0,  // Font size - TODO: pass this through ShapedTextData
-                                (0.0, 0.0).into(),
-                                CacheKeyFlags::empty(),
-                            );
-
-                            text_engine::ShapedGlyph {
-                                cache_key,
-                                glyph_id: g.glyph_id,
-                                x_offset: g.x_offset,
-                                y_offset: g.y_offset,
-                                x_advance: g.x_advance,
-                                y_advance: g.y_advance,
-                                cluster: 0, // Not needed for rendering
-                            }
-                        }).collect(),
-                        bounds: text_engine::TextBounds {
-                            x: 0.0,
-                            y: 0.0,
-                            width: shaped_text.bounds_width,
-                            height: shaped_text.bounds_height,
-                        },
-                    };
-
-                    // Base position for this text node
-                    let position = glam::Vec2::new(node.bounds.x, node.bounds.y);
-                    let text_color = glam::Vec4::new(
-                        color.r(),
-                        color.g(),
-                        color.b(),
-                        color.a() * node.opacity,
-                    );
-
-                    // Use TextRenderer to generate instances with real atlas coordinates
-                    let instances = self.text_renderer.generate_instances(&shaped, position, text_color);
-                    glyph_instances.extend(instances);
-                }
-            }
-
-            // Render all collected glyph instances (from both raw_text and old-style text nodes)
+            // Render all collected glyph instances
             if !glyph_instances.is_empty() {
                 debug!("Rendering {} glyphs", glyph_instances.len());
                 println!("🎨 Rendering {} glyphs to GPU", glyph_instances.len());
@@ -1053,9 +992,6 @@ mod tests {
                     });
                 }
                 NodeContent::Text { .. } => {
-                    // TODO: Render text via separate text pipeline
-                }
-                NodeContent::RawText { .. } => {
                     // TODO: Render text via separate text pipeline
                 }
                 NodeContent::Empty => {}

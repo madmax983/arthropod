@@ -5,7 +5,6 @@ use flux_state::{ReadSignal, Signal, WriteSignal};
 use glam::Vec4;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
-use widget_macros::Widget;
 
 /// TextInput widget with cursor, selection, and validation
 ///
