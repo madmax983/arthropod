@@ -935,6 +935,7 @@ mod tests {
                 height: 200.0,
             },
             children: vec![],
+            parent: None, // Set by add_node
             visible: true,
             opacity: 1.0,
         };
@@ -953,6 +954,7 @@ mod tests {
                 height: 50.0,
             },
             children: vec![],
+            parent: None, // Set by add_node
             visible: false,
             opacity: 1.0,
         };
@@ -971,6 +973,7 @@ mod tests {
                 height: 150.0,
             },
             children: vec![],
+            parent: None, // Set by add_node
             visible: true,
             opacity: 0.5,
         };

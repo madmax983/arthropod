@@ -14,6 +14,11 @@ pub struct SceneNode {
     pub bounds: plat_core::Rect,
     /// Child node IDs.
     pub children: Vec<NodeId>,
+    /// Parent node ID (None for root node).
+    ///
+    /// This enables O(1) parent lookup instead of O(n) search.
+    /// Maintained automatically by Scene::add_node() and Scene::reparent_node().
+    pub parent: Option<NodeId>,
     /// Whether this node is visible.
     pub visible: bool,
     /// Opacity (0.0 - 1.0).
@@ -27,6 +32,7 @@ impl SceneNode {
             transform: Transform2D::IDENTITY,
             bounds: plat_core::Rect::new(0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
+            parent: None, // Root has no parent
             visible: true,
             opacity: 1.0,
         }
@@ -38,6 +44,7 @@ impl SceneNode {
             transform: Transform2D::IDENTITY,
             bounds: plat_core::Rect::new(0.0, 0.0, 0.0, 0.0),
             children: Vec::new(),
+            parent: None, // Parent set by Scene::add_node()
             visible: true,
             opacity: 1.0,
         }

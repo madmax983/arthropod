@@ -1,6 +1,6 @@
 //! Text shaping tests - Written FIRST following TDD
 
-use text_engine::{ShapedText, TextEngine};
+use text_engine::TextEngine;
 
 #[test]
 fn test_simple_text_shaping() {

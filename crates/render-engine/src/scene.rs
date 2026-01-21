@@ -46,9 +46,14 @@ impl Scene {
     }
 
     /// Add a node to the scene, returns its ID.
-    pub fn add_node(&mut self, parent: NodeId, node: SceneNode) -> NodeId {
+    ///
+    /// Sets the node's parent field automatically for O(1) parent lookup.
+    pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
         let id = NodeId(self.next_id);
         self.next_id += 1;
+
+        // Set the parent field for O(1) lookup
+        node.parent = Some(parent);
 
         self.nodes.insert(id, node);
         if let Some(parent_node) = self.nodes.get_mut(&parent) {
@@ -79,26 +84,38 @@ impl Scene {
         self.get_node_mut(id)
     }
 
-    /// Find the parent of a node (O(n) search).
+    /// Get the parent of a node (O(1) lookup).
+    ///
+    /// Returns `None` if the node doesn't exist or is the root node.
+    pub fn parent(&self, child_id: NodeId) -> Option<NodeId> {
+        self.nodes.get(&child_id).and_then(|node| node.parent)
+    }
+
+    /// Find the parent of a node (O(1) lookup via parent field).
+    ///
+    /// This is now O(1) thanks to the parent field in SceneNode.
+    /// For backwards compatibility, this returns the same result as `parent()`.
     pub fn find_parent(&self, child_id: NodeId) -> Option<NodeId> {
-        for (id, node) in &self.nodes {
-            if node.children.contains(&child_id) {
-                return Some(*id);
-            }
-        }
-        None
+        self.parent(child_id)
     }
 
     /// Re-parent a node from old parent to new parent.
+    ///
+    /// Updates the child's parent field for O(1) lookup.
     pub fn reparent_node(&mut self, child_id: NodeId, old_parent: NodeId, new_parent: NodeId) {
-        // Remove child from old parent
+        // Remove child from old parent's children list
         if let Some(old_parent_node) = self.nodes.get_mut(&old_parent) {
             old_parent_node.children.retain(|&id| id != child_id);
         }
 
-        // Add child to new parent
+        // Add child to new parent's children list
         if let Some(new_parent_node) = self.nodes.get_mut(&new_parent) {
             new_parent_node.children.push(child_id);
+        }
+
+        // Update child's parent field for O(1) lookup
+        if let Some(child_node) = self.nodes.get_mut(&child_id) {
+            child_node.parent = Some(new_parent);
         }
 
         // Mark both parents as dirty

@@ -58,6 +58,8 @@ pub use widget_trait::{NamedWidgetTuple, Widget, WidgetTuple};
 pub use layout_engine::{FlexDirection, FlexStyle};
 // Re-export node content for advanced use cases
 pub use render_engine::NodeContent;
+// Re-export theme types for theming support
+pub use theme_engine::{DesignTokens, SystemTheme};
 
 // Re-export derive macros - Widget derive coexists with Widget trait (different namespaces)
 pub use widget_macros::Widget;

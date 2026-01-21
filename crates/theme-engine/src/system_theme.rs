@@ -267,13 +267,63 @@ impl SystemTheme {
 
     #[cfg(target_os = "windows")]
     fn get_windows_version() -> (u32, u32, u32) {
-        // Use RtlGetVersion for accurate version detection
-        // For now, use a simple heuristic based on available APIs
-        // This would need proper implementation for production
+        // Prefer registry method as GetVersionExW is subject to compatibility shims
+        // (returns 6.x for Windows 8+ without a proper app manifest)
+        // The registry always contains the real build number
+        Self::detect_windows_version_from_registry()
+    }
 
-        // Simple heuristic: Check if we're on Windows 11 by checking build number
-        // This is a placeholder - proper implementation would use RtlGetVersion
-        (10, 0, 22000) // Assume Windows 11 for now
+    #[cfg(target_os = "windows")]
+    fn detect_windows_version_from_registry() -> (u32, u32, u32) {
+        use windows::core::HSTRING;
+        use windows::Win32::System::Registry::{
+            RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_LOCAL_MACHINE, KEY_READ,
+            REG_VALUE_TYPE,
+        };
+
+        unsafe {
+            let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+            let mut hkey = Default::default();
+
+            if RegOpenKeyExW(HKEY_LOCAL_MACHINE, &subkey, 0, KEY_READ, &mut hkey).is_ok() {
+                // Read CurrentBuildNumber (stored as string)
+                let value_name = HSTRING::from("CurrentBuildNumber");
+                let mut data = [0u8; 64];
+                let mut data_size = data.len() as u32;
+                let mut reg_type = REG_VALUE_TYPE::default();
+
+                let result = RegQueryValueExW(
+                    hkey,
+                    &value_name,
+                    None,
+                    Some(&mut reg_type as *mut _),
+                    Some(data.as_mut_ptr()),
+                    Some(&mut data_size),
+                );
+
+                let _ = RegCloseKey(hkey);
+
+                if result.is_ok() && data_size > 0 {
+                    // Convert UTF-16 string to build number
+                    let len = (data_size / 2) as usize;
+                    let build_str = String::from_utf16_lossy(
+                        &data.chunks(2)
+                            .take(len - 1) // Remove null terminator
+                            .map(|c| u16::from_ne_bytes([c[0], c[1]]))
+                            .collect::<Vec<_>>()
+                    );
+
+                    if let Ok(build) = build_str.parse::<u32>() {
+                        // Major version is always 10 for Windows 10/11
+                        return (10, 0, build);
+                    }
+                }
+            }
+        }
+
+        // Ultimate fallback: assume Windows 10 version 1809 (conservative)
+        // This ensures we don't enable Mica on systems that don't support it
+        (10, 0, 17763)
     }
 }
 

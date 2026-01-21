@@ -79,6 +79,11 @@ impl TextEngine {
         }
 
         // Update metrics for this font size
+        // Line height uses font metrics: cosmic-text calculates line height from
+        // the font's ascender + descender + line gap. We pass a slightly larger
+        // value to ensure proper spacing, then use the actual run.line_height below.
+        // Note: Metrics::new takes (font_size, line_height) where line_height is
+        // the desired line spacing for multi-line text.
         let metrics = Metrics::new(font_size, font_size * 1.2);
         self.buffer.set_metrics(&mut self.font_system, metrics);
 
@@ -91,10 +96,13 @@ impl TextEngine {
         let mut max_height = 0.0f32;
 
         for run in self.buffer.layout_runs() {
+            // Use the actual line height from font metrics
+            let run_height = run.line_height;
+
             for glyph in run.glyphs.iter() {
                 let x_end = glyph.x + glyph.w;
                 max_width = max_width.max(x_end);
-                max_height = max_height.max(font_size);
+                max_height = max_height.max(run_height);
 
                 // Construct CacheKey from glyph properties
                 let (cache_key, _x_bin, _y_bin) = CacheKey::new(

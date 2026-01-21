@@ -83,21 +83,25 @@ impl GlyphAtlas {
     /// Rasterize a glyph and pack it into the atlas
     fn rasterize_glyph(&mut self, cache_key: CacheKey, font_system: &mut FontSystem) -> TexCoords {
         // Rasterize using cosmic-text's SwashCache
-        let image = match self.swash_cache.get_image(font_system, cache_key) {
-            Some(img) => img,
-            None => {
-                // Return valid small coords for missing glyphs (1x1 pixel)
-                let u0 = self.current_x as f32 / self.width as f32;
-                let v0 = self.current_y as f32 / self.height as f32;
-                let u1 = (self.current_x + 1) as f32 / self.width as f32;
-                let v1 = (self.current_y + 1) as f32 / self.height as f32;
-                self.current_x += 1;
-                return TexCoords { u0, v0, u1, v1 };
-            }
-        };
-
-        let glyph_width = image.placement.width as u32;
-        let glyph_height = image.placement.height as u32;
+        // We extract the data we need immediately to avoid borrow conflicts
+        let (glyph_width, glyph_height, glyph_data) =
+            match self.swash_cache.get_image(font_system, cache_key) {
+                Some(img) => {
+                    let w = img.placement.width as u32;
+                    let h = img.placement.height as u32;
+                    let data = img.data.clone(); // Clone to release borrow on self
+                    (w, h, data)
+                }
+                None => {
+                    // Return valid small coords for missing glyphs (1x1 pixel)
+                    let u0 = self.current_x as f32 / self.width as f32;
+                    let v0 = self.current_y as f32 / self.height as f32;
+                    let u1 = (self.current_x + 1) as f32 / self.width as f32;
+                    let v1 = (self.current_y + 1) as f32 / self.height as f32;
+                    self.current_x += 1;
+                    return TexCoords { u0, v0, u1, v1 };
+                }
+            };
 
         // Check if we need to move to next row
         if self.current_x + glyph_width > self.width {
@@ -108,8 +112,16 @@ impl GlyphAtlas {
 
         // Check if atlas is full
         if self.current_y + glyph_height > self.height {
-            // Atlas full - return last position (will overlap)
-            // TODO: Implement atlas expansion or eviction
+            // Atlas full - reset to beginning and clear cache
+            // This is a simple eviction strategy that clears all glyphs
+            // Future improvement: implement LRU eviction or atlas expansion
+            tracing::warn!(
+                width = self.width,
+                height = self.height,
+                glyph_count = self.cache.len(),
+                "Glyph atlas full, resetting cache"
+            );
+            self.reset();
         }
 
         // Calculate texture coordinates
@@ -130,8 +142,8 @@ impl GlyphAtlas {
                 let dst_y = y + row;
                 let dst_idx = (dst_y * self.width + dst_x) as usize;
 
-                if dst_idx < self.texture_data.len() && src_idx < image.data.len() {
-                    let alpha = image.data[src_idx];
+                if dst_idx < self.texture_data.len() && src_idx < glyph_data.len() {
+                    let alpha = glyph_data[src_idx];
                     self.texture_data[dst_idx] = alpha; // R8: single alpha channel
                 }
             }
@@ -147,6 +159,29 @@ impl GlyphAtlas {
     /// Get the texture data
     pub fn texture_data(&self) -> &[u8] {
         &self.texture_data
+    }
+
+    /// Reset the atlas, clearing all cached glyphs
+    ///
+    /// This is called when the atlas is full and we need to start fresh.
+    /// All previously rasterized glyphs will need to be re-rasterized.
+    pub fn reset(&mut self) {
+        self.cache.clear();
+        self.current_x = 0;
+        self.current_y = 0;
+        self.row_height = 0;
+        // Clear texture data to avoid visual artifacts
+        self.texture_data.fill(0);
+    }
+
+    /// Get the number of cached glyphs
+    pub fn glyph_count(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Check if the atlas is getting full (>80% used in Y direction)
+    pub fn is_near_full(&self) -> bool {
+        self.current_y > (self.height * 80 / 100)
     }
 }
 
@@ -174,5 +209,53 @@ mod tests {
         assert!(coords.v0 >= 0.0 && coords.v0 <= 1.0);
         assert!(coords.u1 >= 0.0 && coords.u1 <= 1.0);
         assert!(coords.v1 >= 0.0 && coords.v1 <= 1.0);
+    }
+
+    #[test]
+    fn test_atlas_reset() {
+        let mut atlas = GlyphAtlas::new(256, 256);
+
+        // Simulate some usage by setting state
+        atlas.current_x = 100;
+        atlas.current_y = 50;
+        atlas.row_height = 20;
+        atlas.texture_data[0] = 255;
+        atlas.texture_data[1000] = 128;
+
+        // Reset should clear everything
+        atlas.reset();
+
+        assert_eq!(atlas.current_x, 0);
+        assert_eq!(atlas.current_y, 0);
+        assert_eq!(atlas.row_height, 0);
+        assert_eq!(atlas.cache.len(), 0);
+        assert_eq!(atlas.texture_data[0], 0);
+        assert_eq!(atlas.texture_data[1000], 0);
+    }
+
+    #[test]
+    fn test_glyph_count() {
+        let atlas = GlyphAtlas::new(256, 256);
+        assert_eq!(atlas.glyph_count(), 0);
+    }
+
+    #[test]
+    fn test_is_near_full() {
+        let mut atlas = GlyphAtlas::new(100, 100);
+
+        // At 0%, not near full
+        assert!(!atlas.is_near_full());
+
+        // At 50%, not near full
+        atlas.current_y = 50;
+        assert!(!atlas.is_near_full());
+
+        // At 80%, still not near full (boundary)
+        atlas.current_y = 80;
+        assert!(!atlas.is_near_full());
+
+        // At 81%, near full
+        atlas.current_y = 81;
+        assert!(atlas.is_near_full());
     }
 }

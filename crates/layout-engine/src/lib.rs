@@ -69,22 +69,45 @@ impl LayoutEngine {
     }
 
     /// Create a new layout node with the given style
+    ///
+    /// # Panics
+    ///
+    /// Panics if memory allocation fails (extremely rare OOM condition).
     pub fn create_node(&mut self, style: FlexStyle) -> NodeId {
         let taffy_style = convert_style(style);
-        let node = self.taffy.new_leaf(taffy_style).unwrap();
+        let node = self.taffy
+            .new_leaf(taffy_style)
+            .expect("layout node creation should succeed (OOM?)");
         NodeId(node)
     }
 
     /// Add a child to a parent node
+    ///
+    /// # Panics
+    ///
+    /// Panics if `parent` or `child` NodeId is invalid. NodeIds are only
+    /// created by `create_node()` and remain valid for the engine's lifetime,
+    /// so this should never panic in normal usage.
     pub fn add_child(&mut self, parent: NodeId, child: NodeId) {
-        self.taffy.add_child(parent.0, child.0).unwrap();
+        self.taffy
+            .add_child(parent.0, child.0)
+            .expect("add_child: both parent and child NodeIds must be valid");
     }
 
     /// Compute layout for a node tree
+    ///
+    /// # Panics
+    ///
+    /// Panics if `root` NodeId is invalid. NodeIds are only created by
+    /// `create_node()` and remain valid for the engine's lifetime, so this
+    /// should never panic in normal usage.
     pub fn compute_layout(&mut self, root: NodeId, constraints: LayoutConstraints) {
         // Update root node to have constraint sizes
         // This ensures flex_grow works correctly
-        let current_style = self.taffy.style(root.0).unwrap().clone();
+        let current_style = self.taffy
+            .style(root.0)
+            .expect("compute_layout: root NodeId must be valid")
+            .clone();
         let mut updated_style = current_style;
 
         // Set root size from constraints if not already set
@@ -100,7 +123,9 @@ impl LayoutEngine {
             }
         }
 
-        self.taffy.set_style(root.0, updated_style).unwrap();
+        self.taffy
+            .set_style(root.0, updated_style)
+            .expect("compute_layout: root NodeId must be valid for set_style");
 
         let available_space = Size {
             width: constraints
@@ -111,7 +136,9 @@ impl LayoutEngine {
                 .map_or(AvailableSpace::MaxContent, AvailableSpace::Definite),
         };
 
-        self.taffy.compute_layout(root.0, available_space).unwrap();
+        self.taffy
+            .compute_layout(root.0, available_space)
+            .expect("compute_layout: layout computation should succeed for valid tree");
     }
 
     /// Get computed layout for a node

@@ -10,6 +10,7 @@ use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use theme_engine::DesignTokens;
 
 /// Text input state for a node
 #[derive(Clone)]
@@ -35,6 +36,30 @@ pub struct FormState {
     pub submit_error: Option<String>,
 }
 
+/// Convert a character index to a byte index in a string.
+///
+/// This is necessary because Rust strings are UTF-8 encoded, where characters
+/// can be 1-4 bytes. `String::insert()` and `String::remove()` expect byte
+/// indices, not character indices.
+///
+/// # Returns
+/// - `Some(byte_idx)` if char_idx is valid
+/// - `None` if char_idx is out of bounds
+fn char_idx_to_byte_idx(s: &str, char_idx: usize) -> Option<usize> {
+    s.char_indices()
+        .nth(char_idx)
+        .map(|(byte_idx, _)| byte_idx)
+        .or_else(|| {
+            // If char_idx equals char count, return the string length
+            // (valid insertion point at the end)
+            if char_idx == s.chars().count() {
+                Some(s.len())
+            } else {
+                None
+            }
+        })
+}
+
 /// Widget building context
 ///
 /// Provides build-time API for widgets to construct scene nodes and configure
@@ -56,6 +81,8 @@ pub struct WidgetContext {
     validators: HashMap<NodeId, ValidationState>,
     placeholders: HashSet<NodeId>,
     form_states: HashMap<NodeId, FormState>,
+    /// Design tokens for theming (optional for backwards compatibility)
+    design_tokens: Option<DesignTokens>,
 }
 
 impl WidgetContext {
@@ -72,7 +99,21 @@ impl WidgetContext {
             validators: HashMap::new(),
             placeholders: HashSet::new(),
             form_states: HashMap::new(),
+            design_tokens: None,
         }
+    }
+
+    /// Set design tokens for theming
+    ///
+    /// When set, widgets will use these tokens for colors instead of hardcoded values.
+    /// Typically called by the app layer after querying SystemTheme.
+    pub fn set_design_tokens(&mut self, tokens: DesignTokens) {
+        self.design_tokens = Some(tokens);
+    }
+
+    /// Get design tokens if set
+    pub fn design_tokens(&self) -> Option<&DesignTokens> {
+        self.design_tokens.as_ref()
     }
 
     /// Get the scene
@@ -208,7 +249,8 @@ impl WidgetContext {
         readonly: bool,
         max_length: Option<usize>,
     ) {
-        let cursor_position = read_signal.get_untracked().len();
+        // Use character count, not byte length for cursor position
+        let cursor_position = read_signal.get_untracked().chars().count();
         self.text_input_states.insert(
             node_id,
             TextInputState {
@@ -255,19 +297,22 @@ impl WidgetContext {
 
                 let mut current_value = state.read_signal.get_untracked();
 
-                // Check max_length
+                // Check max_length (in characters, not bytes)
                 if let Some(max_len) = state.max_length {
-                    if current_value.len() >= max_len {
+                    if current_value.chars().count() >= max_len {
                         return;
                     }
                 }
 
-                // Insert character at cursor position
-                current_value.insert(state.cursor_position, c);
-                state.cursor_position += 1;
+                // Convert character index to byte index for insertion
+                // cursor_position is a character index (user-facing concept)
+                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position) {
+                    current_value.insert(byte_idx, c);
+                    state.cursor_position += 1;
 
-                // Update signal
-                state.write_signal.set(current_value);
+                    // Update signal
+                    state.write_signal.set(current_value);
+                }
             }
         }
     }
@@ -282,11 +327,16 @@ impl WidgetContext {
 
                 if state.cursor_position > 0 {
                     let mut current_value = state.read_signal.get_untracked();
-                    current_value.remove(state.cursor_position - 1);
-                    state.cursor_position -= 1;
 
-                    // Update signal
-                    state.write_signal.set(current_value);
+                    // Convert character index to byte index for removal
+                    // We need to remove the character BEFORE the cursor
+                    if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position - 1) {
+                        current_value.remove(byte_idx);
+                        state.cursor_position -= 1;
+
+                        // Update signal
+                        state.write_signal.set(current_value);
+                    }
                 }
             }
         }
@@ -301,12 +351,19 @@ impl WidgetContext {
                 }
 
                 let current_value = state.read_signal.get_untracked();
-                if state.cursor_position < current_value.len() {
-                    let mut new_value = current_value;
-                    new_value.remove(state.cursor_position);
+                let char_count = current_value.chars().count();
 
-                    // Update signal
-                    state.write_signal.set(new_value);
+                // Check if there's a character at cursor position to delete
+                if state.cursor_position < char_count {
+                    let mut new_value = current_value;
+
+                    // Convert character index to byte index for removal
+                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position) {
+                        new_value.remove(byte_idx);
+
+                        // Update signal (cursor position stays the same)
+                        state.write_signal.set(new_value);
+                    }
                 }
             }
         }
@@ -328,7 +385,10 @@ impl WidgetContext {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
                 let current_value = state.read_signal.get_untracked();
-                if state.cursor_position < current_value.len() {
+                let char_count = current_value.chars().count();
+
+                // Move cursor right if not at end (use char count, not byte length)
+                if state.cursor_position < char_count {
                     state.cursor_position += 1;
                 }
             }
@@ -720,7 +780,7 @@ mod tests {
     #[test]
     fn test_focus_next_focuses_first_node_when_nothing_focused() {
         let mut ctx = WidgetContext::new_test();
-        let node1 = create_text_input_node(&mut ctx);
+        let _node1 = create_text_input_node(&mut ctx);
         let _node2 = create_text_input_node(&mut ctx);
 
         let focused = ctx.focus_next();
@@ -824,5 +884,175 @@ mod tests {
         ctx.focus_prev();
 
         assert_eq!(ctx.focused_node(), Some(node1));
+    }
+
+    // =========================================================================
+    // Unicode Handling Tests
+    // =========================================================================
+
+    fn create_text_input_with_value(ctx: &mut WidgetContext, value: &str) -> NodeId {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, value.to_string());
+        let (read, write) = signal.split();
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        ctx.add_text_input_state(node_id, read, write, false, None);
+        node_id
+    }
+
+    #[test]
+    fn test_send_char_with_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = create_text_input_with_value(&mut ctx, "😀");
+        ctx.focus_node(node_id);
+
+        // Cursor should be at end (1 character, even though it's 4 bytes)
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+
+        // Insert 'a' after the emoji - should not panic
+        ctx.send_char('a');
+
+        // Value should be "😀a"
+        assert_eq!(ctx.get_text_input_value(node_id), Some("😀a".to_string()));
+        assert_eq!(ctx.get_cursor_position(node_id), Some(2));
+    }
+
+    #[test]
+    fn test_send_char_before_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = create_text_input_with_value(&mut ctx, "😀");
+        ctx.focus_node(node_id);
+
+        // Move cursor to beginning
+        ctx.send_key_left();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(0));
+
+        // Insert 'a' before the emoji - should not panic
+        ctx.send_char('a');
+
+        // Value should be "a😀"
+        assert_eq!(ctx.get_text_input_value(node_id), Some("a😀".to_string()));
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+    }
+
+    #[test]
+    fn test_backspace_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = create_text_input_with_value(&mut ctx, "a😀b");
+        ctx.focus_node(node_id);
+
+        // Cursor at end (3 characters)
+        assert_eq!(ctx.get_cursor_position(node_id), Some(3));
+
+        // Backspace should remove 'b'
+        ctx.send_backspace();
+        assert_eq!(ctx.get_text_input_value(node_id), Some("a😀".to_string()));
+        assert_eq!(ctx.get_cursor_position(node_id), Some(2));
+
+        // Backspace should remove the emoji (single operation, even though 4 bytes)
+        ctx.send_backspace();
+        assert_eq!(ctx.get_text_input_value(node_id), Some("a".to_string()));
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+    }
+
+    #[test]
+    fn test_delete_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = create_text_input_with_value(&mut ctx, "a😀b");
+        ctx.focus_node(node_id);
+
+        // Move cursor to position 1 (after 'a', before emoji)
+        ctx.send_key_left(); // now at 2
+        ctx.send_key_left(); // now at 1
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+
+        // Delete should remove the emoji
+        ctx.send_delete();
+        assert_eq!(ctx.get_text_input_value(node_id), Some("ab".to_string()));
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+    }
+
+    #[test]
+    fn test_cursor_movement_with_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = create_text_input_with_value(&mut ctx, "a😀b");
+        ctx.focus_node(node_id);
+
+        // Cursor at end (3 characters)
+        assert_eq!(ctx.get_cursor_position(node_id), Some(3));
+
+        // Move left through each character
+        ctx.send_key_left();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(2));
+
+        ctx.send_key_left();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+
+        ctx.send_key_left();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(0));
+
+        // Can't go past beginning
+        ctx.send_key_left();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(0));
+
+        // Move right through each character
+        ctx.send_key_right();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(1));
+
+        ctx.send_key_right();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(2));
+
+        ctx.send_key_right();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(3));
+
+        // Can't go past end
+        ctx.send_key_right();
+        assert_eq!(ctx.get_cursor_position(node_id), Some(3));
+    }
+
+    #[test]
+    fn test_max_length_with_emoji() {
+        let mut ctx = WidgetContext::new_test();
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, String::new());
+        let (read, write) = signal.split();
+        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+
+        // Max length of 3 characters
+        ctx.add_text_input_state(node_id, read, write, false, Some(3));
+        ctx.focus_node(node_id);
+
+        // Add 3 emojis (12 bytes, but only 3 characters)
+        ctx.send_char('😀');
+        ctx.send_char('😁');
+        ctx.send_char('😂');
+
+        assert_eq!(ctx.get_text_input_value(node_id), Some("😀😁😂".to_string()));
+
+        // 4th character should be rejected (max_length is character count, not bytes)
+        ctx.send_char('x');
+        assert_eq!(ctx.get_text_input_value(node_id), Some("😀😁😂".to_string()));
+    }
+
+    #[test]
+    fn test_char_idx_to_byte_idx_helper() {
+        // ASCII
+        assert_eq!(super::char_idx_to_byte_idx("abc", 0), Some(0));
+        assert_eq!(super::char_idx_to_byte_idx("abc", 1), Some(1));
+        assert_eq!(super::char_idx_to_byte_idx("abc", 2), Some(2));
+        assert_eq!(super::char_idx_to_byte_idx("abc", 3), Some(3)); // End position
+
+        // Emoji (4 bytes each)
+        assert_eq!(super::char_idx_to_byte_idx("😀", 0), Some(0));
+        assert_eq!(super::char_idx_to_byte_idx("😀", 1), Some(4)); // End of 4-byte emoji
+
+        // Mixed
+        assert_eq!(super::char_idx_to_byte_idx("a😀b", 0), Some(0)); // 'a'
+        assert_eq!(super::char_idx_to_byte_idx("a😀b", 1), Some(1)); // emoji start
+        assert_eq!(super::char_idx_to_byte_idx("a😀b", 2), Some(5)); // 'b'
+        assert_eq!(super::char_idx_to_byte_idx("a😀b", 3), Some(6)); // end
+
+        // Out of bounds
+        assert_eq!(super::char_idx_to_byte_idx("abc", 10), None);
+        assert_eq!(super::char_idx_to_byte_idx("😀", 5), None);
     }
 }

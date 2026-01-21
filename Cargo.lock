@@ -3630,6 +3630,7 @@ dependencies = [
  "plat-core",
  "render-engine",
  "text-engine",
+ "theme-engine",
  "widget-macros",
 ]
 

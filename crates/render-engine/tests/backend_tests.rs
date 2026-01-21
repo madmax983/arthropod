@@ -56,6 +56,7 @@ fn test_render_single_rectangle() {
             height: 150.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
@@ -83,6 +84,7 @@ fn test_render_multiple_rectangles() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
@@ -99,6 +101,7 @@ fn test_render_multiple_rectangles() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
@@ -125,6 +128,7 @@ fn test_render_respects_visibility() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: false, // Not visible
         opacity: 1.0,
     };
@@ -150,6 +154,7 @@ fn test_render_respects_opacity() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 0.5, // Half transparent
     };
@@ -177,6 +182,7 @@ fn test_render_respects_transform() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
@@ -205,6 +211,7 @@ fn test_rounded_rectangles() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
@@ -231,6 +238,7 @@ fn test_dirty_tracking_optimization() {
             height: 100.0,
         },
         children: vec![],
+        parent: None,
         visible: true,
         opacity: 1.0,
     };
