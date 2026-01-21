@@ -10,6 +10,11 @@ members = [
     "crates/arthropod-ecs",
     "crates/a11y-engine",
     "crates/arthropod-mcp",
+    "crates/theme-engine",
+    "crates/layout-engine",
+    "crates/text-engine",
+    "crates/widget-core",
+    "crates/widget-macros",
 ]
 
 [package]
@@ -37,6 +42,15 @@ anyhow = "1.0"
 serde_json = "1.0"
 hashbrown = "0.15"
 
+# Layout
+taffy = "0.6"
+
+# Text
+rustybuzz = "0.20"
+swash = "0.1"
+unicode-bidi = "0.3"
+unicode-segmentation = "1.12"
+
 # Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
@@ -52,8 +66,10 @@ features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
+    "Win32_System_Registry",
 ]
 
 # macOS platform
@@ -77,12 +93,27 @@ path = "examples/single_rect_test.rs"
 name = "debug_render"
 path = "examples/debug_render.rs"
 
+[[example]]
+name = "form_demo"
+path = "examples/form_demo.rs"
+
+[[example]]
+name = "widget_gallery"
+path = "examples/widget_gallery.rs"
+
+[[example]]
+name = "macro_demo"
+path = "examples/macro_demo.rs"
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
 render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 anim-graph = { path = "crates/anim-graph" }
+widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
+text-engine = { path = "crates/text-engine" }
+glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
 arthropod-mcp = { path = "crates/arthropod-mcp" }

@@ -46,6 +46,9 @@ pub fn collect_renderables_system(
                         ],
                     });
                 }
+                NodeContent::Text { .. } => {
+                    // Text is handled directly in wgpu_backend during rendering
+                }
                 NodeContent::Empty => {
                     // Empty nodes have no visual representation
                 }

@@ -20,14 +20,14 @@
 //!
 //! ## Example
 //!
-//! ```no_run
-//! use arthropod_mcp::{McpServer, McpFrameworkContext};
+//! ```ignore
+//! use arthropod_mcp::{ArthropodServer, start_tcp_server};
 //!
-//! fn main() -> anyhow::Result<()> {
-//!     let mut server = McpServer::new();
-//!     server.run()?;
-//!     Ok(())
-//! }
+//! // Create server for handling MCP requests
+//! let server = ArthropodServer::new();
+//!
+//! // Start TCP server for live connections (async)
+//! // start_tcp_server().await?;
 //! ```
 
 pub mod context;

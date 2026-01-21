@@ -261,6 +261,104 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             LRESULT(0)
         }
+        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN | WM_MBUTTONUP => {
+            use crate::{MouseButton, MouseInput, ElementState};
+
+            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let x = get_x_lparam(lparam);
+            let y = get_y_lparam(lparam);
+
+            let (button, state) = match msg {
+                WM_LBUTTONDOWN => (MouseButton::Left, ElementState::Pressed),
+                WM_LBUTTONUP => (MouseButton::Left, ElementState::Released),
+                WM_RBUTTONDOWN => (MouseButton::Right, ElementState::Pressed),
+                WM_RBUTTONUP => (MouseButton::Right, ElementState::Released),
+                WM_MBUTTONDOWN => (MouseButton::Middle, ElementState::Pressed),
+                WM_MBUTTONUP => (MouseButton::Middle, ElementState::Released),
+                _ => unreachable!(),
+            };
+
+            // TODO: Extract modifiers from wparam
+            let modifiers = crate::Modifiers::default();
+
+            EVENT_SENDER.with(|sender| {
+                if let Some(sender) = sender.borrow().as_ref() {
+                    let _ = sender.send(Event::Window {
+                        window_id,
+                        event: WindowEvent::MouseInput(MouseInput {
+                            button,
+                            state,
+                            position: Point { x, y },
+                            modifiers,
+                        }),
+                    });
+                }
+            });
+
+            LRESULT(0)
+        }
+        WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
+            use crate::{Key, KeyboardInput, ElementState};
+
+            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let vk = wparam.0 as u32;
+            let state = if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
+                ElementState::Pressed
+            } else {
+                ElementState::Released
+            };
+
+            // Map virtual key codes to Key enum
+            let key = match vk {
+                0x41..=0x5A => {  // A-Z
+                    Key::from_vk(vk)
+                }
+                0x30..=0x39 => {  // 0-9
+                    Key::from_vk(vk)
+                }
+                0x08 => Key::Backspace,
+                0x09 => Key::Tab,
+                0x0D => Key::Enter,
+                0x10 => Key::Shift,
+                0x11 => Key::Control,
+                0x12 => Key::Alt,
+                0x1B => Key::Escape,
+                0x20 => Key::Space,
+                0x21 => Key::PageUp,
+                0x22 => Key::PageDown,
+                0x23 => Key::End,
+                0x24 => Key::Home,
+                0x25 => Key::Left,
+                0x26 => Key::Up,
+                0x27 => Key::Right,
+                0x28 => Key::Down,
+                0x2C => Key::PrintScreen,
+                0x2D => Key::Insert,
+                0x2E => Key::Delete,
+                0x70..=0x87 => Key::from_vk(vk),  // F1-F24
+                _ => Key::Unknown,
+            };
+
+            // TODO: Extract modifiers from GetKeyState
+            let modifiers = crate::Modifiers::default();
+            let repeat = (lparam.0 & 0x40000000) != 0;
+
+            EVENT_SENDER.with(|sender| {
+                if let Some(sender) = sender.borrow().as_ref() {
+                    let _ = sender.send(Event::Window {
+                        window_id,
+                        event: WindowEvent::KeyboardInput(KeyboardInput {
+                            key,
+                            state,
+                            modifiers,
+                            repeat,
+                        }),
+                    });
+                }
+            });
+
+            LRESULT(0)
+        }
         WM_PAINT => {
             // Mark window as needing redraw
             let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };

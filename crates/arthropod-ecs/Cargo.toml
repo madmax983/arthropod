@@ -11,6 +11,8 @@ bevy_ecs = "0.15"
 render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
+layout-engine = { path = "../layout-engine" }
+glam = "0.29"
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }

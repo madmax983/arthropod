@@ -26,6 +26,11 @@ pub fn update_reactive_colors_system(
                     color: new_color,
                     corner_radius,
                 },
+                NodeContent::Text { ref text, font_size, .. } => NodeContent::Text {
+                    text: text.clone(),
+                    font_size,
+                    color: new_color,
+                },
                 NodeContent::Empty => NodeContent::Empty,
             };
         }

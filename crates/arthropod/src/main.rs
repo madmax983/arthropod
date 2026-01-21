@@ -19,14 +19,12 @@ impl Application for DemoApp {
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
-        match event {
-            Event::Window { event, .. } => match event {
-                plat_core::WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                _ => {}
-            },
-            _ => {}
+        if let Event::Window {
+            event: plat_core::WindowEvent::CloseRequested,
+            ..
+        } = event
+        {
+            *control_flow = ControlFlow::Exit;
         }
     }
 

@@ -1,7 +1,9 @@
 //! Rendering backends.
 
+pub mod text;
 mod wgpu_backend;
 
+pub use text::{GlyphAtlas, GlyphInstance, TexCoords, TextRenderer};
 pub use wgpu_backend::{RectInstance, WgpuBackend};
 
 use crate::Scene;

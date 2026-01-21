@@ -1,6 +1,10 @@
 use bevy_ecs::prelude::*;
-use flux_state::ReadSignal;
+use flux_state::{ReadSignal, WriteSignal};
+use glam::Vec4;
+use layout_engine::FlexStyle;
 use render_engine::{Color, NodeId, Transform2D};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Reference to a node in the Scene tree
 ///
@@ -119,4 +123,82 @@ pub struct Renderable;
 #[derive(Component)]
 pub struct Hoverable {
     pub on_hover: Box<dyn Fn() + Send + Sync>,
+}
+
+/// Layout style for flexbox layout engine
+///
+/// Stores the FlexStyle configuration for this node. Layout systems
+/// query this component to compute node positions and sizes.
+#[derive(Component, Clone, Debug)]
+pub struct LayoutStyle(pub FlexStyle);
+
+/// Clickable behavior - callback invoked on click
+///
+/// Entities with this component can respond to mouse clicks.
+/// The event system will invoke the callback when the node is clicked.
+#[derive(Component, Clone)]
+pub struct Clickable {
+    pub callback: Arc<dyn Fn() + Send + Sync>,
+}
+
+/// Background color for nodes
+///
+/// Separate from NodeContent color - allows changing background without
+/// rebuilding the entire node content.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct BackgroundColor(pub Vec4);
+
+/// Text input state component
+///
+/// Stores the reactive signals and cursor state for text input widgets.
+#[derive(Component, Clone)]
+pub struct TextInputState {
+    pub read_signal: MainThreadSignal<String>,
+    pub write_signal_inner: WriteSignal<String>, // WriteSignal is already Send+Sync
+    pub cursor_position: usize,
+    pub readonly: bool,
+    pub max_length: Option<usize>,
+}
+
+impl TextInputState {
+    pub fn new(
+        read_signal: ReadSignal<String>,
+        write_signal: WriteSignal<String>,
+        cursor_position: usize,
+        readonly: bool,
+        max_length: Option<usize>,
+    ) -> Self {
+        Self {
+            read_signal: MainThreadSignal::new(read_signal),
+            write_signal_inner: write_signal,
+            cursor_position,
+            readonly,
+            max_length,
+        }
+    }
+}
+
+/// Validator component - validates node content
+///
+/// Stores validation logic and current error state.
+pub type ValidatorFn = Arc<dyn Fn(&str) -> Result<(), String> + Send + Sync>;
+
+#[derive(Component, Clone)]
+pub struct Validator {
+    pub validator: ValidatorFn,
+    pub error: Option<String>,
+}
+
+/// Form state component - tracks form fields and submission
+///
+/// Stores the mapping of field names to node IDs, validation state,
+/// and submission callback.
+pub type SubmitCallback = Arc<dyn Fn(HashMap<String, String>) -> Result<(), String> + Send + Sync>;
+
+#[derive(Component, Clone)]
+pub struct FormState {
+    pub field_mapping: HashMap<String, NodeId>,
+    pub is_valid: bool,
+    pub on_submit: Option<SubmitCallback>,
+    pub submit_error: Option<String>,
 }

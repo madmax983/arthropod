@@ -3,8 +3,16 @@
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 /// Opaque window identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct WindowId(pub(crate) u64);
+
+impl WindowId {
+    /// Create a test WindowId (for unit tests only)
+    #[cfg(test)]
+    pub fn test_id() -> Self {
+        WindowId(0)
+    }
+}
 
 /// Size in physical pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

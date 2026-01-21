@@ -1,0 +1,200 @@
+warning: unused import: `NodeContent`
+ --> crates\render-engine\src\backend\wgpu_backend.rs:4:20
+  |
+4 | use crate::{Color, NodeContent, RendererError, Scene};
+  |                    ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated type alias `wgpu::ImageCopyTexture`: This has been renamed to `TexelCopyTextureInfo`, and will be removed in 25.0.0.
+   --> crates\render-engine\src\backend\wgpu_backend.rs:651:27
+    |
+651 |                     wgpu::ImageCopyTexture {
+    |                           ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `wgpu::ImageDataLayout`: This has been renamed to `TexelCopyBufferLayout`, and will be removed in 25.0.0.
+   --> crates\render-engine\src\backend\wgpu_backend.rs:658:27
+    |
+658 |                     wgpu::ImageDataLayout {
+    |                           ^^^^^^^^^^^^^^^
+
+warning: `render-engine` (lib) generated 3 warnings (run `cargo fix --lib -p render-engine` to apply 1 suggestion)
+warning: calls to `std::mem::drop` with a reference instead of an owned value does nothing
+   --> examples\form_gui.rs:431:21
+    |
+431 |                     drop(child); // Drop borrow before next get_node_mut
+    |                     ^^^^^-----^
+    |                          |
+    |                          argument has type `&mut arthropod::prelude::SceneNode`
+    |
+    = note: `#[warn(dropping_references)]` on by default
+help: use `let _ = ...` to ignore the expression or result
+    |
+431 -                     drop(child); // Drop borrow before next get_node_mut
+431 +                     let _ = child; // Drop borrow before next get_node_mut
+    |
+
+warning: `arthropod-examples` (example "form_gui") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running `target\debug\examples\form_gui.exe`
+[2m2026-01-20T01:45:44.633617Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mrender_engine::backend::wgpu_backend[0m[2m:[0m Creating wgpu instance
+[2m2026-01-20T01:45:44.731031Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m InstanceFlags::VALIDATION requested, but unable to find layer: VK_LAYER_KHRONOS_validation
+[2m2026-01-20T01:45:44.731174Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	No valid vk_loader_settings.json file found, no loader settings will be active
+[2m2026-01-20T01:45:44.731258Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.731498Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Searching for implicit layer manifest files
+[2m2026-01-20T01:45:44.731510Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.731518Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	   In following locations:
+[2m2026-01-20T01:45:44.731526Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.731533Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe
+[2m2026-01-20T01:45:44.731542Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732140Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	   Found the following files:
+[2m2026-01-20T01:45:44.732188Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732199Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x64.json
+[2m2026-01-20T01:45:44.732210Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732218Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x86.json
+[2m2026-01-20T01:45:44.732227Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732235Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Checking for Layer Manifest files in Registry at HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ImplicitLayers
+[2m2026-01-20T01:45:44.732245Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732338Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_add_json_entry: Located json file "C:\WINDOWS\System32\DriverStore\FileRepository\nvmii.inf_amd64_e9fa27eaab64efe4\nv-vk64.json" from PnP registry: E
+[2m2026-01-20T01:45:44.732352Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732397Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\ProgramData\GOG.com\Galaxy\redists\overlay\injected\galaxy_overlay_vklayer_x64.json" from registry "HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732409Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732421Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\Program Files (x86)\Steam\SteamOverlayVulkanLayer64.json" from registry "HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732432Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732444Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\Program Files (x86)\Steam\SteamFossilizeVulkanLayer64.json" from registry "HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732456Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732468Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\Program Files\RenderDoc\renderdoc.json" from registry "HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732480Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732499Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\ProgramData\obs-studio-hook\obs-vulkan64.json" from registry "HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732509Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732521Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\ProgramData\obs-studio-hook\obs-vulkan32.json" from registry "HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732532Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732544Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\Program Files (x86)\Epic Games\Launcher\Portal\Extras\Overlay\EOSOverlayVkLayer-Win32.json" from registry "HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732556Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732569Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Located json file "C:\Program Files (x86)\Epic Games\Launcher\Portal\Extras\Overlay\EOSOverlayVkLayer-Win64.json" from registry "HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ImplicitLayers"
+[2m2026-01-20T01:45:44.732581Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732659Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x64.json (file version 1.0.1)
+[2m2026-01-20T01:45:44.732675Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732729Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x86.json (file version 1.0.1)
+[2m2026-01-20T01:45:44.732741Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732785Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\WINDOWS\System32\DriverStore\FileRepository\nvmii.inf_amd64_e9fa27eaab64efe4\nv-vk64.json (file version 1.0.1)
+[2m2026-01-20T01:45:44.732797Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732853Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\ProgramData\GOG.com\Galaxy\redists\overlay\injected\galaxy_overlay_vklayer_x64.json (file version 1.0.1)
+[2m2026-01-20T01:45:44.732865Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732874Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Layer name GalaxyOverlayVkLayer does not conform to naming standard (Policy #LLP_LAYER_3)
+[2m2026-01-20T01:45:44.732884Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732896Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Layer name GalaxyOverlayVkLayer_VERBOSE does not conform to naming standard (Policy #LLP_LAYER_3)
+[2m2026-01-20T01:45:44.732905Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732917Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Layer name GalaxyOverlayVkLayer_DEBUG does not conform to naming standard (Policy #LLP_LAYER_3)
+[2m2026-01-20T01:45:44.732926Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.732970Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files (x86)\Steam\SteamOverlayVulkanLayer64.json (file version 1.0.0)
+[2m2026-01-20T01:45:44.732982Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733022Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files (x86)\Steam\SteamFossilizeVulkanLayer64.json (file version 1.0.0)
+[2m2026-01-20T01:45:44.733034Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733081Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files\RenderDoc\renderdoc.json (file version 1.1.2)
+[2m2026-01-20T01:45:44.733094Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733142Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\ProgramData\obs-studio-hook\obs-vulkan64.json (file version 1.1.2)
+[2m2026-01-20T01:45:44.733153Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733192Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\ProgramData\obs-studio-hook\obs-vulkan32.json (file version 1.1.2)
+[2m2026-01-20T01:45:44.733204Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733247Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files (x86)\Epic Games\Launcher\Portal\Extras\Overlay\EOSOverlayVkLayer-Win32.json (file version 1.1.2)
+[2m2026-01-20T01:45:44.733259Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733302Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found manifest file C:\Program Files (x86)\Epic Games\Launcher\Portal\Extras\Overlay\EOSOverlayVkLayer-Win64.json (file version 1.1.2)
+[2m2026-01-20T01:45:44.733314Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733335Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Checking for Layer Manifest files in Registry at HKEY_LOCAL_MACHINE\SOFTWARE\Khronos\Vulkan\ExplicitLayers
+[2m2026-01-20T01:45:44.733344Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733746Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: opening device ROOT\DISPLAY\0000
+[2m2026-01-20T01:45:44.733799Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733845Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_entry: Device ID(2) Does not contain a value for "VulkanExplicitLayers"
+[2m2026-01-20T01:45:44.733857Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733873Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: unable to open child-device error:13
+[2m2026-01-20T01:45:44.733888Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733917Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: opening device PCI\VEN_10DE&DEV_2717&SUBSYS_140C1462&REV_A1\4&32f542c9&0&0008
+[2m2026-01-20T01:45:44.733929Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733949Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_entry: Device ID(1) Does not contain a value for "VulkanExplicitLayers"
+[2m2026-01-20T01:45:44.733960Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.733973Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: unable to open child-device error:13
+[2m2026-01-20T01:45:44.733982Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734009Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: opening device PCI\VEN_8086&DEV_A788&SUBSYS_140C1462&REV_04\3&11583659&1&10
+[2m2026-01-20T01:45:44.734066Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734090Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_entry: Device ID(4) Does not contain a value for "VulkanExplicitLayers"
+[2m2026-01-20T01:45:44.734103Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734120Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: Opening child device 5 - SWD\DRIVERENUM\IGCC&4&3AB00BAC&0
+[2m2026-01-20T01:45:44.734129Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734160Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_entry: Device ID(5) Does not contain a value for "VulkanExplicitLayers"
+[2m2026-01-20T01:45:44.734171Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734188Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: Opening child device 6 - DISPLAY\AUOC5AC\4&3AB00BAC&0&UID8388688
+[2m2026-01-20T01:45:44.734197Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734213Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_get_device_registry_files: found no registry files
+[2m2026-01-20T01:45:44.734221Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734276Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Found no registry files in HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ExplicitLayers
+[2m2026-01-20T01:45:44.734286Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734294Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	windows_read_data_files_in_registry: Registry lookup failed to get layer manifest files.
+[2m2026-01-20T01:45:44.734303Z[0m [33m WARN[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734585Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	Searching for driver manifest files
+[2m2026-01-20T01:45:44.734597Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734605Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	   In following locations:
+[2m2026-01-20T01:45:44.734630Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.734637Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe
+[2m2026-01-20T01:45:44.734646Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.735103Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	   Found the following files:
+[2m2026-01-20T01:45:44.735124Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.735133Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x64.json
+[2m2026-01-20T01:45:44.735144Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.735152Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	      C:\Program Files\WindowsApps\Microsoft.D3DMappingLayers_1.2601.1.0_x64__8wekyb3d8bbwe\dzn_icd.x86.json
+[2m2026-01-20T01:45:44.735161Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x18bfd5acf30, name: ?)
+[2m2026-01-20T01:45:44.735169Z[0m [32m INFO[0m [1mnew[0m[2m:[0m[1mwgpu_backend_init[0m[2m:[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]

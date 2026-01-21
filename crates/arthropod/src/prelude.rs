@@ -3,8 +3,9 @@
 //! This module re-exports the most commonly used types and traits.
 //! Import with `use arthropod::prelude::*;` to get started quickly.
 
-// App builder
-pub use crate::app::{App, AppBuilder, AppError};
+// App builder and context
+pub use crate::app::{App, AppBuilder, AppContext, AppError};
+pub use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 
 // ECS integration
 pub use arthropod_ecs::{
