@@ -1,5 +1,7 @@
 //! Rendering backends.
 
+#[cfg(target_os = "windows")]
+pub mod composition_swap_chain;
 pub mod text;
 mod wgpu_backend;
 
