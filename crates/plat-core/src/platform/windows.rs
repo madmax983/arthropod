@@ -1,5 +1,7 @@
 //! Windows platform implementation using Win32 APIs.
 
+pub mod composition;
+
 use crate::{
     Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent,
     WindowId,
