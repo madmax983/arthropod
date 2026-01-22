@@ -42,10 +42,45 @@ impl CompositionDevice {
         }
     }
 
+    /// Creates a composition target bound to a window handle.
+    ///
+    /// This target is where the composition visual tree will be rendered.
+    pub fn create_target_for_hwnd(&self, hwnd: HWND) -> Result<CompositionTarget> {
+        unsafe {
+            let target = self.device.CreateTargetForHwnd(hwnd, true)?;
+            Ok(CompositionTarget { target })
+        }
+    }
+
     /// Returns the underlying IDCompositionDesktopDevice.
     pub fn raw_device(&self) -> &IDCompositionDesktopDevice {
         &self.device
     }
+}
+
+/// Wrapper around IDCompositionTarget for a window.
+pub struct CompositionTarget {
+    target: IDCompositionTarget,
+}
+
+impl CompositionTarget {
+    /// Sets the root visual for this target.
+    pub fn set_root(&self, visual: &CompositionVisual) -> Result<()> {
+        unsafe {
+            self.target.SetRoot(&visual.visual)?;
+            Ok(())
+        }
+    }
+
+    /// Returns the underlying IDCompositionTarget.
+    pub fn raw_target(&self) -> &IDCompositionTarget {
+        &self.target
+    }
+}
+
+// Forward declaration placeholder for CompositionVisual (will be implemented in next task)
+pub struct CompositionVisual {
+    visual: IDCompositionVisual2,
 }
 
 /// Creates a DXGI device for DirectComposition.
@@ -78,17 +113,72 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Win32::{
+        System::LibraryLoader::*,
+        UI::WindowsAndMessaging::*,
+    };
 
     #[test]
     fn test_composition_device_creation() {
         // COM must be initialized for DirectComposition
         unsafe {
-            CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok();
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 
             let device = CompositionDevice::new();
             assert!(device.is_ok(), "Failed to create DirectComposition device");
 
             CoUninitialize();
         }
+    }
+
+    #[test]
+    fn test_composition_target_creation() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+
+            // Create a test window (minimal Win32 window)
+            let hwnd = create_test_window();
+
+            let device = CompositionDevice::new().unwrap();
+            let target = device.create_target_for_hwnd(hwnd);
+            assert!(target.is_ok(), "Failed to create composition target");
+
+            let _ = DestroyWindow(hwnd);
+            CoUninitialize();
+        }
+    }
+
+    // Minimal wndproc for test window
+    unsafe extern "system" fn test_wndproc(
+        hwnd: HWND,
+        msg: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+
+    // Helper to create minimal test window
+    unsafe fn create_test_window() -> HWND {
+        let class_name = w!("TestWindow");
+        let hinstance: HINSTANCE = GetModuleHandleW(None).unwrap().into();
+        let wc = WNDCLASSW {
+            lpfnWndProc: Some(test_wndproc),
+            lpszClassName: class_name,
+            hInstance: hinstance,
+            ..Default::default()
+        };
+        let _ = RegisterClassW(&wc);
+
+        CreateWindowExW(
+            WINDOW_EX_STYLE::default(),
+            class_name,
+            w!("Test"),
+            WS_OVERLAPPEDWINDOW,
+            0, 0, 100, 100,
+            None, None,
+            Some(hinstance),
+            None,
+        ).unwrap()
     }
 }
