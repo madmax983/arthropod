@@ -3008,6 +3008,7 @@ name = "theme-engine"
 version = "0.1.0"
 dependencies = [
  "glam",
+ "plat-core",
  "thiserror 2.0.17",
  "windows 0.58.0",
 ]

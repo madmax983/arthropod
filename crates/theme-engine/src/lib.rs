@@ -16,12 +16,16 @@
 //! ```
 
 pub mod design_tokens;
+pub mod material_bridge;
 pub mod style_macro;
 pub mod system_theme;
 
 pub use design_tokens::{DesignTokens, TokenValue};
 pub use style_macro::{Padding, Style};
 pub use system_theme::{BackgroundMaterial, MacOSMaterial, SystemTheme, WindowsMaterial};
+
+// Re-export BackdropMaterial for convenience
+pub use plat_core::BackdropMaterial;
 
 /// Common color type
 pub type Color = glam::Vec4;

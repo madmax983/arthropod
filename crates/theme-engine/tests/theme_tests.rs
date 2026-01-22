@@ -2,7 +2,7 @@
 //!
 //! Following TDD: These tests are written BEFORE implementation
 
-use theme_engine::{BackgroundMaterial, Color, DesignTokens, SystemTheme};
+use theme_engine::{BackgroundMaterial, DesignTokens, SystemTheme};
 
 #[test]
 #[cfg(target_os = "windows")]
@@ -85,7 +85,7 @@ fn test_windows_material_types() {
     let theme = SystemTheme::query().expect("Should query system theme");
 
     // Should expose available materials
-    assert!(theme.available_materials.len() > 0);
+    assert!(!theme.available_materials.is_empty());
 
     // Should include at least Acrylic (available on Win10+)
     let has_acrylic = theme
