@@ -16,10 +16,14 @@ use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
     Win32::Foundation::*,
-    Win32::Graphics::Dwm::{DWMWA_SYSTEMBACKDROP_TYPE, DwmSetWindowAttribute},
+    Win32::Graphics::Dwm::{
+        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE,
+        DWMWA_USE_IMMERSIVE_DARK_MODE,
+    },
     Win32::Graphics::Gdi::*,
     Win32::System::LibraryLoader::GetModuleHandleW,
     Win32::System::Threading::INFINITE,
+    Win32::UI::Controls::MARGINS,
     Win32::UI::WindowsAndMessaging::*,
     core::*,
 };
@@ -235,6 +239,17 @@ impl HasBackdropMaterial for WindowImpl {
         // Try to set, store material value regardless of success
         // (graceful degradation on older Windows versions)
         unsafe {
+            // Step 1: Enable immersive dark mode (required for Mica on some Windows 11 builds)
+            // This tells DWM that the window wants to participate in the system backdrop
+            let dark_mode: i32 = 1; // TRUE
+            let _ = DwmSetWindowAttribute(
+                self.hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                &dark_mode as *const _ as *const _,
+                std::mem::size_of::<i32>() as u32,
+            );
+
+            // Step 2: Set the system backdrop type
             let value = backdrop_type as i32;
             let _ = DwmSetWindowAttribute(
                 self.hwnd,
@@ -242,6 +257,18 @@ impl HasBackdropMaterial for WindowImpl {
                 &value as *const _ as *const _,
                 std::mem::size_of::<i32>() as u32,
             );
+
+            // Step 3: Extend the frame into the client area to allow backdrop to show
+            // Using -1 margins tells DWM to extend the frame across the entire window
+            if !matches!(material, BackdropMaterial::None) {
+                let margins = MARGINS {
+                    cxLeftWidth: -1,
+                    cxRightWidth: -1,
+                    cyTopHeight: -1,
+                    cyBottomHeight: -1,
+                };
+                let _ = DwmExtendFrameIntoClientArea(self.hwnd, &margins);
+            }
         }
 
         // Store the material value (0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
