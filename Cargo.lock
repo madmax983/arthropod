@@ -220,6 +220,7 @@ dependencies = [
  "render-engine",
  "serde_json",
  "text-engine",
+ "theme-engine",
  "tracing",
  "tracing-subscriber",
  "widget-core",

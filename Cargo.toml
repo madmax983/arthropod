@@ -105,6 +105,10 @@ path = "examples/widget_gallery.rs"
 name = "macro_demo"
 path = "examples/macro_demo.rs"
 
+[[example]]
+name = "native_materials"
+path = "examples/native_materials.rs"
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
@@ -117,6 +121,7 @@ glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
 arthropod-mcp = { path = "crates/arthropod-mcp" }
+theme-engine = { path = "crates/theme-engine" }
 env_logger.workspace = true
 tracing.workspace = true
 serde_json = "1.0"
