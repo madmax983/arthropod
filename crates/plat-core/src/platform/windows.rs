@@ -122,9 +122,18 @@ impl WindowImpl {
                 .chain(std::iter::once(0))
                 .collect();
 
+            // Note: WS_EX_NOREDIRECTIONBITMAP is NOT used here because it doesn't
+            // work well with wgpu/D3D12 swap chains. Instead, we rely on:
+            // 1. DwmSetWindowAttribute with DWMWA_SYSTEMBACKDROP_TYPE for Mica
+            // 2. DwmExtendFrameIntoClientArea to extend the frame
+            // 3. Transparent clear color in the renderer
+            // The Mica effect will show in the title bar; full client-area transparency
+            // requires additional work with composition swap chains.
+            let ex_style = WINDOW_EX_STYLE::default();
+
             // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
             let hwnd = CreateWindowExW(
-                WINDOW_EX_STYLE::default(),
+                ex_style,
                 class_name,
                 PCWSTR(title.as_ptr()),
                 WS_OVERLAPPEDWINDOW,

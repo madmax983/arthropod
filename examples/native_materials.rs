@@ -1,12 +1,24 @@
 //! Example: Native Materials (Mica/Acrylic)
 //!
 //! Demonstrates platform-native backdrop materials on Windows 11.
-//! The Mica effect shows the desktop wallpaper through the window background.
+//!
+//! ## What Works
+//!
+//! - **Title bar Mica**: The window title bar shows the Mica effect, blending
+//!   with your desktop wallpaper colors. This is the standard Windows 11 behavior.
+//!
+//! ## Current Limitations
+//!
+//! - **Client area Mica**: Full client-area transparency with Mica requires
+//!   DirectComposition swap chains, which wgpu doesn't currently expose.
+//!   The GPU-rendered content appears opaque even with transparent clear color.
+//!
+//! This is a known limitation of wgpu + DWM integration. Native Windows apps
+//! using WinUI 3 or UWP achieve full Mica through special compositor APIs.
 //!
 //! Run with: cargo run --example native_materials
 //!
-//! Note: Mica requires Windows 11. On Windows 10, it will fall back gracefully.
-//! On other platforms, you'll see a solid background.
+//! Note: Mica requires Windows 11. On Windows 10, it falls back gracefully.
 
 use plat_core::{
     Application, BackdropMaterial, ControlFlow, Event, EventLoop, HasBackdropMaterial, Rect, Size,
@@ -82,20 +94,24 @@ impl Application for MaterialApp {
         let mut backend =
             WgpuBackend::new(&window, size.width, size.height).expect("Failed to create backend");
 
-        // IMPORTANT: Use transparent clear color to show Mica backdrop through
-        // Without this, the GPU clear color would obscure the system material
-        backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 0.0));
+        // Note: We set a transparent clear color, but full client-area Mica
+        // requires DirectComposition swap chains. With standard wgpu swap chains,
+        // the alpha channel isn't composited with DWM's backdrop.
+        // Title bar Mica still works via DwmSetWindowAttribute.
+        backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 1.0)); // Solid black for now
 
         // Create scene with semi-transparent cards to demonstrate Mica effect
         let scene = create_demo_scene(&tokens);
 
         println!();
         println!("You should see:");
-        println!("  - Desktop wallpaper bleeding through (Windows 11 Mica)");
-        println!("  - Semi-transparent cards with theme-aware colors");
+        println!("  - Title bar with Mica effect (blends with desktop wallpaper)");
+        println!("  - Theme-aware colored cards using DesignTokens");
         println!("  - Accent-colored card using system accent color");
         println!();
-        println!("Try moving the window to see the Mica effect update!");
+        println!("Note: Full client-area Mica requires DirectComposition APIs");
+        println!("      which wgpu doesn't currently expose. The title bar Mica");
+        println!("      demonstrates the DWM integration is working.");
 
         Self {
             window,

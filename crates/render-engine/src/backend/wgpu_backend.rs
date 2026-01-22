@@ -87,9 +87,15 @@ impl WgpuBackend {
         let _span = span!(Level::INFO, "wgpu_backend_init").entered();
 
         // Create wgpu instance with validation enabled in debug builds
-        info!("Creating wgpu instance");
+        // On Windows, prefer D3D12 over Vulkan for proper DWM alpha composition (Mica/Acrylic)
+        #[cfg(target_os = "windows")]
+        let backends = wgpu::Backends::DX12;
+        #[cfg(not(target_os = "windows"))]
+        let backends = wgpu::Backends::PRIMARY;
+
+        info!("Creating wgpu instance with backends: {:?}", backends);
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
+            backends,
             flags: if cfg!(debug_assertions) {
                 wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
             } else {
@@ -157,14 +163,10 @@ impl WgpuBackend {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
 
-        // Prefer PreMultiplied alpha for transparent windows (Mica/Acrylic backdrop)
-        // Fall back to first available mode if PreMultiplied isn't supported
-        let alpha_mode = surface_caps
-            .alpha_modes
-            .iter()
-            .copied()
-            .find(|m| *m == wgpu::CompositeAlphaMode::PreMultiplied)
-            .unwrap_or(surface_caps.alpha_modes[0]);
+        // Note: PreMultiplied alpha mode is preferred for transparency, but
+        // full client-area transparency with DWM (Mica) requires DirectComposition
+        // swap chains which wgpu doesn't expose. Title bar Mica still works.
+        let alpha_mode = surface_caps.alpha_modes[0];
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
