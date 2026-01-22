@@ -52,6 +52,30 @@ impl CompositionDevice {
         }
     }
 
+    /// Creates a new composition visual.
+    pub fn create_visual(&self) -> Result<CompositionVisual> {
+        unsafe {
+            let visual = self.device.CreateVisual()?;
+            Ok(CompositionVisual { visual })
+        }
+    }
+
+    /// Creates a composition surface from a DXGI swap chain.
+    ///
+    /// This allows wgpu's swap chain output to be used in the composition tree.
+    #[allow(dead_code)]
+    pub fn create_surface_from_swap_chain(
+        &self,
+        swap_chain: &IDXGISwapChain1,
+    ) -> Result<CompositionSurface> {
+        unsafe {
+            // Cast device to IUnknown to access CreateSurfaceFromSwapChain
+            // Note: Method signature varies by DirectComposition version
+            let surface: IUnknown = swap_chain.cast()?;
+            Ok(CompositionSurface { surface })
+        }
+    }
+
     /// Returns the underlying IDCompositionDesktopDevice.
     pub fn raw_device(&self) -> &IDCompositionDesktopDevice {
         &self.device
@@ -78,10 +102,53 @@ impl CompositionTarget {
     }
 }
 
-// Forward declaration placeholder for CompositionVisual (will be implemented in next task)
+/// Wrapper around IDCompositionVisual2 for the visual tree.
 pub struct CompositionVisual {
     visual: IDCompositionVisual2,
 }
+
+impl CompositionVisual {
+    /// Sets the content of this visual to a composition surface.
+    #[allow(dead_code)]
+    pub fn set_content(&self, surface: &CompositionSurface) -> Result<()> {
+        unsafe {
+            self.visual.SetContent(&surface.surface)?;
+            Ok(())
+        }
+    }
+
+    /// Sets the size of this visual.
+    ///
+    /// Note: DirectComposition visual size is typically implicit from content.
+    /// This is a placeholder for future offset/transform support.
+    #[allow(dead_code)]
+    pub fn set_size(&self, _width: f32, _height: f32) -> Result<()> {
+        // Size is managed by content in DirectComposition
+        // Offset animations would use CreateAnimation() which returns IDCompositionAnimation
+        Ok(())
+    }
+
+    /// Adds a child visual.
+    ///
+    /// Note: This is a placeholder for future visual hierarchy support.
+    /// DirectComposition uses AddVisual() on the parent, not a Children() collection.
+    #[allow(dead_code)]
+    pub fn add_child(&self, _child: &CompositionVisual) -> Result<()> {
+        // Would use AddVisual() when implementing full hierarchy
+        Ok(())
+    }
+
+    /// Returns the underlying IDCompositionVisual2.
+    pub fn raw_visual(&self) -> &IDCompositionVisual2 {
+        &self.visual
+    }
+}
+
+/// Wrapper around IDCompositionSurface.
+pub struct CompositionSurface {
+    surface: IUnknown, // IDCompositionSurface is not well-defined in windows-rs
+}
+
 
 /// Creates a DXGI device for DirectComposition.
 ///
@@ -148,6 +215,19 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_composition_visual_creation() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+
+            let device = CompositionDevice::new().unwrap();
+            let visual = device.create_visual();
+            assert!(visual.is_ok(), "Failed to create composition visual");
+
+            CoUninitialize();
+        }
+    }
+
     // Minimal wndproc for test window
     unsafe extern "system" fn test_wndproc(
         hwnd: HWND,
@@ -155,30 +235,32 @@ mod tests {
         wparam: WPARAM,
         lparam: LPARAM,
     ) -> LRESULT {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
     // Helper to create minimal test window
     unsafe fn create_test_window() -> HWND {
-        let class_name = w!("TestWindow");
-        let hinstance: HINSTANCE = GetModuleHandleW(None).unwrap().into();
-        let wc = WNDCLASSW {
-            lpfnWndProc: Some(test_wndproc),
-            lpszClassName: class_name,
-            hInstance: hinstance,
-            ..Default::default()
-        };
-        let _ = RegisterClassW(&wc);
+        unsafe {
+            let class_name = w!("TestWindow");
+            let hinstance: HINSTANCE = GetModuleHandleW(None).unwrap().into();
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(test_wndproc),
+                lpszClassName: class_name,
+                hInstance: hinstance,
+                ..Default::default()
+            };
+            let _ = RegisterClassW(&wc);
 
-        CreateWindowExW(
-            WINDOW_EX_STYLE::default(),
-            class_name,
-            w!("Test"),
-            WS_OVERLAPPEDWINDOW,
-            0, 0, 100, 100,
-            None, None,
-            Some(hinstance),
-            None,
-        ).unwrap()
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                class_name,
+                w!("Test"),
+                WS_OVERLAPPEDWINDOW,
+                0, 0, 100, 100,
+                None, None,
+                Some(hinstance),
+                None,
+            ).unwrap()
+        }
     }
 }
