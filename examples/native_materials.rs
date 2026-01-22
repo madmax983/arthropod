@@ -1,24 +1,29 @@
 //! Example: Native Materials (Mica/Acrylic)
 //!
-//! Demonstrates platform-native backdrop materials on Windows 11.
+//! Demonstrates platform-native backdrop materials on Windows 11 using the
+//! window-vibrancy crate for full-window effects.
 //!
-//! ## What Works
+//! ## How It Works
 //!
-//! - **Title bar Mica**: The window title bar shows the Mica effect, blending
-//!   with your desktop wallpaper colors. This is the standard Windows 11 behavior.
+//! - **window-vibrancy**: Applies Mica/Acrylic to the entire window via DWM APIs
+//! - **Semi-transparent rendering**: wgpu content with alpha < 1.0 shows backdrop through
+//! - **Uniform effect**: The backdrop applies to the whole window (not selective areas)
 //!
-//! ## Current Limitations
+//! ## What You'll See
 //!
-//! - **Client area Mica**: Full client-area transparency with Mica requires
-//!   DirectComposition swap chains, which wgpu doesn't currently expose.
-//!   The GPU-rendered content appears opaque even with transparent clear color.
+//! - Desktop wallpaper blurred/tinted behind the window
+//! - Semi-transparent cards showing Mica/Acrylic effect through them
+//! - Theme-aware colors from DesignTokens
 //!
-//! This is a known limitation of wgpu + DWM integration. Native Windows apps
-//! using WinUI 3 or UWP achieve full Mica through special compositor APIs.
+//! ## Future: DirectComposition (Option 3)
+//!
+//! For selective transparency (Mica in some areas, solid in others), we'll need
+//! DirectComposition integration to composite wgpu output onto a compositor visual tree.
+//! This is planned as the next enhancement.
 //!
 //! Run with: cargo run --example native_materials
 //!
-//! Note: Mica requires Windows 11. On Windows 10, it falls back gracefully.
+//! Note: Mica requires Windows 11. On Windows 10, falls back to Acrylic blur.
 
 use plat_core::{
     Application, BackdropMaterial, ControlFlow, Event, EventLoop, HasBackdropMaterial, Rect, Size,
@@ -94,24 +99,26 @@ impl Application for MaterialApp {
         let mut backend =
             WgpuBackend::new(&window, size.width, size.height).expect("Failed to create backend");
 
-        // Note: We set a transparent clear color, but full client-area Mica
-        // requires DirectComposition swap chains. With standard wgpu swap chains,
-        // the alpha channel isn't composited with DWM's backdrop.
-        // Title bar Mica still works via DwmSetWindowAttribute.
-        backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 1.0)); // Solid black for now
+        // IMPORTANT: Use semi-transparent clear color to show Mica backdrop through.
+        // With window-vibrancy applying the effect to the entire window,
+        // any transparent pixels in our rendered content will show the backdrop.
+        // Alpha 0.5 = 50% transparent, letting Mica blend through nicely.
+        backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 0.5));
 
         // Create scene with semi-transparent cards to demonstrate Mica effect
         let scene = create_demo_scene(&tokens);
 
         println!();
         println!("You should see:");
-        println!("  - Title bar with Mica effect (blends with desktop wallpaper)");
-        println!("  - Theme-aware colored cards using DesignTokens");
+        println!("  - Desktop wallpaper blurred/tinted behind the window (Mica)");
+        println!("  - Semi-transparent cards showing backdrop effect through them");
+        println!("  - Theme-aware colors using DesignTokens");
         println!("  - Accent-colored card using system accent color");
         println!();
-        println!("Note: Full client-area Mica requires DirectComposition APIs");
-        println!("      which wgpu doesn't currently expose. The title bar Mica");
-        println!("      demonstrates the DWM integration is working.");
+        println!("Implementation: window-vibrancy applies effect to entire window,");
+        println!("               semi-transparent wgpu rendering shows it through.");
+        println!();
+        println!("Try moving the window over different desktop areas!");
 
         Self {
             window,

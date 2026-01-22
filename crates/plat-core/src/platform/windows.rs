@@ -16,14 +16,9 @@ use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
     Win32::Foundation::*,
-    Win32::Graphics::Dwm::{
-        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE,
-        DWMWA_USE_IMMERSIVE_DARK_MODE,
-    },
     Win32::Graphics::Gdi::*,
     Win32::System::LibraryLoader::GetModuleHandleW,
     Win32::System::Threading::INFINITE,
-    Win32::UI::Controls::MARGINS,
     Win32::UI::WindowsAndMessaging::*,
     core::*,
 };
@@ -212,72 +207,36 @@ impl Drop for WindowImpl {
     }
 }
 
-/// DWM (Desktop Window Manager) backdrop type constants.
-/// These map to DWMWA_SYSTEMBACKDROP_TYPE values.
-mod dwm {
-    /// DWM system backdrop types for Windows 11.
-    /// DWMWA_SYSTEMBACKDROP_TYPE = 38
-    #[repr(i32)]
-    #[derive(Debug, Clone, Copy)]
-    #[allow(dead_code)]
-    pub enum SystemBackdropType {
-        /// Let the Desktop Window Manager automatically decide the system-drawn backdrop material.
-        Auto = 0,
-        /// Do not draw any system backdrop.
-        None = 1,
-        /// Draw the backdrop material effect corresponding to a long-lived window (Mica).
-        Mica = 2,
-        /// Draw the backdrop material effect corresponding to a transient window (Acrylic).
-        Acrylic = 3,
-        /// Draw the backdrop material effect corresponding to a window with a tabbed title bar (Mica Alt).
-        MicaAlt = 4,
-    }
-}
-
 impl HasBackdropMaterial for WindowImpl {
     fn set_backdrop_material(&self, material: BackdropMaterial) {
-        use dwm::SystemBackdropType;
-
-        let backdrop_type = match material {
-            BackdropMaterial::None => SystemBackdropType::None,
-            BackdropMaterial::Mica => SystemBackdropType::Mica,
-            BackdropMaterial::MicaAlt => SystemBackdropType::MicaAlt,
-            BackdropMaterial::Acrylic => SystemBackdropType::Acrylic,
+        // Use window-vibrancy crate for full-window backdrop effects
+        // This applies the effect to the entire window via DWM, allowing
+        // semi-transparent wgpu content to show the backdrop through.
+        //
+        // Note: This is a window-level effect. For selective transparency
+        // (Mica in some areas, solid in others), we'll need DirectComposition
+        // integration in the future.
+        let result = match material {
+            BackdropMaterial::None => {
+                // Clear all effects
+                window_vibrancy::clear_mica(self)
+                    .and_then(|_| window_vibrancy::clear_acrylic(self))
+            }
+            BackdropMaterial::Mica | BackdropMaterial::MicaAlt => {
+                // Apply Mica effect (Windows 11)
+                // None means use default system theme colors
+                window_vibrancy::apply_mica(self, None)
+            }
+            BackdropMaterial::Acrylic => {
+                // Apply Acrylic effect with subtle dark tint
+                // RGBA: (18, 18, 18, 200) = dark gray with 78% opacity
+                window_vibrancy::apply_acrylic(self, Some((18, 18, 18, 200)))
+            }
         };
 
-        // Try to set, store material value regardless of success
-        // (graceful degradation on older Windows versions)
-        unsafe {
-            // Step 1: Enable immersive dark mode (required for Mica on some Windows 11 builds)
-            // This tells DWM that the window wants to participate in the system backdrop
-            let dark_mode: i32 = 1; // TRUE
-            let _ = DwmSetWindowAttribute(
-                self.hwnd,
-                DWMWA_USE_IMMERSIVE_DARK_MODE,
-                &dark_mode as *const _ as *const _,
-                std::mem::size_of::<i32>() as u32,
-            );
-
-            // Step 2: Set the system backdrop type
-            let value = backdrop_type as i32;
-            let _ = DwmSetWindowAttribute(
-                self.hwnd,
-                DWMWA_SYSTEMBACKDROP_TYPE,
-                &value as *const _ as *const _,
-                std::mem::size_of::<i32>() as u32,
-            );
-
-            // Step 3: Extend the frame into the client area to allow backdrop to show
-            // Using -1 margins tells DWM to extend the frame across the entire window
-            if !matches!(material, BackdropMaterial::None) {
-                let margins = MARGINS {
-                    cxLeftWidth: -1,
-                    cxRightWidth: -1,
-                    cyTopHeight: -1,
-                    cyBottomHeight: -1,
-                };
-                let _ = DwmExtendFrameIntoClientArea(self.hwnd, &margins);
-            }
+        // Log errors but don't fail - graceful degradation on older Windows
+        if let Err(e) = result {
+            log::warn!("Failed to apply backdrop material {:?}: {}", material, e);
         }
 
         // Store the material value (0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
