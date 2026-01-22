@@ -10,10 +10,12 @@
 //! - macOS (Cocoa via objc2)
 
 mod input;
+mod materials;
 mod platform;
 mod window;
 
 pub use input::*;
+pub use materials::*;
 pub use window::*;
 
 use thiserror::Error;
