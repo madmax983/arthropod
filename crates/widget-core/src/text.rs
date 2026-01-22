@@ -35,7 +35,7 @@ pub struct Text {
     font_size: f32,
 
     #[param]
-    color: Vec4,
+    color: Option<Vec4>,
 }
 
 enum TextContent {
@@ -49,7 +49,7 @@ impl Text {
         Self {
             content: TextContent::Static(content.into()),
             font_size: 16.0,
-            color: Vec4::new(0.0, 0.0, 0.0, 1.0),
+            color: None, // Use theme default
         }
     }
 
@@ -58,7 +58,7 @@ impl Text {
         Self {
             content: TextContent::Reactive(signal),
             font_size: 16.0,
-            color: Vec4::new(0.0, 0.0, 0.0, 1.0),
+            color: None, // Use theme default
         }
     }
 
@@ -70,13 +70,22 @@ impl Text {
 
     /// Set text color
     pub fn color(mut self, color: Vec4) -> Self {
-        self.color = color;
+        self.color = Some(color);
         self
     }
 }
 
 impl Widget for Text {
     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+        // Resolve color: explicit > theme > hardcoded fallback
+        let resolved_color = match self.color {
+            Some(c) => c,
+            None => ctx
+                .design_tokens()
+                .map(|t| t.text_primary)
+                .unwrap_or(Vec4::new(0.0, 0.0, 0.0, 1.0)),
+        };
+
         // Get text content
         let text_string = match &self.content {
             TextContent::Static(s) => s.clone(),
@@ -92,7 +101,12 @@ impl Widget for Text {
             NodeContent::Text {
                 text: text_string,
                 font_size: self.font_size,
-                color: Color::rgba(self.color.x, self.color.y, self.color.z, self.color.w),
+                color: Color::rgba(
+                    resolved_color.x,
+                    resolved_color.y,
+                    resolved_color.z,
+                    resolved_color.w,
+                ),
             },
         )
     }
