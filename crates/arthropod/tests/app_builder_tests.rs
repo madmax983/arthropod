@@ -76,6 +76,7 @@ fn test_app_spawn_with_reactive_components() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -132,6 +133,7 @@ fn test_app_render_without_backend() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -179,10 +181,8 @@ fn test_integrate_widgets_transfers_layout_styles() {
     let mut widget_ctx = WidgetContext::new_test();
 
     // Create a node in widget context and set layout style
-    let widget_node = widget_ctx.create_node(
-        widget_ctx.root(),
-        NodeContent::Rect { color: Color::RED },
-    );
+    let widget_node =
+        widget_ctx.create_node(widget_ctx.root(), NodeContent::Rect { color: Color::RED });
     widget_ctx.set_layout_style(widget_node, FlexStyle::default());
 
     // Create app
@@ -204,6 +204,7 @@ fn test_integrate_widgets_transfers_layout_styles() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -226,30 +227,34 @@ fn test_integrate_widgets_transfers_layout_styles() {
         .iter(app.world())
         .any(|(scene_ref, _)| scene_ref.0 == app_node);
 
-    assert!(has_layout, "Entity should have LayoutStyle component after integration");
+    assert!(
+        has_layout,
+        "Entity should have LayoutStyle component after integration"
+    );
 }
 
 #[test]
 fn test_integrate_widgets_transfers_clickables() {
     use std::collections::HashMap;
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use widget_core::WidgetContext;
 
     let mut widget_ctx = WidgetContext::new_test();
 
     // Create a clickable node
-    let widget_node = widget_ctx.create_node(
-        widget_ctx.root(),
-        NodeContent::Rect { color: Color::BLUE },
-    );
+    let widget_node =
+        widget_ctx.create_node(widget_ctx.root(), NodeContent::Rect { color: Color::BLUE });
 
     // Add clickable with a callback we can verify
     let clicked = Arc::new(AtomicBool::new(false));
     let clicked_clone = clicked.clone();
-    widget_ctx.add_clickable(widget_node, Arc::new(move || {
-        clicked_clone.store(true, Ordering::SeqCst);
-    }));
+    widget_ctx.add_clickable(
+        widget_node,
+        Arc::new(move || {
+            clicked_clone.store(true, Ordering::SeqCst);
+        }),
+    );
 
     // Create app and copy node
     let mut app = AppBuilder::new()
@@ -269,6 +274,7 @@ fn test_integrate_widgets_transfers_clickables() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -290,12 +296,18 @@ fn test_integrate_widgets_transfers_clickables() {
         .find(|(scene_ref, _)| scene_ref.0 == app_node)
         .map(|(_, c)| c.callback.clone());
 
-    assert!(clickable.is_some(), "Entity should have Clickable component");
+    assert!(
+        clickable.is_some(),
+        "Entity should have Clickable component"
+    );
 
     // Invoke the callback and verify it works
     if let Some(callback) = clickable {
         callback();
-        assert!(clicked.load(Ordering::SeqCst), "Clickable callback should have been invoked");
+        assert!(
+            clicked.load(Ordering::SeqCst),
+            "Clickable callback should have been invoked"
+        );
     }
 }
 
@@ -310,7 +322,9 @@ fn test_integrate_widgets_transfers_background_colors() {
     // Create a node with background color
     let widget_node = widget_ctx.create_node(
         widget_ctx.root(),
-        NodeContent::Rect { color: Color::GREEN },
+        NodeContent::Rect {
+            color: Color::GREEN,
+        },
     );
     widget_ctx.set_background_color(widget_node, Vec4::new(0.5, 0.5, 0.5, 1.0));
 
@@ -326,12 +340,15 @@ fn test_integrate_widgets_transfers_background_colors() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::GREEN },
+                content: NodeContent::Rect {
+                    color: Color::GREEN,
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect::default(),
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -353,7 +370,13 @@ fn test_integrate_widgets_transfers_background_colors() {
         .find(|(scene_ref, _)| scene_ref.0 == app_node)
         .map(|(_, bg)| bg.0);
 
-    assert!(bg_color.is_some(), "Entity should have BackgroundColor component");
+    assert!(
+        bg_color.is_some(),
+        "Entity should have BackgroundColor component"
+    );
     let color = bg_color.unwrap();
-    assert!((color.x - 0.5).abs() < 0.001, "Background color R should be 0.5");
+    assert!(
+        (color.x - 0.5).abs() < 0.001,
+        "Background color R should be 0.5"
+    );
 }

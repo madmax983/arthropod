@@ -51,6 +51,7 @@ impl Application for TestApp {
                     height: 200.0,
                 },
                 children: vec![],
+                parent: None,
                 visible: true,
                 opacity: 1.0,
             };

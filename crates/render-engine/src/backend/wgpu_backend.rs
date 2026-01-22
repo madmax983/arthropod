@@ -341,40 +341,41 @@ impl WgpuBackend {
         });
 
         // Create bind group layout for glyphs (globals + texture + sampler)
-        let glyph_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Glyph Bind Group Layout"),
-            entries: &[
-                // Globals uniform buffer
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+        let glyph_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Glyph Bind Group Layout"),
+                entries: &[
+                    // Globals uniform buffer
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                // Glyph texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+                    // Glyph texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                // Glyph sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    // Glyph sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         // Create bind group for glyphs
         let glyph_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -404,11 +405,12 @@ impl WgpuBackend {
         });
 
         // Create glyph pipeline
-        let glyph_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Glyph Pipeline Layout"),
-            bind_group_layouts: &[&glyph_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let glyph_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Glyph Pipeline Layout"),
+                bind_group_layouts: &[&glyph_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let glyph_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GlyphInstance>() as u64,
@@ -460,7 +462,8 @@ impl WgpuBackend {
         });
 
         // Create glyph vertex buffer
-        let glyph_vertex_buffer_size = (INITIAL_CAPACITY * std::mem::size_of::<GlyphInstance>()) as u64;
+        let glyph_vertex_buffer_size =
+            (INITIAL_CAPACITY * std::mem::size_of::<GlyphInstance>()) as u64;
         let glyph_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Glyph Instance Buffer"),
             size: glyph_vertex_buffer_size,
@@ -505,9 +508,8 @@ impl super::RenderBackend for WgpuBackend {
         let mut rect_count = 0;
         for (_node_id, node) in scene.nodes() {
             // Debug: Log node types
-            match &node.content {
-                NodeContent::Rect { .. } => rect_count += 1,
-                _ => {}
+            if let NodeContent::Rect { .. } = &node.content {
+                rect_count += 1;
             }
 
             if !node.visible || node.opacity <= 0.0 {
@@ -522,18 +524,28 @@ impl super::RenderBackend for WgpuBackend {
                         color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
-                NodeContent::Text { text, font_size, color } => {
+                NodeContent::Text {
+                    text,
+                    font_size,
+                    color,
+                } => {
                     // Collect text nodes to be shaped during rendering
-                    println!("  📝 Found Text node: '{}' at ({}, {})",
-                             text, node.bounds.x, node.bounds.y);
+                    println!(
+                        "  📝 Found Text node: '{}' at ({}, {})",
+                        text, node.bounds.x, node.bounds.y
+                    );
                     raw_text_nodes.push((node, text, *font_size, color));
                 }
                 NodeContent::Empty => {}
             }
         }
 
-        println!("  📊 Scene content: {} total, {} Rect nodes, {} visible+rendered as instances",
-                 total_nodes, rect_count, instances.len());
+        println!(
+            "  📊 Scene content: {} total, {} Rect nodes, {} visible+rendered as instances",
+            total_nodes,
+            rect_count,
+            instances.len()
+        );
 
         if instances.is_empty() {
             debug!("No visible rectangles to render");
@@ -623,24 +635,28 @@ impl super::RenderBackend for WgpuBackend {
                         continue;
                     }
 
-                    println!("  Raw text node: '{}' at ({}, {})", text, node.bounds.x, node.bounds.y);
+                    println!(
+                        "  Raw text node: '{}' at ({}, {})",
+                        text, node.bounds.x, node.bounds.y
+                    );
 
                     // Shape text using TextRenderer's TextEngine (same FontSystem for rasterization!)
-                    let shaped = self.text_renderer.text_engine_mut().shape_text(text, *font_size);
+                    let shaped = self
+                        .text_renderer
+                        .text_engine_mut()
+                        .shape_text(text, *font_size);
 
                     println!("  Shaped into {} glyphs", shaped.glyphs.len());
 
                     // Base position for this text node
                     let position = glam::Vec2::new(node.bounds.x, node.bounds.y);
-                    let text_color = glam::Vec4::new(
-                        color.r(),
-                        color.g(),
-                        color.b(),
-                        color.a() * node.opacity,
-                    );
+                    let text_color =
+                        glam::Vec4::new(color.r(), color.g(), color.b(), color.a() * node.opacity);
 
                     // Use TextRenderer to generate instances (uses same FontSystem for atlas)
-                    let instances = self.text_renderer.generate_instances(&shaped, position, text_color);
+                    let instances = self
+                        .text_renderer
+                        .generate_instances(&shaped, position, text_color);
                     glyph_instances.extend(instances);
                 }
             }
@@ -690,7 +706,8 @@ impl super::RenderBackend for WgpuBackend {
 
                 // Upload glyph instance data
                 let glyph_bytes = bytemuck::cast_slice(&glyph_instances);
-                self.queue.write_buffer(&self.glyph_vertex_buffer, 0, glyph_bytes);
+                self.queue
+                    .write_buffer(&self.glyph_vertex_buffer, 0, glyph_bytes);
 
                 // Render glyphs
                 render_pass.set_pipeline(&self.glyph_pipeline);

@@ -21,6 +21,9 @@
 //! }
 //! ```
 
+// Allow collapsible_if since nested if-let chains are more readable in this context
+#![allow(clippy::collapsible_if)]
+
 use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 use crate::layout::auto_layout;
 use arthropod_ecs::{
@@ -30,8 +33,7 @@ use arthropod_ecs::{
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
 use flux_state::{Runtime, Signal};
 use plat_core::{
-    Application, ControlFlow, Event, EventLoop, Window, WindowConfig, WindowEvent,
-    Size, WindowId,
+    Application, ControlFlow, Event, EventLoop, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
     Color, NodeContent, NodeId, Scene, SceneNode,
@@ -500,12 +502,15 @@ thread_local! {
     static WIDGET_APP_CONFIG: RefCell<Option<WidgetAppConfig>> = const { RefCell::new(None) };
 }
 
+/// Type alias for widget builder function to reduce type complexity.
+type WidgetBuilder = Box<dyn FnOnce(&mut AppContext) -> Box<dyn WidgetExt>>;
+
 /// Configuration passed to WidgetApp via thread-local.
 struct WidgetAppConfig {
     title: String,
     width: u32,
     height: u32,
-    builder: Box<dyn FnOnce(&mut AppContext) -> Box<dyn WidgetExt>>,
+    builder: WidgetBuilder,
 }
 
 /// Extension trait for boxed widgets.
@@ -562,7 +567,9 @@ impl Application for WidgetApp {
     fn new(event_loop: &EventLoop) -> Self {
         // Retrieve config from thread-local
         let config = WIDGET_APP_CONFIG.with(|cell| {
-            cell.borrow_mut().take().expect("WidgetAppConfig not set - use App::run()")
+            cell.borrow_mut()
+                .take()
+                .expect("WidgetAppConfig not set - use App::run()")
         });
 
         // Initialize logging (using env_logger for simplicity)
@@ -677,7 +684,8 @@ impl Application for WidgetApp {
         // We need to do hit testing separately to avoid borrow conflicts
         let hit_result = {
             let scene = self.app.world().resource::<Scene>();
-            self.dispatcher.dispatch(&event, &mut self.widget_ctx, &scene)
+            self.dispatcher
+                .dispatch(&event, &mut self.widget_ctx, scene)
         };
 
         match hit_result {
@@ -699,7 +707,9 @@ impl Application for WidgetApp {
                     if self.widget_ctx.has_submit_error(form_node) {
                         println!(
                             "Submit error: {}",
-                            self.widget_ctx.get_submit_error(form_node).unwrap_or_default()
+                            self.widget_ctx
+                                .get_submit_error(form_node)
+                                .unwrap_or_default()
                         );
                     } else if !self.widget_ctx.is_form_valid(form_node) {
                         println!("Cannot submit: Form has validation errors");
@@ -719,7 +729,7 @@ impl Application for WidgetApp {
 
         if let Some(ref mut backend) = backend {
             let scene = self.app.world().resource::<Scene>();
-            if let Err(e) = backend.render(&scene) {
+            if let Err(e) = backend.render(scene) {
                 eprintln!("Render error: {}", e);
             }
         }
@@ -773,7 +783,9 @@ impl WidgetApp {
             if self.widget_ctx.is_text_input(widget_node) {
                 if let Some(node) = scene.get_node_mut(app_node) {
                     if matches!(node.content, NodeContent::Rect { .. }) {
-                        node.content = NodeContent::Rect { color: Color::WHITE };
+                        node.content = NodeContent::Rect {
+                            color: Color::WHITE,
+                        };
                     }
                 }
             }
@@ -829,7 +841,13 @@ fn integrate_widget_scene(
     let app_root = {
         let mut scene = app.world_mut().resource_mut::<Scene>();
         let root = scene.root();
-        copy_recursive(widget_scene, &mut scene, widget_root, root, &mut node_id_map)
+        copy_recursive(
+            widget_scene,
+            &mut scene,
+            widget_root,
+            root,
+            &mut node_id_map,
+        )
     };
 
     // Spawn Renderable entities

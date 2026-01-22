@@ -14,8 +14,8 @@ pub struct TextEngine {
 /// A shaped glyph with position and metrics
 #[derive(Debug, Clone)]
 pub struct ShapedGlyph {
-    pub cache_key: CacheKey,  // cosmic-text cache key for rasterization
-    pub glyph_id: u16,        // kept for compatibility
+    pub cache_key: CacheKey, // cosmic-text cache key for rasterization
+    pub glyph_id: u16,       // kept for compatibility
     pub x_offset: f32,
     pub y_offset: f32,
     pub x_advance: f32,
@@ -88,7 +88,8 @@ impl TextEngine {
         self.buffer.set_metrics(&mut self.font_system, metrics);
 
         // Set text and shape
-        self.buffer.set_text(&mut self.font_system, text, Attrs::new(), Shaping::Advanced);
+        self.buffer
+            .set_text(&mut self.font_system, text, Attrs::new(), Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
         let mut glyphs = Vec::new();
@@ -109,13 +110,13 @@ impl TextEngine {
                     glyph.font_id,
                     glyph.glyph_id,
                     glyph.font_size,
-                    (glyph.x_offset, glyph.y_offset).into(),
+                    (glyph.x_offset, glyph.y_offset),
                     CacheKeyFlags::empty(),
                 );
 
                 glyphs.push(ShapedGlyph {
                     cache_key,
-                    glyph_id: glyph.glyph_id as u16,
+                    glyph_id: glyph.glyph_id,
                     x_offset: glyph.x,
                     y_offset: glyph.y,
                     x_advance: glyph.w,

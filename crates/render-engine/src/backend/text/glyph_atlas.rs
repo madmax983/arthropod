@@ -1,7 +1,7 @@
 //! Glyph atlas for caching rasterized glyphs in a texture
 
-use hashbrown::HashMap;
 use cosmic_text::{CacheKey, FontSystem, SwashCache};
+use hashbrown::HashMap;
 
 /// Texture coordinates in atlas (0.0-1.0 normalized)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -87,8 +87,8 @@ impl GlyphAtlas {
         let (glyph_width, glyph_height, glyph_data) =
             match self.swash_cache.get_image(font_system, cache_key) {
                 Some(img) => {
-                    let w = img.placement.width as u32;
-                    let h = img.placement.height as u32;
+                    let w = img.placement.width;
+                    let h = img.placement.height;
                     let data = img.data.clone(); // Clone to release borrow on self
                     (w, h, data)
                 }

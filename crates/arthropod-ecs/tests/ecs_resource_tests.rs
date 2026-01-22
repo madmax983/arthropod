@@ -45,6 +45,7 @@ fn test_add_node_via_world_resource() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -84,6 +85,7 @@ fn test_reactive_color_updates_without_passing_scene() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -136,6 +138,7 @@ fn test_reactive_transform_without_passing_scene() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -182,6 +185,7 @@ fn test_reactive_opacity_without_passing_scene() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -220,6 +224,7 @@ fn test_render_without_passing_scene() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -260,6 +265,7 @@ fn test_integration_reactive_and_render_no_scene_args() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
