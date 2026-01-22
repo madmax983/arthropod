@@ -98,6 +98,12 @@ pub struct WindowConfig {
     pub decorations: bool,
     pub transparent: bool,
     pub visible: bool,
+    /// Enable DirectComposition mode for selective transparency.
+    ///
+    /// When true, the window uses DirectComposition visual trees instead of
+    /// standard wgpu swap chains. This enables per-region backdrop materials
+    /// but requires Windows 10 version 1803 or newer.
+    pub composition_mode: bool,
 }
 
 impl Default for WindowConfig {
@@ -110,6 +116,7 @@ impl Default for WindowConfig {
             decorations: true,
             transparent: false,
             visible: true,
+            composition_mode: false, // Opt-in for now
         }
     }
 }

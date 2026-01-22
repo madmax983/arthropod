@@ -85,6 +85,20 @@ pub struct WindowImpl {
     id: WindowId,
     /// Current backdrop material (stored as u8: 0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
     backdrop_material: AtomicU8,
+    /// DirectComposition integration (only if composition_mode enabled)
+    #[cfg(target_os = "windows")]
+    composition: Option<WindowComposition>,
+}
+
+/// DirectComposition state for a window.
+#[cfg(target_os = "windows")]
+struct WindowComposition {
+    #[allow(dead_code)]
+    device: composition::CompositionDevice,
+    #[allow(dead_code)]
+    target: composition::CompositionTarget,
+    #[allow(dead_code)]
+    root_visual: composition::CompositionVisual,
 }
 
 // SAFETY: HWND is thread-safe to share across threads (it's just a handle).
@@ -152,11 +166,39 @@ impl WindowImpl {
             // Increment window count
             WINDOW_COUNT.fetch_add(1, Ordering::SeqCst);
 
+            // Initialize DirectComposition if requested
+            let composition = if config.composition_mode {
+                // Initialize COM for DirectComposition
+                let _ = windows::Win32::System::Com::CoInitializeEx(
+                    None,
+                    windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
+                );
+
+                let device = composition::CompositionDevice::new()
+                    .map_err(|e| PlatformError::Initialization(format!("DirectComposition device: {}", e)))?;
+                let target = device.create_target_for_hwnd(hwnd)
+                    .map_err(|e| PlatformError::Initialization(format!("Composition target: {}", e)))?;
+                let root_visual = device.create_visual()
+                    .map_err(|e| PlatformError::Initialization(format!("Root visual: {}", e)))?;
+
+                target.set_root(&root_visual)
+                    .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
+
+                Some(WindowComposition {
+                    device,
+                    target,
+                    root_visual,
+                })
+            } else {
+                None
+            };
+
             Ok(Self {
                 hwnd,
                 hinstance,
                 id,
                 backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
+                composition,
             })
         }
     }
