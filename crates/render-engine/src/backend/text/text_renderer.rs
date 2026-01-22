@@ -39,10 +39,9 @@ impl TextRenderer {
 
         for glyph in &shaped.glyphs {
             // Get texture coordinates from atlas using cosmic-text cache key
-            let coords = self.atlas.get_or_rasterize(
-                glyph.cache_key,
-                self.text_engine.font_system(),
-            );
+            let coords = self
+                .atlas
+                .get_or_rasterize(glyph.cache_key, self.text_engine.font_system());
 
             // Calculate glyph position
             let glyph_x = position.x + glyph.x_offset;

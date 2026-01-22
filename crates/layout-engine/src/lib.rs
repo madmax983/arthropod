@@ -75,7 +75,8 @@ impl LayoutEngine {
     /// Panics if memory allocation fails (extremely rare OOM condition).
     pub fn create_node(&mut self, style: FlexStyle) -> NodeId {
         let taffy_style = convert_style(style);
-        let node = self.taffy
+        let node = self
+            .taffy
             .new_leaf(taffy_style)
             .expect("layout node creation should succeed (OOM?)");
         NodeId(node)
@@ -104,7 +105,8 @@ impl LayoutEngine {
     pub fn compute_layout(&mut self, root: NodeId, constraints: LayoutConstraints) {
         // Update root node to have constraint sizes
         // This ensures flex_grow works correctly
-        let current_style = self.taffy
+        let current_style = self
+            .taffy
             .style(root.0)
             .expect("compute_layout: root NodeId must be valid")
             .clone();

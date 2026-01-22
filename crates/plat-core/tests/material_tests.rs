@@ -3,6 +3,36 @@
 use plat_core::{BackdropMaterial, HasBackdropMaterial};
 
 #[test]
+#[ignore] // Requires actual window - run manually with: cargo test -p plat-core --test material_tests -- --ignored
+fn test_apply_mica_to_window() {
+    use plat_core::{EventLoop, Size, WindowConfig};
+
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig {
+            title: "Mica Test".into(),
+            size: Size::new(400, 300),
+            visible: false,
+            ..Default::default()
+        })
+        .expect("Failed to create window");
+
+    // Should not panic and should update state
+    window.set_backdrop_material(BackdropMaterial::Mica);
+    assert_eq!(window.backdrop_material(), BackdropMaterial::Mica);
+
+    // Test other materials
+    window.set_backdrop_material(BackdropMaterial::Acrylic);
+    assert_eq!(window.backdrop_material(), BackdropMaterial::Acrylic);
+
+    window.set_backdrop_material(BackdropMaterial::MicaAlt);
+    assert_eq!(window.backdrop_material(), BackdropMaterial::MicaAlt);
+
+    window.set_backdrop_material(BackdropMaterial::None);
+    assert_eq!(window.backdrop_material(), BackdropMaterial::None);
+}
+
+#[test]
 fn test_material_enum_variants() {
     // Verify all variants exist and can be created
     let mica = BackdropMaterial::Mica;
@@ -29,8 +59,11 @@ fn test_backdrop_material_default() {
 #[test]
 fn test_backdrop_material_clone_and_copy() {
     let original = BackdropMaterial::Mica;
+    // Test Copy trait (implicit copy on assignment)
+    let copied = original;
+    // Test Clone trait explicitly (allowed by attribute even though Copy exists)
+    #[allow(clippy::clone_on_copy)]
     let cloned = original.clone();
-    let copied = original; // Copy trait
 
     assert_eq!(original, cloned);
     assert_eq!(original, copied);
@@ -50,6 +83,5 @@ fn test_has_backdrop_material_trait_exists() {
         w.set_backdrop_material(m);
         let _: BackdropMaterial = w.backdrop_material();
     }
-    // Note: Actual implementation tests will come in Task A2
-    // when we implement HasBackdropMaterial for Window
+    // Actual implementation tested in test_apply_mica_to_window
 }

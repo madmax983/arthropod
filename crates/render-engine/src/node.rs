@@ -75,7 +75,6 @@ pub enum NodeContent {
     },
 }
 
-
 /// RGBA color backed by glam::Vec4 for SIMD performance.
 #[derive(Debug, Clone, Copy)]
 pub struct Color(pub glam::Vec4);

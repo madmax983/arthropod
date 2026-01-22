@@ -1,5 +1,6 @@
 //! Window types and traits.
 
+use crate::materials::{BackdropMaterial, HasBackdropMaterial};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 /// Opaque window identifier.
@@ -163,5 +164,15 @@ impl HasDisplayHandle for Window {
         &self,
     ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
         self.inner.display_handle()
+    }
+}
+
+impl HasBackdropMaterial for Window {
+    fn set_backdrop_material(&self, material: BackdropMaterial) {
+        self.inner.set_backdrop_material(material);
+    }
+
+    fn backdrop_material(&self) -> BackdropMaterial {
+        self.inner.backdrop_material()
     }
 }

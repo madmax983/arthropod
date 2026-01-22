@@ -306,7 +306,8 @@ impl WidgetContext {
 
                 // Convert character index to byte index for insertion
                 // cursor_position is a character index (user-facing concept)
-                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position) {
+                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position)
+                {
                     current_value.insert(byte_idx, c);
                     state.cursor_position += 1;
 
@@ -330,7 +331,9 @@ impl WidgetContext {
 
                     // Convert character index to byte index for removal
                     // We need to remove the character BEFORE the cursor
-                    if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position - 1) {
+                    if let Some(byte_idx) =
+                        char_idx_to_byte_idx(&current_value, state.cursor_position - 1)
+                    {
                         current_value.remove(byte_idx);
                         state.cursor_position -= 1;
 
@@ -358,7 +361,8 @@ impl WidgetContext {
                     let mut new_value = current_value;
 
                     // Convert character index to byte index for removal
-                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position) {
+                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position)
+                    {
                         new_value.remove(byte_idx);
 
                         // Update signal (cursor position stays the same)
@@ -712,7 +716,12 @@ mod tests {
         let signal = Signal::new(runtime, String::new());
         let (read, write) = signal.split();
 
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
 
         assert!(ctx.is_text_input(node_id));
@@ -728,7 +737,12 @@ mod tests {
     #[test]
     fn test_is_clickable_returns_true_after_adding_clickable() {
         let mut ctx = WidgetContext::new_test();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_clickable(node_id, Arc::new(|| {}));
 
         assert!(ctx.is_clickable(node_id));
@@ -743,7 +757,12 @@ mod tests {
     #[test]
     fn test_focused_node_returns_some_after_focusing() {
         let mut ctx = WidgetContext::new_test();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.focus_node(node_id);
 
         assert_eq!(ctx.focused_node(), Some(node_id));
@@ -766,7 +785,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, String::new());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         node_id
     }
@@ -894,7 +918,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, value.to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         node_id
     }
@@ -1015,7 +1044,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, String::new());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
 
         // Max length of 3 characters
         ctx.add_text_input_state(node_id, read, write, false, Some(3));
@@ -1026,11 +1060,17 @@ mod tests {
         ctx.send_char('😁');
         ctx.send_char('😂');
 
-        assert_eq!(ctx.get_text_input_value(node_id), Some("😀😁😂".to_string()));
+        assert_eq!(
+            ctx.get_text_input_value(node_id),
+            Some("😀😁😂".to_string())
+        );
 
         // 4th character should be rejected (max_length is character count, not bytes)
         ctx.send_char('x');
-        assert_eq!(ctx.get_text_input_value(node_id), Some("😀😁😂".to_string()));
+        assert_eq!(
+            ctx.get_text_input_value(node_id),
+            Some("😀😁😂".to_string())
+        );
     }
 
     #[test]

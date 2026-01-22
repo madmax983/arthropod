@@ -3,6 +3,7 @@
 use crate::{
     Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent,
     WindowId,
+    materials::{BackdropMaterial, HasBackdropMaterial},
 };
 use raw_window_handle::{
     DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
@@ -11,11 +12,16 @@ use raw_window_handle::{
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::Once;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
-    Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::System::Threading::INFINITE, Win32::UI::WindowsAndMessaging::*, core::*,
+    Win32::Foundation::*,
+    Win32::Graphics::Dwm::{DWMWA_SYSTEMBACKDROP_TYPE, DwmSetWindowAttribute},
+    Win32::Graphics::Gdi::*,
+    Win32::System::LibraryLoader::GetModuleHandleW,
+    Win32::System::Threading::INFINITE,
+    Win32::UI::WindowsAndMessaging::*,
+    core::*,
 };
 
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
@@ -76,6 +82,8 @@ pub struct WindowImpl {
     #[allow(dead_code)]
     hinstance: HINSTANCE,
     id: WindowId,
+    /// Current backdrop material (stored as u8: 0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
+    backdrop_material: AtomicU8,
 }
 
 // SAFETY: HWND is thread-safe to share across threads (it's just a handle).
@@ -138,6 +146,7 @@ impl WindowImpl {
                 hwnd,
                 hinstance,
                 id,
+                backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
             })
         }
     }
@@ -187,6 +196,72 @@ impl Drop for WindowImpl {
     fn drop(&mut self) {
         // Decrement window count when window is dropped
         WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// DWM (Desktop Window Manager) backdrop type constants.
+/// These map to DWMWA_SYSTEMBACKDROP_TYPE values.
+mod dwm {
+    /// DWM system backdrop types for Windows 11.
+    /// DWMWA_SYSTEMBACKDROP_TYPE = 38
+    #[repr(i32)]
+    #[derive(Debug, Clone, Copy)]
+    #[allow(dead_code)]
+    pub enum SystemBackdropType {
+        /// Let the Desktop Window Manager automatically decide the system-drawn backdrop material.
+        Auto = 0,
+        /// Do not draw any system backdrop.
+        None = 1,
+        /// Draw the backdrop material effect corresponding to a long-lived window (Mica).
+        Mica = 2,
+        /// Draw the backdrop material effect corresponding to a transient window (Acrylic).
+        Acrylic = 3,
+        /// Draw the backdrop material effect corresponding to a window with a tabbed title bar (Mica Alt).
+        MicaAlt = 4,
+    }
+}
+
+impl HasBackdropMaterial for WindowImpl {
+    fn set_backdrop_material(&self, material: BackdropMaterial) {
+        use dwm::SystemBackdropType;
+
+        let backdrop_type = match material {
+            BackdropMaterial::None => SystemBackdropType::None,
+            BackdropMaterial::Mica => SystemBackdropType::Mica,
+            BackdropMaterial::MicaAlt => SystemBackdropType::MicaAlt,
+            BackdropMaterial::Acrylic => SystemBackdropType::Acrylic,
+        };
+
+        // Try to set, store material value regardless of success
+        // (graceful degradation on older Windows versions)
+        unsafe {
+            let value = backdrop_type as i32;
+            let _ = DwmSetWindowAttribute(
+                self.hwnd,
+                DWMWA_SYSTEMBACKDROP_TYPE,
+                &value as *const _ as *const _,
+                std::mem::size_of::<i32>() as u32,
+            );
+        }
+
+        // Store the material value (0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
+        let material_value = match material {
+            BackdropMaterial::None => 0u8,
+            BackdropMaterial::Mica => 1u8,
+            BackdropMaterial::MicaAlt => 2u8,
+            BackdropMaterial::Acrylic => 3u8,
+        };
+        self.backdrop_material
+            .store(material_value, Ordering::SeqCst);
+    }
+
+    fn backdrop_material(&self) -> BackdropMaterial {
+        match self.backdrop_material.load(Ordering::SeqCst) {
+            1 => BackdropMaterial::Mica,
+            2 => BackdropMaterial::MicaAlt,
+            3 => BackdropMaterial::Acrylic,
+            _ => BackdropMaterial::None,
+        }
     }
 }
 
@@ -261,8 +336,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             LRESULT(0)
         }
-        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN | WM_MBUTTONUP => {
-            use crate::{MouseButton, MouseInput, ElementState};
+        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN
+        | WM_MBUTTONUP => {
+            use crate::{ElementState, MouseButton, MouseInput};
 
             let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
             let x = get_x_lparam(lparam);
@@ -298,7 +374,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
-            use crate::{Key, KeyboardInput, ElementState};
+            use crate::{ElementState, Key, KeyboardInput};
 
             let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
             let vk = wparam.0 as u32;
@@ -310,10 +386,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             // Map virtual key codes to Key enum
             let key = match vk {
-                0x41..=0x5A => {  // A-Z
+                0x41..=0x5A => {
+                    // A-Z
                     Key::from_vk(vk)
                 }
-                0x30..=0x39 => {  // 0-9
+                0x30..=0x39 => {
+                    // 0-9
                     Key::from_vk(vk)
                 }
                 0x08 => Key::Backspace,
@@ -335,7 +413,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 0x2C => Key::PrintScreen,
                 0x2D => Key::Insert,
                 0x2E => Key::Delete,
-                0x70..=0x87 => Key::from_vk(vk),  // F1-F24
+                0x70..=0x87 => Key::from_vk(vk), // F1-F24
                 _ => Key::Unknown,
             };
 

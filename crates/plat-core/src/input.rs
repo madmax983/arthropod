@@ -338,17 +338,17 @@ impl Key {
             0x7A => Key::F11,
             0x7B => Key::F12,
             // Punctuation
-            0xBE => Key::Period,     // .
-            0xBC => Key::Comma,      // ,
-            0xBD => Key::Minus,      // -
-            0xBB => Key::Equal,      // =
-            0xBA => Key::Semicolon,  // ;
-            0xDE => Key::Quote,      // '
-            0xBF => Key::Slash,      // /
-            0xDC => Key::Backslash,  // \
+            0xBE => Key::Period,       // .
+            0xBC => Key::Comma,        // ,
+            0xBD => Key::Minus,        // -
+            0xBB => Key::Equal,        // =
+            0xBA => Key::Semicolon,    // ;
+            0xDE => Key::Quote,        // '
+            0xBF => Key::Slash,        // /
+            0xDC => Key::Backslash,    // \
             0xDB => Key::BracketLeft,  // [
             0xDD => Key::BracketRight, // ]
-            0xC0 => Key::Backtick,   // `
+            0xC0 => Key::Backtick,     // `
             _ => Key::Unknown,
         }
     }
@@ -437,10 +437,32 @@ mod tests {
     #[test]
     fn test_to_char_all_letters_covered() {
         let letters = [
-            Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G,
-            Key::H, Key::I, Key::J, Key::K, Key::L, Key::M, Key::N,
-            Key::O, Key::P, Key::Q, Key::R, Key::S, Key::T, Key::U,
-            Key::V, Key::W, Key::X, Key::Y, Key::Z,
+            Key::A,
+            Key::B,
+            Key::C,
+            Key::D,
+            Key::E,
+            Key::F,
+            Key::G,
+            Key::H,
+            Key::I,
+            Key::J,
+            Key::K,
+            Key::L,
+            Key::M,
+            Key::N,
+            Key::O,
+            Key::P,
+            Key::Q,
+            Key::R,
+            Key::S,
+            Key::T,
+            Key::U,
+            Key::V,
+            Key::W,
+            Key::X,
+            Key::Y,
+            Key::Z,
         ];
         for (i, key) in letters.iter().enumerate() {
             let expected_lower = (b'a' + i as u8) as char;

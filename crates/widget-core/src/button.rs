@@ -1,11 +1,11 @@
 //! Button widget - interactive clickable button
 
+use crate::WidgetEnum;
 use crate::{Text, Widget, WidgetContext};
 use glam::Vec4;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
 use std::sync::Arc;
-use crate::WidgetEnum;
 use theme_engine::DesignTokens;
 
 /// Button widget with hover and click interactions
@@ -112,7 +112,12 @@ impl Button {
                 ButtonStyle::Secondary => {
                     // Use a slightly darker surface for secondary
                     let surface = t.surface_secondary.as_color();
-                    Vec4::new(surface.x * 0.85, surface.y * 0.85, surface.z * 0.85, surface.w)
+                    Vec4::new(
+                        surface.x * 0.85,
+                        surface.y * 0.85,
+                        surface.z * 0.85,
+                        surface.w,
+                    )
                 }
                 ButtonStyle::Default => t.surface_secondary.as_color(),
             },
@@ -153,7 +158,10 @@ impl Widget for Button {
         // We extract colors first to avoid holding a reference across mutable borrows
         let (bg_color, text_color) = {
             let tokens = ctx.design_tokens();
-            (self.get_background_color(tokens), self.get_text_color(tokens))
+            (
+                self.get_background_color(tokens),
+                self.get_text_color(tokens),
+            )
         };
 
         // Create button container with background

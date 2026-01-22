@@ -13,8 +13,8 @@ use plat_core::{
     Window, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
-    backend::{RenderBackend, WgpuBackend},
     Color, NodeContent, Scene, SceneNode,
+    backend::{RenderBackend, WgpuBackend},
 };
 use theme_engine::{DesignTokens, SystemTheme};
 

@@ -307,10 +307,11 @@ impl SystemTheme {
                     // Convert UTF-16 string to build number
                     let len = (data_size / 2) as usize;
                     let build_str = String::from_utf16_lossy(
-                        &data.chunks(2)
+                        &data
+                            .chunks(2)
                             .take(len - 1) // Remove null terminator
                             .map(|c| u16::from_ne_bytes([c[0], c[1]]))
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>(),
                     );
 
                     if let Ok(build) = build_str.parse::<u32>() {

@@ -98,13 +98,25 @@ impl<F: NamedWidgetTuple> Form<F> {
 
 impl<F: NamedWidgetTuple> Widget for Form<F> {
     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
-        // Create form container
+        // Get background from design tokens
+        let bg_color = {
+            let tokens = ctx.design_tokens();
+            match tokens {
+                Some(t) => t.surface_secondary.as_color(),
+                None => glam::Vec4::new(0.95, 0.95, 0.95, 1.0), // Fallback light gray
+            }
+        };
+
+        // Create form container with themed background
         let form_node = ctx.create_node(
             ctx.root(),
             NodeContent::Rect {
-                color: Color::rgba(0.95, 0.95, 0.95, 1.0), // Light gray background
+                color: Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w),
             },
         );
+
+        // Register background color for theming tests
+        ctx.set_background_color(form_node, bg_color);
 
         // Build all fields using NamedWidgetTuple trait
         let field_mapping = self.fields.build_all_named(ctx, form_node);

@@ -21,7 +21,7 @@ pub mod style_macro;
 pub mod system_theme;
 
 pub use design_tokens::{DesignTokens, TokenValue};
-pub use style_macro::{Padding, Style};
+pub use style_macro::{Padding, ResolvedStyle, Style, StyleOverrides};
 pub use system_theme::{BackgroundMaterial, MacOSMaterial, SystemTheme, WindowsMaterial};
 
 // Re-export BackdropMaterial for convenience
