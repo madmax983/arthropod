@@ -5,6 +5,7 @@ use flux_state::{ReadSignal, Signal, WriteSignal};
 use glam::Vec4;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
+use theme_engine::DesignTokens;
 
 /// TextInput widget with cursor, selection, and validation
 ///
@@ -144,11 +145,16 @@ impl TextInput {
 
 impl Widget for TextInput {
     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
-        // Create input container with border
+        // Get colors from design tokens (must be done before mutable ctx operations)
+        // We extract colors first to avoid holding a reference across mutable borrows
+        let (bg_color, text_color_primary, placeholder_color) =
+            Self::get_colors_from_tokens(ctx.design_tokens());
+
+        // Create input container with themed background
         let input_node = ctx.create_node(
             ctx.root(),
             NodeContent::Rect {
-                color: Color::rgba(1.0, 1.0, 1.0, 1.0), // White background
+                color: Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w),
             },
         );
 
@@ -163,9 +169,9 @@ impl Widget for TextInput {
         };
 
         let text_color = if current_value.is_empty() && self.placeholder.is_some() {
-            Vec4::new(0.5, 0.5, 0.5, 1.0) // Gray for placeholder
+            placeholder_color // Use themed placeholder color
         } else {
-            Vec4::new(0.0, 0.0, 0.0, 1.0) // Black for value
+            text_color_primary // Use themed text color
         };
 
         let text_widget = Text::new(display_text).color(text_color);
@@ -207,9 +213,35 @@ impl Widget for TextInput {
             ctx.add_placeholder(input_node);
         }
 
-        // Set background color for style checks
-        ctx.set_background_color(input_node, Vec4::new(1.0, 1.0, 1.0, 1.0));
+        // Set background color for style checks (using themed color)
+        ctx.set_background_color(input_node, bg_color);
 
         input_node
+    }
+}
+
+impl TextInput {
+    /// Get colors from design tokens or fall back to defaults
+    ///
+    /// Returns (background_color, text_color, placeholder_color)
+    ///
+    /// If design tokens are provided, uses themed colors:
+    /// - Background: surface_primary (for input background)
+    /// - Text: text_primary
+    /// - Placeholder: text_secondary (dimmer color for placeholder text)
+    fn get_colors_from_tokens(tokens: Option<&DesignTokens>) -> (Vec4, Vec4, Vec4) {
+        match tokens {
+            Some(t) => (
+                t.surface_primary.as_color(),
+                t.text_primary,
+                t.text_secondary, // Placeholder uses secondary text color
+            ),
+            // Fallback to hardcoded values if no tokens (backwards compatibility)
+            None => (
+                Vec4::new(1.0, 1.0, 1.0, 1.0), // White background
+                Vec4::new(0.0, 0.0, 0.0, 1.0), // Black text
+                Vec4::new(0.5, 0.5, 0.5, 1.0), // Gray placeholder
+            ),
+        }
     }
 }
