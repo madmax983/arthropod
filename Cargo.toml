@@ -116,6 +116,10 @@ path = "examples/macro_demo.rs"
 name = "native_materials"
 path = "examples/native_materials.rs"
 
+[[example]]
+name = "directcomposition_demo"
+path = "examples/directcomposition_demo.rs"
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
