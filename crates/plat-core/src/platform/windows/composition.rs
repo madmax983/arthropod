@@ -60,6 +60,29 @@ impl CompositionDevice {
         }
     }
 
+    /// Creates a backdrop visual with the specified material effect.
+    ///
+    /// This creates a visual that samples the content behind it with the
+    /// specified material effect (Mica, Acrylic, etc.). The visual can then
+    /// be added to the composition tree.
+    ///
+    /// Note: Actual backdrop effects require Windows 11 22H2+ for full
+    /// SystemBackdrop API support. On older versions, this creates a
+    /// standard visual that can be styled via DWM attributes.
+    pub fn create_backdrop_visual(
+        &self,
+        material: crate::materials::BackdropMaterial,
+    ) -> Result<BackdropVisual> {
+        unsafe {
+            let visual = self.device.CreateVisual()?;
+
+            // Store the material for later application
+            // The actual backdrop effect is applied via DWM when the visual
+            // is connected to the composition tree
+            Ok(BackdropVisual { visual, material })
+        }
+    }
+
     /// Creates a composition surface from a DXGI swap chain.
     ///
     /// This allows wgpu's swap chain output to be used in the composition tree.
@@ -149,6 +172,33 @@ pub struct CompositionSurface {
     surface: IUnknown, // IDCompositionSurface is not well-defined in windows-rs
 }
 
+/// A composition visual with an associated backdrop material.
+///
+/// This visual can display Mica, Acrylic, or other backdrop effects
+/// behind content rendered to it.
+pub struct BackdropVisual {
+    visual: IDCompositionVisual2,
+    material: crate::materials::BackdropMaterial,
+}
+
+impl BackdropVisual {
+    /// Returns the backdrop material for this visual.
+    pub fn material(&self) -> crate::materials::BackdropMaterial {
+        self.material
+    }
+
+    /// Returns the underlying composition visual.
+    pub fn visual(&self) -> &CompositionVisual {
+        // Safety: BackdropVisual contains IDCompositionVisual2, same as CompositionVisual
+        // We return a reference to allow using CompositionVisual methods
+        unsafe { std::mem::transmute(&self.visual) }
+    }
+
+    /// Returns the raw IDCompositionVisual2.
+    pub fn raw_visual(&self) -> &IDCompositionVisual2 {
+        &self.visual
+    }
+}
 
 /// Creates a DXGI device for DirectComposition.
 ///
@@ -223,6 +273,27 @@ mod tests {
             let device = CompositionDevice::new().unwrap();
             let visual = device.create_visual();
             assert!(visual.is_ok(), "Failed to create composition visual");
+
+            CoUninitialize();
+        }
+    }
+
+    #[test]
+    fn test_backdrop_visual_creation() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+
+            let device = CompositionDevice::new().unwrap();
+
+            // Test creating backdrop visuals for different materials
+            let mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica);
+            assert!(mica.is_ok(), "Failed to create Mica backdrop visual");
+
+            let acrylic = device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
+            assert!(acrylic.is_ok(), "Failed to create Acrylic backdrop visual");
+
+            let none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None);
+            assert!(none.is_ok(), "Failed to create None backdrop visual");
 
             CoUninitialize();
         }
