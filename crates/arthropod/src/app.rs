@@ -111,8 +111,8 @@ impl AppBuilder {
 
         let size = window.inner_size();
 
-        // Create GPU backend
-        let backend = WgpuBackend::new(&window, size.width, size.height)
+        // Create GPU backend (standard mode - not using DirectComposition)
+        let backend = WgpuBackend::new(&window, size.width, size.height, false)
             .map_err(|e| AppError::BackendCreation(e.to_string()))?;
 
         // Create app with backend

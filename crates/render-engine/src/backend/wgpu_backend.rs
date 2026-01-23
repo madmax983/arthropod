@@ -79,8 +79,18 @@ impl WgpuBackend {
     ///     backend: WgpuBackend,  // Dropped first
     /// }
     /// ```
-    #[instrument(skip(window), fields(width, height))]
-    pub fn new<W>(window: &W, width: u32, height: u32) -> Result<Self, RendererError>
+    /// Creates a new wgpu backend.
+    ///
+    /// If `composition_mode` is true, creates a swap chain compatible with
+    /// DirectComposition instead of a standard window surface. This enables
+    /// proper alpha blending for backdrop materials (Mica, Acrylic).
+    #[instrument(skip(window), fields(width, height, composition_mode))]
+    pub fn new<W>(
+        window: &W,
+        width: u32,
+        height: u32,
+        composition_mode: bool,
+    ) -> Result<Self, RendererError>
     where
         W: HasWindowHandle + HasDisplayHandle + Sync,
     {
@@ -156,27 +166,60 @@ impl WgpuBackend {
 
         // Configure surface
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
 
-        // Note: PreMultiplied alpha mode is preferred for transparency, but
-        // full client-area transparency with DWM (Mica) requires DirectComposition
-        // swap chains which wgpu doesn't expose. Title bar Mica still works.
-        let alpha_mode = surface_caps.alpha_modes[0];
+        // Branch on composition mode for proper alpha blending
+        #[cfg(target_os = "windows")]
+        let config = if composition_mode {
+            // Use composition-compatible config for DirectComposition integration
+            info!("Using DirectComposition-compatible surface configuration");
+            super::composition_swap_chain::create_composition_surface_config(
+                width,
+                height,
+                surface_caps.present_modes[0],
+            )
+        } else {
+            // Standard surface configuration
+            let surface_format = surface_caps
+                .formats
+                .iter()
+                .copied()
+                .find(|f| f.is_srgb())
+                .unwrap_or(surface_caps.formats[0]);
+            let alpha_mode = surface_caps.alpha_modes[0];
 
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width,
-            height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode,
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: surface_format,
+                width,
+                height,
+                present_mode: surface_caps.present_modes[0],
+                alpha_mode,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            }
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let config = {
+            let _ = composition_mode; // Suppress unused warning on non-Windows
+            let surface_format = surface_caps
+                .formats
+                .iter()
+                .copied()
+                .find(|f| f.is_srgb())
+                .unwrap_or(surface_caps.formats[0]);
+            let alpha_mode = surface_caps.alpha_modes[0];
+
+            wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: surface_format,
+                width,
+                height,
+                present_mode: surface_caps.present_modes[0],
+                alpha_mode,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            }
         };
 
         surface.configure(&device, &config);
