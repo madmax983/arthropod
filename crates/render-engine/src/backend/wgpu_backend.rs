@@ -169,7 +169,9 @@ impl WgpuBackend {
 
         // Branch on composition mode for proper alpha blending
         #[cfg(target_os = "windows")]
-        let config = if composition_mode {
+        let config = if composition_mode
+            && super::composition_swap_chain::supports_composition(&surface_caps)
+        {
             // Use composition-compatible config for DirectComposition integration
             info!("Using DirectComposition-compatible surface configuration");
             super::composition_swap_chain::create_composition_surface_config(
@@ -178,6 +180,14 @@ impl WgpuBackend {
                 surface_caps.present_modes[0],
             )
         } else {
+            if composition_mode {
+                // Requested composition mode but surface doesn't support it
+                warn!(
+                    "Composition mode requested but surface doesn't support BGRA + PreMultiplied. \
+                     Falling back to standard config. Available formats: {:?}, alpha modes: {:?}",
+                    surface_caps.formats, surface_caps.alpha_modes
+                );
+            }
             // Standard surface configuration
             let surface_format = surface_caps
                 .formats
