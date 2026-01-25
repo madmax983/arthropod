@@ -6,17 +6,11 @@
 #![cfg(target_os = "windows")]
 
 use windows::{
-    core::*,
     Win32::{
         Foundation::*,
-        Graphics::{
-            DirectComposition::*,
-            Dxgi::*,
-            Direct3D::*,
-            Direct3D11::*,
-        },
-        System::Com::*,
+        Graphics::{Direct3D::*, Direct3D11::*, DirectComposition::*, Dxgi::*},
     },
+    core::*,
 };
 
 /// Wrapper around IDCompositionDesktopDevice for creating composition visuals.
@@ -35,8 +29,7 @@ impl CompositionDevice {
             let dxgi_device: IDXGIDevice = create_dxgi_device()?;
 
             // Create DirectComposition desktop device
-            let device: IDCompositionDesktopDevice =
-                DCompositionCreateDevice3(&dxgi_device)?;
+            let device: IDCompositionDesktopDevice = DCompositionCreateDevice3(&dxgi_device)?;
 
             Ok(Self { device })
         }
@@ -45,9 +38,11 @@ impl CompositionDevice {
     /// Creates a composition target bound to a window handle.
     ///
     /// This target is where the composition visual tree will be rendered.
-    pub fn create_target_for_hwnd(&self, hwnd: HWND) -> Result<CompositionTarget> {
+    /// If `topmost` is true, the visual tree is rendered on top of the window's children.
+    /// If `topmost` is false, it is rendered behind the window's children (but in front of the window background).
+    pub fn create_target_for_hwnd(&self, hwnd: HWND, topmost: bool) -> Result<CompositionTarget> {
         unsafe {
-            let target = self.device.CreateTargetForHwnd(hwnd, true)?;
+            let target = self.device.CreateTargetForHwnd(hwnd, topmost)?;
             Ok(CompositionTarget { target })
         }
     }
@@ -76,9 +71,12 @@ impl CompositionDevice {
         unsafe {
             let visual = self.device.CreateVisual()?;
 
-            // Store the material for later application
-            // The actual backdrop effect is applied via DWM when the visual
-            // is connected to the composition tree
+            // Note: We return a standard visual for now as current bindings
+            // don't easily support IDCompositionDevice3 or Direct2D interop
+            // without additional dependencies/features.
+            // The transparency effect relies on the window-level DWM attributes
+            // and the transparent swapchain.
+
             Ok(BackdropVisual { visual, material })
         }
     }
@@ -91,12 +89,10 @@ impl CompositionDevice {
         &self,
         swap_chain: &IDXGISwapChain1,
     ) -> Result<CompositionSurface> {
-        unsafe {
-            // Cast device to IUnknown to access CreateSurfaceFromSwapChain
-            // Note: Method signature varies by DirectComposition version
-            let surface: IUnknown = swap_chain.cast()?;
-            Ok(CompositionSurface { surface })
-        }
+        // Cast device to IUnknown to access CreateSurfaceFromSwapChain
+        // Note: Method signature varies by DirectComposition version
+        let surface: IUnknown = unsafe { swap_chain.cast()? };
+        Ok(CompositionSurface { surface })
     }
 
     /// Returns the underlying IDCompositionDesktopDevice.
@@ -155,10 +151,11 @@ impl CompositionVisual {
     ///
     /// Note: This is a placeholder for future visual hierarchy support.
     /// DirectComposition uses AddVisual() on the parent, not a Children() collection.
-    #[allow(dead_code)]
-    pub fn add_child(&self, _child: &CompositionVisual) -> Result<()> {
-        // Would use AddVisual() when implementing full hierarchy
-        Ok(())
+    pub fn add_child(&self, child: &CompositionVisual) -> Result<()> {
+        unsafe {
+            self.visual.AddVisual(&child.visual, false, None)?;
+            Ok(())
+        }
     }
 
     /// Returns the underlying IDCompositionVisual2.
@@ -211,16 +208,16 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
 
     unsafe {
         D3D11CreateDevice(
-        None, // Use default adapter
-        D3D_DRIVER_TYPE_HARDWARE,
-        HMODULE(std::ptr::null_mut()), // No software rasterizer
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT, // Required for DirectComposition
-        Some(&feature_levels),
-        D3D11_SDK_VERSION,
-        Some(&mut device),
-        None,
-        None,
-    )?;
+            None, // Use default adapter
+            D3D_DRIVER_TYPE_HARDWARE,
+            HMODULE(std::ptr::null_mut()),    // No software rasterizer
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT, // Required for DirectComposition
+            Some(&feature_levels),
+            D3D11_SDK_VERSION,
+            Some(&mut device),
+            None,
+            None,
+        )?;
 
         let d3d_device = device.ok_or_else(|| Error::from(E_FAIL))?;
         d3d_device.cast::<IDXGIDevice>()
@@ -230,10 +227,7 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use windows::Win32::{
-        System::LibraryLoader::*,
-        UI::WindowsAndMessaging::*,
-    };
+    use windows::Win32::{System::LibraryLoader::*, UI::WindowsAndMessaging::*};
 
     #[test]
     fn test_composition_device_creation() {
@@ -257,7 +251,7 @@ mod tests {
             let hwnd = create_test_window();
 
             let device = CompositionDevice::new().unwrap();
-            let target = device.create_target_for_hwnd(hwnd);
+            let target = device.create_target_for_hwnd(hwnd, true);
             assert!(target.is_ok(), "Failed to create composition target");
 
             let _ = DestroyWindow(hwnd);
@@ -289,7 +283,8 @@ mod tests {
             let mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica);
             assert!(mica.is_ok(), "Failed to create Mica backdrop visual");
 
-            let acrylic = device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
+            let acrylic =
+                device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
             assert!(acrylic.is_ok(), "Failed to create Acrylic backdrop visual");
 
             let none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None);
@@ -327,11 +322,16 @@ mod tests {
                 class_name,
                 w!("Test"),
                 WS_OVERLAPPEDWINDOW,
-                0, 0, 100, 100,
-                None, None,
+                0,
+                0,
+                100,
+                100,
+                None,
+                None,
                 Some(hinstance),
                 None,
-            ).unwrap()
+            )
+            .unwrap()
         }
     }
 }

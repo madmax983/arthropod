@@ -21,9 +21,9 @@
 //! compositor.commit()?;
 //! ```
 
+use crate::PlatformError;
 use crate::materials::BackdropMaterial;
 use crate::window::Rect;
-use crate::PlatformError;
 
 /// A compositor manages layers for selective transparency effects.
 ///
@@ -151,7 +151,7 @@ mod platform {
     use crate::platform::windows::composition::{CompositionDevice, CompositionVisual};
 
     pub struct CompositorImpl {
-        device: CompositionDevice,
+        composition: std::sync::Arc<crate::platform::windows::WindowComposition>,
         layers: Vec<LayerImpl>,
     }
 
@@ -186,32 +186,38 @@ mod platform {
     }
 
     impl CompositorImpl {
-        pub fn new(_window: &crate::Window) -> Result<Option<Self>, PlatformError> {
-            // For now, create a standalone device
-            // TODO: Share device with WindowComposition when available
-            unsafe {
-                let _ = windows::Win32::System::Com::CoInitializeEx(
-                    None,
-                    windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
-                );
+        pub fn new(window: &crate::Window) -> Result<Option<Self>, PlatformError> {
+            // Get the shared composition state from the window
+            // This ensures we draw into the same visual tree as the window's target
+            if let Some(composition) = window.inner.composition() {
+                Ok(Some(Self {
+                    composition,
+                    layers: Vec::new(),
+                }))
+            } else {
+                Ok(None)
             }
-
-            let device = CompositionDevice::new()
-                .map_err(|e| PlatformError::Initialization(format!("CompositionDevice: {}", e)))?;
-
-            Ok(Some(Self {
-                device,
-                layers: Vec::new(),
-            }))
         }
 
         pub fn create_layer(&mut self, material: BackdropMaterial) -> Result<Layer, PlatformError> {
+            // Create a visual using the shared device
             let visual = self
+                .composition
                 .device
-                .create_visual()
+                .create_backdrop_visual(material)
                 .map_err(|e| PlatformError::Initialization(format!("Create visual: {}", e)))?;
 
-            let wrapped = std::sync::Arc::new(CompositionVisualWrapper { visual });
+            // Add the visual to the root visual of the window
+            // This ensures it renders behind the wgpu content (because target is not topmost)
+            // Layers are added to the root, so they stack on top of each other
+            self.composition
+                .root_visual
+                .add_child(visual.visual())
+                .map_err(|e| PlatformError::Initialization(format!("Add child: {}", e)))?;
+
+            let wrapped = std::sync::Arc::new(CompositionVisualWrapper {
+                visual: unsafe { std::mem::transmute(visual.raw_visual().clone()) },
+            });
 
             let layer_impl = LayerImpl {
                 visual: wrapped,
@@ -225,8 +231,14 @@ mod platform {
         }
 
         pub fn commit(&self) -> Result<(), PlatformError> {
-            // TODO: Call IDCompositionDevice::Commit()
-            // For now, this is a placeholder
+            // Commit all changes to the composition tree
+            unsafe {
+                self.composition
+                    .device
+                    .raw_device()
+                    .Commit()
+                    .map_err(|e| PlatformError::Initialization(format!("Commit: {}", e)))?;
+            }
             Ok(())
         }
     }
@@ -238,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_layer_bounds() {
-        let bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
+        let _bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
 
         #[cfg(not(target_os = "windows"))]
         {

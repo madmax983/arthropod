@@ -97,20 +97,13 @@ impl WgpuBackend {
         let _span = span!(Level::INFO, "wgpu_backend_init").entered();
 
         // Create wgpu instance with validation enabled in debug builds
-        // On Windows, prefer D3D12 over Vulkan for proper DWM alpha composition (Mica/Acrylic)
-        #[cfg(target_os = "windows")]
-        let backends = wgpu::Backends::DX12;
-        #[cfg(not(target_os = "windows"))]
-        let backends = wgpu::Backends::PRIMARY;
-
-        info!("Creating wgpu instance with backends: {:?}", backends);
+        // Create instance
+        println!("🚀 Creating wgpu Instance (forcing DX12 for DirectComposition)");
+        // Force DX12 for best DirectComposition support
+        // We use Instance::new(&InstanceDescriptor) which is standard in wgpu 0.19+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends,
-            flags: if cfg!(debug_assertions) {
-                wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
-            } else {
-                wgpu::InstanceFlags::empty()
-            },
+            backends: wgpu::Backends::DX12,
+            flags: wgpu::InstanceFlags::empty(), // Disable validation to allow forcing PreMultiplied
             ..Default::default()
         });
 
@@ -135,13 +128,25 @@ impl WgpuBackend {
         // Request adapter
         info!("Requesting GPU adapter");
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
+            power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
         .ok_or(RendererError::NoAdapter)?;
 
         let adapter_info = adapter.get_info();
+        println!(
+            "🎮 Adapter: {} ({:?})",
+            adapter_info.name, adapter_info.backend
+        );
+        println!(
+            "   Driver: {} ({})",
+            adapter_info.driver, adapter_info.driver_info
+        );
+        println!(
+            "   Vendor: {:?} (Device: {:?})",
+            adapter_info.vendor, adapter_info.device
+        );
         info!(
             "Selected adapter: {} ({:?})",
             adapter_info.name, adapter_info.backend
@@ -173,6 +178,7 @@ impl WgpuBackend {
             && super::composition_swap_chain::supports_composition(&surface_caps)
         {
             // Use composition-compatible config for DirectComposition integration
+            println!("✨ Using DirectComposition: Bgra8UnormSrgb + PreMultiplied");
             info!("Using DirectComposition-compatible surface configuration");
             super::composition_swap_chain::create_composition_surface_config(
                 width,
@@ -182,6 +188,11 @@ impl WgpuBackend {
         } else {
             if composition_mode {
                 // Requested composition mode but surface doesn't support it
+                println!(
+                    "⚠️  WARNING: Composition mode requested but surface capabilities incompatible!"
+                );
+                println!("   Available formats: {:?}", surface_caps.formats);
+                println!("   Available alpha modes: {:?}", surface_caps.alpha_modes);
                 warn!(
                     "Composition mode requested but surface doesn't support BGRA + PreMultiplied. \
                      Falling back to standard config. Available formats: {:?}, alpha modes: {:?}",
@@ -196,6 +207,11 @@ impl WgpuBackend {
                 .find(|f| f.is_srgb())
                 .unwrap_or(surface_caps.formats[0]);
             let alpha_mode = surface_caps.alpha_modes[0];
+
+            info!(
+                "Configuring surface: format={:?}, alpha={:?}",
+                surface_format, alpha_mode
+            );
 
             wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -535,6 +551,14 @@ impl WgpuBackend {
             mapped_at_creation: false,
         });
 
+        let clear_color = if composition_mode {
+            // Transparent clear color for composition integration
+            Color::rgba(0.0, 0.0, 0.0, 0.0)
+        } else {
+            // Standard black background
+            Color::rgba(0.0, 0.0, 0.0, 1.0)
+        };
+
         Ok(Self {
             instance,
             surface,
@@ -552,7 +576,7 @@ impl WgpuBackend {
             glyph_texture,
             glyph_vertex_buffer,
             glyph_vertex_buffer_capacity: INITIAL_CAPACITY,
-            clear_color: Color::rgba(0.0, 0.0, 0.0, 1.0),
+            clear_color,
         })
     }
 }

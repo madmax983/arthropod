@@ -17,12 +17,8 @@ use std::sync::Once;
 use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
-    Win32::Foundation::*,
-    Win32::Graphics::Gdi::*,
-    Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::System::Threading::INFINITE,
-    Win32::UI::WindowsAndMessaging::*,
-    core::*,
+    Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
+    Win32::System::Threading::INFINITE, Win32::UI::WindowsAndMessaging::*, core::*,
 };
 
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
@@ -87,18 +83,15 @@ pub struct WindowImpl {
     backdrop_material: AtomicU8,
     /// DirectComposition integration (only if composition_mode enabled)
     #[cfg(target_os = "windows")]
-    composition: Option<WindowComposition>,
+    composition: Option<std::sync::Arc<WindowComposition>>,
 }
 
 /// DirectComposition state for a window.
 #[cfg(target_os = "windows")]
-struct WindowComposition {
-    #[allow(dead_code)]
-    device: composition::CompositionDevice,
-    #[allow(dead_code)]
-    target: composition::CompositionTarget,
-    #[allow(dead_code)]
-    root_visual: composition::CompositionVisual,
+pub struct WindowComposition {
+    pub device: composition::CompositionDevice,
+    pub target: composition::CompositionTarget,
+    pub root_visual: composition::CompositionVisual,
 }
 
 // SAFETY: HWND is thread-safe to share across threads (it's just a handle).
@@ -118,7 +111,7 @@ impl WindowImpl {
                     lpszClassName: class_name,
                     style: CS_HREDRAW | CS_VREDRAW,
                     hCursor: LoadCursorW(None, IDC_ARROW).ok().unwrap_or_default(),
-                    hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as _),
+                    hbrBackground: HBRUSH(0 as _), // Transparent background for composition
                     ..Default::default()
                 };
 
@@ -133,14 +126,13 @@ impl WindowImpl {
                 .chain(std::iter::once(0))
                 .collect();
 
-            // Note: WS_EX_NOREDIRECTIONBITMAP is NOT used here because it doesn't
-            // work well with wgpu/D3D12 swap chains. Instead, we rely on:
-            // 1. DwmSetWindowAttribute with DWMWA_SYSTEMBACKDROP_TYPE for Mica
-            // 2. DwmExtendFrameIntoClientArea to extend the frame
-            // 3. Transparent clear color in the renderer
-            // The Mica effect will show in the title bar; full client-area transparency
-            // requires additional work with composition swap chains.
-            let ex_style = WINDOW_EX_STYLE::default();
+            // Note: WS_EX_NOREDIRECTIONBITMAP is required for DirectComposition to work correctly
+            // with transparent swapchains. It tells the DWM not to allocate a redirection bitmap,
+            // relying entirely on the application's swapchain for content.
+            let mut ex_style = WINDOW_EX_STYLE::default();
+            if config.composition_mode {
+                ex_style |= WS_EX_NOREDIRECTIONBITMAP;
+            }
 
             // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
             let hwnd = CreateWindowExW(
@@ -163,6 +155,18 @@ impl WindowImpl {
                 let _ = ShowWindow(hwnd, SW_SHOW);
             }
 
+            // Extend frame into client area to ensure transparency works
+            if config.composition_mode {
+                use windows::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea;
+                let margins = windows::Win32::UI::Controls::MARGINS {
+                    cxLeftWidth: -1, // -1 extends to entire client area
+                    cxRightWidth: -1,
+                    cyTopHeight: -1,
+                    cyBottomHeight: -1,
+                };
+                let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+            }
+
             // Increment window count
             WINDOW_COUNT.fetch_add(1, Ordering::SeqCst);
 
@@ -174,21 +178,26 @@ impl WindowImpl {
                     windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
                 );
 
-                let device = composition::CompositionDevice::new()
-                    .map_err(|e| PlatformError::Initialization(format!("DirectComposition device: {}", e)))?;
-                let target = device.create_target_for_hwnd(hwnd)
-                    .map_err(|e| PlatformError::Initialization(format!("Composition target: {}", e)))?;
-                let root_visual = device.create_visual()
+                let device = composition::CompositionDevice::new().map_err(|e| {
+                    PlatformError::Initialization(format!("DirectComposition device: {}", e))
+                })?;
+                // Topmost=false ensures composition content is BEHIND wgpu swapchain
+                let target = device.create_target_for_hwnd(hwnd, false).map_err(|e| {
+                    PlatformError::Initialization(format!("Composition target: {}", e))
+                })?;
+                let root_visual = device
+                    .create_visual()
                     .map_err(|e| PlatformError::Initialization(format!("Root visual: {}", e)))?;
 
-                target.set_root(&root_visual)
+                target
+                    .set_root(&root_visual)
                     .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
 
-                Some(WindowComposition {
+                Some(std::sync::Arc::new(WindowComposition {
                     device,
                     target,
                     root_visual,
-                })
+                }))
             } else {
                 None
             };
@@ -242,10 +251,20 @@ impl WindowImpl {
             let _ = ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
     }
+
+    #[cfg(target_os = "windows")]
+    pub fn composition(&self) -> Option<std::sync::Arc<WindowComposition>> {
+        self.composition.clone()
+    }
 }
 
 impl Drop for WindowImpl {
     fn drop(&mut self) {
+        unsafe {
+            // Ensure the window is destroyed when the Rust struct is dropped
+            // This handles cases where the app drops the window manually
+            let _ = DestroyWindow(self.hwnd);
+        }
         // Decrement window count when window is dropped
         WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
     }
@@ -263,8 +282,7 @@ impl HasBackdropMaterial for WindowImpl {
         let result = match material {
             BackdropMaterial::None => {
                 // Clear all effects
-                window_vibrancy::clear_mica(self)
-                    .and_then(|_| window_vibrancy::clear_acrylic(self))
+                window_vibrancy::clear_mica(self).and_then(|_| window_vibrancy::clear_acrylic(self))
             }
             BackdropMaterial::Mica | BackdropMaterial::MicaAlt => {
                 // Apply Mica effect (Windows 11)
@@ -491,10 +509,20 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             LRESULT(0)
         }
-        WM_CLOSE => unsafe {
-            let _ = DestroyWindow(hwnd);
+        WM_CLOSE => {
+            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            EVENT_SENDER.with(|sender| {
+                if let Some(sender) = sender.borrow().as_ref() {
+                    let _ = sender.send(Event::Window {
+                        window_id,
+                        event: WindowEvent::CloseRequested,
+                    });
+                }
+            });
+            // We do NOT call DestroyWindow here. We let the application decide.
+            // If the app wants to close, it should drop the Window or return ControlFlow::Exit.
             LRESULT(0)
-        },
+        }
         WM_DESTROY => unsafe {
             // Only quit the application when the last window is destroyed
             if WINDOW_COUNT.load(Ordering::SeqCst) == 0 {
@@ -502,6 +530,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             LRESULT(0)
         },
+        WM_ERASEBKGND => {
+            // Return 1 (TRUE) to tell Windows we handled background erasure (by doing nothing)
+            // This prevents GDI from clearing the window to the class background color
+            LRESULT(1)
+        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
