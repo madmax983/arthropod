@@ -35,6 +35,7 @@ fn test_reactive_color_updates_scene_node() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -89,6 +90,7 @@ fn test_reactive_transform_updates_scene_node() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -140,6 +142,7 @@ fn test_reactive_opacity_updates_scene_node() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -182,6 +185,7 @@ fn test_collect_renderables_filters_invisible() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         );
 
@@ -199,6 +203,7 @@ fn test_collect_renderables_filters_invisible() {
                 children: Vec::new(),
                 visible: false, // Hidden!
                 opacity: 1.0,
+                parent: None,
             },
         );
 
@@ -240,6 +245,7 @@ fn test_collect_renderables_filters_zero_opacity() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         );
 
@@ -257,6 +263,7 @@ fn test_collect_renderables_filters_zero_opacity() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 0.0, // Fully transparent!
+                parent: None,
             },
         );
 
@@ -298,6 +305,7 @@ fn test_collect_renderables_applies_opacity() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 0.5, // 50% opacity
+                parent: None,
             },
         )
     };
@@ -345,6 +353,7 @@ fn test_framework_context_update_and_render() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };
@@ -384,6 +393,7 @@ fn test_empty_nodes_not_rendered() {
                 children: Vec::new(),
                 visible: true,
                 opacity: 1.0,
+                parent: None,
             },
         )
     };

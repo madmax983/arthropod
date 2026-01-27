@@ -3,6 +3,9 @@
 //! Bridges the WidgetContext layout styles to Scene node bounds using
 //! the layout-engine (taffy) for flexbox computation.
 
+// Allow collapsible_if since nested if-let chains are more readable
+#![allow(clippy::collapsible_if)]
+
 use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 use plat_core::Rect;
 use render_engine::{NodeId, Scene};
@@ -335,7 +338,11 @@ mod tests {
 
         // Gap of 10.0 between children
         let actual_gap = node2.bounds.y - (node1.bounds.y + node1.bounds.height);
-        assert!((actual_gap - 10.0).abs() < 0.1, "Expected gap of 10.0, got {}", actual_gap);
+        assert!(
+            (actual_gap - 10.0).abs() < 0.1,
+            "Expected gap of 10.0, got {}",
+            actual_gap
+        );
     }
 
     // =========================================================================
@@ -427,7 +434,11 @@ mod tests {
 
         // Gap of 15.0 between children
         let actual_gap = node2.bounds.x - (node1.bounds.x + node1.bounds.width);
-        assert!((actual_gap - 15.0).abs() < 0.1, "Expected gap of 15.0, got {}", actual_gap);
+        assert!(
+            (actual_gap - 15.0).abs() < 0.1,
+            "Expected gap of 15.0, got {}",
+            actual_gap
+        );
     }
 
     // =========================================================================
@@ -469,10 +480,16 @@ mod tests {
         let root_node = scene.get_node(root).unwrap();
 
         // Child should be offset by padding from root's position
-        assert!((child_node.bounds.x - root_node.bounds.x - 20.0).abs() < 0.1,
-            "Expected x offset of 20.0, got {}", child_node.bounds.x - root_node.bounds.x);
-        assert!((child_node.bounds.y - root_node.bounds.y - 10.0).abs() < 0.1,
-            "Expected y offset of 10.0, got {}", child_node.bounds.y - root_node.bounds.y);
+        assert!(
+            (child_node.bounds.x - root_node.bounds.x - 20.0).abs() < 0.1,
+            "Expected x offset of 20.0, got {}",
+            child_node.bounds.x - root_node.bounds.x
+        );
+        assert!(
+            (child_node.bounds.y - root_node.bounds.y - 10.0).abs() < 0.1,
+            "Expected y offset of 10.0, got {}",
+            child_node.bounds.y - root_node.bounds.y
+        );
     }
 
     // =========================================================================
@@ -582,8 +599,16 @@ mod tests {
         let level3_node = scene.get_node(level3).unwrap();
 
         // Level3 should be offset by accumulated padding (10 + 10 + 10 = 30)
-        assert!(level3_node.bounds.x >= 30.0 - 0.1, "Expected x >= 30, got {}", level3_node.bounds.x);
-        assert!(level3_node.bounds.y >= 30.0 - 0.1, "Expected y >= 30, got {}", level3_node.bounds.y);
+        assert!(
+            level3_node.bounds.x >= 30.0 - 0.1,
+            "Expected x >= 30, got {}",
+            level3_node.bounds.x
+        );
+        assert!(
+            level3_node.bounds.y >= 30.0 - 0.1,
+            "Expected y >= 30, got {}",
+            level3_node.bounds.y
+        );
     }
 
     // =========================================================================
@@ -765,8 +790,12 @@ mod tests {
             let prev = scene.get_node(children[i - 1]).unwrap();
             let curr = scene.get_node(children[i]).unwrap();
 
-            assert!(curr.bounds.y > prev.bounds.y,
-                "Child {} should be below child {}", i, i - 1);
+            assert!(
+                curr.bounds.y > prev.bounds.y,
+                "Child {} should be below child {}",
+                i,
+                i - 1
+            );
         }
     }
 
@@ -810,8 +839,12 @@ mod tests {
             let prev = scene.get_node(children[i - 1]).unwrap();
             let curr = scene.get_node(children[i]).unwrap();
 
-            assert!(curr.bounds.x > prev.bounds.x,
-                "Child {} should be to the right of child {}", i, i - 1);
+            assert!(
+                curr.bounds.x > prev.bounds.x,
+                "Child {} should be to the right of child {}",
+                i,
+                i - 1
+            );
         }
     }
 }

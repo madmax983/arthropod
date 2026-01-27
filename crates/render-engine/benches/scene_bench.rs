@@ -6,7 +6,7 @@
 //! - hit_test on 1k nodes < 100μs
 //! - hit_test on 10k nodes < 1ms
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use plat_core::Rect;
 use render_engine::{Color, NodeContent, Scene, SceneNode};
 

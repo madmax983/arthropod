@@ -79,22 +79,31 @@ impl WgpuBackend {
     ///     backend: WgpuBackend,  // Dropped first
     /// }
     /// ```
-    #[instrument(skip(window), fields(width, height))]
-    pub fn new<W>(window: &W, width: u32, height: u32) -> Result<Self, RendererError>
+    /// Creates a new wgpu backend.
+    ///
+    /// If `composition_mode` is true, creates a swap chain compatible with
+    /// DirectComposition instead of a standard window surface. This enables
+    /// proper alpha blending for backdrop materials (Mica, Acrylic).
+    #[instrument(skip(window), fields(width, height, composition_mode))]
+    pub fn new<W>(
+        window: &W,
+        width: u32,
+        height: u32,
+        composition_mode: bool,
+    ) -> Result<Self, RendererError>
     where
         W: HasWindowHandle + HasDisplayHandle + Sync,
     {
         let _span = span!(Level::INFO, "wgpu_backend_init").entered();
 
         // Create wgpu instance with validation enabled in debug builds
-        info!("Creating wgpu instance");
+        // Create instance
+        println!("🚀 Creating wgpu Instance (forcing DX12 for DirectComposition)");
+        // Force DX12 for best DirectComposition support
+        // We use Instance::new(&InstanceDescriptor) which is standard in wgpu 0.19+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            flags: if cfg!(debug_assertions) {
-                wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
-            } else {
-                wgpu::InstanceFlags::empty()
-            },
+            backends: wgpu::Backends::DX12,
+            flags: wgpu::InstanceFlags::empty(), // Disable validation to allow forcing PreMultiplied
             ..Default::default()
         });
 
@@ -119,13 +128,25 @@ impl WgpuBackend {
         // Request adapter
         info!("Requesting GPU adapter");
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
+            power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
         .ok_or(RendererError::NoAdapter)?;
 
         let adapter_info = adapter.get_info();
+        println!(
+            "🎮 Adapter: {} ({:?})",
+            adapter_info.name, adapter_info.backend
+        );
+        println!(
+            "   Driver: {} ({})",
+            adapter_info.driver, adapter_info.driver_info
+        );
+        println!(
+            "   Vendor: {:?} (Device: {:?})",
+            adapter_info.vendor, adapter_info.device
+        );
         info!(
             "Selected adapter: {} ({:?})",
             adapter_info.name, adapter_info.backend
@@ -150,22 +171,81 @@ impl WgpuBackend {
 
         // Configure surface
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
 
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width,
-            height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+        // Branch on composition mode for proper alpha blending
+        #[cfg(target_os = "windows")]
+        let config = if composition_mode
+            && super::composition_swap_chain::supports_composition(&surface_caps)
+        {
+            // Use composition-compatible config for DirectComposition integration
+            println!("✨ Using DirectComposition: Bgra8UnormSrgb + PreMultiplied");
+            info!("Using DirectComposition-compatible surface configuration");
+            super::composition_swap_chain::create_composition_surface_config(
+                width,
+                height,
+                surface_caps.present_modes[0],
+            )
+        } else {
+            if composition_mode {
+                // Requested composition mode but surface doesn't support it
+                println!(
+                    "⚠️  WARNING: Composition mode requested but surface capabilities incompatible!"
+                );
+                println!("   Available formats: {:?}", surface_caps.formats);
+                println!("   Available alpha modes: {:?}", surface_caps.alpha_modes);
+                warn!(
+                    "Composition mode requested but surface doesn't support BGRA + PreMultiplied. \
+                     Falling back to standard config. Available formats: {:?}, alpha modes: {:?}",
+                    surface_caps.formats, surface_caps.alpha_modes
+                );
+            }
+            // Standard surface configuration
+            let surface_format = surface_caps
+                .formats
+                .iter()
+                .copied()
+                .find(|f| f.is_srgb())
+                .unwrap_or(surface_caps.formats[0]);
+            let alpha_mode = surface_caps.alpha_modes[0];
+
+            info!(
+                "Configuring surface: format={:?}, alpha={:?}",
+                surface_format, alpha_mode
+            );
+
+            wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: surface_format,
+                width,
+                height,
+                present_mode: surface_caps.present_modes[0],
+                alpha_mode,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            }
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let config = {
+            let _ = composition_mode; // Suppress unused warning on non-Windows
+            let surface_format = surface_caps
+                .formats
+                .iter()
+                .copied()
+                .find(|f| f.is_srgb())
+                .unwrap_or(surface_caps.formats[0]);
+            let alpha_mode = surface_caps.alpha_modes[0];
+
+            wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: surface_format,
+                width,
+                height,
+                present_mode: surface_caps.present_modes[0],
+                alpha_mode,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            }
         };
 
         surface.configure(&device, &config);
@@ -341,40 +421,41 @@ impl WgpuBackend {
         });
 
         // Create bind group layout for glyphs (globals + texture + sampler)
-        let glyph_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Glyph Bind Group Layout"),
-            entries: &[
-                // Globals uniform buffer
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+        let glyph_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Glyph Bind Group Layout"),
+                entries: &[
+                    // Globals uniform buffer
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                // Glyph texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+                    // Glyph texture
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                // Glyph sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    // Glyph sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         // Create bind group for glyphs
         let glyph_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -404,11 +485,12 @@ impl WgpuBackend {
         });
 
         // Create glyph pipeline
-        let glyph_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Glyph Pipeline Layout"),
-            bind_group_layouts: &[&glyph_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let glyph_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Glyph Pipeline Layout"),
+                bind_group_layouts: &[&glyph_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let glyph_vertex_buffer_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GlyphInstance>() as u64,
@@ -460,13 +542,22 @@ impl WgpuBackend {
         });
 
         // Create glyph vertex buffer
-        let glyph_vertex_buffer_size = (INITIAL_CAPACITY * std::mem::size_of::<GlyphInstance>()) as u64;
+        let glyph_vertex_buffer_size =
+            (INITIAL_CAPACITY * std::mem::size_of::<GlyphInstance>()) as u64;
         let glyph_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Glyph Instance Buffer"),
             size: glyph_vertex_buffer_size,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+
+        let clear_color = if composition_mode {
+            // Transparent clear color for composition integration
+            Color::rgba(0.0, 0.0, 0.0, 0.0)
+        } else {
+            // Standard black background
+            Color::rgba(0.0, 0.0, 0.0, 1.0)
+        };
 
         Ok(Self {
             instance,
@@ -485,7 +576,7 @@ impl WgpuBackend {
             glyph_texture,
             glyph_vertex_buffer,
             glyph_vertex_buffer_capacity: INITIAL_CAPACITY,
-            clear_color: Color::rgba(0.0, 0.0, 0.0, 1.0),
+            clear_color,
         })
     }
 }
@@ -505,9 +596,8 @@ impl super::RenderBackend for WgpuBackend {
         let mut rect_count = 0;
         for (_node_id, node) in scene.nodes() {
             // Debug: Log node types
-            match &node.content {
-                NodeContent::Rect { .. } => rect_count += 1,
-                _ => {}
+            if let NodeContent::Rect { .. } = &node.content {
+                rect_count += 1;
             }
 
             if !node.visible || node.opacity <= 0.0 {
@@ -522,18 +612,28 @@ impl super::RenderBackend for WgpuBackend {
                         color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
                     });
                 }
-                NodeContent::Text { text, font_size, color } => {
+                NodeContent::Text {
+                    text,
+                    font_size,
+                    color,
+                } => {
                     // Collect text nodes to be shaped during rendering
-                    println!("  📝 Found Text node: '{}' at ({}, {})",
-                             text, node.bounds.x, node.bounds.y);
+                    println!(
+                        "  📝 Found Text node: '{}' at ({}, {})",
+                        text, node.bounds.x, node.bounds.y
+                    );
                     raw_text_nodes.push((node, text, *font_size, color));
                 }
                 NodeContent::Empty => {}
             }
         }
 
-        println!("  📊 Scene content: {} total, {} Rect nodes, {} visible+rendered as instances",
-                 total_nodes, rect_count, instances.len());
+        println!(
+            "  📊 Scene content: {} total, {} Rect nodes, {} visible+rendered as instances",
+            total_nodes,
+            rect_count,
+            instances.len()
+        );
 
         if instances.is_empty() {
             debug!("No visible rectangles to render");
@@ -623,24 +723,28 @@ impl super::RenderBackend for WgpuBackend {
                         continue;
                     }
 
-                    println!("  Raw text node: '{}' at ({}, {})", text, node.bounds.x, node.bounds.y);
+                    println!(
+                        "  Raw text node: '{}' at ({}, {})",
+                        text, node.bounds.x, node.bounds.y
+                    );
 
                     // Shape text using TextRenderer's TextEngine (same FontSystem for rasterization!)
-                    let shaped = self.text_renderer.text_engine_mut().shape_text(text, *font_size);
+                    let shaped = self
+                        .text_renderer
+                        .text_engine_mut()
+                        .shape_text(text, *font_size);
 
                     println!("  Shaped into {} glyphs", shaped.glyphs.len());
 
                     // Base position for this text node
                     let position = glam::Vec2::new(node.bounds.x, node.bounds.y);
-                    let text_color = glam::Vec4::new(
-                        color.r(),
-                        color.g(),
-                        color.b(),
-                        color.a() * node.opacity,
-                    );
+                    let text_color =
+                        glam::Vec4::new(color.r(), color.g(), color.b(), color.a() * node.opacity);
 
                     // Use TextRenderer to generate instances (uses same FontSystem for atlas)
-                    let instances = self.text_renderer.generate_instances(&shaped, position, text_color);
+                    let instances = self
+                        .text_renderer
+                        .generate_instances(&shaped, position, text_color);
                     glyph_instances.extend(instances);
                 }
             }
@@ -690,7 +794,8 @@ impl super::RenderBackend for WgpuBackend {
 
                 // Upload glyph instance data
                 let glyph_bytes = bytemuck::cast_slice(&glyph_instances);
-                self.queue.write_buffer(&self.glyph_vertex_buffer, 0, glyph_bytes);
+                self.queue
+                    .write_buffer(&self.glyph_vertex_buffer, 0, glyph_bytes);
 
                 // Render glyphs
                 render_pass.set_pipeline(&self.glyph_pipeline);

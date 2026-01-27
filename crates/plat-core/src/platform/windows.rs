@@ -1,8 +1,11 @@
 //! Windows platform implementation using Win32 APIs.
 
+pub mod composition;
+
 use crate::{
     Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent,
     WindowId,
+    materials::{BackdropMaterial, HasBackdropMaterial},
 };
 use raw_window_handle::{
     DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
@@ -11,7 +14,7 @@ use raw_window_handle::{
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::Once;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
     Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
@@ -76,6 +79,19 @@ pub struct WindowImpl {
     #[allow(dead_code)]
     hinstance: HINSTANCE,
     id: WindowId,
+    /// Current backdrop material (stored as u8: 0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
+    backdrop_material: AtomicU8,
+    /// DirectComposition integration (only if composition_mode enabled)
+    #[cfg(target_os = "windows")]
+    composition: Option<std::sync::Arc<WindowComposition>>,
+}
+
+/// DirectComposition state for a window.
+#[cfg(target_os = "windows")]
+pub struct WindowComposition {
+    pub device: composition::CompositionDevice,
+    pub target: composition::CompositionTarget,
+    pub root_visual: composition::CompositionVisual,
 }
 
 // SAFETY: HWND is thread-safe to share across threads (it's just a handle).
@@ -95,7 +111,7 @@ impl WindowImpl {
                     lpszClassName: class_name,
                     style: CS_HREDRAW | CS_VREDRAW,
                     hCursor: LoadCursorW(None, IDC_ARROW).ok().unwrap_or_default(),
-                    hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as _),
+                    hbrBackground: HBRUSH(0 as _), // Transparent background for composition
                     ..Default::default()
                 };
 
@@ -110,9 +126,17 @@ impl WindowImpl {
                 .chain(std::iter::once(0))
                 .collect();
 
+            // Note: WS_EX_NOREDIRECTIONBITMAP is required for DirectComposition to work correctly
+            // with transparent swapchains. It tells the DWM not to allocate a redirection bitmap,
+            // relying entirely on the application's swapchain for content.
+            let mut ex_style = WINDOW_EX_STYLE::default();
+            if config.composition_mode {
+                ex_style |= WS_EX_NOREDIRECTIONBITMAP;
+            }
+
             // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
             let hwnd = CreateWindowExW(
-                WINDOW_EX_STYLE::default(),
+                ex_style,
                 class_name,
                 PCWSTR(title.as_ptr()),
                 WS_OVERLAPPEDWINDOW,
@@ -131,13 +155,59 @@ impl WindowImpl {
                 let _ = ShowWindow(hwnd, SW_SHOW);
             }
 
+            // Extend frame into client area to ensure transparency works
+            if config.composition_mode {
+                use windows::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea;
+                let margins = windows::Win32::UI::Controls::MARGINS {
+                    cxLeftWidth: -1, // -1 extends to entire client area
+                    cxRightWidth: -1,
+                    cyTopHeight: -1,
+                    cyBottomHeight: -1,
+                };
+                let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+            }
+
             // Increment window count
             WINDOW_COUNT.fetch_add(1, Ordering::SeqCst);
+
+            // Initialize DirectComposition if requested
+            let composition = if config.composition_mode {
+                // Initialize COM for DirectComposition
+                let _ = windows::Win32::System::Com::CoInitializeEx(
+                    None,
+                    windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
+                );
+
+                let device = composition::CompositionDevice::new().map_err(|e| {
+                    PlatformError::Initialization(format!("DirectComposition device: {}", e))
+                })?;
+                // Topmost=false ensures composition content is BEHIND wgpu swapchain
+                let target = device.create_target_for_hwnd(hwnd, false).map_err(|e| {
+                    PlatformError::Initialization(format!("Composition target: {}", e))
+                })?;
+                let root_visual = device
+                    .create_visual()
+                    .map_err(|e| PlatformError::Initialization(format!("Root visual: {}", e)))?;
+
+                target
+                    .set_root(&root_visual)
+                    .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
+
+                Some(std::sync::Arc::new(WindowComposition {
+                    device,
+                    target,
+                    root_visual,
+                }))
+            } else {
+                None
+            };
 
             Ok(Self {
                 hwnd,
                 hinstance,
                 id,
+                backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
+                composition,
             })
         }
     }
@@ -181,12 +251,74 @@ impl WindowImpl {
             let _ = ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
     }
+
+    #[cfg(target_os = "windows")]
+    pub fn composition(&self) -> Option<std::sync::Arc<WindowComposition>> {
+        self.composition.clone()
+    }
 }
 
 impl Drop for WindowImpl {
     fn drop(&mut self) {
+        unsafe {
+            // Ensure the window is destroyed when the Rust struct is dropped
+            // This handles cases where the app drops the window manually
+            let _ = DestroyWindow(self.hwnd);
+        }
         // Decrement window count when window is dropped
         WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl HasBackdropMaterial for WindowImpl {
+    fn set_backdrop_material(&self, material: BackdropMaterial) {
+        // Use window-vibrancy crate for full-window backdrop effects
+        // This applies the effect to the entire window via DWM, allowing
+        // semi-transparent wgpu content to show the backdrop through.
+        //
+        // Note: This is a window-level effect. For selective transparency
+        // (Mica in some areas, solid in others), we'll need DirectComposition
+        // integration in the future.
+        let result = match material {
+            BackdropMaterial::None => {
+                // Clear all effects
+                window_vibrancy::clear_mica(self).and_then(|_| window_vibrancy::clear_acrylic(self))
+            }
+            BackdropMaterial::Mica | BackdropMaterial::MicaAlt => {
+                // Apply Mica effect (Windows 11)
+                // None means use default system theme colors
+                window_vibrancy::apply_mica(self, None)
+            }
+            BackdropMaterial::Acrylic => {
+                // Apply Acrylic effect with subtle dark tint
+                // RGBA: (18, 18, 18, 200) = dark gray with 78% opacity
+                window_vibrancy::apply_acrylic(self, Some((18, 18, 18, 200)))
+            }
+        };
+
+        // Log errors but don't fail - graceful degradation on older Windows
+        if let Err(e) = result {
+            log::warn!("Failed to apply backdrop material {:?}: {}", material, e);
+        }
+
+        // Store the material value (0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
+        let material_value = match material {
+            BackdropMaterial::None => 0u8,
+            BackdropMaterial::Mica => 1u8,
+            BackdropMaterial::MicaAlt => 2u8,
+            BackdropMaterial::Acrylic => 3u8,
+        };
+        self.backdrop_material
+            .store(material_value, Ordering::SeqCst);
+    }
+
+    fn backdrop_material(&self) -> BackdropMaterial {
+        match self.backdrop_material.load(Ordering::SeqCst) {
+            1 => BackdropMaterial::Mica,
+            2 => BackdropMaterial::MicaAlt,
+            3 => BackdropMaterial::Acrylic,
+            _ => BackdropMaterial::None,
+        }
     }
 }
 
@@ -261,8 +393,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             LRESULT(0)
         }
-        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN | WM_MBUTTONUP => {
-            use crate::{MouseButton, MouseInput, ElementState};
+        WM_LBUTTONDOWN | WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN
+        | WM_MBUTTONUP => {
+            use crate::{ElementState, MouseButton, MouseInput};
 
             let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
             let x = get_x_lparam(lparam);
@@ -298,7 +431,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
-            use crate::{Key, KeyboardInput, ElementState};
+            use crate::{ElementState, Key, KeyboardInput};
 
             let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
             let vk = wparam.0 as u32;
@@ -310,10 +443,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 
             // Map virtual key codes to Key enum
             let key = match vk {
-                0x41..=0x5A => {  // A-Z
+                0x41..=0x5A => {
+                    // A-Z
                     Key::from_vk(vk)
                 }
-                0x30..=0x39 => {  // 0-9
+                0x30..=0x39 => {
+                    // 0-9
                     Key::from_vk(vk)
                 }
                 0x08 => Key::Backspace,
@@ -335,7 +470,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 0x2C => Key::PrintScreen,
                 0x2D => Key::Insert,
                 0x2E => Key::Delete,
-                0x70..=0x87 => Key::from_vk(vk),  // F1-F24
+                0x70..=0x87 => Key::from_vk(vk), // F1-F24
                 _ => Key::Unknown,
             };
 
@@ -374,10 +509,20 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             LRESULT(0)
         }
-        WM_CLOSE => unsafe {
-            let _ = DestroyWindow(hwnd);
+        WM_CLOSE => {
+            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            EVENT_SENDER.with(|sender| {
+                if let Some(sender) = sender.borrow().as_ref() {
+                    let _ = sender.send(Event::Window {
+                        window_id,
+                        event: WindowEvent::CloseRequested,
+                    });
+                }
+            });
+            // We do NOT call DestroyWindow here. We let the application decide.
+            // If the app wants to close, it should drop the Window or return ControlFlow::Exit.
             LRESULT(0)
-        },
+        }
         WM_DESTROY => unsafe {
             // Only quit the application when the last window is destroyed
             if WINDOW_COUNT.load(Ordering::SeqCst) == 0 {
@@ -385,6 +530,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             LRESULT(0)
         },
+        WM_ERASEBKGND => {
+            // Return 1 (TRUE) to tell Windows we handled background erasure (by doing nothing)
+            // This prevents GDI from clearing the window to the class background color
+            LRESULT(1)
+        }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }

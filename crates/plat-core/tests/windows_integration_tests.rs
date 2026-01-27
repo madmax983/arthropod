@@ -119,11 +119,11 @@ impl Application for RedrawTestApp {
     }
 
     fn on_event(&mut self, _event: Event, control_flow: &mut ControlFlow) {
-        if !self.requested_redraw {
-            if let Some(window) = &self.window {
-                window.request_redraw();
-                self.requested_redraw = true;
-            }
+        if !self.requested_redraw
+            && let Some(window) = &self.window
+        {
+            window.request_redraw();
+            self.requested_redraw = true;
         }
         *control_flow = ControlFlow::Exit;
     }

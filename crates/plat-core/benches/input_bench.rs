@@ -5,7 +5,7 @@
 //! Performance targets:
 //! - Key::to_char < 10ns per call (this is called on every keystroke)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use plat_core::Key;
 
 /// Benchmark Key::to_char for letter keys
@@ -13,10 +13,32 @@ fn bench_key_to_char_letters(c: &mut Criterion) {
     let mut group = c.benchmark_group("key_to_char_letters");
 
     let letters = [
-        Key::A, Key::B, Key::C, Key::D, Key::E, Key::F, Key::G,
-        Key::H, Key::I, Key::J, Key::K, Key::L, Key::M, Key::N,
-        Key::O, Key::P, Key::Q, Key::R, Key::S, Key::T, Key::U,
-        Key::V, Key::W, Key::X, Key::Y, Key::Z,
+        Key::A,
+        Key::B,
+        Key::C,
+        Key::D,
+        Key::E,
+        Key::F,
+        Key::G,
+        Key::H,
+        Key::I,
+        Key::J,
+        Key::K,
+        Key::L,
+        Key::M,
+        Key::N,
+        Key::O,
+        Key::P,
+        Key::Q,
+        Key::R,
+        Key::S,
+        Key::T,
+        Key::U,
+        Key::V,
+        Key::W,
+        Key::X,
+        Key::Y,
+        Key::Z,
     ];
 
     group.bench_function("lowercase", |b| {
@@ -50,8 +72,16 @@ fn bench_key_to_char_numbers(c: &mut Criterion) {
     let mut group = c.benchmark_group("key_to_char_numbers");
 
     let numbers = [
-        Key::Key0, Key::Key1, Key::Key2, Key::Key3, Key::Key4,
-        Key::Key5, Key::Key6, Key::Key7, Key::Key8, Key::Key9,
+        Key::Key0,
+        Key::Key1,
+        Key::Key2,
+        Key::Key3,
+        Key::Key4,
+        Key::Key5,
+        Key::Key6,
+        Key::Key7,
+        Key::Key8,
+        Key::Key9,
     ];
 
     group.bench_function("digits", |b| {
@@ -78,9 +108,17 @@ fn bench_key_to_char_punctuation(c: &mut Criterion) {
     let mut group = c.benchmark_group("key_to_char_punctuation");
 
     let punctuation = [
-        Key::Period, Key::Comma, Key::Minus, Key::Equal,
-        Key::Semicolon, Key::Quote, Key::Slash, Key::Backslash,
-        Key::BracketLeft, Key::BracketRight, Key::Backtick,
+        Key::Period,
+        Key::Comma,
+        Key::Minus,
+        Key::Equal,
+        Key::Semicolon,
+        Key::Quote,
+        Key::Slash,
+        Key::Backslash,
+        Key::BracketLeft,
+        Key::BracketRight,
+        Key::Backtick,
     ];
 
     group.bench_function("no_shift", |b| {
@@ -107,10 +145,22 @@ fn bench_key_to_char_non_printable(c: &mut Criterion) {
     let mut group = c.benchmark_group("key_to_char_non_printable");
 
     let non_printable = [
-        Key::Enter, Key::Tab, Key::Backspace, Key::Escape,
-        Key::Shift, Key::Control, Key::Alt, Key::Meta,
-        Key::Left, Key::Right, Key::Up, Key::Down,
-        Key::F1, Key::F2, Key::F3, Key::F4,
+        Key::Enter,
+        Key::Tab,
+        Key::Backspace,
+        Key::Escape,
+        Key::Shift,
+        Key::Control,
+        Key::Alt,
+        Key::Meta,
+        Key::Left,
+        Key::Right,
+        Key::Up,
+        Key::Down,
+        Key::F1,
+        Key::F2,
+        Key::F3,
+        Key::F4,
     ];
 
     group.bench_function("all", |b| {
@@ -137,19 +187,19 @@ fn bench_key_to_char_mixed(c: &mut Criterion) {
 
     // Simulate typing "Hello, World!"
     let keystrokes: Vec<(Key, bool)> = vec![
-        (Key::H, true),  // H
-        (Key::E, false), // e
-        (Key::L, false), // l
-        (Key::L, false), // l
-        (Key::O, false), // o
+        (Key::H, true),      // H
+        (Key::E, false),     // e
+        (Key::L, false),     // l
+        (Key::L, false),     // l
+        (Key::O, false),     // o
         (Key::Comma, false), // ,
         (Key::Space, false), // space
-        (Key::W, true),  // W
-        (Key::O, false), // o
-        (Key::R, false), // r
-        (Key::L, false), // l
-        (Key::D, false), // d
-        (Key::Key1, true), // !
+        (Key::W, true),      // W
+        (Key::O, false),     // o
+        (Key::R, false),     // r
+        (Key::L, false),     // l
+        (Key::D, false),     // d
+        (Key::Key1, true),   // !
     ];
 
     group.bench_function("typing_simulation", |b| {
@@ -189,7 +239,7 @@ fn bench_rect_contains(c: &mut Criterion) {
             black_box(rect.contains(100.0, 100.0)); // top-left (inside)
             black_box(rect.contains(299.9, 249.9)); // near bottom-right (inside)
             black_box(rect.contains(300.0, 250.0)); // exactly at bottom-right (outside)
-            black_box(rect.contains(99.9, 150.0));  // just outside left
+            black_box(rect.contains(99.9, 150.0)); // just outside left
         });
     });
 

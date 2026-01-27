@@ -160,9 +160,18 @@ struct NodeDetail {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 enum NodeContentData {
-    Rect { color: [f32; 4] },
-    RoundedRect { color: [f32; 4], corner_radius: f32 },
-    Text { text: String, font_size: f32, color: [f32; 4] },
+    Rect {
+        color: [f32; 4],
+    },
+    RoundedRect {
+        color: [f32; 4],
+        corner_radius: f32,
+    },
+    Text {
+        text: String,
+        font_size: f32,
+        color: [f32; 4],
+    },
     Empty,
 }
 
@@ -205,7 +214,11 @@ impl Tool for GetNodeTool {
                 color: [color.r(), color.g(), color.b(), color.a()],
                 corner_radius: *corner_radius,
             },
-            NodeContent::Text { text, font_size, color } => NodeContentData::Text {
+            NodeContent::Text {
+                text,
+                font_size,
+                color,
+            } => NodeContentData::Text {
                 text: text.clone(),
                 font_size: *font_size,
                 color: [color.r(), color.g(), color.b(), color.a()],

@@ -1,5 +1,6 @@
 //! Window types and traits.
 
+use crate::materials::{BackdropMaterial, HasBackdropMaterial};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 /// Opaque window identifier.
@@ -97,6 +98,12 @@ pub struct WindowConfig {
     pub decorations: bool,
     pub transparent: bool,
     pub visible: bool,
+    /// Enable DirectComposition mode for selective transparency.
+    ///
+    /// When true, the window uses DirectComposition visual trees instead of
+    /// standard wgpu swap chains. This enables per-region backdrop materials
+    /// but requires Windows 10 version 1803 or newer.
+    pub composition_mode: bool,
 }
 
 impl Default for WindowConfig {
@@ -109,6 +116,7 @@ impl Default for WindowConfig {
             decorations: true,
             transparent: false,
             visible: true,
+            composition_mode: false, // Opt-in for now
         }
     }
 }
@@ -163,5 +171,15 @@ impl HasDisplayHandle for Window {
         &self,
     ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
         self.inner.display_handle()
+    }
+}
+
+impl HasBackdropMaterial for Window {
+    fn set_backdrop_material(&self, material: BackdropMaterial) {
+        self.inner.set_backdrop_material(material);
+    }
+
+    fn backdrop_material(&self) -> BackdropMaterial {
+        self.inner.backdrop_material()
     }
 }

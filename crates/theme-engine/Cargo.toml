@@ -9,6 +9,7 @@ description = "Three-layer theming system for Arthropod GUI framework"
 [dependencies]
 glam = "0.29"
 thiserror = "2.0"
+plat-core = { path = "../plat-core" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

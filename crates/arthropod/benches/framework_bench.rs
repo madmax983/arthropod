@@ -8,7 +8,7 @@
 //! - Event dispatch < 1μs per event
 //! - Layout computation for 100 widgets < 500μs
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use flux_state::{Runtime, Signal};
 use layout_engine::{FlexDirection, FlexStyle};
 use plat_core::{ElementState, Event, Key, KeyboardInput, Modifiers, Point, WindowEvent};
@@ -48,7 +48,12 @@ fn create_text_input_node(ctx: &mut WidgetContext) -> NodeId {
     let runtime = Runtime::new();
     let signal = Signal::new(runtime, String::new());
     let (read, write) = signal.split();
-    let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+    let node_id = ctx.create_node(
+        ctx.root(),
+        NodeContent::Rect {
+            color: Color::WHITE,
+        },
+    );
     ctx.add_text_input_state(node_id, read, write, false, None);
     node_id
 }
@@ -135,7 +140,12 @@ fn bench_dispatch_keyboard(c: &mut Criterion) {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, "Hello World".to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 

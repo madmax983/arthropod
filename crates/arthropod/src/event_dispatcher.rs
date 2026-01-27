@@ -6,6 +6,9 @@
 //! - Mouse click hit testing and focus management
 //! - Form submission on Enter
 
+// Allow collapsible_if since nested if-let chains are more readable in this context
+#![allow(clippy::collapsible_if)]
+
 use plat_core::{ElementState, Event, Key, MouseButton, WindowEvent};
 use render_engine::{NodeContent, NodeId, Scene};
 use std::collections::HashMap;
@@ -248,7 +251,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, String::new());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         node_id
     }
@@ -389,7 +397,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, "hello".to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
@@ -409,7 +422,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, "hello".to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
@@ -436,7 +454,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, "abc".to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
@@ -459,7 +482,12 @@ mod tests {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, "abc".to_string());
         let (read, write) = signal.split();
-        let node_id = ctx.create_node(ctx.root(), NodeContent::Rect { color: Color::WHITE });
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Rect {
+                color: Color::WHITE,
+            },
+        );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 

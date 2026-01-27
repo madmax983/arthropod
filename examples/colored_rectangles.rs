@@ -271,6 +271,7 @@ impl Application for DemoApp {
                 transform: Transform2D::identity(),
                 bounds,
                 children: vec![],
+                parent: None,
                 visible: true,
                 opacity: 1.0,
             };

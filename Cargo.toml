@@ -65,11 +65,18 @@ version = "0.59"
 features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Controls",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
+    "Win32_Graphics_DirectComposition",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
     "Win32_System_Registry",
+    "Win32_System_Com",
 ]
 
 # macOS platform
@@ -105,6 +112,14 @@ path = "examples/widget_gallery.rs"
 name = "macro_demo"
 path = "examples/macro_demo.rs"
 
+[[example]]
+name = "native_materials"
+path = "examples/native_materials.rs"
+
+[[example]]
+name = "directcomposition_demo"
+path = "examples/directcomposition_demo.rs"
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
@@ -117,6 +132,7 @@ glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
 arthropod-mcp = { path = "crates/arthropod-mcp" }
+theme-engine = { path = "crates/theme-engine" }
 env_logger.workspace = true
 tracing.workspace = true
 serde_json = "1.0"

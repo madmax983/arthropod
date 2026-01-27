@@ -271,7 +271,11 @@ mod tests {
         // In overlap region, should return one of the overlapping nodes
         // (HashMap iteration order is not guaranteed)
         let hit = scene.hit_test(75.0, 75.0);
-        assert!(hit == Some(id1) || hit == Some(id2), "Expected id1 or id2, got {:?}", hit);
+        assert!(
+            hit == Some(id1) || hit == Some(id2),
+            "Expected id1 or id2, got {:?}",
+            hit
+        );
 
         // Only in first node
         assert_eq!(scene.hit_test(25.0, 25.0), Some(id1));
@@ -300,7 +304,9 @@ mod tests {
         let root = scene.root();
 
         // Parent container
-        let mut parent = SceneNode::new(NodeContent::Rect { color: Color::WHITE });
+        let mut parent = SceneNode::new(NodeContent::Rect {
+            color: Color::WHITE,
+        });
         parent.bounds = Rect::new(0.0, 0.0, 200.0, 200.0);
         let parent_id = scene.add_node(root, parent);
 
@@ -312,8 +318,11 @@ mod tests {
         // In overlap region, should return one of parent or child
         // (HashMap iteration order is not guaranteed)
         let hit = scene.hit_test(75.0, 75.0);
-        assert!(hit == Some(parent_id) || hit == Some(child_id),
-            "Expected parent_id or child_id, got {:?}", hit);
+        assert!(
+            hit == Some(parent_id) || hit == Some(child_id),
+            "Expected parent_id or child_id, got {:?}",
+            hit
+        );
 
         // Hit parent only (outside child bounds)
         assert_eq!(scene.hit_test(25.0, 25.0), Some(parent_id));

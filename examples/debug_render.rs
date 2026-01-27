@@ -59,6 +59,7 @@ impl Application for DebugApp {
                     height: 200.0,
                 },
                 children: vec![],
+                parent: None,
                 visible: true,
                 opacity: 1.0,
             };

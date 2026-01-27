@@ -9,11 +9,15 @@
 //! - Windows (Win32)
 //! - macOS (Cocoa via objc2)
 
+mod compositor;
 mod input;
+mod materials;
 mod platform;
 mod window;
 
+pub use compositor::{Compositor, Layer};
 pub use input::*;
+pub use materials::*;
 pub use window::*;
 
 use thiserror::Error;
