@@ -24,6 +24,17 @@ impl A11yId {
     pub fn raw(&self) -> u64 {
         self.0
     }
+
+    /// Create an A11yId from a raw value
+    ///
+    /// # Safety
+    ///
+    /// This should only be used when reconstructing an A11yId from a value
+    /// previously obtained via `raw()`. The caller must ensure the ID was
+    /// originally created by this system.
+    pub fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
 }
 
 impl Default for A11yId {

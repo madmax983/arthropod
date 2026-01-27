@@ -12,14 +12,21 @@ use raw_window_handle::{
     Win32WindowHandle, WindowHandle, WindowsDisplayHandle,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Once;
 use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use windows::{
     Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
-    Win32::System::Threading::INFINITE, Win32::UI::WindowsAndMessaging::*, core::*,
+    Win32::System::Threading::INFINITE, Win32::UI::Accessibility::*,
+    Win32::UI::WindowsAndMessaging::*, core::*,
 };
+
+#[cfg(target_os = "windows")]
+thread_local! {
+    static A11Y_PROVIDERS: RefCell<HashMap<isize, IRawElementProviderSimple>> = RefCell::new(HashMap::new());
+}
 
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(1);
 static WINDOW_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -135,7 +142,7 @@ impl WindowImpl {
             }
 
             // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
-            let hwnd = CreateWindowExW(
+            let hwnd: HWND = CreateWindowExW(
                 ex_style,
                 class_name,
                 PCWSTR(title.as_ptr()),
@@ -144,10 +151,10 @@ impl WindowImpl {
                 CW_USEDEFAULT,
                 config.size.width as i32,
                 config.size.height as i32,
-                None,
-                None,
-                Some(hinstance),
-                Some(id.0 as *const _),
+                HWND::default(),  // Parent
+                HMENU::default(), // Menu
+                hinstance,
+                Some(id.0 as *const std::ffi::c_void),
             )
             .map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
 
@@ -237,7 +244,7 @@ impl WindowImpl {
     pub fn request_redraw(&self) {
         unsafe {
             // InvalidateRect will trigger WM_PAINT, which marks window as dirty
-            let _ = InvalidateRect(Some(self.hwnd), None, false);
+            let _ = InvalidateRect(self.hwnd, None, false);
         }
     }
 
@@ -255,6 +262,17 @@ impl WindowImpl {
     #[cfg(target_os = "windows")]
     pub fn composition(&self) -> Option<std::sync::Arc<WindowComposition>> {
         self.composition.clone()
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn register_a11y_provider(&self, provider: IRawElementProviderSimple) {
+        // Register the provider for this window's HWND
+        A11Y_PROVIDERS.with(|providers| {
+            // Cast *mut c_void to isize
+            providers
+                .borrow_mut()
+                .insert(self.hwnd.0 as isize, provider);
+        });
     }
 }
 
@@ -327,7 +345,8 @@ impl HasWindowHandle for WindowImpl {
         &self,
     ) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
         use std::num::NonZeroIsize;
-        let handle = Win32WindowHandle::new(NonZeroIsize::new(self.hwnd.0 as isize).unwrap());
+        let handle =
+            Win32WindowHandle::new(NonZeroIsize::new(self.hwnd.0 as usize as isize).unwrap());
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
     }
 }
@@ -534,6 +553,22 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             // Return 1 (TRUE) to tell Windows we handled background erasure (by doing nothing)
             // This prevents GDI from clearing the window to the class background color
             LRESULT(1)
+        }
+        WM_GETOBJECT => {
+            // Handle UIA provider request
+            if lparam.0 == UiaRootObjectId as isize {
+                let mut result = LRESULT(0);
+                A11Y_PROVIDERS.with(|providers| {
+                    if let Some(provider) = providers.borrow().get(&(hwnd.0 as isize)) {
+                        unsafe {
+                            result = UiaReturnRawElementProvider(hwnd, wparam, lparam, provider);
+                        }
+                    }
+                });
+                result
+            } else {
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            }
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }

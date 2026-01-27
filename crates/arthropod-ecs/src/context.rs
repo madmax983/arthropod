@@ -1,12 +1,12 @@
-use a11y_engine::A11yTree;
+use a11y_engine::{A11yTree, ArthropodActionHandler, FocusManager};
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::RectInstance, NodeId, Scene};
 
 use crate::components::SceneNodeRef;
 use crate::systems::{
-    collect_renderables_system, update_reactive_colors_system, update_reactive_opacity_system,
-    update_reactive_transforms_system, RenderCommands,
+    collect_renderables_system, sync_accessible_nodes_system, update_reactive_colors_system,
+    update_reactive_opacity_system, update_reactive_transforms_system, RenderCommands,
 };
 
 /// Enterprise GUI framework context - wraps ECS World
@@ -60,6 +60,8 @@ impl FrameworkContext {
         // Initialize resources
         world.insert_resource(Scene::new()); // Scene lives in the World now!
         world.insert_resource(A11yTree::new()); // A11yTree for accessibility
+        world.insert_resource(FocusManager::new()); // Focus tracking
+        world.insert_resource(ArthropodActionHandler::new()); // Action handler
         world.insert_resource(RenderCommands::default());
 
         Self {
@@ -146,6 +148,7 @@ impl FrameworkContext {
             update_reactive_colors_system,
             update_reactive_transforms_system,
             update_reactive_opacity_system,
+            sync_accessible_nodes_system, // Sync after reactive updates
         ));
         schedule
     }

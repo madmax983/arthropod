@@ -13,6 +13,7 @@ flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
 layout-engine = { path = "../layout-engine" }
 glam = "0.29"
+accesskit = "0.17"  # For ActionRequest in tests
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }

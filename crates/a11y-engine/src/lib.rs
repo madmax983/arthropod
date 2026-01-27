@@ -33,12 +33,16 @@
 //! let button_id = tree.add_node(tree.root(), button);
 //! ```
 
+pub mod focus;
 pub mod node;
+pub mod platform;
 pub mod tree;
 
+pub use focus::FocusManager;
 pub use node::{
     A11yAction, A11yId, A11yNode, A11yRelations, A11yState, AccessibleName, CheckedState, Role,
 };
+pub use platform::action_handler::ArthropodActionHandler;
 pub use tree::A11yTree;
 
 #[cfg(test)]

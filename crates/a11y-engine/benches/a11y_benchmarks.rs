@@ -1,10 +1,17 @@
 //! Benchmarks for accessibility engine performance
 //!
 //! Measures key operations to ensure < 100 μs overhead per frame.
+//! Per ADR 0010 requirements:
+//! - A11yTree add node: < 50 ns
+//! - A11yTree update node: < 30 ns
+//! - Sync to platform (100 nodes): < 100 microseconds
 
-use a11y_engine::{A11yNode, A11yTree, AccessibleName, Role};
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use a11y_engine::{
+    platform::accesskit_bridge::AccessKitBridge, A11yNode, A11yTree, AccessibleName, Role,
+};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use plat_core::Rect;
+use std::sync::{Arc, Mutex};
 
 /// Benchmark adding nodes to the tree
 fn bench_add_node(c: &mut Criterion) {
@@ -220,6 +227,152 @@ fn bench_realistic_ui(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark syncing dirty nodes to AccessKit platform
+/// Target: < 100 microseconds for 100 dirty nodes (ADR 0010)
+fn bench_sync_to_platform(c: &mut Criterion) {
+    let mut group = c.benchmark_group("sync_to_platform");
+
+    for node_count in [10, 50, 100, 500, 1000] {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(node_count),
+            &node_count,
+            |b, &count| {
+                // Setup: create tree with many dirty nodes
+                let mut tree = A11yTree::new();
+                let root = tree.root();
+
+                let _node_ids: Vec<_> = (0..count)
+                    .map(|i| {
+                        tree.add_node(root, A11yNode {
+                            role: Role::Button,
+                            name: AccessibleName::Text(format!("Button {}", i)),
+                            ..Default::default()
+                        })
+                    })
+                    .collect();
+
+                // Get all dirty nodes
+                let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+
+                // Create bridge
+                let tree_arc = Arc::new(Mutex::new(tree));
+                let bridge = AccessKitBridge::new(tree_arc);
+
+                // Benchmark syncing dirty nodes to AccessKit
+                b.iter(|| {
+                    black_box(bridge.create_tree_update(black_box(&dirty)));
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark full ECS sync cycle (ECS → A11yTree update)
+/// Simulates sync_accessible_nodes_system updating A11yTree from Scene
+fn bench_ecs_a11y_sync(c: &mut Criterion) {
+    let mut group = c.benchmark_group("ecs_a11y_sync");
+
+    for widget_count in [100, 500, 1000] {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(widget_count),
+            &widget_count,
+            |b, &count| {
+                b.iter(|| {
+                    // Setup: create tree and simulate ECS sync
+                    let mut tree = A11yTree::new();
+                    let root = tree.root();
+
+                    // Create nodes
+                    let node_ids: Vec<_> = (0..count)
+                        .map(|i| {
+                            tree.add_node(root, A11yNode {
+                                role: Role::Button,
+                                name: AccessibleName::Text(format!("Button {}", i)),
+                                ..Default::default()
+                            })
+                        })
+                        .collect();
+
+                    tree.clear_dirty();
+
+                    // Simulate ECS system updating bounds for all nodes
+                    for (i, &node_id) in node_ids.iter().enumerate() {
+                        tree.update_node(node_id, |node| {
+                            node.bounds = Rect::new(
+                                (i as f32 * 10.0) % 800.0,
+                                (i as f32 / 80.0) * 50.0,
+                                100.0,
+                                40.0,
+                            );
+                        });
+                    }
+
+                    black_box(tree);
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark complete render frame a11y overhead
+/// Measures: ECS sync → get dirty → platform sync
+fn bench_frame_a11y_overhead(c: &mut Criterion) {
+    let mut group = c.benchmark_group("frame_a11y_overhead");
+
+    for dirty_count in [10, 50, 100] {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(dirty_count),
+            &dirty_count,
+            |b, &count| {
+                b.iter(|| {
+                    // Create tree with existing nodes
+                    let mut tree = A11yTree::new();
+                    let root = tree.root();
+
+                    // Add 1000 total nodes (realistic UI)
+                    let mut node_ids = Vec::new();
+                    for i in 0..1000 {
+                        let id = tree.add_node(root, A11yNode {
+                            role: Role::Button,
+                            name: AccessibleName::Text(format!("Button {}", i)),
+                            ..Default::default()
+                        });
+                        node_ids.push(id);
+                    }
+
+                    tree.clear_dirty();
+
+                    // Update only a subset (dirty nodes from frame changes)
+                    for i in 0..count {
+                        tree.update_node(node_ids[i], |node| {
+                            node.bounds = Rect::new(
+                                black_box(100.0),
+                                black_box(200.0),
+                                black_box(50.0),
+                                black_box(30.0),
+                            );
+                        });
+                    }
+
+                    // Get dirty nodes
+                    let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+
+                    // Sync to platform
+                    let tree_arc = Arc::new(Mutex::new(tree));
+                    let bridge = AccessKitBridge::new(tree_arc);
+                    let _update = black_box(bridge.create_tree_update(&dirty));
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_add_node,
@@ -228,5 +381,8 @@ criterion_group!(
     bench_get_dirty_nodes,
     bench_remove_node,
     bench_realistic_ui,
+    bench_sync_to_platform,
+    bench_ecs_a11y_sync,
+    bench_frame_a11y_overhead,
 );
 criterion_main!(benches);
