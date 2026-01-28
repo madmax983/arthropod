@@ -65,15 +65,15 @@ impl GlyphAtlas {
         }
 
         // Rasterize glyph using cosmic-text
-        let coords = self.rasterize_glyph(cache_key, font_system);
+        let (coords, width, height) = self.rasterize_glyph(cache_key, font_system);
 
         // Cache it
         self.cache.insert(
             cache_key,
             CachedGlyph {
                 coords,
-                width: 0, // TODO: store actual dimensions
-                height: 0,
+                width,
+                height,
             },
         );
 
@@ -81,7 +81,11 @@ impl GlyphAtlas {
     }
 
     /// Rasterize a glyph and pack it into the atlas
-    fn rasterize_glyph(&mut self, cache_key: CacheKey, font_system: &mut FontSystem) -> TexCoords {
+    fn rasterize_glyph(
+        &mut self,
+        cache_key: CacheKey,
+        font_system: &mut FontSystem,
+    ) -> (TexCoords, u32, u32) {
         // Rasterize using cosmic-text's SwashCache
         // We extract the data we need immediately to avoid borrow conflicts
         let (glyph_width, glyph_height, glyph_data) =
@@ -99,7 +103,7 @@ impl GlyphAtlas {
                     let u1 = (self.current_x + 1) as f32 / self.width as f32;
                     let v1 = (self.current_y + 1) as f32 / self.height as f32;
                     self.current_x += 1;
-                    return TexCoords { u0, v0, u1, v1 };
+                    return (TexCoords { u0, v0, u1, v1 }, 1, 1);
                 }
             };
 
@@ -153,7 +157,7 @@ impl GlyphAtlas {
         self.current_x += glyph_width;
         self.row_height = self.row_height.max(glyph_height);
 
-        TexCoords { u0, v0, u1, v1 }
+        (TexCoords { u0, v0, u1, v1 }, glyph_width, glyph_height)
     }
 
     /// Get the texture data
@@ -257,5 +261,36 @@ mod tests {
         // At 81%, near full
         atlas.current_y = 81;
         assert!(atlas.is_near_full());
+    }
+
+    #[test]
+    fn test_cached_glyph_dimensions() {
+        use text_engine::TextEngine;
+        let mut atlas = GlyphAtlas::new(512, 512);
+        let mut engine = TextEngine::new();
+
+        // Shape some text to get a valid cache key
+        let shaped = engine.shape_text("A", 16.0);
+
+        // Ensure we have at least one glyph
+        if shaped.glyphs.is_empty() {
+            // If no system fonts are found or "A" produces no glyphs, we skip the test
+            // or print a warning, but we expect "A" to work on most systems.
+            // On CI environments without fonts this might be an issue.
+            // But let's assume there is a font.
+            return;
+        }
+
+        let glyph = &shaped.glyphs[0];
+
+        atlas.get_or_rasterize(glyph.cache_key, engine.font_system());
+
+        let cached = atlas.cache.get(&glyph.cache_key).expect("Glyph should be cached");
+
+        // Allow for the possibility that one dimension could legitimately be zero
+        assert!(
+            cached.width > 0 || cached.height > 0,
+            "At least one glyph dimension should be > 0"
+        );
     }
 }

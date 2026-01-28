@@ -1,6 +1,9 @@
 //! Stub implementation for unsupported platforms.
 
-use crate::{Application, ControlFlow, Event, PlatformError, Size, Window, WindowConfig, WindowId};
+use crate::{
+    Application, BackdropMaterial, ControlFlow, Event, PlatformError, Size, Window, WindowConfig,
+    WindowId,
+};
 use crate::materials::BackdropMaterial;
 use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
 
