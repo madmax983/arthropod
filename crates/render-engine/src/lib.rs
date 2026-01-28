@@ -31,6 +31,9 @@ pub enum RendererError {
     #[error("No suitable graphics adapter found")]
     NoAdapter,
 
+    #[error("Initialization failed: {0}")]
+    InitializationFailed(String),
+
     #[error("wgpu error: {0}")]
     Wgpu(#[from] wgpu::RequestDeviceError),
 

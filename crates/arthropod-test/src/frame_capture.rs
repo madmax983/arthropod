@@ -69,7 +69,9 @@ impl FrameCapture {
             tx.send(result).unwrap();
         });
 
-        self.device.poll(wgpu::Maintain::Wait);
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .context("Device poll failed during frame capture")?;
         rx.recv().context("Failed to map buffer")??;
 
         // Get the data
@@ -148,7 +150,9 @@ impl FrameCapture {
             tx.send(result).unwrap();
         });
 
-        self.device.poll(wgpu::Maintain::Wait);
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .context("Device poll failed during frame capture")?;
         rx.recv().context("Failed to map buffer")??;
 
         let data = buffer_slice.get_mapped_range().to_vec();

@@ -96,14 +96,46 @@ impl WgpuBackend {
     {
         let _span = span!(Level::INFO, "wgpu_backend_init").entered();
 
-        // Create wgpu instance with validation enabled in debug builds
-        // Create instance
-        println!("🚀 Creating wgpu Instance (forcing DX12 for DirectComposition)");
-        // Force DX12 for best DirectComposition support
-        // We use Instance::new(&InstanceDescriptor) which is standard in wgpu 0.19+
+        // Create wgpu instance with DirectComposition support
+        println!("🚀 Creating wgpu Instance (DX12 with DirectComposition)");
+
+        #[cfg(target_os = "windows")]
+        let backend_options = {
+            let mut dx12_options = if composition_mode {
+                wgpu::Dx12BackendOptions {
+                    presentation_system: wgpu::Dx12SwapchainKind::DxgiFromVisual,
+                    ..Default::default()
+                }
+            } else {
+                Default::default()
+            };
+
+            // Apply environment variable overrides (e.g., WGPU_DX12_PRESENTATION_SYSTEM=Hwnd for RenderDoc)
+            dx12_options = dx12_options.with_env();
+
+            // Log final presentation system
+            match dx12_options.presentation_system {
+                wgpu::Dx12SwapchainKind::DxgiFromVisual => {
+                    println!("   Using DxgiFromVisual (transparency, no RenderDoc)");
+                }
+                wgpu::Dx12SwapchainKind::DxgiFromHwnd => {
+                    println!("   Using DxgiFromHwnd (RenderDoc compatible)");
+                }
+            }
+
+            wgpu::BackendOptions {
+                dx12: dx12_options,
+                ..Default::default()
+            }
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let backend_options = Default::default();
+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::DX12,
-            flags: wgpu::InstanceFlags::empty(), // Disable validation to allow forcing PreMultiplied
+            flags: wgpu::InstanceFlags::empty(),
+            backend_options,
             ..Default::default()
         });
 
@@ -132,7 +164,7 @@ impl WgpuBackend {
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
-        .ok_or(RendererError::NoAdapter)?;
+        .map_err(|e| RendererError::InitializationFailed(format!("Failed to request adapter: {:?}", e)))?;
 
         let adapter_info = adapter.get_info();
         println!(
@@ -160,12 +192,13 @@ impl WgpuBackend {
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
                 memory_hints: wgpu::MemoryHints::default(),
+                experimental_features: Default::default(),
+                trace: Default::default(),
             },
-            None,
         ))?;
 
         // Set up error callback
-        device.on_uncaptured_error(Box::new(|err| {
+        device.on_uncaptured_error(std::sync::Arc::new(|err| {
             error!("wgpu uncaptured error: {}", err);
         }));
 
@@ -333,7 +366,7 @@ impl WgpuBackend {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &[&globals_bind_group_layout],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         // Define vertex buffer layout (per-instance attributes)
@@ -381,7 +414,7 @@ impl WgpuBackend {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -416,7 +449,7 @@ impl WgpuBackend {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -489,7 +522,7 @@ impl WgpuBackend {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Glyph Pipeline Layout"),
                 bind_group_layouts: &[&glyph_bind_group_layout],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
 
         let glyph_vertex_buffer_layout = wgpu::VertexBufferLayout {
@@ -537,7 +570,7 @@ impl WgpuBackend {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
@@ -688,6 +721,7 @@ impl super::RenderBackend for WgpuBackend {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: self.clear_color.r() as f64,
@@ -701,6 +735,7 @@ impl super::RenderBackend for WgpuBackend {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             // Render rectangles
@@ -910,6 +945,7 @@ impl WgpuBackend {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: self.clear_color.r() as f64,
@@ -923,6 +959,7 @@ impl WgpuBackend {
                 depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             render_pass.set_pipeline(&self.pipeline);

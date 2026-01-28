@@ -151,9 +151,9 @@ impl WindowImpl {
                 CW_USEDEFAULT,
                 config.size.width as i32,
                 config.size.height as i32,
-                HWND::default(),  // Parent
-                HMENU::default(), // Menu
-                hinstance,
+                None,  // Parent
+                None,  // Menu
+                Some(hinstance),
                 Some(id.0 as *const std::ffi::c_void),
             )
             .map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
@@ -244,7 +244,7 @@ impl WindowImpl {
     pub fn request_redraw(&self) {
         unsafe {
             // InvalidateRect will trigger WM_PAINT, which marks window as dirty
-            let _ = InvalidateRect(self.hwnd, None, false);
+            let _ = InvalidateRect(Some(self.hwnd), None, false);
         }
     }
 
@@ -278,6 +278,18 @@ impl WindowImpl {
 
 impl Drop for WindowImpl {
     fn drop(&mut self) {
+        // If we initialized COM for DirectComposition, uninitialize it
+        // Must be done before destroying the window to ensure clean teardown
+        #[cfg(target_os = "windows")]
+        if self.composition.is_some() {
+            // Drop composition resources first (while COM is still active)
+            self.composition = None;
+            // Now uninitialize COM
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
+        }
+
         unsafe {
             // Ensure the window is destroyed when the Rust struct is dropped
             // This handles cases where the app drops the window manually

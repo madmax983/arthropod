@@ -9,6 +9,7 @@ use windows::{
     Win32::{
         Foundation::*,
         Graphics::{Direct3D::*, Direct3D11::*, DirectComposition::*, Dxgi::*},
+        System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED},
     },
     core::*,
 };

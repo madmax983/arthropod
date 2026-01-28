@@ -108,8 +108,8 @@ impl SystemTheme {
 
     #[cfg(target_os = "windows")]
     fn query_windows() -> Result<Self> {
-        use windows::Win32::Foundation::BOOL;
         use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
+        use windows_core::BOOL;
 
         // Query accent color from DWM
         let accent_color = unsafe {
@@ -194,7 +194,7 @@ impl SystemTheme {
             let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows\\DWM");
             let mut hkey = Default::default();
 
-            if RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, 0, KEY_READ, &mut hkey).is_ok() {
+            if RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, None, KEY_READ, &mut hkey).is_ok() {
                 let value_name = HSTRING::from("AccentColor");
                 let mut data: u32 = 0;
                 let mut data_size = std::mem::size_of::<u32>() as u32;
@@ -238,7 +238,7 @@ impl SystemTheme {
                 HSTRING::from("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
             let mut hkey = Default::default();
 
-            if RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, 0, KEY_READ, &mut hkey).is_ok() {
+            if RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, None, KEY_READ, &mut hkey).is_ok() {
                 let value_name = HSTRING::from("AppsUseLightTheme");
                 let mut data: u32 = 0;
                 let mut data_size = std::mem::size_of::<u32>() as u32;
@@ -285,7 +285,7 @@ impl SystemTheme {
             let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
             let mut hkey = Default::default();
 
-            if RegOpenKeyExW(HKEY_LOCAL_MACHINE, &subkey, 0, KEY_READ, &mut hkey).is_ok() {
+            if RegOpenKeyExW(HKEY_LOCAL_MACHINE, &subkey, None, KEY_READ, &mut hkey).is_ok() {
                 // Read CurrentBuildNumber (stored as string)
                 let value_name = HSTRING::from("CurrentBuildNumber");
                 let mut data = [0u8; 64];

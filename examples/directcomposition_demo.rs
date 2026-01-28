@@ -46,12 +46,12 @@ impl Application for CompositionApp {
         println!("Selective transparency: Mica sidebar + solid content");
         println!();
 
-        // Enable composition mode in window config
+        // Window config for wgpu-managed DirectComposition
         let config = WindowConfig {
-            title: "DirectComposition Demo - Selective Transparency".to_string(),
+            title: "DirectComposition Demo - wgpu Built-in Transparency".to_string(),
             size: Size::new(1000, 700),
-            composition_mode: true, // Key: enable DirectComposition
-            transparent: true,
+            composition_mode: false, // FALSE: wgpu handles DirectComposition via DxgiFromVisual
+            transparent: true,       // TRUE: enables transparent window
             visible: true,
             ..Default::default()
         };
@@ -71,47 +71,18 @@ impl Application for CompositionApp {
         // Use transparent clear color so backdrop shows through
         backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 0.0));
 
-        // Create compositor for layer-based materials
-        let compositor = match Compositor::new(&window) {
-            Ok(Some(mut comp)) => {
-                // Create Mica layer for sidebar
-                if let Ok(mut sidebar_layer) = comp.create_layer(BackdropMaterial::Mica) {
-                    let _ = sidebar_layer.set_bounds(Rect::new(
-                        0.0,
-                        0.0,
-                        SIDEBAR_WIDTH,
-                        size.height as f32,
-                    ));
-                }
+        // NOTE: wgpu 28.0's DxgiFromVisual handles DirectComposition automatically.
+        // The Mica backdrop is applied via window.set_backdrop_material() above.
+        // Manual Compositor would conflict with wgpu's built-in DirectComposition,
+        // causing DCOMPOSITION_ERROR_WINDOW_ALREADY_COMPOSED.
+        //
+        // Instead, we demonstrate transparency by rendering:
+        // - Semi-transparent rectangles in sidebar (shows Mica through)
+        // - Opaque rectangles in content area (blocks Mica)
+        let compositor = None;
 
-                // Create solid layer for content area
-                if let Ok(mut content_layer) = comp.create_layer(BackdropMaterial::None) {
-                    let _ = content_layer.set_bounds(Rect::new(
-                        SIDEBAR_WIDTH,
-                        0.0,
-                        size.width as f32 - SIDEBAR_WIDTH,
-                        size.height as f32,
-                    ));
-                }
-
-                // Commit changes
-                let _ = comp.commit();
-
-                println!("DirectComposition layers created:");
-                println!("  - Sidebar: Mica (0-{}px)", SIDEBAR_WIDTH);
-                println!("  - Content: Solid ({}px+)", SIDEBAR_WIDTH);
-
-                Some(comp)
-            }
-            Ok(None) => {
-                println!("Note: Compositor not available (composition_mode may be disabled)");
-                None
-            }
-            Err(e) => {
-                println!("Note: Failed to create compositor: {}", e);
-                None
-            }
-        };
+        println!("Using wgpu's built-in DirectComposition (DxgiFromVisual)");
+        println!("Window backdrop: Mica (shows through transparent areas)");
 
         // Create demo scene
         let scene = create_demo_scene(size.width, size.height);
