@@ -96,7 +96,7 @@ impl Widget for Text {
         };
 
         // Create text node with raw text (backend will shape it during rendering)
-        ctx.create_node(
+        let node_id = ctx.create_node(
             ctx.root(),
             NodeContent::Text {
                 text: text_string,
@@ -108,6 +108,12 @@ impl Widget for Text {
                     resolved_color.w,
                 ),
             },
-        )
+        );
+
+        if let TextContent::Reactive(signal) = &self.content {
+            ctx.add_reactive_text_state(node_id, signal.clone());
+        }
+
+        node_id
     }
 }

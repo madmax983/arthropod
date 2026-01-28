@@ -22,6 +22,12 @@ pub struct TextInputState {
     pub max_length: Option<usize>,
 }
 
+/// Reactive text state for a node
+#[derive(Clone)]
+pub struct ReactiveTextState {
+    pub read_signal: ReadSignal<String>,
+}
+
 /// Validation state for a node
 pub struct ValidationState {
     pub validator: Validator,
@@ -77,6 +83,7 @@ pub struct WidgetContext {
     clickables: HashMap<NodeId, Arc<dyn Fn() + Send + Sync>>,
     background_colors: HashMap<NodeId, Vec4>,
     text_input_states: HashMap<NodeId, TextInputState>,
+    reactive_text_states: HashMap<NodeId, ReactiveTextState>,
     focused_node: Option<NodeId>,
     validators: HashMap<NodeId, ValidationState>,
     placeholders: HashSet<NodeId>,
@@ -95,6 +102,7 @@ impl WidgetContext {
             clickables: HashMap::new(),
             background_colors: HashMap::new(),
             text_input_states: HashMap::new(),
+            reactive_text_states: HashMap::new(),
             focused_node: None,
             validators: HashMap::new(),
             placeholders: HashSet::new(),
@@ -158,9 +166,25 @@ impl WidgetContext {
     }
 
     /// Check if node has reactive text component
-    pub fn has_reactive_text(&self, _node_id: NodeId) -> bool {
-        // TODO: Query ECS for ReactiveText component
-        true // For now, assume reactive nodes exist
+    pub fn has_reactive_text(&self, node_id: NodeId) -> bool {
+        self.reactive_text_states.contains_key(&node_id)
+    }
+
+    /// Get the text content of a node if it has any
+    pub fn get_text(&self, node_id: NodeId) -> Option<String> {
+        // Check reactive state first
+        if let Some(state) = self.reactive_text_states.get(&node_id) {
+            return Some(state.read_signal.get_untracked());
+        }
+
+        // Fallback to static content in node
+        if let Some(node) = self.scene.get_node(node_id) {
+            if let NodeContent::Text { text, .. } = &node.content {
+                return Some(text.clone());
+            }
+        }
+
+        None
     }
 
     /// Set layout style for a node
@@ -238,6 +262,14 @@ impl WidgetContext {
         } else {
             self.hover_states.remove(&node_id);
         }
+    }
+
+    /// Add reactive text state to a node
+    pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
+        self.reactive_text_states.insert(
+            node_id,
+            ReactiveTextState { read_signal },
+        );
     }
 
     /// Add text input state to a node
@@ -675,6 +707,11 @@ impl WidgetContext {
         &self.text_input_states
     }
 
+    /// Get all reactive text states (for app-shell integration)
+    pub fn reactive_text_states(&self) -> &HashMap<NodeId, ReactiveTextState> {
+        &self.reactive_text_states
+    }
+
     /// Get all validators (for app-shell integration)
     pub fn validators(&self) -> &HashMap<NodeId, ValidationState> {
         &self.validators
@@ -1094,5 +1131,54 @@ mod tests {
         // Out of bounds
         assert_eq!(super::char_idx_to_byte_idx("abc", 10), None);
         assert_eq!(super::char_idx_to_byte_idx("😀", 5), None);
+    }
+
+    #[test]
+    fn test_get_text_static() {
+        let mut ctx = WidgetContext::new_test();
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Text {
+                text: "Hello".to_string(),
+                font_size: 16.0,
+                color: Color::BLACK,
+            },
+        );
+
+        assert_eq!(ctx.get_text(node_id), Some("Hello".to_string()));
+    }
+
+    #[test]
+    fn test_get_text_reactive() {
+        let mut ctx = WidgetContext::new_test();
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, "Initial".to_string());
+        let (read, write) = signal.split();
+
+        // Simulate what Text widget does:
+        // 1. Get initial value
+        let initial = read.get_untracked();
+
+        // 2. Create node
+        let node_id = ctx.create_node(
+            ctx.root(),
+            NodeContent::Text {
+                text: initial,
+                font_size: 16.0,
+                color: Color::BLACK,
+            },
+        );
+
+        // 3. Register reactive state
+        ctx.add_reactive_text_state(node_id, read);
+
+        // Initial check
+        assert_eq!(ctx.get_text(node_id), Some("Initial".to_string()));
+
+        // Update signal
+        write.set("Updated".to_string());
+
+        // Should reflect update
+        assert_eq!(ctx.get_text(node_id), Some("Updated".to_string()));
     }
 }

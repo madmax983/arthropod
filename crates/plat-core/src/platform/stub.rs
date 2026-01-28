@@ -1,6 +1,7 @@
 //! Stub implementation for unsupported platforms.
 
 use crate::{Application, ControlFlow, Event, PlatformError, Size, Window, WindowConfig, WindowId};
+use crate::materials::BackdropMaterial;
 use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
 
 pub struct EventLoopImpl;
@@ -39,6 +40,12 @@ impl WindowImpl {
     }
 
     pub fn set_visible(&self, _visible: bool) {}
+
+    pub fn set_backdrop_material(&self, _material: BackdropMaterial) {}
+
+    pub fn backdrop_material(&self) -> BackdropMaterial {
+        BackdropMaterial::None
+    }
 }
 
 impl HasWindowHandle for WindowImpl {
