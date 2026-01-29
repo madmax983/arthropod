@@ -3677,6 +3677,7 @@ dependencies = [
  "criterion",
  "flux-state",
  "glam",
+ "indexmap",
  "layout-engine",
  "plat-core",
  "render-engine",

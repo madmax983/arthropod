@@ -2,7 +2,9 @@
 //!
 //! Provides API for widgets to build scene nodes and configure components.
 
-use crate::form::{FormData, SubmitCallback};
+use crate::form::SubmitCallback;
+use crate::form_context::FormContext;
+use crate::input_context::InputContext;
 use crate::validation::Validator;
 use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
@@ -12,59 +14,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use theme_engine::DesignTokens;
 
-/// Text input state for a node
-#[derive(Clone)]
-pub struct TextInputState {
-    pub read_signal: ReadSignal<String>,
-    pub write_signal: WriteSignal<String>,
-    pub cursor_position: usize,
-    pub readonly: bool,
-    pub max_length: Option<usize>,
-}
-
-/// Reactive text state for a node
-#[derive(Clone)]
-pub struct ReactiveTextState {
-    pub read_signal: ReadSignal<String>,
-}
-
-/// Validation state for a node
-pub struct ValidationState {
-    pub validator: Validator,
-    pub error: Option<String>,
-}
-
-/// Form state for tracking form fields and validation
-pub struct FormState {
-    pub field_mapping: HashMap<String, NodeId>, // field name -> field node ID
-    pub is_valid: bool,
-    pub on_submit: Option<SubmitCallback>,
-    pub submit_error: Option<String>,
-}
-
-/// Convert a character index to a byte index in a string.
-///
-/// This is necessary because Rust strings are UTF-8 encoded, where characters
-/// can be 1-4 bytes. `String::insert()` and `String::remove()` expect byte
-/// indices, not character indices.
-///
-/// # Returns
-/// - `Some(byte_idx)` if char_idx is valid
-/// - `None` if char_idx is out of bounds
-fn char_idx_to_byte_idx(s: &str, char_idx: usize) -> Option<usize> {
-    s.char_indices()
-        .nth(char_idx)
-        .map(|(byte_idx, _)| byte_idx)
-        .or_else(|| {
-            // If char_idx equals char count, return the string length
-            // (valid insertion point at the end)
-            if char_idx == s.chars().count() {
-                Some(s.len())
-            } else {
-                None
-            }
-        })
-}
+// Re-export types from sub-contexts to maintain API compatibility
+pub use crate::form_context::{FormState, ValidationState};
+pub use crate::input_context::{ReactiveTextState, TextInputState};
 
 /// Widget building context
 ///
@@ -82,12 +34,11 @@ pub struct WidgetContext {
     hover_states: HashSet<NodeId>,
     clickables: HashMap<NodeId, Arc<dyn Fn() + Send + Sync>>,
     background_colors: HashMap<NodeId, Vec4>,
-    text_input_states: HashMap<NodeId, TextInputState>,
-    reactive_text_states: HashMap<NodeId, ReactiveTextState>,
-    focused_node: Option<NodeId>,
-    validators: HashMap<NodeId, ValidationState>,
-    placeholders: HashSet<NodeId>,
-    form_states: HashMap<NodeId, FormState>,
+
+    // Delegated contexts
+    input_context: InputContext,
+    form_context: FormContext,
+
     /// Design tokens for theming (optional for backwards compatibility)
     design_tokens: Option<DesignTokens>,
 }
@@ -101,12 +52,8 @@ impl WidgetContext {
             hover_states: HashSet::new(),
             clickables: HashMap::new(),
             background_colors: HashMap::new(),
-            text_input_states: HashMap::new(),
-            reactive_text_states: HashMap::new(),
-            focused_node: None,
-            validators: HashMap::new(),
-            placeholders: HashSet::new(),
-            form_states: HashMap::new(),
+            input_context: InputContext::new(),
+            form_context: FormContext::new(),
             design_tokens: None,
         }
     }
@@ -167,13 +114,13 @@ impl WidgetContext {
 
     /// Check if node has reactive text component
     pub fn has_reactive_text(&self, node_id: NodeId) -> bool {
-        self.reactive_text_states.contains_key(&node_id)
+        self.input_context.reactive_text_states.contains_key(&node_id)
     }
 
     /// Get the text content of a node if it has any
     pub fn get_text(&self, node_id: NodeId) -> Option<String> {
         // Check reactive state first
-        if let Some(state) = self.reactive_text_states.get(&node_id) {
+        if let Some(state) = self.input_context.reactive_text_states.get(&node_id) {
             return Some(state.read_signal.get_untracked());
         }
 
@@ -266,8 +213,7 @@ impl WidgetContext {
 
     /// Add reactive text state to a node
     pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
-        self.reactive_text_states
-            .insert(node_id, ReactiveTextState { read_signal });
+        self.input_context.add_reactive_text_state(node_id, read_signal);
     }
 
     /// Add text input state to a node
@@ -279,154 +225,52 @@ impl WidgetContext {
         readonly: bool,
         max_length: Option<usize>,
     ) {
-        // Use character count, not byte length for cursor position
-        let cursor_position = read_signal.get_untracked().chars().count();
-        self.text_input_states.insert(
-            node_id,
-            TextInputState {
-                read_signal,
-                write_signal,
-                cursor_position,
-                readonly,
-                max_length,
-            },
-        );
+        self.input_context.add_text_input_state(node_id, read_signal, write_signal, readonly, max_length);
     }
 
     /// Focus a node
     pub fn focus_node(&mut self, node_id: NodeId) {
-        self.focused_node = Some(node_id);
+        self.input_context.focus_node(node_id);
     }
 
     /// Check if node is focused
     pub fn is_focused(&self, node_id: NodeId) -> bool {
-        self.focused_node == Some(node_id)
+        self.input_context.is_focused(node_id)
     }
 
     /// Blur a node
     pub fn blur_node(&mut self, node_id: NodeId) {
-        if self.focused_node == Some(node_id) {
-            self.focused_node = None;
-        }
+        self.input_context.blur_node(node_id);
     }
 
     /// Get cursor position for a text input
     pub fn get_cursor_position(&self, node_id: NodeId) -> Option<usize> {
-        self.text_input_states
-            .get(&node_id)
-            .map(|state| state.cursor_position)
+        self.input_context.get_cursor_position(node_id)
     }
 
     /// Send a character to focused input
     pub fn send_char(&mut self, c: char) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                let mut current_value = state.read_signal.get_untracked();
-
-                // Check max_length (in characters, not bytes)
-                if let Some(max_len) = state.max_length {
-                    if current_value.chars().count() >= max_len {
-                        return;
-                    }
-                }
-
-                // Convert character index to byte index for insertion
-                // cursor_position is a character index (user-facing concept)
-                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position)
-                {
-                    current_value.insert(byte_idx, c);
-                    state.cursor_position += 1;
-
-                    // Update signal
-                    state.write_signal.set(current_value);
-                }
-            }
-        }
+        self.input_context.send_char(c);
     }
 
     /// Send backspace to focused input
     pub fn send_backspace(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                if state.cursor_position > 0 {
-                    let mut current_value = state.read_signal.get_untracked();
-
-                    // Convert character index to byte index for removal
-                    // We need to remove the character BEFORE the cursor
-                    if let Some(byte_idx) =
-                        char_idx_to_byte_idx(&current_value, state.cursor_position - 1)
-                    {
-                        current_value.remove(byte_idx);
-                        state.cursor_position -= 1;
-
-                        // Update signal
-                        state.write_signal.set(current_value);
-                    }
-                }
-            }
-        }
+        self.input_context.send_backspace();
     }
 
     /// Send delete to focused input
     pub fn send_delete(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                let current_value = state.read_signal.get_untracked();
-                let char_count = current_value.chars().count();
-
-                // Check if there's a character at cursor position to delete
-                if state.cursor_position < char_count {
-                    let mut new_value = current_value;
-
-                    // Convert character index to byte index for removal
-                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position)
-                    {
-                        new_value.remove(byte_idx);
-
-                        // Update signal (cursor position stays the same)
-                        state.write_signal.set(new_value);
-                    }
-                }
-            }
-        }
+        self.input_context.send_delete();
     }
 
     /// Send left arrow key to focused input
     pub fn send_key_left(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.cursor_position > 0 {
-                    state.cursor_position -= 1;
-                }
-            }
-        }
+        self.input_context.send_key_left();
     }
 
     /// Send right arrow key to focused input
     pub fn send_key_right(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                let current_value = state.read_signal.get_untracked();
-                let char_count = current_value.chars().count();
-
-                // Move cursor right if not at end (use char count, not byte length)
-                if state.cursor_position < char_count {
-                    state.cursor_position += 1;
-                }
-            }
-        }
+        self.input_context.send_key_right();
     }
 
     /// Set validator for a node
@@ -436,45 +280,32 @@ impl WidgetContext {
         validator: Validator,
         initial_result: Result<(), String>,
     ) {
-        self.validators.insert(
-            node_id,
-            ValidationState {
-                validator,
-                error: initial_result.err(),
-            },
-        );
+        self.form_context.set_validator(node_id, validator, initial_result);
     }
 
     /// Check if node has validation error
     pub fn has_validation_error(&self, node_id: NodeId) -> bool {
-        self.validators
-            .get(&node_id)
-            .and_then(|state| state.error.as_ref())
-            .is_some()
+        self.form_context.has_validation_error(node_id)
     }
 
     /// Get validation error for a node
     pub fn get_validation_error(&self, node_id: NodeId) -> Option<String> {
-        self.validators
-            .get(&node_id)
-            .and_then(|state| state.error.clone())
+        self.form_context.get_validation_error(node_id)
     }
 
     /// Add placeholder marker to a node
     pub fn add_placeholder(&mut self, node_id: NodeId) {
-        self.placeholders.insert(node_id);
+        self.input_context.add_placeholder(node_id);
     }
 
     /// Check if node has placeholder
     pub fn has_placeholder(&self, node_id: NodeId) -> bool {
-        self.placeholders.contains(&node_id)
+        self.input_context.has_placeholder(node_id)
     }
 
     /// Get current value of a text input (for testing)
     pub fn get_text_input_value(&self, node_id: NodeId) -> Option<String> {
-        self.text_input_states
-            .get(&node_id)
-            .map(|state| state.read_signal.get_untracked())
+        self.input_context.get_text_input_value(node_id)
     }
 
     /// Add form state to a node
@@ -484,130 +315,49 @@ impl WidgetContext {
         field_mapping: HashMap<String, NodeId>,
         on_submit: Option<SubmitCallback>,
     ) {
-        self.form_states.insert(
-            node_id,
-            FormState {
-                field_mapping,
-                is_valid: true, // Will be updated by revalidate_form
-                on_submit,
-                submit_error: None,
-            },
-        );
+        self.form_context.add_form_state(node_id, field_mapping, on_submit);
     }
 
     /// Check if form is valid
     pub fn is_form_valid(&self, node_id: NodeId) -> bool {
-        self.form_states
-            .get(&node_id)
-            .map(|state| state.is_valid)
-            .unwrap_or(true)
+        self.form_context.is_form_valid(node_id)
     }
 
     /// Get all field errors for a form
     pub fn get_form_field_errors(&self, node_id: NodeId) -> HashMap<String, String> {
-        let mut errors = HashMap::new();
-
-        if let Some(form_state) = self.form_states.get(&node_id) {
-            for (field_name, field_node_id) in &form_state.field_mapping {
-                if let Some(error) = self.get_validation_error(*field_node_id) {
-                    errors.insert(field_name.clone(), error);
-                }
-            }
-        }
-
-        errors
+        self.form_context.get_form_field_errors(node_id)
     }
 
     /// Get form state for a form node
     pub fn get_form_state(&self, node_id: NodeId) -> Option<&FormState> {
-        self.form_states.get(&node_id)
+        self.form_context.get_form_state(node_id)
     }
 
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
-        // Re-run validators on all fields with current values
-        let field_node_ids: Vec<NodeId> = if let Some(form_state) = self.form_states.get(&node_id) {
-            form_state.field_mapping.values().copied().collect()
-        } else {
-            return;
-        };
-
-        // Collect current values first to avoid borrowing issues
-        let mut field_values = HashMap::new();
-        for field_node_id in &field_node_ids {
-            if let Some(current_value) = self.get_text_input_value(*field_node_id) {
-                field_values.insert(*field_node_id, current_value);
-            }
-        }
-
-        // Re-run validation for each field
-        for (field_node_id, current_value) in field_values {
-            if let Some(validator_state) = self.validators.get_mut(&field_node_id) {
-                // Run validator on current value
-                let result = (validator_state.validator)(&current_value);
-                validator_state.error = result.err();
-            }
-        }
-
-        // Get field errors after re-validation
-        let field_errors = self.get_form_field_errors(node_id);
-
-        // Update form is_valid state
-        if let Some(form_state) = self.form_states.get_mut(&node_id) {
-            form_state.is_valid = field_errors.is_empty();
-        }
+        let input_context = &self.input_context;
+        self.form_context.revalidate_form(node_id, |id| input_context.get_text_input_value(id));
     }
 
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
-        // Revalidate first
-        self.revalidate_form(node_id);
-
-        // Only submit if valid
-        if !self.is_form_valid(node_id) {
-            return;
-        }
-
-        // Collect form data
-        let mut form_data = FormData::new();
-
-        if let Some(form_state) = self.form_states.get(&node_id) {
-            for (field_name, field_node_id) in &form_state.field_mapping {
-                if let Some(value) = self.get_text_input_value(*field_node_id) {
-                    form_data.insert(field_name.clone(), value);
-                }
-            }
-
-            // Call submit callback
-            if let Some(callback) = &form_state.on_submit {
-                let result = callback(form_data);
-
-                // Store submit error if any
-                if let Some(form_state_mut) = self.form_states.get_mut(&node_id) {
-                    form_state_mut.submit_error = result.err();
-                }
-            }
-        }
+        let input_context = &self.input_context;
+        self.form_context.trigger_submit(node_id, |id| input_context.get_text_input_value(id));
     }
 
     /// Check if form has submit error
     pub fn has_submit_error(&self, node_id: NodeId) -> bool {
-        self.form_states
-            .get(&node_id)
-            .and_then(|state| state.submit_error.as_ref())
-            .is_some()
+        self.form_context.has_submit_error(node_id)
     }
 
     /// Get submit error for a form
     pub fn get_submit_error(&self, node_id: NodeId) -> Option<String> {
-        self.form_states
-            .get(&node_id)
-            .and_then(|state| state.submit_error.clone())
+        self.form_context.get_submit_error(node_id)
     }
 
     /// Check if node is a text input
     pub fn is_text_input(&self, node_id: NodeId) -> bool {
-        self.text_input_states.contains_key(&node_id)
+        self.input_context.is_text_input(node_id)
     }
 
     /// Check if node is clickable (alias for has_clickable)
@@ -617,66 +367,17 @@ impl WidgetContext {
 
     /// Get the currently focused node
     pub fn focused_node(&self) -> Option<NodeId> {
-        self.focused_node
+        self.input_context.focused_node
     }
 
     /// Focus the next focusable node (Tab navigation).
-    ///
-    /// Cycles through all text inputs in the order they were added.
-    /// If no node is focused, focuses the first one.
-    /// Wraps around from last to first.
-    ///
-    /// # Returns
-    ///
-    /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_next(&mut self) -> Option<NodeId> {
-        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
-        if focusable.is_empty() {
-            return None;
-        }
-
-        let current_index = self
-            .focused_node
-            .and_then(|f| focusable.iter().position(|&id| id == f));
-
-        let next_index = match current_index {
-            Some(idx) => (idx + 1) % focusable.len(),
-            None => 0,
-        };
-
-        let next_node = focusable[next_index];
-        self.focused_node = Some(next_node);
-        Some(next_node)
+        self.input_context.focus_next()
     }
 
     /// Focus the previous focusable node (Shift+Tab navigation).
-    ///
-    /// Cycles through all text inputs in reverse order.
-    /// If no node is focused, focuses the last one.
-    /// Wraps around from first to last.
-    ///
-    /// # Returns
-    ///
-    /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_prev(&mut self) -> Option<NodeId> {
-        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
-        if focusable.is_empty() {
-            return None;
-        }
-
-        let current_index = self
-            .focused_node
-            .and_then(|f| focusable.iter().position(|&id| id == f));
-
-        let prev_index = match current_index {
-            Some(0) => focusable.len() - 1,
-            Some(idx) => idx - 1,
-            None => focusable.len() - 1,
-        };
-
-        let prev_node = focusable[prev_index];
-        self.focused_node = Some(prev_node);
-        Some(prev_node)
+        self.input_context.focus_prev()
     }
 
     // =========================================================================
@@ -701,23 +402,23 @@ impl WidgetContext {
     }
 
     /// Get all text input states (for app-shell integration)
-    pub fn text_input_states(&self) -> &HashMap<NodeId, TextInputState> {
-        &self.text_input_states
+    pub fn text_input_states(&self) -> &indexmap::IndexMap<NodeId, TextInputState> {
+        &self.input_context.text_input_states
     }
 
     /// Get all reactive text states (for app-shell integration)
     pub fn reactive_text_states(&self) -> &HashMap<NodeId, ReactiveTextState> {
-        &self.reactive_text_states
+        &self.input_context.reactive_text_states
     }
 
     /// Get all validators (for app-shell integration)
     pub fn validators(&self) -> &HashMap<NodeId, ValidationState> {
-        &self.validators
+        &self.form_context.validators
     }
 
     /// Get all form states (for app-shell integration)
     pub fn form_states(&self) -> &HashMap<NodeId, FormState> {
-        &self.form_states
+        &self.form_context.form_states
     }
 
     /// Take ownership of the scene (consumes self)
@@ -1106,29 +807,6 @@ mod tests {
             ctx.get_text_input_value(node_id),
             Some("😀😁😂".to_string())
         );
-    }
-
-    #[test]
-    fn test_char_idx_to_byte_idx_helper() {
-        // ASCII
-        assert_eq!(super::char_idx_to_byte_idx("abc", 0), Some(0));
-        assert_eq!(super::char_idx_to_byte_idx("abc", 1), Some(1));
-        assert_eq!(super::char_idx_to_byte_idx("abc", 2), Some(2));
-        assert_eq!(super::char_idx_to_byte_idx("abc", 3), Some(3)); // End position
-
-        // Emoji (4 bytes each)
-        assert_eq!(super::char_idx_to_byte_idx("😀", 0), Some(0));
-        assert_eq!(super::char_idx_to_byte_idx("😀", 1), Some(4)); // End of 4-byte emoji
-
-        // Mixed
-        assert_eq!(super::char_idx_to_byte_idx("a😀b", 0), Some(0)); // 'a'
-        assert_eq!(super::char_idx_to_byte_idx("a😀b", 1), Some(1)); // emoji start
-        assert_eq!(super::char_idx_to_byte_idx("a😀b", 2), Some(5)); // 'b'
-        assert_eq!(super::char_idx_to_byte_idx("a😀b", 3), Some(6)); // end
-
-        // Out of bounds
-        assert_eq!(super::char_idx_to_byte_idx("abc", 10), None);
-        assert_eq!(super::char_idx_to_byte_idx("😀", 5), None);
     }
 
     #[test]
