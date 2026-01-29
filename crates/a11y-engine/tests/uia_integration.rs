@@ -4,7 +4,7 @@
 
 use a11y_engine::{
     node::{A11yNode, A11yState, AccessibleName, CheckedState, Role},
-    platform::accesskit_bridge::{a11y_node_to_accesskit, AccessKitBridge},
+    platform::accesskit_bridge::{AccessKitBridge, a11y_node_to_accesskit},
     tree::A11yTree,
 };
 use accesskit::NodeId as AccessKitNodeId;
@@ -149,21 +149,30 @@ fn test_accesskit_only_dirty_nodes_in_update() {
     let root = tree.root();
 
     // Add 3 nodes
-    let node1 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        name: AccessibleName::Text("Button 1".into()),
-        ..Default::default()
-    });
-    let node2 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        name: AccessibleName::Text("Button 2".into()),
-        ..Default::default()
-    });
-    let node3 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        name: AccessibleName::Text("Button 3".into()),
-        ..Default::default()
-    });
+    let node1 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Button 1".into()),
+            ..Default::default()
+        },
+    );
+    let node2 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Button 2".into()),
+            ..Default::default()
+        },
+    );
+    let node3 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Button 3".into()),
+            ..Default::default()
+        },
+    );
 
     // Clear dirty flags
     tree.clear_dirty();
@@ -196,8 +205,7 @@ fn test_accesskit_only_dirty_nodes_in_update() {
         "Only dirty nodes should be in update"
     );
 
-    let node_ids_in_update: Vec<AccessKitNodeId> =
-        update.nodes.iter().map(|(id, _)| *id).collect();
+    let node_ids_in_update: Vec<AccessKitNodeId> = update.nodes.iter().map(|(id, _)| *id).collect();
     assert!(
         node_ids_in_update.contains(&AccessKitNodeId(node1.raw())),
         "node1 should be in update"
@@ -291,16 +299,22 @@ fn test_accesskit_bridge_handles_node_removal() {
     let root = tree.root();
 
     // Add two nodes
-    let node1 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        name: AccessibleName::Text("Persistent".into()),
-        ..Default::default()
-    });
-    let node2 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        name: AccessibleName::Text("Temporary".into()),
-        ..Default::default()
-    });
+    let node1 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Persistent".into()),
+            ..Default::default()
+        },
+    );
+    let node2 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Temporary".into()),
+            ..Default::default()
+        },
+    );
 
     // Clear dirty and update only node2
     tree.clear_dirty();
@@ -327,10 +341,7 @@ fn test_accesskit_bridge_handles_node_removal() {
 
     let removed_ak_id = AccessKitNodeId(node2.raw());
     let node_in_update = update.nodes.iter().any(|(id, _)| *id == removed_ak_id);
-    assert!(
-        !node_in_update,
-        "Removed node should not be in update"
-    );
+    assert!(!node_in_update, "Removed node should not be in update");
 
     // Verify node1 still exists
     {
@@ -348,10 +359,13 @@ fn test_accesskit_bridge_multiple_updates() {
     let root = tree.root();
 
     // First update: add nodes
-    let node1 = tree.add_node(root, A11yNode {
-        role: Role::Button,
-        ..Default::default()
-    });
+    let node1 = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            ..Default::default()
+        },
+    );
 
     let tree_arc = Arc::new(Mutex::new(tree));
     let bridge = AccessKitBridge::new(tree_arc.clone());
@@ -361,7 +375,11 @@ fn test_accesskit_bridge_multiple_updates() {
         tree_lock.get_dirty_nodes().into_iter().collect()
     };
     let update1 = bridge.create_tree_update(&dirty1);
-    assert_eq!(update1.nodes.len(), 1, "First update should have 1 node (the newly added button)");
+    assert_eq!(
+        update1.nodes.len(),
+        1,
+        "First update should have 1 node (the newly added button)"
+    );
 
     // Second update: modify node
     {
@@ -387,10 +405,13 @@ fn test_accesskit_bridge_multiple_updates() {
     {
         let mut tree_lock = tree_arc.lock().unwrap();
         tree_lock.clear_dirty();
-        tree_lock.add_node(root, A11yNode {
-            role: Role::Checkbox,
-            ..Default::default()
-        });
+        tree_lock.add_node(
+            root,
+            A11yNode {
+                role: Role::Checkbox,
+                ..Default::default()
+            },
+        );
     }
 
     let dirty3: Vec<_> = {

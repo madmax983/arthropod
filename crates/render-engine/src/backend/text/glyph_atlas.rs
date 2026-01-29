@@ -285,7 +285,10 @@ mod tests {
 
         atlas.get_or_rasterize(glyph.cache_key, engine.font_system());
 
-        let cached = atlas.cache.get(&glyph.cache_key).expect("Glyph should be cached");
+        let cached = atlas
+            .cache
+            .get(&glyph.cache_key)
+            .expect("Glyph should be cached");
 
         // Allow for the possibility that one dimension could legitimately be zero
         assert!(

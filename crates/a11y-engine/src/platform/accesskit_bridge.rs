@@ -3,7 +3,7 @@
 //! This module provides conversion from our platform-agnostic A11yNode representation
 //! to AccessKit's platform-specific format.
 
-use crate::node::{A11yId, A11yNode, AccessibleName, CheckedState, Role};
+use crate::node::{A11yId, A11yNode, Role};
 use crate::platform::A11yBridge;
 use crate::tree::A11yTree;
 use accesskit::{Node, NodeId as AccessKitNodeId, TreeUpdate};
@@ -84,7 +84,7 @@ impl AccessKitBridge {
         // For now, return a minimal tree update
         TreeUpdate {
             nodes,
-            tree: None,        // Will be set with root info later
+            tree: None,                // Will be set with root info later
             focus: AccessKitNodeId(0), // Will be set properly later
         }
     }
@@ -108,6 +108,7 @@ impl A11yBridge for AccessKitBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node::{AccessibleName, CheckedState};
     use plat_core::Rect;
 
     // Role conversion tests

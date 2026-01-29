@@ -164,7 +164,9 @@ impl WgpuBackend {
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
-        .map_err(|e| RendererError::InitializationFailed(format!("Failed to request adapter: {:?}", e)))?;
+        .map_err(|e| {
+            RendererError::InitializationFailed(format!("Failed to request adapter: {:?}", e))
+        })?;
 
         let adapter_info = adapter.get_info();
         println!(
@@ -186,16 +188,15 @@ impl WgpuBackend {
 
         // Request device and queue
         info!("Creating device and queue");
-        let (device, queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
+        let (device, queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                 label: Some("Arthropod Device"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
                 memory_hints: wgpu::MemoryHints::default(),
                 experimental_features: Default::default(),
                 trace: Default::default(),
-            },
-        ))?;
+            }))?;
 
         // Set up error callback
         device.on_uncaptured_error(std::sync::Arc::new(|err| {

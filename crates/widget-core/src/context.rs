@@ -266,10 +266,8 @@ impl WidgetContext {
 
     /// Add reactive text state to a node
     pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
-        self.reactive_text_states.insert(
-            node_id,
-            ReactiveTextState { read_signal },
-        );
+        self.reactive_text_states
+            .insert(node_id, ReactiveTextState { read_signal });
     }
 
     /// Add text input state to a node

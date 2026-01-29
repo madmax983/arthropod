@@ -34,6 +34,7 @@ pub struct Compositor {
     #[cfg(target_os = "windows")]
     inner: Option<platform::CompositorImpl>,
     #[cfg(not(target_os = "windows"))]
+    #[allow(dead_code)]
     inner: Option<()>,
 }
 
@@ -103,6 +104,7 @@ pub struct Layer {
     #[cfg(target_os = "windows")]
     inner: platform::LayerImpl,
     #[cfg(not(target_os = "windows"))]
+    #[allow(dead_code)]
     inner: (),
 }
 

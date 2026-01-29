@@ -15,9 +15,9 @@ impl<T: Clone + 'static + Send> Computed<T> {
     /// Create a new computed value.
     pub fn new<F>(runtime: Arc<Runtime>, compute: F) -> Self
     where
-        F: Fn() -> T + 'static + Send,
+        F: Fn() -> T + 'static + Send + Sync,
     {
-        let id = runtime.create_computed(Box::new(move || {
+        let id = runtime.create_computed(Arc::new(move || {
             Box::new(Mutex::new(compute())) as Box<dyn std::any::Any + Send>
         }));
 

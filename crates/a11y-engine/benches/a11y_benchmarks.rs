@@ -7,9 +7,9 @@
 //! - Sync to platform (100 nodes): < 100 microseconds
 
 use a11y_engine::{
-    platform::accesskit_bridge::AccessKitBridge, A11yNode, A11yTree, AccessibleName, Role,
+    A11yNode, A11yTree, AccessibleName, Role, platform::accesskit_bridge::AccessKitBridge,
 };
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use plat_core::Rect;
 use std::sync::{Arc, Mutex};
 
@@ -243,11 +243,14 @@ fn bench_sync_to_platform(c: &mut Criterion) {
 
                 let _node_ids: Vec<_> = (0..count)
                     .map(|i| {
-                        tree.add_node(root, A11yNode {
-                            role: Role::Button,
-                            name: AccessibleName::Text(format!("Button {}", i)),
-                            ..Default::default()
-                        })
+                        tree.add_node(
+                            root,
+                            A11yNode {
+                                role: Role::Button,
+                                name: AccessibleName::Text(format!("Button {}", i)),
+                                ..Default::default()
+                            },
+                        )
                     })
                     .collect();
 
@@ -287,11 +290,14 @@ fn bench_ecs_a11y_sync(c: &mut Criterion) {
                     // Create nodes
                     let node_ids: Vec<_> = (0..count)
                         .map(|i| {
-                            tree.add_node(root, A11yNode {
-                                role: Role::Button,
-                                name: AccessibleName::Text(format!("Button {}", i)),
-                                ..Default::default()
-                            })
+                            tree.add_node(
+                                root,
+                                A11yNode {
+                                    role: Role::Button,
+                                    name: AccessibleName::Text(format!("Button {}", i)),
+                                    ..Default::default()
+                                },
+                            )
                         })
                         .collect();
 
@@ -336,11 +342,14 @@ fn bench_frame_a11y_overhead(c: &mut Criterion) {
                     // Add 1000 total nodes (realistic UI)
                     let mut node_ids = Vec::new();
                     for i in 0..1000 {
-                        let id = tree.add_node(root, A11yNode {
-                            role: Role::Button,
-                            name: AccessibleName::Text(format!("Button {}", i)),
-                            ..Default::default()
-                        });
+                        let id = tree.add_node(
+                            root,
+                            A11yNode {
+                                role: Role::Button,
+                                name: AccessibleName::Text(format!("Button {}", i)),
+                                ..Default::default()
+                            },
+                        );
                         node_ids.push(id);
                     }
 

@@ -1,10 +1,6 @@
 //! Stub implementation for unsupported platforms.
 
-use crate::{
-    Application, BackdropMaterial, ControlFlow, Event, PlatformError, Size, Window, WindowConfig,
-    WindowId,
-};
-use crate::materials::BackdropMaterial;
+use crate::{Application, BackdropMaterial, PlatformError, Size, Window, WindowConfig, WindowId};
 use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle, WindowHandle};
 
 pub struct EventLoopImpl;
@@ -63,6 +59,7 @@ impl HasDisplayHandle for WindowImpl {
     }
 }
 
+#[allow(clippy::extra_unused_type_parameters)]
 pub fn run<A: Application>() -> Result<(), PlatformError> {
     Err(PlatformError::Initialization(
         "Platform not supported".into(),

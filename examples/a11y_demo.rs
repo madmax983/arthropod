@@ -17,7 +17,7 @@
 //!      (bounds)            (component)    (semantic)        (platform)      (output)
 //! ```
 
-use a11y_engine::{A11yNode, A11yTree, ArthropodActionHandler, AccessibleName, Role};
+use a11y_engine::{A11yNode, A11yTree, AccessibleName, ArthropodActionHandler, Role};
 use arthropod_ecs::components::{AccessibleNode, OnA11yClick};
 use arthropod_ecs::{FrameworkContext, Renderable};
 use plat_core::Rect;
@@ -31,7 +31,9 @@ fn main() {
     let mut context = FrameworkContext::new();
 
     // Add ActionHandler resource
-    context.world_mut().insert_resource(ArthropodActionHandler::new());
+    context
+        .world_mut()
+        .insert_resource(ArthropodActionHandler::new());
 
     // Setup accessible UI elements with click handlers
     let click_count = Arc::new(Mutex::new(0));
@@ -57,11 +59,11 @@ fn setup_accessible_button(context: &mut FrameworkContext, click_count: Arc<Mute
     // Get root IDs
     let scene = context.world().resource::<Scene>();
     let root_scene = scene.root();
-    drop(scene);
+    let _ = scene;
 
     let a11y_tree = context.world().resource::<A11yTree>();
     let root_a11y = a11y_tree.root();
-    drop(a11y_tree);
+    let _ = a11y_tree;
 
     // 1. Create Scene node (visual representation)
     let mut scene = context.world_mut().resource_mut::<Scene>();
@@ -72,7 +74,7 @@ fn setup_accessible_button(context: &mut FrameworkContext, click_count: Arc<Mute
         }),
     );
     scene.get_node_mut(button_scene).unwrap().bounds = Rect::new(50.0, 50.0, 150.0, 50.0);
-    drop(scene);
+    let _ = scene;
 
     println!("   ✓ Scene node created at (50, 50, 150x50)");
 
@@ -87,7 +89,7 @@ fn setup_accessible_button(context: &mut FrameworkContext, click_count: Arc<Mute
             ..Default::default()
         },
     );
-    drop(a11y_tree);
+    let _ = a11y_tree;
 
     println!("   ✓ A11y node created with role=Button, name=\"Submit\"");
 
@@ -100,7 +102,10 @@ fn setup_accessible_button(context: &mut FrameworkContext, click_count: Arc<Mute
         .insert(OnA11yClick::new(move || {
             let mut count = count_clone.lock().unwrap();
             *count += 1;
-            println!("      ▶ Button clicked via screen reader! Count: {}", *count);
+            println!(
+                "      ▶ Button clicked via screen reader! Count: {}",
+                *count
+            );
         }));
 
     println!("   ✓ ECS entity created with AccessibleNode + OnA11yClick\n");
@@ -111,11 +116,11 @@ fn setup_accessible_checkbox(context: &mut FrameworkContext, click_count: Arc<Mu
 
     let scene = context.world().resource::<Scene>();
     let root_scene = scene.root();
-    drop(scene);
+    let _ = scene;
 
     let a11y_tree = context.world().resource::<A11yTree>();
     let root_a11y = a11y_tree.root();
-    drop(a11y_tree);
+    let _ = a11y_tree;
 
     // Scene node
     let mut scene = context.world_mut().resource_mut::<Scene>();
@@ -126,7 +131,7 @@ fn setup_accessible_checkbox(context: &mut FrameworkContext, click_count: Arc<Mu
         }),
     );
     scene.get_node_mut(checkbox_scene).unwrap().bounds = Rect::new(50.0, 120.0, 30.0, 30.0);
-    drop(scene);
+    let _ = scene;
 
     println!("   ✓ Scene node created at (50, 120, 30x30)");
 
@@ -141,7 +146,7 @@ fn setup_accessible_checkbox(context: &mut FrameworkContext, click_count: Arc<Mu
             ..Default::default()
         },
     );
-    drop(a11y_tree);
+    let _ = a11y_tree;
 
     println!("   ✓ A11y node created with role=Checkbox, name=\"Enable notifications\"");
 
@@ -154,7 +159,10 @@ fn setup_accessible_checkbox(context: &mut FrameworkContext, click_count: Arc<Mu
         .insert(OnA11yClick::new(move || {
             let mut count = count_clone.lock().unwrap();
             *count += 10;
-            println!("      ▶ Checkbox toggled via screen reader! Count: {}", *count);
+            println!(
+                "      ▶ Checkbox toggled via screen reader! Count: {}",
+                *count
+            );
         }));
 
     println!("   ✓ ECS entity created with AccessibleNode + OnA11yClick\n");
@@ -167,7 +175,10 @@ fn verify_a11y_sync(context: &FrameworkContext) {
 
     // Check that dirty tracking works
     let dirty_count = a11y_tree.get_dirty_nodes().len();
-    println!("   ✓ {} nodes marked dirty (will be sent to AccessKit)", dirty_count);
+    println!(
+        "   ✓ {} nodes marked dirty (will be sent to AccessKit)",
+        dirty_count
+    );
 
     // In a real app, AccessKitBridge would:
     // 1. Call create_tree_update(dirty_nodes)
@@ -185,7 +196,9 @@ fn demonstrate_action_handlers(context: &mut FrameworkContext, click_count: Arc<
     // Register all action callbacks with the handler
     // (In a real app, this would run automatically as an ECS system)
     {
-        let mut query = context.world_mut().query::<(&AccessibleNode, &OnA11yClick)>();
+        let mut query = context
+            .world_mut()
+            .query::<(&AccessibleNode, &OnA11yClick)>();
         let mut callbacks_to_register = Vec::new();
 
         for (accessible, on_click) in query.iter(context.world()) {
@@ -203,7 +216,9 @@ fn demonstrate_action_handlers(context: &mut FrameworkContext, click_count: Arc<
 
     // Get the a11y IDs
     let button_id = {
-        let mut query = context.world_mut().query::<(&AccessibleNode, &OnA11yClick)>();
+        let mut query = context
+            .world_mut()
+            .query::<(&AccessibleNode, &OnA11yClick)>();
         query
             .iter(context.world())
             .next()
@@ -217,7 +232,9 @@ fn demonstrate_action_handlers(context: &mut FrameworkContext, click_count: Arc<
 
     // Manually trigger the callback for demonstration
     {
-        let mut query = context.world_mut().query::<(&AccessibleNode, &OnA11yClick)>();
+        let mut query = context
+            .world_mut()
+            .query::<(&AccessibleNode, &OnA11yClick)>();
         for (accessible, on_click) in query.iter(context.world()) {
             if accessible.a11y_id == button_id {
                 (on_click.callback)();
@@ -227,5 +244,8 @@ fn demonstrate_action_handlers(context: &mut FrameworkContext, click_count: Arc<
     }
 
     let final_count = *click_count.lock().unwrap();
-    println!("   ✓ Final click count: {} (callbacks executed successfully!)", final_count);
+    println!(
+        "   ✓ Final click count: {} (callbacks executed successfully!)",
+        final_count
+    );
 }

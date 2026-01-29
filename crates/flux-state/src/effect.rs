@@ -13,9 +13,9 @@ impl Effect {
     /// Create a new effect.
     pub fn new<F>(runtime: Arc<Runtime>, effect_fn: F) -> Self
     where
-        F: Fn() + 'static + Send,
+        F: Fn() + 'static + Send + Sync,
     {
-        let id = runtime.create_effect(Box::new(effect_fn));
+        let id = runtime.create_effect(Arc::new(effect_fn));
 
         // Run the effect immediately to establish dependencies
         runtime.run_effect(id);

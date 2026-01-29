@@ -26,7 +26,7 @@ struct RuntimeInner {
     computeds: HashMap<NodeId, ComputedNode>,
 
     // Effect storage
-    effects: HashMap<NodeId, Box<dyn Fn() + Send>>,
+    effects: HashMap<NodeId, std::sync::Arc<dyn Fn() + Send + Sync>>,
 
     // Dependency graph
     dependencies: HashMap<NodeId, HashSet<NodeId>>, // node -> its dependencies
@@ -43,7 +43,7 @@ struct RuntimeInner {
 }
 
 struct ComputedNode {
-    compute: Box<dyn Fn() -> Box<dyn Any + Send> + Send>,
+    compute: std::sync::Arc<dyn Fn() -> Box<dyn Any + Send> + Send + Sync>,
     value: Option<Box<dyn Any + Send>>,
 }
 
@@ -74,7 +74,7 @@ impl Runtime {
 
     pub(crate) fn create_computed(
         &self,
-        compute: Box<dyn Fn() -> Box<dyn Any + Send> + Send>,
+        compute: std::sync::Arc<dyn Fn() -> Box<dyn Any + Send> + Send + Sync>,
     ) -> NodeId {
         let mut inner = self.inner.lock().unwrap();
         let id = NodeId(inner.next_id);
@@ -89,7 +89,10 @@ impl Runtime {
         id
     }
 
-    pub(crate) fn create_effect(&self, effect_fn: Box<dyn Fn() + Send>) -> NodeId {
+    pub(crate) fn create_effect(
+        &self,
+        effect_fn: std::sync::Arc<dyn Fn() + Send + Sync>,
+    ) -> NodeId {
         let mut inner = self.inner.lock().unwrap();
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
@@ -194,11 +197,11 @@ impl Runtime {
         // Run effect (will re-establish dependencies)
         let effect_fn = {
             let inner = self.inner.lock().unwrap();
-            inner.effects.get(&id).map(|f| f as *const dyn Fn())
+            inner.effects.get(&id).cloned()
         };
 
         if let Some(f) = effect_fn {
-            unsafe { (*f)() };
+            f();
         }
 
         // Clear tracking context
@@ -237,15 +240,15 @@ impl Runtime {
         }
         // Drop borrow before running user code!
 
-        // Get compute function pointer and run it (without holding any borrows)
+        // Get compute function and run it (without holding any borrows)
         let new_value = {
             let compute_fn = {
                 let inner = self.inner.lock().unwrap();
                 let computed = inner.computeds.get(&id).expect("Computed not found");
-                &computed.compute as *const dyn Fn() -> Box<dyn std::any::Any + Send>
+                computed.compute.clone()
             };
             // Call without holding borrow
-            unsafe { (*compute_fn)() }
+            compute_fn()
         };
 
         // Store new value and clear tracking context

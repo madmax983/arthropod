@@ -3,7 +3,6 @@
 //! Handles actions triggered by screen readers (Click, Focus, etc.) and
 //! dispatches them to application callbacks.
 
-use crate::focus::FocusManager;
 use crate::node::A11yId;
 use accesskit::{ActionHandler, ActionRequest, NodeId as AccessKitNodeId};
 use bevy_ecs::system::Resource;
@@ -13,13 +12,16 @@ use std::sync::{Arc, Mutex};
 /// Callback type for action handlers
 pub type ActionCallback = Arc<dyn Fn() + Send + Sync>;
 
+/// Callback type for focus handler
+pub type FocusHandler = Arc<Mutex<dyn FnMut(A11yId) + Send>>;
+
 /// Arthropod implementation of AccessKit ActionHandler
 ///
 /// Routes actions from screen readers to application callbacks.
 #[derive(Resource)]
 pub struct ArthropodActionHandler {
     click_handlers: HashMap<A11yId, ActionCallback>,
-    focus_handler: Option<Arc<Mutex<dyn FnMut(A11yId) + Send>>>,
+    focus_handler: Option<FocusHandler>,
 }
 
 impl ArthropodActionHandler {
@@ -74,6 +76,7 @@ impl ActionHandler for ArthropodActionHandler {
             accesskit::Action::Focus => {
                 // Invoke focus handler if registered
                 if let Some(ref handler) = self.focus_handler {
+                    #[allow(clippy::collapsible_if)]
                     if let Ok(mut h) = handler.lock() {
                         h(node_id);
                     }
@@ -96,7 +99,11 @@ impl ActionHandler for ArthropodActionHandler {
                 );
             }
             _ => {
-                log::debug!("Unhandled action: {:?} for node {:?}", request.action, node_id);
+                log::debug!(
+                    "Unhandled action: {:?} for node {:?}",
+                    request.action,
+                    node_id
+                );
             }
         }
     }
@@ -135,7 +142,10 @@ mod tests {
 
         handler.do_action(request);
 
-        assert!(*clicked.lock().unwrap(), "Click callback should have been invoked");
+        assert!(
+            *clicked.lock().unwrap(),
+            "Click callback should have been invoked"
+        );
     }
 
     #[test]
@@ -226,6 +236,9 @@ mod tests {
             data: None,
         });
 
-        assert!(!*clicked.lock().unwrap(), "Unregistered node should not trigger callback");
+        assert!(
+            !*clicked.lock().unwrap(),
+            "Unregistered node should not trigger callback"
+        );
     }
 }

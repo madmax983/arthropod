@@ -151,8 +151,8 @@ impl WindowImpl {
                 CW_USEDEFAULT,
                 config.size.width as i32,
                 config.size.height as i32,
-                None,  // Parent
-                None,  // Menu
+                None, // Parent
+                None, // Menu
                 Some(hinstance),
                 Some(id.0 as *const std::ffi::c_void),
             )

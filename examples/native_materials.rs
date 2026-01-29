@@ -96,8 +96,8 @@ impl Application for MaterialApp {
 
         // Create GPU backend (standard mode - not using DirectComposition)
         let size = window.inner_size();
-        let mut backend =
-            WgpuBackend::new(&window, size.width, size.height, false).expect("Failed to create backend");
+        let mut backend = WgpuBackend::new(&window, size.width, size.height, false)
+            .expect("Failed to create backend");
 
         // IMPORTANT: Use semi-transparent clear color to show Mica backdrop through.
         // With window-vibrancy applying the effect to the entire window,

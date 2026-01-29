@@ -31,7 +31,9 @@ pub fn create_composition_surface_config(
 /// Checks if a surface supports DirectComposition.
 pub fn supports_composition(caps: &wgpu::SurfaceCapabilities) -> bool {
     caps.formats.contains(&wgpu::TextureFormat::Bgra8UnormSrgb)
-        && caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        && caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
 }
 
 #[cfg(test)]

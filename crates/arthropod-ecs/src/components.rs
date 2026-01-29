@@ -283,7 +283,10 @@ mod tests {
         // Invoke the callback
         (click_handler.callback)();
 
-        assert!(*clicked.lock().unwrap(), "Callback should have been invoked");
+        assert!(
+            *clicked.lock().unwrap(),
+            "Callback should have been invoked"
+        );
     }
 
     #[test]

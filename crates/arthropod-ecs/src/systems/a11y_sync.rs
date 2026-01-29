@@ -4,7 +4,7 @@
 //! ensuring screen readers have up-to-date information.
 
 use crate::components::{AccessibleNode, OnA11yClick, SceneNodeRef};
-use a11y_engine::{ArthropodActionHandler, A11yTree};
+use a11y_engine::{A11yTree, ArthropodActionHandler};
 use bevy_ecs::prelude::*;
 use render_engine::Scene;
 
@@ -38,6 +38,7 @@ pub fn sync_accessible_nodes_system(
 /// Note: When OnA11yClick components are removed, the handlers remain registered
 /// but become no-ops since the A11yId won't match any active nodes. Full cleanup
 /// happens when entities are despawned and removed from the A11yTree.
+#[allow(clippy::type_complexity)]
 pub fn register_action_callbacks_system(
     // Only query components that were added or changed this frame
     query: Query<(&AccessibleNode, &OnA11yClick), Or<(Added<OnA11yClick>, Changed<OnA11yClick>)>>,
@@ -181,7 +182,10 @@ mod tests {
             data: None,
         });
 
-        assert!(*clicked.lock().unwrap(), "Click callback should have been invoked");
+        assert!(
+            *clicked.lock().unwrap(),
+            "Click callback should have been invoked"
+        );
     }
 
     #[test]

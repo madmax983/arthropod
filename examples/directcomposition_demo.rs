@@ -21,8 +21,8 @@
 //! Full Mica effect requires Windows 11.
 
 use plat_core::{
-    Application, BackdropMaterial, Compositor, ControlFlow, Event, EventLoop,
-    HasBackdropMaterial, Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
+    Application, BackdropMaterial, Compositor, ControlFlow, Event, EventLoop, HasBackdropMaterial,
+    Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
     Color, NodeContent, Scene, SceneNode,
@@ -33,6 +33,7 @@ const SIDEBAR_WIDTH: f32 = 250.0;
 
 /// Application state for the DirectComposition demo
 struct CompositionApp {
+    #[allow(dead_code)]
     window: Window,
     backend: WgpuBackend,
     scene: Scene,
@@ -161,7 +162,12 @@ fn create_demo_scene(width: u32, height: u32) -> Scene {
     });
     let content_id = scene.add_node(root, content);
     if let Some(node) = scene.get_node_mut(content_id) {
-        node.bounds = Rect::new(SIDEBAR_WIDTH, 0.0, width as f32 - SIDEBAR_WIDTH, height as f32);
+        node.bounds = Rect::new(
+            SIDEBAR_WIDTH,
+            0.0,
+            width as f32 - SIDEBAR_WIDTH,
+            height as f32,
+        );
     }
 
     // Content cards (solid, demonstrating opaque rendering)
