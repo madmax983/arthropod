@@ -10,8 +10,27 @@ pub struct NodeId(pub u64);
 
 /// The reactive runtime - manages the dependency graph.
 ///
-/// Stored as `Arc<Runtime>` and shared between signals and effects.
-/// Thread-safe using Mutex for interior mutability.
+/// The `Runtime` is the heart of the reactivity system. It maintains:
+/// - Storage for signals, computeds, and effects
+/// - The dependency graph (who depends on whom)
+/// - The current execution context (which effect/computed is running)
+///
+/// It is typically shared via `Arc<Runtime>` between all reactive primitives.
+///
+/// # Thread Safety
+///
+/// `Runtime` is thread-safe (`Send + Sync`) and uses internal `Mutex` locking
+/// to allow signals to be read/written from any thread.
+///
+/// # Example
+///
+/// ```
+/// use flux_state::Runtime;
+/// use std::sync::Arc;
+///
+/// let runtime = Runtime::new();
+/// // Pass runtime.clone() to signals/effects
+/// ```
 pub struct Runtime {
     inner: Mutex<RuntimeInner>,
 }
@@ -48,6 +67,10 @@ struct ComputedNode {
 }
 
 impl Runtime {
+    /// Create a new reactive runtime.
+    ///
+    /// Returns an `Arc<Runtime>` because the runtime must be shared between
+    /// all signals, effects, and computed values it manages.
     pub fn new() -> std::sync::Arc<Self> {
         std::sync::Arc::new(Self {
             inner: Mutex::new(RuntimeInner {
