@@ -1,0 +1,62 @@
+warning: unused imports: `ControlFlow` and `Event`
+ --> crates/plat-core/src/platform/stub.rs:4:36
+  |
+4 |     Application, BackdropMaterial, ControlFlow, Event, PlatformError, Size, Window, WindowConfig,
+  |                                    ^^^^^^^^^^^  ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `inner` is never read
+  --> crates/plat-core/src/compositor.rs:37:5
+   |
+33 | pub struct Compositor {
+   |            ---------- field in this struct
+...
+37 |     inner: Option<()>,
+   |     ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `inner` is never read
+   --> crates/plat-core/src/compositor.rs:106:5
+    |
+102 | pub struct Layer {
+    |            ----- field in this struct
+...
+106 |     inner: (),
+    |     ^^^^^
+
+warning: `plat-core` (lib) generated 3 warnings (run `cargo fix --lib -p plat-core` to apply 1 suggestion)
+   Compiling render-engine v0.1.0 (/app/crates/render-engine)
+    Finished `bench` profile [optimized] target(s) in 4.06s
+     Running benches/scene_bench.rs (target/release/deps/scene_bench-7c0358d053eb5066)
+Gnuplot not found, using plotters backend
+Benchmarking scene_node_lookup/100
+Benchmarking scene_node_lookup/100: Warming up for 3.0000 s
+Benchmarking scene_node_lookup/100: Collecting 100 samples in estimated 5.0000 s (869M iterations)
+Benchmarking scene_node_lookup/100: Analyzing
+scene_node_lookup/100   time:   [6.7202 ns 6.9950 ns 7.2342 ns]
+                        change: [-61.123% -59.962% -58.864%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking scene_node_lookup/1000
+Benchmarking scene_node_lookup/1000: Warming up for 3.0000 s
+Benchmarking scene_node_lookup/1000: Collecting 100 samples in estimated 5.0000 s (865M iterations)
+Benchmarking scene_node_lookup/1000: Analyzing
+scene_node_lookup/1000  time:   [5.7472 ns 5.7536 ns 5.7608 ns]
+                        change: [-63.635% -63.562% -63.497%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low mild
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+Benchmarking scene_node_lookup/10000
+Benchmarking scene_node_lookup/10000: Warming up for 3.0000 s
+Benchmarking scene_node_lookup/10000: Collecting 100 samples in estimated 5.0000 s (872M iterations)
+Benchmarking scene_node_lookup/10000: Analyzing
+scene_node_lookup/10000 time:   [5.7462 ns 5.7590 ns 5.7738 ns]
+                        change: [-63.636% -63.583% -63.527%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  3 (3.00%) high severe
