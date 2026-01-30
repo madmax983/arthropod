@@ -60,3 +60,59 @@ impl Drop for Effect {
         self.runtime.dispose_effect(self.id);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::Runtime;
+    use crate::signal::Signal;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn test_effect_basic() {
+        let runtime = Runtime::new();
+        let count = Signal::new(runtime.clone(), 0);
+        let (read, write) = count.split();
+
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let log_clone = log.clone();
+
+        let _effect = Effect::new(runtime, move || {
+            log_clone.lock().unwrap().push(read.get());
+        });
+
+        // Initial run
+        assert_eq!(*log.lock().unwrap(), vec![0]);
+
+        // Update
+        write.set(1);
+        assert_eq!(*log.lock().unwrap(), vec![0, 1]);
+    }
+
+    #[test]
+    fn test_effect_cleanup() {
+        let runtime = Runtime::new();
+        let count = Signal::new(runtime.clone(), 0);
+        let (read, write) = count.split();
+
+        let log = Arc::new(Mutex::new(0));
+        let log_clone = log.clone();
+
+        {
+            let _effect = Effect::new(runtime, move || {
+                let _ = read.get();
+                *log_clone.lock().unwrap() += 1;
+            });
+            // Run 1 (init)
+            assert_eq!(*log.lock().unwrap(), 1);
+
+            write.set(1);
+            // Run 2
+            assert_eq!(*log.lock().unwrap(), 2);
+        } // Effect dropped here
+
+        write.set(2);
+        // Should NOT run
+        assert_eq!(*log.lock().unwrap(), 2);
+    }
+}

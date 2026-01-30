@@ -88,3 +88,85 @@ impl<T: Clone + 'static + Send> Computed<T> {
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::Runtime;
+    use crate::signal::Signal;
+
+    #[test]
+    fn test_computed_basic() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 1);
+        let (read, write) = signal.split();
+
+        let read_clone = read.clone();
+        let computed = Computed::new(runtime, move || read_clone.get() * 2);
+
+        assert_eq!(computed.get(), 2);
+
+        write.set(10);
+        assert_eq!(computed.get(), 20);
+    }
+
+    #[test]
+    fn test_diamond_pull() {
+        let runtime = Runtime::new();
+        let a = Signal::new(runtime.clone(), 1);
+        let (r_a, w_a) = a.split();
+
+        let r_a_1 = r_a.clone();
+        let b = Computed::new(runtime.clone(), move || r_a_1.get() * 2);
+
+        let r_a_2 = r_a.clone();
+        let c = Computed::new(runtime.clone(), move || r_a_2.get() + 1);
+
+        // D = B + C
+        let b_c = b.clone();
+        let c_c = c.clone();
+        let d = Computed::new(runtime, move || b_c.get() + c_c.get());
+
+        // Initial: a=1, b=2, c=2, d=4
+        assert_eq!(d.get(), 4);
+
+        w_a.set(2);
+        // a=2, b=4, c=3, d=7
+        assert_eq!(d.get(), 7);
+    }
+
+    #[test]
+    fn test_dynamic_deps() {
+        let runtime = Runtime::new();
+        let toggle = Signal::new(runtime.clone(), true);
+        let (r_toggle, w_toggle) = toggle.split();
+
+        let a = Signal::new(runtime.clone(), 10);
+        let (r_a, _w_a) = a.split();
+
+        let b = Signal::new(runtime.clone(), 20);
+        let (r_b, w_b) = b.split();
+
+        let r_toggle_c = r_toggle.clone();
+        let r_a_c = r_a.clone();
+        let r_b_c = r_b.clone();
+
+        let computed = Computed::new(runtime.clone(), move || {
+            if r_toggle_c.get() {
+                r_a_c.get()
+            } else {
+                r_b_c.get()
+            }
+        });
+
+        assert_eq!(computed.get(), 10);
+
+        // Update B. A is still active. Computed should not change.
+        w_b.set(30);
+        assert_eq!(computed.get(), 10);
+
+        // Switch to B.
+        w_toggle.set(false);
+        assert_eq!(computed.get(), 30);
+    }
+}

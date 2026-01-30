@@ -209,3 +209,55 @@ impl<T: 'static + Send> WriteSignal<T> {
         self.runtime.notify(self.id);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::Runtime;
+    use std::thread;
+
+    #[test]
+    fn test_signal_basic() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(Arc::clone(&runtime), 0);
+        let (read, write) = signal.split();
+
+        assert_eq!(read.get(), 0);
+
+        write.set(10);
+        assert_eq!(read.get(), 10);
+
+        write.update(|v| *v += 5);
+        assert_eq!(read.get(), 15);
+    }
+
+    #[test]
+    fn test_get_untracked() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(Arc::clone(&runtime), 1);
+        let (read, _write) = signal.split();
+        assert_eq!(read.get_untracked(), 1);
+    }
+
+    #[test]
+    fn test_threading() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(Arc::clone(&runtime), 0);
+        let (read, write) = signal.split();
+
+        let w_thread = write.clone();
+        let handle_write = thread::spawn(move || {
+            w_thread.set(99);
+        });
+
+        handle_write.join().unwrap();
+
+        let r_thread = read.clone();
+        let handle_read = thread::spawn(move || r_thread.get());
+
+        let val = handle_read.join().unwrap();
+
+        assert_eq!(val, 99);
+        assert_eq!(read.get(), 99);
+    }
+}
