@@ -114,7 +114,9 @@ impl WidgetContext {
 
     /// Check if node has reactive text component
     pub fn has_reactive_text(&self, node_id: NodeId) -> bool {
-        self.input_context.reactive_text_states.contains_key(&node_id)
+        self.input_context
+            .reactive_text_states
+            .contains_key(&node_id)
     }
 
     /// Get the text content of a node if it has any
@@ -213,7 +215,8 @@ impl WidgetContext {
 
     /// Add reactive text state to a node
     pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
-        self.input_context.add_reactive_text_state(node_id, read_signal);
+        self.input_context
+            .add_reactive_text_state(node_id, read_signal);
     }
 
     /// Add text input state to a node
@@ -225,7 +228,13 @@ impl WidgetContext {
         readonly: bool,
         max_length: Option<usize>,
     ) {
-        self.input_context.add_text_input_state(node_id, read_signal, write_signal, readonly, max_length);
+        self.input_context.add_text_input_state(
+            node_id,
+            read_signal,
+            write_signal,
+            readonly,
+            max_length,
+        );
     }
 
     /// Focus a node
@@ -280,7 +289,8 @@ impl WidgetContext {
         validator: Validator,
         initial_result: Result<(), String>,
     ) {
-        self.form_context.set_validator(node_id, validator, initial_result);
+        self.form_context
+            .set_validator(node_id, validator, initial_result);
     }
 
     /// Check if node has validation error
@@ -315,7 +325,8 @@ impl WidgetContext {
         field_mapping: HashMap<String, NodeId>,
         on_submit: Option<SubmitCallback>,
     ) {
-        self.form_context.add_form_state(node_id, field_mapping, on_submit);
+        self.form_context
+            .add_form_state(node_id, field_mapping, on_submit);
     }
 
     /// Check if form is valid
@@ -336,13 +347,15 @@ impl WidgetContext {
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
         let input_context = &self.input_context;
-        self.form_context.revalidate_form(node_id, |id| input_context.get_text_input_value(id));
+        self.form_context
+            .revalidate_form(node_id, |id| input_context.get_text_input_value(id));
     }
 
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
         let input_context = &self.input_context;
-        self.form_context.trigger_submit(node_id, |id| input_context.get_text_input_value(id));
+        self.form_context
+            .trigger_submit(node_id, |id| input_context.get_text_input_value(id));
     }
 
     /// Check if form has submit error

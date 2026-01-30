@@ -47,6 +47,13 @@ pub struct WriteSignal<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
+// SAFETY: Signal uses internal Mutex locking via Runtime, so it is safe to share
+// between threads even if T is !Sync (e.g., RefCell), as long as T is Send.
+// T must be Send because it is stored in Box<dyn Any + Send>.
+unsafe impl<T: Send> Sync for Signal<T> {}
+unsafe impl<T: Send> Sync for ReadSignal<T> {}
+unsafe impl<T: Send> Sync for WriteSignal<T> {}
+
 impl<T: 'static + Send> Signal<T> {
     /// Create a new signal with an initial value.
     ///

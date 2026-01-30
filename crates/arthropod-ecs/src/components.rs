@@ -15,25 +15,13 @@ pub struct SceneNodeRef(pub NodeId);
 
 /// Thread-safe wrapper for ReadSignal
 ///
-/// # Safety
-///
-/// This type unsafely implements Send + Sync to satisfy bevy_ecs's requirements.
-/// This is safe in the context of Arthropod because:
-/// 1. GUI applications run entirely on the main thread
-/// 2. The FrameworkContext and all ECS systems run synchronously on the main thread
-/// 3. No parallel system execution is used
-///
-/// Users must ensure they never move FrameworkContext or components containing
-/// MainThreadSignal to other threads.
+/// Wraps a `ReadSignal` to provide a consistent interface for components.
+/// `ReadSignal` is intrinsically thread-safe (Send + Sync) thanks to internal
+/// mutex locking in the flux-state runtime.
 pub struct MainThreadSignal<T: 'static>(ReadSignal<T>);
 
 impl<T: 'static> MainThreadSignal<T> {
     /// Create a new MainThreadSignal from a ReadSignal
-    ///
-    /// # Safety
-    ///
-    /// The signal must only be used from the main thread. The caller must ensure
-    /// this wrapper is never sent to or accessed from other threads.
     pub fn new(signal: ReadSignal<T>) -> Self {
         Self(signal)
     }
@@ -49,11 +37,6 @@ impl<T: Clone + 'static> Clone for MainThreadSignal<T> {
         Self(self.0.clone())
     }
 }
-
-// SAFETY: See MainThreadSignal documentation. This is safe because Arthropod
-// runs all GUI operations on the main thread.
-unsafe impl<T: 'static> Send for MainThreadSignal<T> {}
-unsafe impl<T: 'static> Sync for MainThreadSignal<T> {}
 
 /// Reactive color - polls signal to update scene node
 ///

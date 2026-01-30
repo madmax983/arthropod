@@ -131,7 +131,8 @@ impl InputContext {
                     }
                 }
 
-                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position) {
+                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position)
+                {
                     current_value.insert(byte_idx, c);
                     state.cursor_position += 1;
                     state.write_signal.set(current_value);
@@ -175,7 +176,8 @@ impl InputContext {
                 if state.cursor_position < char_count {
                     let mut new_value = current_value;
 
-                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position) {
+                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position)
+                    {
                         new_value.remove(byte_idx);
                         state.write_signal.set(new_value);
                     }
