@@ -129,8 +129,8 @@ impl FrameworkContext {
     pub fn render(&mut self) -> Vec<RectInstance> {
         self.render_schedule.run(&mut self.world);
 
-    // Extract render commands
-    std::mem::take(&mut self.world.resource_mut::<RenderCommands>().0)
+        // Extract render commands
+        std::mem::take(&mut self.world.resource_mut::<RenderCommands>().0)
     }
 
     /// Build the render schedule with rendering systems

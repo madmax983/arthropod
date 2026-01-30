@@ -30,9 +30,7 @@ fn test_signal_with_send_not_sync_type() {
     let read2 = read1.clone();
 
     // Both references should work from different threads
-    let handle = thread::spawn(move || {
-        *read2.get().borrow()
-    });
+    let handle = thread::spawn(move || *read2.get().borrow());
 
     assert_eq!(read1.get().borrow().clone(), 42);
     assert_eq!(handle.join().unwrap(), 42);
