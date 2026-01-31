@@ -100,6 +100,15 @@ impl RuntimeInner {
             .map(|subs| subs.iter().copied().collect())
             .unwrap_or_default()
     }
+
+    fn mark_subscribers_stale(&mut self, source: NodeId) {
+        let mut stack = self.get_subscribers(source);
+        while let Some(node) = stack.pop() {
+            if self.mark_stale(node) {
+                stack.extend(self.get_subscribers(node));
+            }
+        }
+    }
 }
 
 impl Runtime {
@@ -179,25 +188,10 @@ impl Runtime {
     /// Notify subscribers that a source changed.
     pub(crate) fn notify(&self, source: NodeId) {
         // Mark all transitive subscribers as stale
-        self.mark_stale_recursive(source);
+        self.inner.lock().unwrap().mark_subscribers_stale(source);
 
         // Flush pending effects (synchronous for now)
         self.flush_effects();
-    }
-
-    fn mark_stale_recursive(&self, source: NodeId) {
-        // Collect immediate subscribers
-        let subs_to_mark = self.inner.lock().unwrap().get_subscribers(source);
-
-        // Mark each subscriber as stale
-        for sub in subs_to_mark {
-            let should_recurse = self.inner.lock().unwrap().mark_stale(sub);
-
-            // Recursively mark dependents of this computed
-            if should_recurse {
-                self.mark_stale_recursive(sub);
-            }
-        }
     }
 
     fn flush_effects(&self) {
@@ -215,20 +209,16 @@ impl Runtime {
     }
 
     pub(crate) fn run_effect(&self, id: NodeId) {
-        // Clear old dependencies
-        {
+        // Clear old dependencies and set tracking context
+        let effect_fn = {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
             inner.tracking_context = Some(id);
-        }
-
-        // Run effect (will re-establish dependencies)
-        let effect_fn = {
-            let inner = self.inner.lock().unwrap();
             inner.effects.get(&id).cloned()
         };
 
+        // Run effect (will re-establish dependencies)
         if let Some(f) = effect_fn {
             f();
         }
@@ -244,7 +234,11 @@ impl Runtime {
     /// Panics if the signal does not exist.
     pub(crate) fn get_signal_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
-        inner.signals.get(&id).cloned().expect("Signal not found")
+        inner
+            .signals
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| panic!("Signal not found for id {:?}", id))
     }
 
     /// Get a handle to the computed value (Arc) without holding the runtime lock.
@@ -254,8 +248,14 @@ impl Runtime {
     /// Panics if the computed value does not exist or has not been initialized.
     pub(crate) fn get_computed_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
-        let computed = inner.computeds.get(&id).expect("Computed not found");
-        computed.value.clone().expect("Computed value not initialized")
+        let computed = inner
+            .computeds
+            .get(&id)
+            .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+        computed
+            .value
+            .clone()
+            .unwrap_or_else(|| panic!("Computed value not initialized for id {:?}", id))
     }
 
     pub(crate) fn is_stale(&self, id: NodeId) -> bool {
@@ -268,25 +268,22 @@ impl Runtime {
     ///
     /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
-        // Clear old dependencies and set tracking context
-        {
+        // Clear old dependencies and set tracking context, then get compute function
+        let compute_fn = {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
             inner.tracking_context = Some(id);
-        }
-        // Drop borrow before running user code!
 
-        // Get compute function and run it (without holding any borrows)
-        let new_value = {
-            let compute_fn = {
-                let inner = self.inner.lock().unwrap();
-                let computed = inner.computeds.get(&id).expect("Computed not found");
-                computed.compute.clone()
-            };
-            // Call without holding borrow
-            compute_fn()
+            let computed = inner
+                .computeds
+                .get(&id)
+                .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+            computed.compute.clone()
         };
+
+        // Call without holding borrow
+        let new_value = compute_fn();
 
         // Store new value and clear tracking context
         {
