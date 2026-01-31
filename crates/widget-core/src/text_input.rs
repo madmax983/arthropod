@@ -158,17 +158,22 @@ impl Widget for TextInput {
             },
         );
 
-        // Get current value
-        let current_value = self.read_signal.get_untracked();
+        // Get current value and compute derived state without cloning the full string
+        let (display_text, validation_result, is_empty) = self.read_signal.with_untracked(|value| {
+            let is_empty = value.is_empty();
 
-        // Create text display (or placeholder)
-        let display_text = if current_value.is_empty() && self.placeholder.is_some() {
-            self.placeholder.as_ref().unwrap().clone()
-        } else {
-            current_value.clone()
-        };
+            let display = if is_empty && self.placeholder.is_some() {
+                self.placeholder.as_ref().unwrap().clone()
+            } else {
+                value.clone()
+            };
 
-        let text_color = if current_value.is_empty() && self.placeholder.is_some() {
+            let result = self.validate(value);
+
+            (display, result, is_empty)
+        });
+
+        let text_color = if is_empty && self.placeholder.is_some() {
             placeholder_color // Use themed placeholder color
         } else {
             text_color_primary // Use themed text color
@@ -204,12 +209,11 @@ impl Widget for TextInput {
 
         // Add validator if present
         if let Some(validator) = &self.validator {
-            let validation_result = self.validate(&current_value);
             ctx.set_validator(input_node, validator.clone(), validation_result);
         }
 
         // Mark as having placeholder if empty and placeholder exists
-        if current_value.is_empty() && self.placeholder.is_some() {
+        if is_empty && self.placeholder.is_some() {
             ctx.add_placeholder(input_node);
         }
 

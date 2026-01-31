@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_layer_bounds() {
-        let _bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
+        let bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
 
         #[cfg(not(target_os = "windows"))]
         {

@@ -2,7 +2,7 @@
 
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Unique identifier for reactive nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -39,7 +39,7 @@ struct RuntimeInner {
     next_id: u64,
 
     // Signal storage
-    signals: HashMap<NodeId, Box<dyn Any + Send>>,
+    signals: HashMap<NodeId, Arc<dyn Any + Send + Sync>>,
 
     // Computed storage
     computeds: HashMap<NodeId, ComputedNode>,
@@ -62,8 +62,8 @@ struct RuntimeInner {
 }
 
 struct ComputedNode {
-    compute: std::sync::Arc<dyn Fn() -> Box<dyn Any + Send> + Send + Sync>,
-    value: Option<Box<dyn Any + Send>>,
+    compute: std::sync::Arc<dyn Fn() -> Arc<dyn Any + Send + Sync> + Send + Sync>,
+    value: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl RuntimeInner {
@@ -123,7 +123,7 @@ impl Runtime {
         })
     }
 
-    pub(crate) fn create_signal(&self, value: Box<dyn Any + Send>) -> NodeId {
+    pub(crate) fn create_signal(&self, value: Arc<dyn Any + Send + Sync>) -> NodeId {
         let mut inner = self.inner.lock().unwrap();
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
@@ -133,7 +133,7 @@ impl Runtime {
 
     pub(crate) fn create_computed(
         &self,
-        compute: std::sync::Arc<dyn Fn() -> Box<dyn Any + Send> + Send + Sync>,
+        compute: std::sync::Arc<dyn Fn() -> Arc<dyn Any + Send + Sync> + Send + Sync>,
     ) -> NodeId {
         let mut inner = self.inner.lock().unwrap();
         let id = NodeId(inner.next_id);
@@ -237,13 +237,17 @@ impl Runtime {
         self.inner.lock().unwrap().tracking_context = None;
     }
 
-    pub(crate) fn with_signal_value<R, F>(&self, id: NodeId, f: F) -> R
-    where
-        F: FnOnce(&dyn Any) -> R,
-    {
+    /// Get a handle to the signal value (Arc) without holding the runtime lock.
+    pub(crate) fn get_signal_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
-        let value = inner.signals.get(&id).expect("Signal not found");
-        f(value.as_ref())
+        inner.signals.get(&id).cloned().expect("Signal not found")
+    }
+
+    /// Get a handle to the computed value (Arc) without holding the runtime lock.
+    pub(crate) fn get_computed_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
+        let inner = self.inner.lock().unwrap();
+        let computed = inner.computeds.get(&id).expect("Computed not found");
+        computed.value.clone().expect("Computed value not initialized")
     }
 
     pub(crate) fn is_stale(&self, id: NodeId) -> bool {
@@ -279,19 +283,6 @@ impl Runtime {
             }
             inner.tracking_context = None;
         }
-    }
-
-    pub(crate) fn with_computed_value<R, F>(&self, id: NodeId, f: F) -> R
-    where
-        F: FnOnce(&dyn Any) -> R,
-    {
-        let inner = self.inner.lock().unwrap();
-        let computed = inner.computeds.get(&id).expect("Computed not found");
-        let value = computed
-            .value
-            .as_ref()
-            .expect("Computed value not initialized");
-        f(value.as_ref())
     }
 
     pub(crate) fn dispose_effect(&self, id: NodeId) {

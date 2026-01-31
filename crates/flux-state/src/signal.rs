@@ -49,7 +49,7 @@ pub struct WriteSignal<T> {
 
 // SAFETY: Signal uses internal Mutex locking via Runtime, so it is safe to share
 // between threads even if T is !Sync (e.g., RefCell), as long as T is Send.
-// T must be Send because it is stored in Box<dyn Any + Send>.
+// T must be Send because it is stored in Arc<dyn Any + Send + Sync>.
 unsafe impl<T: Send> Sync for Signal<T> {}
 unsafe impl<T: Send> Sync for ReadSignal<T> {}
 unsafe impl<T: Send> Sync for WriteSignal<T> {}
@@ -65,7 +65,7 @@ impl<T: 'static + Send> Signal<T> {
     /// let count = Signal::new(runtime, 100);
     /// ```
     pub fn new(runtime: Arc<Runtime>, value: T) -> Self {
-        let id = runtime.create_signal(Box::new(Mutex::new(value)));
+        let id = runtime.create_signal(Arc::new(Mutex::new(value)));
         Self {
             id,
             runtime,
@@ -100,6 +100,32 @@ impl<T: 'static + Send> Signal<T> {
             },
         )
     }
+
+    /// Access the signal value safely with a closure.
+    ///
+    /// This method allows accessing the value without cloning it.
+    /// It automatically tracks dependencies.
+    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        self.runtime.track(self.id);
+        let handle = self.runtime.get_signal_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
+    }
+
+    /// Access the signal value safely with a closure, without tracking dependencies.
+    pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        let handle = self.runtime.get_signal_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
+    }
 }
 
 impl<T: Clone + 'static + Send> ReadSignal<T> {
@@ -120,15 +146,7 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// });
     /// ```
     pub fn get(&self) -> T {
-        self.runtime.track(self.id);
-        self.runtime
-            .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<Mutex<T>>()
-                    .expect("Type mismatch")
-                    .lock()
-                    .unwrap()
-                    .clone()
-            })
+        self.with(|v| v.clone())
     }
 
     /// Get the current value without tracking dependencies.
@@ -150,14 +168,35 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// });
     /// ```
     pub fn get_untracked(&self) -> T {
-        self.runtime
-            .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<Mutex<T>>()
-                    .expect("Type mismatch")
-                    .lock()
-                    .unwrap()
-                    .clone()
-            })
+        self.with_untracked(|v| v.clone())
+    }
+}
+
+impl<T: 'static + Send> ReadSignal<T> {
+    /// Access the signal value safely with a closure.
+    ///
+    /// This method allows accessing the value without cloning it.
+    /// It automatically tracks dependencies.
+    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        self.runtime.track(self.id);
+        let handle = self.runtime.get_signal_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
+    }
+
+    /// Access the signal value safely with a closure, without tracking dependencies.
+    pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        let handle = self.runtime.get_signal_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
     }
 }
 
@@ -175,13 +214,15 @@ impl<T: 'static + Send> WriteSignal<T> {
     /// write.set(42);
     /// ```
     pub fn set(&self, value: T) {
-        self.runtime
-            .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                *v.downcast_ref::<Mutex<T>>()
-                    .expect("Type mismatch")
-                    .lock()
-                    .unwrap() = value;
-            });
+        let handle = self.runtime.get_signal_handle(self.id);
+        {
+            let mut guard = handle
+                .downcast_ref::<Mutex<T>>()
+                .expect("Type mismatch")
+                .lock()
+                .unwrap();
+            *guard = value;
+        }
         self.runtime.notify(self.id);
     }
 
@@ -198,14 +239,15 @@ impl<T: 'static + Send> WriteSignal<T> {
     /// write.update(|c| *c += 1);
     /// ```
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        self.runtime
-            .with_signal_value(self.id, |v: &dyn std::any::Any| {
-                f(&mut v
-                    .downcast_ref::<Mutex<T>>()
-                    .expect("Type mismatch")
-                    .lock()
-                    .unwrap());
-            });
+        let handle = self.runtime.get_signal_handle(self.id);
+        {
+            let mut guard = handle
+                .downcast_ref::<Mutex<T>>()
+                .expect("Type mismatch")
+                .lock()
+                .unwrap();
+            f(&mut *guard);
+        }
         self.runtime.notify(self.id);
     }
 }
@@ -237,6 +279,16 @@ mod tests {
         let signal = Signal::new(Arc::clone(&runtime), 1);
         let (read, _write) = signal.split();
         assert_eq!(read.get_untracked(), 1);
+    }
+
+    #[test]
+    fn test_with() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(Arc::clone(&runtime), vec![1, 2, 3]);
+        let (read, _) = signal.split();
+
+        let len = read.with(|v| v.len());
+        assert_eq!(len, 3);
     }
 
     #[test]

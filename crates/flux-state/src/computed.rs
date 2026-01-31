@@ -38,7 +38,7 @@ pub struct Computed<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: Clone + 'static + Send> Computed<T> {
+impl<T: 'static + Send> Computed<T> {
     /// Create a new computed value.
     ///
     /// The `compute` closure will be called to calculate the initial value,
@@ -48,7 +48,7 @@ impl<T: Clone + 'static + Send> Computed<T> {
         F: Fn() -> T + 'static + Send + Sync,
     {
         let id = runtime.create_computed(Arc::new(move || {
-            Box::new(Mutex::new(compute())) as Box<dyn std::any::Any + Send>
+            Arc::new(Mutex::new(compute())) as Arc<dyn std::any::Any + Send + Sync>
         }));
 
         // Initialize the value by computing it once
@@ -64,13 +64,11 @@ impl<T: Clone + 'static + Send> Computed<T> {
         result
     }
 
-    /// Get the current value.
+    /// Access the computed value safely with a closure.
     ///
-    /// This method:
-    /// 1. Tracks the dependency if called inside an Effect or another Computed.
-    /// 2. Recomputes the value if any dependencies have changed (lazy evaluation).
-    /// 3. Returns the memoized value otherwise.
-    pub fn get(&self) -> T {
+    /// This method allows accessing the value without cloning it.
+    /// It automatically tracks dependencies and recomputes if stale.
+    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
 
         // Check if value is stale and recompute if needed
@@ -78,14 +76,44 @@ impl<T: Clone + 'static + Send> Computed<T> {
             self.runtime.recompute(self.id);
         }
 
-        self.runtime
-            .with_computed_value(self.id, |v: &dyn std::any::Any| {
-                v.downcast_ref::<Mutex<T>>()
-                    .expect("Type mismatch")
-                    .lock()
-                    .unwrap()
-                    .clone()
-            })
+        let handle = self.runtime.get_computed_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
+    }
+
+    /// Access the computed value safely with a closure, without tracking dependencies.
+    ///
+    /// Note: This will still trigger a recompute if the value is stale, but will not
+    /// subscribe the current context to this computed value.
+    pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        // Check if value is stale and recompute if needed
+        if self.runtime.is_stale(self.id) {
+            self.runtime.recompute(self.id);
+        }
+
+        let handle = self.runtime.get_computed_handle(self.id);
+        let guard = handle
+            .downcast_ref::<Mutex<T>>()
+            .expect("Type mismatch")
+            .lock()
+            .unwrap();
+        f(&*guard)
+    }
+}
+
+impl<T: Clone + 'static + Send> Computed<T> {
+    /// Get the current value.
+    ///
+    /// This method:
+    /// 1. Tracks the dependency if called inside an Effect or another Computed.
+    /// 2. Recomputes the value if any dependencies have changed (lazy evaluation).
+    /// 3. Returns the memoized value otherwise.
+    pub fn get(&self) -> T {
+        self.with(|v| v.clone())
     }
 }
 
