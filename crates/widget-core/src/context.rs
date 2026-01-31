@@ -2,15 +2,18 @@
 //!
 //! Provides API for widgets to build scene nodes and configure components.
 
+use crate::decoration_context::DecorationContext;
 use crate::form::SubmitCallback;
 use crate::form_context::FormContext;
 use crate::input_context::InputContext;
+use crate::interaction_context::InteractionContext;
+use crate::layout_context::LayoutContext;
 use crate::validation::Validator;
 use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use theme_engine::DesignTokens;
 
@@ -25,17 +28,16 @@ pub use crate::input_context::{ReactiveTextState, TextInputState};
 /// the accumulated widget state (layout, clickables, validators, etc.) to
 /// ECS components.
 ///
-/// This is a build-time context only - it accumulates widget state in HashMaps
+/// This is a build-time context only - it accumulates widget state in sub-contexts
 /// during widget construction, which is then transferred to ECS components for
 /// runtime use.
 pub struct WidgetContext {
     scene: Scene,
-    layout_styles: HashMap<NodeId, FlexStyle>,
-    hover_states: HashSet<NodeId>,
-    clickables: HashMap<NodeId, Arc<dyn Fn() + Send + Sync>>,
-    background_colors: HashMap<NodeId, Vec4>,
 
-    // Delegated contexts
+    // Sub-contexts
+    layout_context: LayoutContext,
+    interaction_context: InteractionContext,
+    decoration_context: DecorationContext,
     input_context: InputContext,
     form_context: FormContext,
 
@@ -48,10 +50,9 @@ impl WidgetContext {
     pub fn new_test() -> Self {
         Self {
             scene: Scene::new(),
-            layout_styles: HashMap::new(),
-            hover_states: HashSet::new(),
-            clickables: HashMap::new(),
-            background_colors: HashMap::new(),
+            layout_context: LayoutContext::new(),
+            interaction_context: InteractionContext::new(),
+            decoration_context: DecorationContext::new(),
             input_context: InputContext::new(),
             form_context: FormContext::new(),
             design_tokens: None,
@@ -100,7 +101,7 @@ impl WidgetContext {
 
     /// Get layout style for node
     pub fn get_layout_style(&self, node_id: NodeId) -> Option<FlexStyle> {
-        self.layout_styles.get(&node_id).cloned()
+        self.layout_context.get_style(node_id)
     }
 
     /// Check if node is a text node
@@ -141,7 +142,7 @@ impl WidgetContext {
     /// Layout styles are accumulated during widget building and transferred to
     /// ECS components via `apply_to_ecs()` after building is complete.
     pub fn set_layout_style(&mut self, node_id: NodeId, style: FlexStyle) {
-        self.layout_styles.insert(node_id, style);
+        self.layout_context.set_style(node_id, style);
     }
 
     /// Re-parent a node from old parent to new parent
@@ -164,53 +165,47 @@ impl WidgetContext {
 
     /// Add hover state tracking to a node
     pub fn add_hover_state(&mut self, node_id: NodeId) {
-        self.hover_states.insert(node_id);
+        self.interaction_context.add_hover_state(node_id);
     }
 
     /// Check if node has hover state
     pub fn has_hover_state(&self, node_id: NodeId) -> bool {
-        self.hover_states.contains(&node_id)
+        self.interaction_context.has_hover_state(node_id)
     }
 
     /// Add clickable component to a node
     pub fn add_clickable(&mut self, node_id: NodeId, callback: Arc<dyn Fn() + Send + Sync>) {
-        self.clickables.insert(node_id, callback);
+        self.interaction_context.add_clickable(node_id, callback);
     }
 
     /// Check if node is clickable
     pub fn has_clickable(&self, node_id: NodeId) -> bool {
-        self.clickables.contains_key(&node_id)
+        self.interaction_context.has_clickable(node_id)
     }
 
     /// Set background color for a node
     pub fn set_background_color(&mut self, node_id: NodeId, color: Vec4) {
-        self.background_colors.insert(node_id, color);
+        self.decoration_context.set_background_color(node_id, color);
     }
 
     /// Check if node has background color
     pub fn has_background_color(&self, node_id: NodeId) -> bool {
-        self.background_colors.contains_key(&node_id)
+        self.decoration_context.has_background_color(node_id)
     }
 
     /// Get background color for a node
     pub fn get_background_color(&self, node_id: NodeId) -> Option<Vec4> {
-        self.background_colors.get(&node_id).copied()
+        self.decoration_context.get_background_color(node_id)
     }
 
     /// Simulate click on a node (for testing)
     pub fn trigger_click(&mut self, node_id: NodeId) {
-        if let Some(callback) = self.clickables.get(&node_id) {
-            callback();
-        }
+        self.interaction_context.trigger_click(node_id);
     }
 
     /// Simulate hover on a node (for testing)
     pub fn trigger_hover(&mut self, node_id: NodeId, hovered: bool) {
-        if hovered {
-            self.hover_states.insert(node_id);
-        } else {
-            self.hover_states.remove(&node_id);
-        }
+        self.interaction_context.trigger_hover(node_id, hovered);
     }
 
     /// Add reactive text state to a node
@@ -401,17 +396,17 @@ impl WidgetContext {
 
     /// Get all layout styles (for app-shell integration)
     pub fn layout_styles(&self) -> &HashMap<NodeId, FlexStyle> {
-        &self.layout_styles
+        self.layout_context.get_all_styles()
     }
 
     /// Get all clickables (for app-shell integration)
     pub fn clickables(&self) -> &HashMap<NodeId, Arc<dyn Fn() + Send + Sync>> {
-        &self.clickables
+        self.interaction_context.get_clickables()
     }
 
     /// Get all background colors (for app-shell integration)
     pub fn background_colors(&self) -> &HashMap<NodeId, Vec4> {
-        &self.background_colors
+        self.decoration_context.get_background_colors()
     }
 
     /// Get all text input states (for app-shell integration)
