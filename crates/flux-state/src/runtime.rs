@@ -66,6 +66,42 @@ struct ComputedNode {
     value: Option<Box<dyn Any + Send>>,
 }
 
+impl RuntimeInner {
+    fn cleanup_dependencies(&mut self, id: NodeId) {
+        if let Some(deps) = self.dependencies.remove(&id) {
+            for dep in deps {
+                if let Some(subs) = self.subscribers.get_mut(&dep) {
+                    subs.remove(&id);
+                }
+            }
+        }
+    }
+
+    fn mark_stale(&mut self, id: NodeId) -> bool {
+        // Only process if not already stale (avoid infinite loops)
+        if self.stale.contains(&id) {
+            return false;
+        }
+
+        self.stale.insert(id);
+
+        // If it's an effect, schedule it
+        if self.effects.contains_key(&id) && !self.pending_effects.contains(&id) {
+            self.pending_effects.push(id);
+        }
+
+        // We should recurse for computed values
+        self.computeds.contains_key(&id)
+    }
+
+    fn get_subscribers(&self, source: NodeId) -> Vec<NodeId> {
+        self.subscribers
+            .get(&source)
+            .map(|subs| subs.iter().copied().collect())
+            .unwrap_or_default()
+    }
+}
+
 impl Runtime {
     /// Create a new reactive runtime.
     ///
@@ -151,39 +187,15 @@ impl Runtime {
 
     fn mark_stale_recursive(&self, source: NodeId) {
         // Collect immediate subscribers
-        let subs_to_mark: Vec<NodeId> = {
-            let inner = self.inner.lock().unwrap();
-            inner
-                .subscribers
-                .get(&source)
-                .map(|subs| subs.iter().copied().collect())
-                .unwrap_or_default()
-        };
+        let subs_to_mark = self.inner.lock().unwrap().get_subscribers(source);
 
         // Mark each subscriber as stale
-        for sub in subs_to_mark.iter() {
-            let should_recurse = {
-                let mut inner = self.inner.lock().unwrap();
-
-                // Only process if not already stale (avoid infinite loops)
-                if inner.stale.contains(sub) {
-                    false
-                } else {
-                    inner.stale.insert(*sub);
-
-                    // If it's an effect, schedule it
-                    if inner.effects.contains_key(sub) && !inner.pending_effects.contains(sub) {
-                        inner.pending_effects.push(*sub);
-                    }
-
-                    // We should recurse for computed values
-                    inner.computeds.contains_key(sub)
-                }
-            };
+        for sub in subs_to_mark {
+            let should_recurse = self.inner.lock().unwrap().mark_stale(sub);
 
             // Recursively mark dependents of this computed
             if should_recurse {
-                self.mark_stale_recursive(*sub);
+                self.mark_stale_recursive(sub);
             }
         }
     }
@@ -206,13 +218,7 @@ impl Runtime {
         // Clear old dependencies
         {
             let mut inner = self.inner.lock().unwrap();
-            if let Some(deps) = inner.dependencies.remove(&id) {
-                for dep in deps {
-                    if let Some(subs) = inner.subscribers.get_mut(&dep) {
-                        subs.remove(&id);
-                    }
-                }
-            }
+            inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
             inner.tracking_context = Some(id);
         }
@@ -248,16 +254,7 @@ impl Runtime {
         // Clear old dependencies and set tracking context
         {
             let mut inner = self.inner.lock().unwrap();
-
-            // Clear old dependencies
-            if let Some(deps) = inner.dependencies.remove(&id) {
-                for dep in deps {
-                    if let Some(subs) = inner.subscribers.get_mut(&dep) {
-                        subs.remove(&id);
-                    }
-                }
-            }
-
+            inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
             inner.tracking_context = Some(id);
         }
@@ -304,12 +301,6 @@ impl Runtime {
         inner.effects.remove(&id);
 
         // Clean up dependencies
-        if let Some(deps) = inner.dependencies.remove(&id) {
-            for dep in deps {
-                if let Some(subs) = inner.subscribers.get_mut(&dep) {
-                    subs.remove(&id);
-                }
-            }
-        }
+        inner.cleanup_dependencies(id);
     }
 }
