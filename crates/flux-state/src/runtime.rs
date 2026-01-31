@@ -238,12 +238,20 @@ impl Runtime {
     }
 
     /// Get a handle to the signal value (Arc) without holding the runtime lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the signal does not exist.
     pub(crate) fn get_signal_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
         inner.signals.get(&id).cloned().expect("Signal not found")
     }
 
     /// Get a handle to the computed value (Arc) without holding the runtime lock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the computed value does not exist or has not been initialized.
     pub(crate) fn get_computed_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
         let computed = inner.computeds.get(&id).expect("Computed not found");
@@ -254,6 +262,11 @@ impl Runtime {
         self.inner.lock().unwrap().stale.contains(&id)
     }
 
+    /// Recompute the value of a computed node.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
         // Clear old dependencies and set tracking context
         {

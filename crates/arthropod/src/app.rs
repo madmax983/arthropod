@@ -7,7 +7,7 @@
 //!
 //! For widget-based applications, use [`App::run()`]:
 //!
-//! ```ignore
+//! ```no_run
 //! use arthropod::prelude::*;
 //! use widget_core::{Form, TextInput};
 //!
@@ -455,7 +455,7 @@ impl App {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```no_run
     /// use arthropod::prelude::*;
     /// use widget_core::{Form, TextInput};
     ///
@@ -536,12 +536,16 @@ impl AppContext {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use arthropod::prelude::*;
+    /// # use widget_core::Text;
     /// App::run("Test", 400, 300, |ctx| {
-    ///     let counter = ctx.signal(0);
-    ///     let name = ctx.signal(String::new());
-    ///     // ...
-    /// })
+    ///     let _counter = ctx.signal(0);
+    ///     let _name = ctx.signal(String::new());
+    ///
+    ///     // Return a widget...
+    ///     Text::new("Placeholder")
+    /// });
     /// ```
     pub fn signal<T: Clone + Send + Sync + 'static>(&self, initial: T) -> Signal<T> {
         Signal::new(self.runtime.clone(), initial)

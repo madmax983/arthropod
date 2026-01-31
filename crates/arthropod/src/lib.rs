@@ -7,8 +7,31 @@
 //!
 //! # Quick Start
 //!
+//! For widget-based applications, use the high-level `App::run` API:
+//!
+//! ```no_run
+//! use arthropod::prelude::*;
+//! use widget_core::{txt, btn, col};
+//!
+//! fn main() -> Result<(), AppError> {
+//!     App::run("Hello Arthropod", 400, 300, |_ctx| {
+//!         col!(
+//!             [
+//!                 txt!("Hello, World!", size: 24.0),
+//!                 btn!("Click Me", primary, on_click: || println!("Button clicked!")),
+//!             ],
+//!             gap: 20.0,
+//!             padding: 20.0
+//!         )
+//!     })
+//! }
+//! ```
+//!
+//! For low-level control or headless testing:
+//!
 //! ```
 //! use arthropod::prelude::*;
+//! use render_engine::Scene;
 //!
 //! let config = WindowConfig {
 //!     title: "My App".to_string(),
@@ -16,14 +39,15 @@
 //!     ..Default::default()
 //! };
 //!
-//! // For testing/headless mode
+//! // Create headless app (no window/GPU)
 //! let mut app = AppBuilder::new()
 //!     .with_window_config(config)
 //!     .build_headless()
 //!     .expect("Failed to create app");
 //!
-//! // Add your UI code here
-//! // app.spawn(node_id).insert(Renderable);
+//! // Access resources via ECS world
+//! let scene = app.world().resource::<Scene>();
+//! println!("Root node: {:?}", scene.root());
 //! ```
 //!
 //! # Architecture

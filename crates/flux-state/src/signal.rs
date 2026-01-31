@@ -105,6 +105,22 @@ impl<T: 'static + Send> Signal<T> {
     ///
     /// This method allows accessing the value without cloning it.
     /// It automatically tracks dependencies.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime, vec![1, 2, 3]);
+    ///
+    /// // Access length without cloning the vector
+    /// let len = count.with(|v| v.len());
+    /// assert_eq!(len, 3);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let handle = self.runtime.get_signal_handle(self.id);
@@ -117,6 +133,21 @@ impl<T: 'static + Send> Signal<T> {
     }
 
     /// Access the signal value safely with a closure, without tracking dependencies.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime, vec![1, 2, 3]);
+    ///
+    /// // Access without tracking
+    /// let _len = count.with_untracked(|v| v.len());
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let handle = self.runtime.get_signal_handle(self.id);
         let guard = handle
@@ -177,6 +208,23 @@ impl<T: 'static + Send> ReadSignal<T> {
     ///
     /// This method allows accessing the value without cloning it.
     /// It automatically tracks dependencies.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime, vec![1, 2, 3]);
+    /// let (read, _) = count.split();
+    ///
+    /// // Access length without cloning the vector
+    /// let len = read.with(|v| v.len());
+    /// assert_eq!(len, 3);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let handle = self.runtime.get_signal_handle(self.id);
@@ -189,6 +237,22 @@ impl<T: 'static + Send> ReadSignal<T> {
     }
 
     /// Access the signal value safely with a closure, without tracking dependencies.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime, vec![1, 2, 3]);
+    /// let (read, _) = count.split();
+    ///
+    /// // Access without tracking
+    /// let _len = read.with_untracked(|v| v.len());
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let handle = self.runtime.get_signal_handle(self.id);
         let guard = handle
@@ -213,6 +277,10 @@ impl<T: 'static + Send> WriteSignal<T> {
     ///
     /// write.set(42);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn set(&self, value: T) {
         let handle = self.runtime.get_signal_handle(self.id);
         {
@@ -238,6 +306,10 @@ impl<T: 'static + Send> WriteSignal<T> {
     ///
     /// write.update(|c| *c += 1);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         let handle = self.runtime.get_signal_handle(self.id);
         {

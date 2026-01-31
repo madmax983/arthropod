@@ -68,6 +68,10 @@ impl<T: 'static + Send> Computed<T> {
     ///
     /// This method allows accessing the value without cloning it.
     /// It automatically tracks dependencies and recomputes if stale.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
 
@@ -89,6 +93,10 @@ impl<T: 'static + Send> Computed<T> {
     ///
     /// Note: This will still trigger a recompute if the value is stale, but will not
     /// subscribe the current context to this computed value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         // Check if value is stale and recompute if needed
         if self.runtime.is_stale(self.id) {
