@@ -78,7 +78,10 @@ impl CompositionDevice {
             // The transparency effect relies on the window-level DWM attributes
             // and the transparent swapchain.
 
-            Ok(BackdropVisual { visual, material })
+            Ok(BackdropVisual {
+                visual: CompositionVisual::from_raw(visual),
+                material,
+            })
         }
     }
 
@@ -123,11 +126,16 @@ impl CompositionTarget {
 }
 
 /// Wrapper around IDCompositionVisual2 for the visual tree.
+#[derive(Clone)]
 pub struct CompositionVisual {
     visual: IDCompositionVisual2,
 }
 
 impl CompositionVisual {
+    pub(crate) fn from_raw(visual: IDCompositionVisual2) -> Self {
+        Self { visual }
+    }
+
     /// Sets the content of this visual to a composition surface.
     #[allow(dead_code)]
     pub fn set_content(&self, surface: &CompositionSurface) -> Result<()> {
@@ -175,7 +183,7 @@ pub struct CompositionSurface {
 /// This visual can display Mica, Acrylic, or other backdrop effects
 /// behind content rendered to it.
 pub struct BackdropVisual {
-    visual: IDCompositionVisual2,
+    visual: CompositionVisual,
     material: crate::materials::BackdropMaterial,
 }
 
@@ -187,14 +195,12 @@ impl BackdropVisual {
 
     /// Returns the underlying composition visual.
     pub fn visual(&self) -> &CompositionVisual {
-        // Safety: BackdropVisual contains IDCompositionVisual2, same as CompositionVisual
-        // We return a reference to allow using CompositionVisual methods
-        unsafe { std::mem::transmute(&self.visual) }
+        &self.visual
     }
 
     /// Returns the raw IDCompositionVisual2.
     pub fn raw_visual(&self) -> &IDCompositionVisual2 {
-        &self.visual
+        self.visual.raw_visual()
     }
 }
 

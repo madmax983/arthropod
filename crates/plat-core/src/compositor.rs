@@ -218,7 +218,7 @@ mod platform {
                 .map_err(|e| PlatformError::Initialization(format!("Add child: {}", e)))?;
 
             let wrapped = std::sync::Arc::new(CompositionVisualWrapper {
-                visual: unsafe { std::mem::transmute(visual.raw_visual().clone()) },
+                visual: visual.visual().clone(),
             });
 
             let layer_impl = LayerImpl {

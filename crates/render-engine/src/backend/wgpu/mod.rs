@@ -14,6 +14,11 @@ pub use pipelines::rect_pipeline::RectInstance;
 use pipelines::rect_pipeline::RectPipeline;
 use pipelines::glyph_pipeline::GlyphPipeline;
 
+type SceneInstanceData<'a> = (
+    Vec<RectInstance>,
+    Vec<(&'a SceneNode, &'a String, f32, Color)>,
+);
+
 /// wgpu-based rendering backend.
 #[derive(Resource)]
 pub struct WgpuBackend {
@@ -85,7 +90,7 @@ impl WgpuBackend {
     ///
     /// Returns a tuple of (rect_instances, text_nodes).
     /// Text nodes are returned as a list of data needed for shaping: (node, text, font_size, color).
-    fn collect_instances<'a>(scene: &'a Scene) -> (Vec<RectInstance>, Vec<(&'a SceneNode, &'a String, f32, Color)>) {
+    fn collect_instances(scene: &Scene) -> SceneInstanceData<'_> {
         use crate::NodeContent;
         let mut instances = Vec::new();
         let mut raw_text_nodes = Vec::new();
