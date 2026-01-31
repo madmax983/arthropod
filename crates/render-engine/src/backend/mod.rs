@@ -3,10 +3,10 @@
 #[cfg(target_os = "windows")]
 pub mod composition_swap_chain;
 pub mod text;
-mod wgpu_backend;
+pub mod wgpu;
 
 pub use text::{GlyphAtlas, GlyphInstance, TexCoords, TextRenderer};
-pub use wgpu_backend::{RectInstance, WgpuBackend};
+pub use wgpu::{RectInstance, WgpuBackend};
 
 use crate::Scene;
 
