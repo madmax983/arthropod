@@ -279,6 +279,27 @@ impl App {
         self.context.update();
     }
 
+    /// Add a system to the update loop
+    ///
+    /// Allows registering custom systems (e.g., from plugins or experimental modules)
+    /// to run during the application update cycle.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use arthropod::prelude::*;
+    /// # use bevy_ecs::prelude::*;
+    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// fn my_system() {
+    ///     println!("Updating!");
+    /// }
+    ///
+    /// app.add_update_system(my_system);
+    /// ```
+    pub fn add_update_system<M>(&mut self, system: impl IntoSystemConfigs<M>) {
+        self.context.add_update_system(system);
+    }
+
     /// Run render systems and collect GPU instances
     ///
     /// In headless mode, this returns the instances without rendering.

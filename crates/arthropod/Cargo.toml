@@ -27,3 +27,11 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "framework_bench"
 harness = false
+
+[[bench]]
+name = "particles"
+harness = false
+required-features = ["nova"]
+
+[features]
+nova = []

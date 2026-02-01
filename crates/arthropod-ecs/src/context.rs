@@ -151,6 +151,21 @@ impl FrameworkContext {
         ));
         schedule
     }
+
+    /// Add a system to the update schedule
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use arthropod_ecs::FrameworkContext;
+    /// # use bevy_ecs::prelude::*;
+    /// # let mut context = FrameworkContext::new();
+    /// fn my_system() {}
+    /// context.add_update_system(my_system);
+    /// ```
+    pub fn add_update_system<M>(&mut self, system: impl IntoSystemConfigs<M>) {
+        self.update_schedule.add_systems(system);
+    }
 }
 
 impl Default for FrameworkContext {

@@ -132,6 +132,35 @@ impl Scene {
         }
     }
 
+    /// Remove a node from the scene.
+    ///
+    /// Removes the node from its parent's children list and deletes the node.
+    /// Note: This does not recursively remove children. Orphaned children will remain in the map
+    /// but have no parent, potentially leaking if not handled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use render_engine::{Scene, SceneNode, NodeContent, Color};
+    /// # let mut scene = Scene::new();
+    /// # let root = scene.root();
+    /// let node = scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+    /// scene.remove_node(node);
+    /// assert!(scene.get_node(node).is_none());
+    /// ```
+    #[allow(clippy::collapsible_if)]
+    pub fn remove_node(&mut self, id: NodeId) {
+        if let Some(node) = self.nodes.remove(&id) {
+            // Remove from parent's children list
+            if let Some(parent_id) = node.parent {
+                if let Some(parent) = self.nodes.get_mut(&parent_id) {
+                    parent.children.retain(|&child_id| child_id != id);
+                    self.mark_dirty(parent_id);
+                }
+            }
+        }
+    }
+
     /// Get dirty nodes and clear the list.
     pub fn take_dirty(&mut self) -> Vec<NodeId> {
         std::mem::take(&mut self.dirty_nodes)
@@ -343,5 +372,68 @@ mod tests {
         assert_eq!(scene.hit_test(10.0, 10.0), Some(node_id)); // Top-left: inclusive
         assert_eq!(scene.hit_test(110.0, 110.0), None); // Bottom-right: exclusive
         assert_eq!(scene.hit_test(109.99, 109.99), Some(node_id)); // Just inside
+    }
+
+    #[test]
+    fn test_remove_node_updates_parent_children_list() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Create a child node
+        let mut child = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        child.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
+        let child_id = scene.add_node(root, child);
+
+        // Verify child is in parent's list
+        assert!(scene.get_node(root).unwrap().children.contains(&child_id));
+
+        // Remove child
+        scene.remove_node(child_id);
+
+        // Verify child is gone
+        assert!(scene.get_node(child_id).is_none());
+
+        // Verify child is removed from parent's list
+        assert!(!scene.get_node(root).unwrap().children.contains(&child_id));
+    }
+
+    #[test]
+    fn test_remove_node_with_children_orphans_them() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Create parent
+        let parent_id = scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+
+        // Create child
+        let child_id = scene.add_node(parent_id, SceneNode::new(NodeContent::Rect { color: Color::BLUE }));
+
+        // Remove parent
+        scene.remove_node(parent_id);
+
+        // Parent is gone
+        assert!(scene.get_node(parent_id).is_none());
+
+        // Child still exists (orphaned)
+        assert!(scene.get_node(child_id).is_some());
+
+        // Child still points to deleted parent (as per current simplistic implementation)
+        // This confirms the behavior described in doc comment
+        assert_eq!(scene.get_node(child_id).unwrap().parent, Some(parent_id));
+    }
+
+    #[test]
+    fn test_remove_root_node() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Attempt to remove root
+        scene.remove_node(root);
+
+        // Root should be gone
+        assert!(scene.get_node(root).is_none());
+
+        // Scene state is technically invalid now (no root), but API allows it.
+        // This test ensures no panic occurs.
     }
 }
