@@ -3,6 +3,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 /// Unique identifier for reactive nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -51,8 +52,8 @@ struct RuntimeInner {
     dependencies: HashMap<NodeId, HashSet<NodeId>>, // node -> its dependencies
     subscribers: HashMap<NodeId, HashSet<NodeId>>,  // node -> nodes that depend on it
 
-    // Current tracking context
-    tracking_context: Option<NodeId>,
+    // Current tracking context (per thread stack)
+    tracking_context: HashMap<thread::ThreadId, Vec<NodeId>>,
 
     // Stale tracking
     stale: HashSet<NodeId>,
@@ -109,6 +110,28 @@ impl RuntimeInner {
             }
         }
     }
+
+    fn push_context(&mut self, id: NodeId) {
+        self.tracking_context
+            .entry(thread::current().id())
+            .or_default()
+            .push(id);
+    }
+
+    fn pop_context(&mut self) {
+        if let Some(stack) = self.tracking_context.get_mut(&thread::current().id()) {
+            stack.pop();
+            if stack.is_empty() {
+                self.tracking_context.remove(&thread::current().id());
+            }
+        }
+    }
+
+    fn current_context(&self) -> Option<NodeId> {
+        self.tracking_context
+            .get(&thread::current().id())
+            .and_then(|stack| stack.last().copied())
+    }
 }
 
 impl Runtime {
@@ -125,7 +148,7 @@ impl Runtime {
                 effects: HashMap::new(),
                 dependencies: HashMap::new(),
                 subscribers: HashMap::new(),
-                tracking_context: None,
+                tracking_context: HashMap::new(),
                 stale: HashSet::new(),
                 pending_effects: Vec::new(),
             }),
@@ -171,7 +194,7 @@ impl Runtime {
     /// Track a dependency (called during signal/computed reads).
     pub(crate) fn track(&self, source: NodeId) {
         let mut inner = self.inner.lock().unwrap();
-        if let Some(observer) = inner.tracking_context {
+        if let Some(observer) = inner.current_context() {
             inner
                 .dependencies
                 .entry(observer)
@@ -214,7 +237,7 @@ impl Runtime {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
-            inner.tracking_context = Some(id);
+            inner.push_context(id);
             inner.effects.get(&id).cloned()
         };
 
@@ -224,7 +247,7 @@ impl Runtime {
         }
 
         // Clear tracking context
-        self.inner.lock().unwrap().tracking_context = None;
+        self.inner.lock().unwrap().pop_context();
     }
 
     /// Get a handle to the signal value (Arc) without holding the runtime lock.
@@ -273,7 +296,7 @@ impl Runtime {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
-            inner.tracking_context = Some(id);
+            inner.push_context(id);
 
             let computed = inner
                 .computeds
@@ -291,7 +314,7 @@ impl Runtime {
             if let Some(computed) = inner.computeds.get_mut(&id) {
                 computed.value = Some(new_value);
             }
-            inner.tracking_context = None;
+            inner.pop_context();
         }
     }
 
