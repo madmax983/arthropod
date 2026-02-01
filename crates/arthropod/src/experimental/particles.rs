@@ -97,7 +97,10 @@ impl Rng {
 /// # let mut schedule = Schedule::default();
 /// # schedule.add_systems(update_particle_time);
 /// ```
-pub fn update_particle_time(mut time: ResMut<ParticleTime>, mut state: ResMut<ParticleGlobalState>) {
+pub fn update_particle_time(
+    mut time: ResMut<ParticleTime>,
+    mut state: ResMut<ParticleGlobalState>,
+) {
     let now = Instant::now();
     // In wasm or some envs duration might panic if time goes back, but here we assume monotonic
     if now >= state.last_update {
@@ -246,7 +249,8 @@ pub fn update_particles(
 /// ```
 pub fn register_particles(app: &mut crate::App) {
     app.world_mut().insert_resource(ParticleTime::default());
-    app.world_mut().insert_resource(ParticleGlobalState::default());
+    app.world_mut()
+        .insert_resource(ParticleGlobalState::default());
     app.add_update_system((update_particle_time, emit_particles, update_particles).chain());
 }
 

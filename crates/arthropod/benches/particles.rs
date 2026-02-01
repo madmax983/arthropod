@@ -1,8 +1,8 @@
 use arthropod::experimental::particles::{
-    emit_particles, update_particles, ParticleEmitter, ParticleTime,
+    ParticleEmitter, ParticleTime, emit_particles, update_particles,
 };
 use bevy_ecs::prelude::*;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use render_engine::Scene;
 
 fn benchmark_particles(c: &mut Criterion) {

@@ -15,6 +15,7 @@ members = [
     "crates/text-engine",
     "crates/widget-core",
     "crates/widget-macros",
+    "experiments/chronos",
 ]
 
 [package]

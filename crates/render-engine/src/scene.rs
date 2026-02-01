@@ -403,10 +403,16 @@ mod tests {
         let root = scene.root();
 
         // Create parent
-        let parent_id = scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+        let parent_id = scene.add_node(
+            root,
+            SceneNode::new(NodeContent::Rect { color: Color::RED }),
+        );
 
         // Create child
-        let child_id = scene.add_node(parent_id, SceneNode::new(NodeContent::Rect { color: Color::BLUE }));
+        let child_id = scene.add_node(
+            parent_id,
+            SceneNode::new(NodeContent::Rect { color: Color::BLUE }),
+        );
 
         // Remove parent
         scene.remove_node(parent_id);
