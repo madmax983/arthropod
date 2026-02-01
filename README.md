@@ -8,7 +8,7 @@ Arthropod is a high-performance, retained-mode GUI framework built for Rust. It 
 
 - **⚡ Fine-Grained Reactivity**: Built on `flux-state`, inspired by SolidJS signals. Updates are surgical—only the changed nodes re-render.
 - **🏗️ Modular Architecture**: Powered by `bevy_ecs`. Everything is a resource or a component, making the system highly extensible.
-- **🚀 GPU Acceleration**: Rendering is handled by `wgpu`, ensuring smooth performance across platforms (Windows, macOS, Linux).
+- **🚀 GPU Acceleration**: Rendering is handled by `wgpu`, ensuring smooth performance across platforms (Windows, macOS). Linux support is planned.
 - **📝 Declarative Widgets**: Use Rust macros (`txt!`, `btn!`, `col!`) to build UI layouts with ease.
 
 ## Architecture

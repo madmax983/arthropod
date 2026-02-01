@@ -8,13 +8,13 @@ pub struct EventLoopImpl;
 impl EventLoopImpl {
     pub fn new() -> Result<Self, PlatformError> {
         Err(PlatformError::Initialization(
-            "Platform not supported".into(),
+            "The current platform is not supported. Arthropod currently supports Windows and macOS.".into(),
         ))
     }
 
     pub fn create_window(&self, _config: WindowConfig) -> Result<Window, PlatformError> {
         Err(PlatformError::WindowCreation(
-            "Platform not supported".into(),
+            "The current platform is not supported. Arthropod currently supports Windows and macOS.".into(),
         ))
     }
 }
@@ -62,6 +62,6 @@ impl HasDisplayHandle for WindowImpl {
 #[allow(clippy::extra_unused_type_parameters)]
 pub fn run<A: Application>() -> Result<(), PlatformError> {
     Err(PlatformError::Initialization(
-        "Platform not supported".into(),
+        "The current platform is not supported. Arthropod currently supports Windows and macOS.".into(),
     ))
 }
