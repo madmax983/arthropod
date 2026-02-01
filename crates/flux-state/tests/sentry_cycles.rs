@@ -1,4 +1,4 @@
-use flux_state::{Runtime, Signal, Computed};
+use flux_state::{Computed, Runtime, Signal};
 use std::sync::{Arc, Mutex};
 
 #[test]

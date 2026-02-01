@@ -1,6 +1,6 @@
-use flux_state::{Runtime, Signal, Computed};
+use flux_state::{Computed, Runtime, Signal};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -69,14 +69,10 @@ fn test_concurrent_dependency_tracking() {
 
     // Spawn threads to access them concurrently
     let c1_thread = c1.clone();
-    let t1 = thread::spawn(move || {
-        c1_thread.get()
-    });
+    let t1 = thread::spawn(move || c1_thread.get());
 
     let c2_thread = c2.clone();
-    let t2 = thread::spawn(move || {
-        c2_thread.get()
-    });
+    let t2 = thread::spawn(move || c2_thread.get());
 
     let v1 = t1.join().unwrap();
     let v2 = t2.join().unwrap();
@@ -98,20 +94,36 @@ fn test_concurrent_dependency_tracking() {
 
     // Check C1 (should verify S1 dependency)
     assert_eq!(c1.get(), 12, "C1 should have updated when S1 changed");
-    assert_eq!(c1_count.load(Ordering::SeqCst), 3, "C1 should have recomputed");
+    assert_eq!(
+        c1_count.load(Ordering::SeqCst),
+        3,
+        "C1 should have recomputed"
+    );
 
     // Check C2 (should verify S1 is NOT a dependency)
     assert_eq!(c2.get(), 21, "C2 should not change when S1 changes");
-    assert_eq!(c2_count.load(Ordering::SeqCst), 2, "C2 should NOT have recomputed when S1 changed");
+    assert_eq!(
+        c2_count.load(Ordering::SeqCst),
+        2,
+        "C2 should NOT have recomputed when S1 changed"
+    );
 
     // 2. Update S2. Should trigger C2. Should NOT trigger C1.
     w_s2.set(22);
 
     // Check C2 (should verify S2 dependency)
     assert_eq!(c2.get(), 22, "C2 should have updated when S2 changed");
-    assert_eq!(c2_count.load(Ordering::SeqCst), 3, "C2 should have recomputed");
+    assert_eq!(
+        c2_count.load(Ordering::SeqCst),
+        3,
+        "C2 should have recomputed"
+    );
 
     // Check C1 (should verify S2 is NOT a dependency)
     assert_eq!(c1.get(), 12, "C1 should not change when S2 changes");
-    assert_eq!(c1_count.load(Ordering::SeqCst), 3, "C1 should NOT have recomputed when S2 changed");
+    assert_eq!(
+        c1_count.load(Ordering::SeqCst),
+        3,
+        "C1 should NOT have recomputed when S2 changed"
+    );
 }

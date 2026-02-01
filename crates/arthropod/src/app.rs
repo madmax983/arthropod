@@ -390,6 +390,27 @@ impl App {
     // Widget Integration (App-Shell Layer)
     // =========================================================================
 
+    /// Helper to transfer components from widget context to ECS world
+    fn transfer_components<'a, T, C, F>(
+        &mut self,
+        source_data: impl Iterator<Item = (&'a NodeId, &'a T)>,
+        node_id_map: &HashMap<NodeId, NodeId>,
+        component_factory: F,
+    ) where
+        T: 'a,
+        C: Component,
+        F: Fn(&T) -> C,
+    {
+        for (widget_node_id, data) in source_data {
+            if let Some(mut entity) = node_id_map
+                .get(widget_node_id)
+                .and_then(|&app_node_id| self.get_entity_mut(app_node_id))
+            {
+                entity.insert(component_factory(data));
+            }
+        }
+    }
+
     /// Integrate widgets from a WidgetContext into the ECS world
     ///
     /// This is the bridge between the widget-core layer (ECS-agnostic) and
@@ -427,33 +448,27 @@ impl App {
         node_id_map: &HashMap<NodeId, NodeId>,
     ) {
         // Transfer layout styles to LayoutStyle components
-        for (widget_node_id, style) in widget_ctx.layout_styles() {
-            if let Some(&app_node_id) = node_id_map.get(widget_node_id) {
-                if let Some(mut entity) = self.get_entity_mut(app_node_id) {
-                    entity.insert(LayoutStyle(style.clone()));
-                }
-            }
-        }
+        self.transfer_components(
+            widget_ctx.layout_styles().iter(),
+            node_id_map,
+            |style: &layout_engine::FlexStyle| LayoutStyle(style.clone()),
+        );
 
         // Transfer clickables to Clickable components
-        for (widget_node_id, callback) in widget_ctx.clickables() {
-            if let Some(&app_node_id) = node_id_map.get(widget_node_id) {
-                if let Some(mut entity) = self.get_entity_mut(app_node_id) {
-                    entity.insert(Clickable {
-                        callback: callback.clone(),
-                    });
-                }
-            }
-        }
+        self.transfer_components(
+            widget_ctx.clickables().iter(),
+            node_id_map,
+            |callback: &std::sync::Arc<dyn Fn() + Send + Sync>| Clickable {
+                callback: callback.clone(),
+            },
+        );
 
         // Transfer background colors to BackgroundColor components
-        for (widget_node_id, color) in widget_ctx.background_colors() {
-            if let Some(&app_node_id) = node_id_map.get(widget_node_id) {
-                if let Some(mut entity) = self.get_entity_mut(app_node_id) {
-                    entity.insert(BackgroundColor(*color));
-                }
-            }
-        }
+        self.transfer_components(
+            widget_ctx.background_colors().iter(),
+            node_id_map,
+            |color: &render_engine::Vec4| BackgroundColor(*color),
+        );
 
         // Note: TextInputState, Validator, and FormState components require
         // additional implementation in arthropod-ecs. For now, we handle the
@@ -781,26 +796,36 @@ impl WidgetApp {
         const PLACEHOLDER_COLOR: Color = Color::rgba(0.5, 0.5, 0.5, 1.0);
 
         for (&widget_node, &app_node) in &self.node_id_map {
-            if self.widget_ctx.is_text_input(widget_node) {
-                if let Some(value) = self.widget_ctx.get_text_input_value(widget_node) {
-                    let mut scene = self.app.world_mut().resource_mut::<Scene>();
-                    if let Some(input_node) = scene.get_node(app_node) {
-                        if let Some(&text_child) = input_node.children.first() {
-                            if let Some(text_node) = scene.get_node_mut(text_child) {
-                                let color = if value.is_empty() {
-                                    PLACEHOLDER_COLOR
-                                } else {
-                                    TEXT_COLOR
-                                };
-                                text_node.content = NodeContent::Text {
-                                    text: value.clone(),
-                                    font_size: FONT_SIZE,
-                                    color,
-                                };
-                            }
-                        }
-                    }
-                }
+            if !self.widget_ctx.is_text_input(widget_node) {
+                continue;
+            }
+
+            let Some(value) = self.widget_ctx.get_text_input_value(widget_node) else {
+                continue;
+            };
+
+            let mut scene = self.app.world_mut().resource_mut::<Scene>();
+
+            // Extract text_child ID first to drop immutable borrow of scene
+            let text_child = scene
+                .get_node(app_node)
+                .and_then(|n| n.children.first().copied());
+
+            let Some(text_child) = text_child else {
+                continue;
+            };
+
+            if let Some(text_node) = scene.get_node_mut(text_child) {
+                let color = if value.is_empty() {
+                    PLACEHOLDER_COLOR
+                } else {
+                    TEXT_COLOR
+                };
+                text_node.content = NodeContent::Text {
+                    text: value.clone(),
+                    font_size: FONT_SIZE,
+                    color,
+                };
             }
         }
     }
@@ -812,25 +837,29 @@ impl WidgetApp {
 
         // Reset all text input colors to white
         for (&widget_node, &app_node) in &self.node_id_map {
-            if self.widget_ctx.is_text_input(widget_node) {
-                if let Some(node) = scene.get_node_mut(app_node) {
-                    if matches!(node.content, NodeContent::Rect { .. }) {
-                        node.content = NodeContent::Rect {
-                            color: Color::WHITE,
-                        };
-                    }
+            if !self.widget_ctx.is_text_input(widget_node) {
+                continue;
+            }
+
+            if let Some(node) = scene.get_node_mut(app_node) {
+                if let NodeContent::Rect { color } = &mut node.content {
+                    *color = Color::WHITE;
                 }
             }
         }
 
         // Highlight focused field
-        if let Some(focused_widget) = focused {
-            if let Some(&app_node) = self.node_id_map.get(&focused_widget) {
-                if let Some(node) = scene.get_node_mut(app_node) {
-                    node.content = NodeContent::Rect {
-                        color: Color::rgba(0.7, 0.85, 1.0, 1.0),
-                    };
-                }
+        let Some(focused_widget) = focused else {
+            return;
+        };
+
+        let Some(&app_node) = self.node_id_map.get(&focused_widget) else {
+            return;
+        };
+
+        if let Some(node) = scene.get_node_mut(app_node) {
+            if let NodeContent::Rect { color } = &mut node.content {
+                *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
             }
         }
     }
