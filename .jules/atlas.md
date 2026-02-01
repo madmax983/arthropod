@@ -5,3 +5,7 @@
 ## 2026-01-31 - Decompose WidgetContext
 **Tangle:** `WidgetContext` in `widget-core` was a "Blob" (800+ lines) managing Layout, Input, Interaction, Forms, and Decoration logic, violating Single Responsibility Principle.
 **Blueprint:** Extracted `LayoutContext`, `InteractionContext`, and `DecorationContext` into separate modules. `WidgetContext` now acts as a cohesive Facade, composing these sub-contexts to maintain API compatibility while delegating implementation details.
+
+## 2026-02-01 - Decompose MCP Test Tools
+**Tangle:** `crates/arthropod-mcp/src/tools/test.rs` was a "Blob" (1400+ lines) mixing scene creation, state assertion, render verification, and reactivity setup.
+**Blueprint:** Split into `create_scene.rs`, `assert_state.rs`, `verify_render.rs`, and `setup_reactive.rs` under `crates/arthropod-mcp/src/tools/test/`. This improves cohesion and test organization.
