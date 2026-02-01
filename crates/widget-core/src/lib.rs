@@ -12,6 +12,10 @@
 //! - `col!` / `column!` - Column container
 //! - `row!` - Row container
 //!
+//! # Custom Widgets
+//!
+//! For instructions on creating custom widgets, see the [`Widget`] trait documentation.
+//!
 //! # Examples
 //!
 //! ```no_run

@@ -10,6 +10,61 @@ use render_engine::NodeId;
 /// 2. Spawn ECS entities (components)
 /// 3. Configure layout (flexbox)
 /// 4. Handle state updates (reactive)
+///
+/// # Implementing Custom Widgets
+///
+/// To create a custom widget, implement the `Widget` trait. The `build` method is responsible
+/// for constructing the visual and behavioral representation of your widget.
+///
+/// ## Lifecycle of `build`
+///
+/// 1. **Create Node**: Use `ctx.create_node()` to add a node to the scene.
+/// 2. **Layout**: Use `ctx.set_layout_style()` to define size, padding, etc.
+/// 3. **Composition**: If your widget has children, build them and use `ctx.reparent_node()` to attach them.
+/// 4. **Interaction**: Use `ctx.add_clickable()` or `ctx.add_hover_state()` for events.
+///
+/// ## Example: Colored Box Widget
+///
+/// ```
+/// use widget_core::{Widget, WidgetContext};
+/// use render_engine::{NodeContent, NodeId, Color};
+/// use layout_engine::FlexStyle;
+/// use glam::Vec4;
+///
+/// pub struct ColoredBox {
+///     color: Color,
+///     width: f32,
+///     height: f32,
+/// }
+///
+/// impl ColoredBox {
+///     pub fn new(color: Color, width: f32, height: f32) -> Self {
+///         Self { color, width, height }
+///     }
+/// }
+///
+/// impl Widget for ColoredBox {
+///     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+///         // 1. Create the scene node attached to the root (initially)
+///         let node_id = ctx.create_node(
+///             ctx.root(),
+///             NodeContent::Rect {
+///                 color: self.color,
+///             },
+///         );
+///
+///         // 2. Configure layout
+///         ctx.set_layout_style(node_id, FlexStyle {
+///             width: Some(self.width),
+///             height: Some(self.height),
+///             ..Default::default()
+///         });
+///
+///         // 3. Return the node ID so the parent can reparent it
+///         node_id
+///     }
+/// }
+/// ```
 pub trait Widget {
     /// Build this widget, returning the root scene node ID
     ///
@@ -17,6 +72,10 @@ pub trait Widget {
     /// - Scene nodes for visual hierarchy
     /// - ECS entities with components
     /// - Layout nodes for flexbox
+    ///
+    /// Note: The returned `NodeId` is initially attached to the scene root (or whatever parent
+    /// was passed to `create_node`). The caller of `build` (e.g., a container widget) is
+    /// responsible for reparenting it if necessary.
     fn build(&self, ctx: &mut WidgetContext) -> NodeId;
 }
 

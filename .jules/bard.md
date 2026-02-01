@@ -7,3 +7,7 @@
 ## 2024-05-22 - The Hidden Engine
 **Confusion:** The `flux-state` crate, being the core reactive engine, had no visible README on GitHub, forcing users to dive into source code to understand how to use it.
 **Clarification:** Created `crates/flux-state/README.md` mirroring the crate-level documentation to provide immediate visibility into Core Concepts and Quick Start examples.
+
+## 2024-05-22 - Layout Engine Exports
+**Confusion:** `layout-engine` uses `taffy` internally but does not publicly re-export `Dimension` enum. Users attempting to construct `FlexStyle` manually might try to use `Dimension::Points` based on Taffy docs.
+**Clarification:** `FlexStyle` uses `Option<f32>` for width/height instead of `Dimension`. The conversion happens internally.

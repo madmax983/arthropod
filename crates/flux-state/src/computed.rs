@@ -31,6 +31,45 @@ use std::sync::{Arc, Mutex};
 ///
 /// assert_eq!(double_count.get(), 2);
 /// ```
+///
+/// # The Diamond Problem
+///
+/// `Computed` correctly handles the "Diamond Problem" (shared dependencies), ensuring
+/// that the computed value updates only once even if multiple paths lead back to the
+/// same source signal.
+///
+/// ```
+/// use flux_state::{Runtime, Signal, Computed};
+///
+/// let runtime = Runtime::new();
+/// let a = Signal::new(runtime.clone(), 1);
+/// let (r_a, w_a) = a.split();
+///
+/// // B depends on A
+/// let r_a_1 = r_a.clone();
+/// let b = Computed::new(runtime.clone(), move || r_a_1.get() * 2);
+///
+/// // C depends on A
+/// let r_a_2 = r_a.clone();
+/// let c = Computed::new(runtime.clone(), move || r_a_2.get() + 1);
+///
+/// // D depends on B and C
+/// //     A
+/// //    / \
+/// //   B   C
+/// //    \ /
+/// //     D
+/// let b_c = b.clone();
+/// let c_c = c.clone();
+/// let d = Computed::new(runtime, move || b_c.get() + c_c.get());
+///
+/// // Initial: a=1 => b=2, c=2 => d=4
+/// assert_eq!(d.get(), 4);
+///
+/// // Update A: a=2 => b=4, c=3 => d=7
+/// w_a.set(2);
+/// assert_eq!(d.get(), 7);
+/// ```
 #[derive(Clone)]
 pub struct Computed<T> {
     id: NodeId,

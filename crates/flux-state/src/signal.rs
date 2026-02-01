@@ -296,6 +296,8 @@ impl<T: 'static + Send> WriteSignal<T> {
 
     /// Update the value with a function and notify dependents.
     ///
+    /// The closure receives a mutable reference `&mut T` to the current value.
+    ///
     /// # Example
     ///
     /// ```
@@ -304,6 +306,7 @@ impl<T: 'static + Send> WriteSignal<T> {
     /// let count = Signal::new(runtime, 0);
     /// let (_, write) = count.split();
     ///
+    /// // The closure argument `c` is `&mut i32`
     /// write.update(|c| *c += 1);
     /// ```
     ///
