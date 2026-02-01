@@ -7,12 +7,12 @@ use crate::backend::text::TextRenderer;
 use crate::{Color, RendererError, Scene, SceneNode};
 use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use tracing::{instrument, span, Level};
+use tracing::{Level, instrument, span};
 
 use context::WgpuContext;
+use pipelines::glyph_pipeline::GlyphPipeline;
 pub use pipelines::rect_pipeline::RectInstance;
 use pipelines::rect_pipeline::RectPipeline;
-use pipelines::glyph_pipeline::GlyphPipeline;
 
 type SceneInstanceData<'a> = (
     Vec<RectInstance>,
@@ -30,8 +30,15 @@ pub struct WgpuBackend {
 
 impl WgpuBackend {
     /// Create a new wgpu backend from a window.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the created `WgpuBackend` is dropped *before* the window
+    /// it was created from. This is required because `wgpu::Surface` holds a reference to the
+    /// window handle, but carries a `'static` lifetime. Accessing the surface after the window
+    /// is destroyed results in undefined behavior.
     #[instrument(skip(window), fields(width, height, composition_mode))]
-    pub fn new<W>(
+    pub unsafe fn new<W>(
         window: &W,
         width: u32,
         height: u32,
@@ -40,18 +47,19 @@ impl WgpuBackend {
     where
         W: HasWindowHandle + HasDisplayHandle + Sync,
     {
-        let context = WgpuContext::new(window, width, height, composition_mode)?;
+        // SAFETY: Propagating the safety requirement to the caller.
+        let context = unsafe { WgpuContext::new(window, width, height, composition_mode)? };
 
         let rect_pipeline = RectPipeline::new(
             &context.device,
             &context.globals_bind_group_layout,
-            context.config.format
+            context.config.format,
         );
 
         let glyph_pipeline = GlyphPipeline::new(
             &context.device,
             &context.globals_buffer,
-            context.config.format
+            context.config.format,
         );
 
         let text_renderer = TextRenderer::new();
@@ -69,7 +77,8 @@ impl WgpuBackend {
     pub fn render_instances(&mut self, instances: &[RectInstance]) -> Result<(), RendererError> {
         let _span = span!(Level::TRACE, "render_instances").entered();
 
-        self.rect_pipeline.prepare(&self.context.device, &self.context.queue, instances);
+        self.rect_pipeline
+            .prepare(&self.context.device, &self.context.queue, instances);
 
         let WgpuBackend {
             context,
@@ -78,11 +87,7 @@ impl WgpuBackend {
         } = self;
 
         context.with_render_pass(|render_pass, globals_bind_group| {
-            rect_pipeline.render(
-                render_pass,
-                globals_bind_group,
-                instances.len() as u32
-            );
+            rect_pipeline.render(render_pass, globals_bind_group, instances.len() as u32);
         })
     }
 
@@ -129,7 +134,8 @@ impl super::RenderBackend for WgpuBackend {
 
         let (instances, raw_text_nodes) = Self::collect_instances(scene);
 
-        self.rect_pipeline.prepare(&self.context.device, &self.context.queue, &instances);
+        self.rect_pipeline
+            .prepare(&self.context.device, &self.context.queue, &instances);
 
         // Process text nodes
         let mut glyph_instances = Vec::new();
@@ -159,7 +165,7 @@ impl super::RenderBackend for WgpuBackend {
             &self.context.device,
             &self.context.queue,
             self.text_renderer.atlas().texture_data(),
-            &glyph_instances
+            &glyph_instances,
         );
 
         let WgpuBackend {
@@ -171,17 +177,10 @@ impl super::RenderBackend for WgpuBackend {
 
         context.with_render_pass(|render_pass, globals_bind_group| {
             // Render rectangles
-            rect_pipeline.render(
-                render_pass,
-                globals_bind_group,
-                instances.len() as u32
-            );
+            rect_pipeline.render(render_pass, globals_bind_group, instances.len() as u32);
 
             // Render glyphs
-            glyph_pipeline.render(
-                render_pass,
-                glyph_instances.len() as u32
-            );
+            glyph_pipeline.render(render_pass, glyph_instances.len() as u32);
         })
     }
 

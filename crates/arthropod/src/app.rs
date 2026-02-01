@@ -112,7 +112,8 @@ impl AppBuilder {
         let size = window.inner_size();
 
         // Create GPU backend (standard mode - not using DirectComposition)
-        let backend = WgpuBackend::new(&window, size.width, size.height, false)
+        // SAFETY: Safe because `App` struct guarantees correct drop order (context before window).
+        let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .map_err(|e| AppError::BackendCreation(e.to_string()))?;
 
         // Create app with backend
@@ -144,11 +145,17 @@ impl Default for AppBuilder {
 ///
 /// All resources are stored in the ECS World and accessed via `world()` / `world_mut()`.
 pub struct App {
+    /// ECS framework context (contains Scene as Resource)
+    ///
+    /// NOTE: `context` MUST be declared before `window` to ensure correct drop order.
+    /// `context` owns the `WgpuBackend` (as a resource), which owns the `wgpu::Surface`.
+    /// The `Surface` holds a reference to `Window` but is `'static`.
+    /// We must ensure the backend is dropped (and the surface destroyed) BEFORE the window is closed
+    /// to avoid Undefined Behavior.
+    context: FrameworkContext,
+
     /// Optional window (None in headless mode)
     window: Option<Window>,
-
-    /// ECS framework context (contains Scene as Resource)
-    context: FrameworkContext,
 
     /// Reactive runtime (also stored in World as Resource for signals)
     #[allow(dead_code)]
@@ -173,8 +180,8 @@ impl App {
         }
 
         Self {
-            window,
-            context,
+            context, // Drops first
+            window,  // Drops last
             runtime,
         }
     }

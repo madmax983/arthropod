@@ -33,9 +33,10 @@ const SIDEBAR_WIDTH: f32 = 250.0;
 
 /// Application state for the DirectComposition demo
 struct CompositionApp {
+    // Backend must be dropped before window to avoid use-after-free
+    backend: WgpuBackend,
     #[allow(dead_code)]
     window: Window,
-    backend: WgpuBackend,
     scene: Scene,
     #[allow(dead_code)]
     compositor: Option<Compositor>,
@@ -66,7 +67,8 @@ impl Application for CompositionApp {
 
         // Create wgpu backend in composition mode for proper alpha blending
         let size = window.inner_size();
-        let mut backend = WgpuBackend::new(&window, size.width, size.height, true)
+        // SAFETY: Safe because backend is dropped before window (struct field order)
+        let mut backend = unsafe { WgpuBackend::new(&window, size.width, size.height, true) }
             .expect("Failed to create backend");
 
         // Use transparent clear color so backdrop shows through
@@ -96,8 +98,8 @@ impl Application for CompositionApp {
         println!();
 
         Self {
-            window,
             backend,
+            window,
             scene,
             compositor,
         }

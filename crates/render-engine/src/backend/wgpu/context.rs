@@ -2,7 +2,7 @@
 
 use crate::RendererError;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use tracing::{info, error, span, Level};
+use tracing::{Level, error, info, span};
 
 /// Global uniform data (shared across all rectangles and glyphs)
 #[repr(C)]
@@ -27,7 +27,14 @@ pub struct WgpuContext {
 
 impl WgpuContext {
     /// Create a new WGPU context.
-    pub fn new<W>(
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the created `WgpuContext` is dropped *before* the window
+    /// it was created from. This is required because `wgpu::Surface` holds a reference to the
+    /// window handle, but carries a `'static` lifetime to avoid infecting the entire codebase
+    /// with lifetimes. Accessing the surface after the window is destroyed results in undefined behavior.
+    pub unsafe fn new<W>(
         window: &W,
         width: u32,
         height: u32,
@@ -101,8 +108,14 @@ impl WgpuContext {
         })?;
 
         let adapter_info = adapter.get_info();
-        println!("🎮 Adapter: {} ({:?})", adapter_info.name, adapter_info.backend);
-        info!("Selected adapter: {} ({:?})", adapter_info.name, adapter_info.backend);
+        println!(
+            "🎮 Adapter: {} ({:?})",
+            adapter_info.name, adapter_info.backend
+        );
+        info!(
+            "Selected adapter: {} ({:?})",
+            adapter_info.name, adapter_info.backend
+        );
 
         // Request device and queue
         info!("Creating device and queue");

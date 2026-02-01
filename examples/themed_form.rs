@@ -26,8 +26,9 @@ use theme_engine::{DesignTokens, SystemTheme};
 
 /// Application state for the themed form demo
 struct ThemedFormApp {
-    window: Window,
+    // Backend must be dropped before window
     backend: WgpuBackend,
+    window: Window,
     scene: Scene,
     #[allow(dead_code)]
     tokens: DesignTokens,
@@ -89,7 +90,8 @@ impl Application for ThemedFormApp {
 
         // Create GPU backend (standard mode - not using DirectComposition)
         let size = window.inner_size();
-        let mut backend = WgpuBackend::new(&window, size.width, size.height, false)
+        // SAFETY: Safe because backend is dropped before window (struct field order)
+        let mut backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .expect("Failed to create backend");
 
         // IMPORTANT: Use transparent clear color to show Mica backdrop through
@@ -109,8 +111,8 @@ impl Application for ThemedFormApp {
         println!("Try moving the window to see the Mica effect update!");
 
         Self {
-            window,
             backend,
+            window,
             scene,
             tokens,
         }

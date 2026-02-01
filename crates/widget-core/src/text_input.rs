@@ -159,19 +159,20 @@ impl Widget for TextInput {
         );
 
         // Get current value and compute derived state without cloning the full string
-        let (display_text, validation_result, is_empty) = self.read_signal.with_untracked(|value| {
-            let is_empty = value.is_empty();
+        let (display_text, validation_result, is_empty) =
+            self.read_signal.with_untracked(|value| {
+                let is_empty = value.is_empty();
 
-            let display = if is_empty && self.placeholder.is_some() {
-                self.placeholder.as_ref().unwrap().clone()
-            } else {
-                value.clone()
-            };
+                let display = if is_empty && self.placeholder.is_some() {
+                    self.placeholder.as_ref().unwrap().clone()
+                } else {
+                    value.clone()
+                };
 
-            let result = self.validate(value);
+                let result = self.validate(value);
 
-            (display, result, is_empty)
-        });
+                (display, result, is_empty)
+            });
 
         let text_color = if is_empty && self.placeholder.is_some() {
             placeholder_color // Use themed placeholder color

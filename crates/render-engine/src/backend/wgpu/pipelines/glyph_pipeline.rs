@@ -238,11 +238,7 @@ impl GlyphPipeline {
         }
     }
 
-    pub fn render(
-        &self,
-        render_pass: &mut wgpu::RenderPass<'_>,
-        instance_count: u32,
-    ) {
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, instance_count: u32) {
         if instance_count == 0 {
             return;
         }
