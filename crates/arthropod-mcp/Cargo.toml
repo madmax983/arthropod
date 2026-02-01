@@ -37,6 +37,11 @@ tracing-subscriber.workspace = true
 hashbrown = "0.15"
 glam.workspace = true
 
+# CLI / TUI
+ratatui = "0.29"
+crossterm = "0.28"
+regex = "1.10"
+
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 pollster.workspace = true
@@ -44,6 +49,10 @@ pollster.workspace = true
 [[bin]]
 name = "arthropod-mcp"
 path = "src/bin/arthropod-mcp.rs"
+
+[[bin]]
+name = "bench-viewer"
+path = "src/bin/bench-viewer.rs"
 
 [[bench]]
 name = "mcp_overhead"
