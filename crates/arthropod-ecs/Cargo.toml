@@ -12,11 +12,11 @@ render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
 layout-engine = { path = "../layout-engine" }
+plat-core = { path = "../plat-core" }
 glam = "0.29"
 accesskit = "0.17"  # For ActionRequest in tests
 
 [dev-dependencies]
-plat-core = { path = "../plat-core" }
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]

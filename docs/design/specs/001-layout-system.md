@@ -1,60 +1,59 @@
 # 🔭 Vantage Spec: Layout System Integration
 
-**Feature**: Automatic Flexbox Layout
-**Status**: Draft
-**Owner**: Vantage
+**Feature**: Automatic Flexbox Layout (ECS System)
+**Status**: Approved
+**Owner**: Vantage / Jules
 **Impact**: High (Core Feature)
 
 ## 1. 👤 User Story & Value
 
 **As a** UI Developer,
-**I want** to use declarative layout primitives (Row, Column) and properties (Padding, Gap),
-**So that** my interface automatically adapts to content size and window resizing without me writing manual pixel math.
+**I want** my interface to automatically layout itself (Flexbox) whenever I change content or resize the window,
+**So that** I don't have to manually call layout functions or calculate pixel coordinates.
 
 **Value Proposition**:
-- Reduces boilerplate code (no more `node.bounds = ...` in event loops).
-- Enables responsive design.
-- Aligns with modern UI frameworks (React, Flutter, SwiftUI).
+- **Zero-Boilerplate**: Layout just works.
+- **Reactive**: Changing a text signal automatically triggers re-layout if the text size changes.
+- **Robust**: Eliminates "forgetting to call layout" bugs.
 
 ## 2. ✅ Acceptance Criteria
 
 ### Functional Requirements
 1.  **ECS Integration**:
-    - A new system `layout_system` must be added to `FrameworkContext`.
+    - A new system `layout_system` must be running in `FrameworkContext::update`.
     - It must process entities with `SceneNodeRef` and `LayoutStyle` components.
-2.  **Taffy Integration**:
-    - The system must construct a Taffy tree mirroring the Scene tree (for nodes with layout).
-    - It must synchronize `FlexStyle` changes from ECS to Taffy.
-3.  **Output Sync**:
-    - Computed layout (x, y, width, height) must be written back to the corresponding `SceneNode`'s `bounds`.
-    - This must happen every frame (or intelligently when dirty).
-4.  **Integration Test**:
-    - A test case (e.g., `tests/layout_integration.rs`) must demonstrate a hierarchy (Row -> [Item, Item]) correctly positioning children based on the parent's size.
+2.  **Automatic Updates**:
+    - Changing `FlexStyle` component -> Updates Scene Node bounds.
+    - Resizing Window -> Updates Root Node bounds -> Updates Layout.
+    - Changing Content (Text) -> Updates Node Size -> Updates Layout.
+3.  **Taffy Integration**:
+    - The system must bridge ECS components to the `layout-engine` (Taffy).
+4.  **Verification**:
+    - `crates/arthropod-ecs/tests/layout_integration.rs` must pass.
+    - `crates/arthropod/src/app/widget.rs` should no longer need manual `auto_layout` calls.
 
-### Non-Functional Requirements
-1.  **Performance**:
-    - Layout calculation for < 1,000 nodes must take < 1ms.
-    - Should ideally use caching/dirty marking to avoid full re-layout every frame if nothing changed.
+### Performance Requirements
+- Layout calculation for < 1,000 nodes must take < 1ms.
+- Ideally, cache the Taffy tree (or rebuild cheaply). For Phase 1, rebuilding every frame is acceptable IF performance remains < 1ms for typical scenes (100-500 nodes).
 
-## 3. 📝 Technical Approach (High Level)
+## 3. 📝 Technical Approach
 
-*Note: Engineering to refine.*
-
-1.  **Layout System**: A `bevy_ecs` system that runs in `FrameworkContext::update`.
-2.  **State Management**: `LayoutEngine` should be a Resource in the World.
-3.  **Synchronization**:
-    - Iterate `Scene` to build/update Taffy tree.
-    - Apply constraints (Window size) to the root.
-    - `layout_engine.compute_layout()`.
-    - Apply results to `SceneNode.bounds`.
+1.  **System**: `arthropod_ecs::systems::layout::layout_system`.
+2.  **Logic**:
+    - Acquire `Scene` (Resource) and `Window` (Resource/Config).
+    - Iterate `Scene` to build Taffy tree.
+    - Apply `FlexStyle` from ECS components (`Query<(Entity, &SceneNodeRef, &LayoutStyle)>`).
+    - Compute Layout.
+    - Write back to `SceneNode.bounds`.
+3.  **Registration**: Add to `arthropod_ecs::context::FrameworkContext::build_update_schedule`.
 
 ## 4. 🚫 Out of Scope (Phase 1)
-- Grid layout (Flexbox only for now).
-- Absolute positioning within flex containers (keep it simple).
-- Z-index sorting (handled by Scene tree order).
+- Incremental Layout (Dirty Marking). Phase 1 will rebuild tree every frame for simplicity/correctness.
+- Grid Layout.
+- Multi-pass layout for text wrapping (handled by `render-engine` or `text-engine` separately, though layout needs to know text size).
 
 ## 5. 📅 Roadmap
-1.  Add `LayoutEngine` as a Resource in `FrameworkContext`.
-2.  Implement `layout_system`.
-3.  Add `layout_system` to `FrameworkContext::update_schedule`.
-4.  Verify with `colored_rectangles.rs` (refactor to use Layout) or a new example.
+1.  Implement `layout_system` in `arthropod-ecs`.
+2.  Register in `FrameworkContext`.
+3.  Remove manual calls in `WidgetApp`.
+4.  Verify with integration test.

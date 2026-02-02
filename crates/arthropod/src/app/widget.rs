@@ -2,8 +2,10 @@ use super::builder::AppBuilder;
 use super::core::{App, AppError};
 use super::integration::integrate_widget_scene;
 use crate::event_dispatcher::{DispatchResult, EventDispatcher};
-use crate::layout::auto_layout;
+// use crate::layout::auto_layout; // Removed in favor of ECS system
+use arthropod_ecs::components::LayoutConstraintsResource;
 use flux_state::{Runtime, Signal};
+use layout_engine::LayoutConstraints;
 use plat_core::{
     Application, ControlFlow, Event, EventLoop, Size, WindowConfig, WindowEvent, WindowId,
 };
@@ -107,7 +109,6 @@ struct WidgetApp {
     app: App,
     widget_ctx: WidgetContext,
     dispatcher: EventDispatcher,
-    app_root: NodeId,
     node_id_map: HashMap<NodeId, NodeId>,
     viewport: (u32, u32),
 }
@@ -157,20 +158,19 @@ impl Application for WidgetApp {
         let form_node = widget_ctx.form_states().keys().next().copied();
 
         // Integrate widget scene into app scene
-        let (app_root, node_id_map) = integrate_widget_scene(&mut app, &widget_ctx, widget_root);
+        let (_app_root, node_id_map) = integrate_widget_scene(&mut app, &widget_ctx, widget_root);
 
-        // Perform initial layout
-        let layout_styles = widget_ctx.layout_styles().clone();
-        {
-            let mut scene = app.world_mut().resource_mut::<Scene>();
-            auto_layout(
-                &mut scene,
-                app_root,
-                config.width as f32,
-                config.height as f32,
-                &layout_styles,
-            );
-        }
+        // Integrate widget components (LayoutStyle, Clickable, etc.) into ECS
+        app.integrate_widgets(&widget_ctx, &node_id_map);
+
+        // Set initial layout constraints
+        app.world_mut()
+            .insert_resource(LayoutConstraintsResource(LayoutConstraints {
+                max_width: Some(config.width as f32),
+                max_height: Some(config.height as f32),
+                min_width: None,
+                min_height: None,
+            }));
 
         // Create event dispatcher
         let dispatcher = EventDispatcher::new(node_id_map.clone(), form_node);
@@ -186,7 +186,6 @@ impl Application for WidgetApp {
             app,
             widget_ctx,
             dispatcher,
-            app_root,
             node_id_map,
             viewport: (config.width, config.height),
         }
@@ -208,17 +207,18 @@ impl Application for WidgetApp {
                 self.viewport = (size.width, size.height);
                 self.app.resize(size.width, size.height);
 
-                // Re-layout
-                let layout_styles = self.widget_ctx.layout_styles().clone();
+                // Update layout constraints resource
+                if let Some(mut constraints) = self
+                    .app
+                    .world_mut()
+                    .get_resource_mut::<LayoutConstraintsResource>()
                 {
-                    let mut scene = self.app.world_mut().resource_mut::<Scene>();
-                    auto_layout(
-                        &mut scene,
-                        self.app_root,
-                        size.width as f32,
-                        size.height as f32,
-                        &layout_styles,
-                    );
+                    constraints.0 = LayoutConstraints {
+                        max_width: Some(size.width as f32),
+                        max_height: Some(size.height as f32),
+                        min_width: None,
+                        min_height: None,
+                    };
                 }
 
                 if let Some(window) = self.app.window() {
@@ -273,6 +273,9 @@ impl Application for WidgetApp {
     }
 
     fn on_redraw(&mut self, _window_id: WindowId) {
+        // Run update systems (layout, reactive, etc.)
+        self.app.update();
+
         // Take backend to avoid borrow conflicts
         let mut backend = self.app.world_mut().remove_resource::<WgpuBackend>();
 

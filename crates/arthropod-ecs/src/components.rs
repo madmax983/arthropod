@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
-use layout_engine::FlexStyle;
+use layout_engine::{FlexStyle, LayoutConstraints};
 use render_engine::{Color, NodeId, Transform2D};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -114,6 +114,12 @@ pub struct Hoverable {
 /// query this component to compute node positions and sizes.
 #[derive(Component, Clone, Debug)]
 pub struct LayoutStyle(pub FlexStyle);
+
+/// Global resource for layout constraints (e.g., window size)
+///
+/// This resource is used by the layout system to constrain the root node.
+#[derive(Resource, Default, Clone, Debug)]
+pub struct LayoutConstraintsResource(pub LayoutConstraints);
 
 /// Clickable behavior - callback invoked on click
 ///
