@@ -1,33 +1,102 @@
 //! Animation system for Arthropod GUI framework.
 //!
-//! Provides animation primitives (Tween, Spring, Keyframes) and an animation controller
-//! that drives scene graph properties over time.
+//! The `anim-graph` crate provides a physics-based animation system designed for UI interactions.
+//! It supports both traditional tweening (time-based) and spring physics (force-based) animations.
+//!
+//! # Key Concepts
+//!
+//! - **[`Animation`]:** The core enum representing an active animation state (Tween or Spring).
+//! - **[`Animatable`]:** A trait implemented by types that can be animated (e.g., `f32`, `Color`).
+//! - **[`Easing`]:** Functions that control the rate of change for tweens.
+//!
+//! # Examples
+//!
+//! ## Simple Tween
+//!
+//! Create a linear interpolation between two values over 1 second:
+//!
+//! ```
+//! use anim_graph::{Animation, Easing};
+//! use std::time::Duration;
+//!
+//! let mut anim = Animation::tween(0.0, 100.0, Duration::from_secs(1), Easing::Linear);
+//!
+//! // Advance time by 0.5 seconds
+//! let value = anim.tick(Duration::from_millis(500));
+//! assert_eq!(value, 50.0);
+//! ```
+//!
+//! ## Physics Spring
+//!
+//! Create a spring animation that naturally settles at a target:
+//!
+//! ```
+//! use anim_graph::Animation;
+//! use std::time::Duration;
+//!
+//! // Create a stiff spring with low damping (bouncy)
+//! let mut spring = Animation::spring(0.0, 100.0, 300.0, 15.0);
+//!
+//! // Tick the simulation
+//! let value = spring.tick(Duration::from_millis(16));
+//! ```
 
 use std::time::Duration;
 
 /// Trait for types that can be animated.
+///
+/// This trait extends `Clone` and requires implementation of interpolation
+/// and basic vector arithmetic operations needed for physics simulations.
 pub trait Animatable: Clone + 'static {
     /// Interpolate between two values.
+    ///
+    /// `t` is a value between 0.0 and 1.0 (clamped).
     fn interpolate(&self, other: &Self, t: f32) -> Self;
+
+    /// Scale the value by a scalar factor.
+    fn scale(&self, scalar: f32) -> Self;
+
+    /// Add another value to this one.
+    fn add(&self, other: &Self) -> Self;
+
+    /// Subtract another value from this one.
+    fn sub(&self, other: &Self) -> Self;
+
+    /// Return the zero value (additive identity).
+    ///
+    /// For `f32`, this is `0.0`. For `Color`, this is a transparent zero vector.
+    fn zero() -> Self;
 }
 
 /// Easing function for animations.
+///
+/// Easing functions specify the rate of change of a parameter over time.
+///
+/// # Visualizations
+///
+/// - **Linear:** Constant speed. `f(t) = t`
+/// - **EaseIn:** Starts slow, speeds up. `f(t) = t²`
+/// - **EaseOut:** Starts fast, slows down. `f(t) = t(2-t)`
+/// - **EaseInOut:** Slow start and end. `f(t) = 2t²` if t<0.5 else `...`
 #[derive(Debug, Clone, Copy)]
 pub enum Easing {
-    /// Linear interpolation.
+    /// Linear interpolation (no easing).
     Linear,
-    /// Ease in (slow start).
+    /// Quadratic ease-in (slow start).
     EaseIn,
-    /// Ease out (slow end).
+    /// Quadratic ease-out (slow end).
     EaseOut,
-    /// Ease in-out (slow start and end).
+    /// Quadratic ease-in-out (slow start and end).
     EaseInOut,
-    /// Custom cubic bezier curve.
+    /// Custom cubic bezier curve defined by two control points (x1, y1) and (x2, y2).
     CubicBezier(f32, f32, f32, f32),
 }
 
 impl Easing {
     /// Apply the easing function to a linear parameter t (0.0 to 1.0).
+    ///
+    /// Returns the eased value, which is usually between 0.0 and 1.0,
+    /// but may overshoot for elastic functions (not yet implemented).
     pub fn apply(&self, t: f32) -> f32 {
         let t = t.clamp(0.0, 1.0);
         match self {
@@ -51,28 +120,47 @@ impl Easing {
     }
 }
 
-/// Animation primitive.
+/// Animation primitive representing an active animation state.
 pub enum Animation<T: Animatable> {
-    /// Simple tween from one value to another.
+    /// Simple tween from one value to another over a fixed duration.
     Tween {
+        /// Starting value.
         from: T,
+        /// Target value.
         to: T,
+        /// Total duration of the animation.
         duration: Duration,
+        /// Easing curve to apply.
         easing: Easing,
+        /// Time elapsed since start.
         elapsed: Duration,
     },
     /// Physics-based spring animation.
+    ///
+    /// Uses a damped harmonic oscillator simulation.
     Spring {
+        /// Current value.
         current: T,
+        /// Target equilibrium value.
         target: T,
+        /// Current velocity.
         velocity: T,
+        /// Spring stiffness (k). Higher values mean stiffer/faster spring.
         stiffness: f32,
+        /// Damping coefficient (c). Higher values mean less oscillation/slower settling.
         damping: f32,
     },
 }
 
 impl<T: Animatable> Animation<T> {
     /// Create a new tween animation.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Starting value.
+    /// * `to` - Target value.
+    /// * `duration` - Time to complete the animation.
+    /// * `easing` - Easing curve to use.
     pub fn tween(from: T, to: T, duration: Duration, easing: Easing) -> Self {
         Self::Tween {
             from,
@@ -84,17 +172,34 @@ impl<T: Animatable> Animation<T> {
     }
 
     /// Create a spring animation.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Starting value.
+    /// * `to` - Target value.
+    /// * `stiffness` - Spring stiffness constant (k). Typical values: 100.0 - 500.0.
+    /// * `damping` - Damping coefficient (c). Typical values: 10.0 - 30.0.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use anim_graph::Animation;
+    /// let spring = Animation::spring(0.0, 100.0, 200.0, 20.0);
+    /// ```
     pub fn spring(from: T, to: T, stiffness: f32, damping: f32) -> Self {
         Self::Spring {
             current: from.clone(),
             target: to,
-            velocity: from, // Zero velocity initially
+            velocity: T::zero(),
             stiffness,
             damping,
         }
     }
 
     /// Advance the animation by delta time, returns current value.
+    ///
+    /// For springs, this runs the physics simulation step.
+    /// For tweens, this advances the elapsed time.
     pub fn tick(&mut self, dt: Duration) -> T {
         match self {
             Self::Tween {
@@ -111,26 +216,47 @@ impl<T: Animatable> Animation<T> {
             }
             Self::Spring {
                 current,
-                target: _,
-                velocity: _,
-                stiffness: _,
-                damping: _,
+                target,
+                velocity,
+                stiffness,
+                damping,
             } => {
-                // Simplified spring physics - will be improved
+                let dt_secs = dt.as_secs_f32();
+                // Avoid instability with large time steps by clamping
+                // Max 50ms per tick for stability
+                let dt_secs = dt_secs.min(0.05);
+
+                // Force = -k * (x - target) - d * v
+                // displacement = current - target
+                let displacement = current.sub(target);
+                let spring_force = displacement.scale(-*stiffness);
+                let damping_force = velocity.scale(-*damping);
+
+                let acceleration = spring_force.add(&damping_force);
+
+                // v += a * dt
+                *velocity = velocity.add(&acceleration.scale(dt_secs));
+
+                // x += v * dt
+                *current = current.add(&velocity.scale(dt_secs));
+
                 current.clone()
             }
         }
     }
 
     /// Check if animation is complete.
+    ///
+    /// - **Tween:** Returns true if `elapsed >= duration`.
+    /// - **Spring:** Currently returns false (springs technically oscillate forever).
+    ///   Future implementations may use a settling threshold.
     pub fn is_complete(&self) -> bool {
         match self {
             Self::Tween {
                 elapsed, duration, ..
             } => elapsed >= duration,
             Self::Spring { .. } => {
-                // Spring never truly completes, but we can check if close enough
-                // For now, return false - will implement threshold check later
+                // TODO: Implement proper threshold check based on velocity and displacement
                 false
             }
         }
@@ -142,6 +268,22 @@ impl Animatable for f32 {
     fn interpolate(&self, other: &Self, t: f32) -> Self {
         self + (other - self) * t
     }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self * scalar
+    }
+
+    fn add(&self, other: &Self) -> Self {
+        self + other
+    }
+
+    fn sub(&self, other: &Self) -> Self {
+        self - other
+    }
+
+    fn zero() -> Self {
+        0.0
+    }
 }
 
 /// Implement Animatable for Color using SIMD-accelerated glam.
@@ -152,5 +294,21 @@ impl Animatable for render_engine::Color {
         let v2 = other.as_vec4();
         let result = v1.lerp(v2, t);
         render_engine::Color::from_vec4(result)
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        render_engine::Color::from_vec4(self.as_vec4() * scalar)
+    }
+
+    fn add(&self, other: &Self) -> Self {
+        render_engine::Color::from_vec4(self.as_vec4() + other.as_vec4())
+    }
+
+    fn sub(&self, other: &Self) -> Self {
+        render_engine::Color::from_vec4(self.as_vec4() - other.as_vec4())
+    }
+
+    fn zero() -> Self {
+        render_engine::Color::from_vec4(render_engine::Vec4::ZERO)
     }
 }

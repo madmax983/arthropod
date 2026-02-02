@@ -276,5 +276,26 @@ fn test_spring_starts_at_initial_value() {
     assert_eq!(value, 0.0, "Spring should start at initial value");
 }
 
-// Note: Spring physics implementation will be tested more thoroughly
-// once we implement the actual spring simulation
+#[test]
+fn test_spring_moves_towards_target() {
+    let mut anim = Animation::spring(0.0_f32, 100.0_f32, 100.0, 10.0);
+
+    // Initial state
+    assert_eq!(anim.tick(Duration::ZERO), 0.0);
+
+    // Advance time
+    let val_after_tick = anim.tick(Duration::from_millis(100));
+
+    // It should have moved towards 100
+    assert!(val_after_tick > 0.0, "Spring should move towards target, got {}", val_after_tick);
+    assert!(val_after_tick < 100.0, "Spring shouldn't overshoot immediately, got {}", val_after_tick);
+}
+
+#[test]
+fn test_spring_equilibrium_stability() {
+    // If we start at target, it should stay there if velocity is 0
+    let mut anim = Animation::spring(100.0_f32, 100.0_f32, 100.0, 10.0);
+
+    let val = anim.tick(Duration::from_millis(100));
+    assert_eq!(val, 100.0, "Spring at equilibrium should not move");
+}
