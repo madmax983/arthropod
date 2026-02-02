@@ -10,7 +10,6 @@ use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 use plat_core::Rect;
 use render_engine::{NodeId, Scene};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use widget_core::WidgetContext;
 
 /// Perform automatic layout on the scene tree.
@@ -84,40 +83,13 @@ fn build_layout_tree(
     // Process children
     if let Some(scene_node) = scene.get_node(node_id) {
         // Iterate over children reference directly to avoid cloning the Vec
+        // (This is safe because build_layout_tree only takes &Scene)
         for &child_id in &scene_node.children {
             build_layout_tree(scene, child_id, engine, node_map, layout_styles);
 
             // Add as child in layout tree
             if let Some(&child_layout) = node_map.get(&child_id) {
                 engine.add_child(layout_node, child_layout);
-            }
-        }
-    }
-}
-
-/// Guard to restore children to a node on Drop, ensuring panic safety.
-///
-/// This allows us to temporarily `take` the children vector to iterate over it
-/// without holding a mutable borrow on Scene (which prevents recursion),
-/// while ensuring the children are restored even if a panic occurs.
-struct ChildrenGuard<'a> {
-    scene: *mut Scene,
-    node_id: NodeId,
-    children: Vec<NodeId>,
-    _marker: PhantomData<&'a mut Scene>,
-}
-
-impl<'a> Drop for ChildrenGuard<'a> {
-    fn drop(&mut self) {
-        // SAFETY: The scene pointer is valid because the guard is created from a valid
-        // &mut Scene reference that outlives the guard's scope.
-        // We only access the scene via this pointer during Drop, at which point
-        // the recursive borrows of scene have ended.
-        unsafe {
-            if let Some(scene) = self.scene.as_mut() {
-                if let Some(node) = scene.get_node_mut(self.node_id) {
-                    node.children = std::mem::take(&mut self.children);
-                }
             }
         }
     }
@@ -138,26 +110,18 @@ fn apply_layouts(
             let abs_x = parent_x + layout.x;
             let abs_y = parent_y + layout.y;
 
-            // Update scene node bounds and process children.
-            // We use std::mem::take to avoid cloning the children vector (O(N) allocations).
-            // We use ChildrenGuard to ensure children are restored even if recursion panics.
+            // Update scene node bounds and get children.
+            // We clone the children vector (cheap copy of NodeIds) to avoid holding
+            // a mutable borrow on the scene while recursing.
             let children = if let Some(scene_node) = scene.get_node_mut(node_id) {
                 scene_node.bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
-                std::mem::take(&mut scene_node.children)
+                scene_node.children.clone()
             } else {
                 Vec::new()
             };
 
-            // Create guard to restore children on scope exit (or panic)
-            let guard = ChildrenGuard {
-                scene: scene as *mut _,
-                node_id,
-                children,
-                _marker: PhantomData,
-            };
-
-            // Recurse using the children from the guard
-            for &child_id in &guard.children {
+            // Recurse using the cloned children
+            for child_id in children {
                 apply_layouts(scene, child_id, engine, node_map, abs_x, abs_y);
             }
         }

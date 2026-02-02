@@ -13,3 +13,7 @@
 ## 2026-02-01 - [WgpuContext Drop Order Soundness Fix]
 **Threat:** `WgpuContext` stores a `wgpu::Surface<'static>` that holds a reference to a `Window` but erases the lifetime. If the `Window` is dropped before the `WgpuContext` (and its backend), accessing the surface during cleanup could lead to Use-After-Free/UB. `App` struct had `Window` declared before `Context`, causing `Window` to drop first.
 **Defense:** Marked `WgpuContext::new` and `WgpuBackend::new` as `unsafe` to enforce caller awareness. Reordered fields in `App` struct and example application structs to ensure `Context`/`Backend` is dropped *before* `Window`.
+
+## 2026-02-02 - [Layout Recursion Unsafe Removal]
+**Threat:** `apply_layouts` in `arthropod` used `unsafe` code with a custom `ChildrenGuard` and raw pointers to iterate over scene children while modifying the scene. This was done to avoid cloning `Vec<NodeId>`, violating safety guidelines against premature optimization with unsafe code.
+**Defense:** Removed `ChildrenGuard` and the `unsafe` block. Switched to cloning the `children` vector (which contains `Copy` `NodeId`s) to safely iterate while allowing mutable scene access during recursion.
