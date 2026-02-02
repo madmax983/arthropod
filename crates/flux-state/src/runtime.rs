@@ -95,18 +95,23 @@ impl RuntimeInner {
         self.computeds.contains_key(&id)
     }
 
-    fn get_subscribers(&self, source: NodeId) -> Vec<NodeId> {
-        self.subscribers
-            .get(&source)
-            .map(|subs| subs.iter().copied().collect())
-            .unwrap_or_default()
-    }
-
     fn mark_subscribers_stale(&mut self, source: NodeId) {
-        let mut stack = self.get_subscribers(source);
+        // Optimization: Avoid allocating intermediate Vecs by iterating HashSet refs directly.
+        // We use a stack for DFS traversal.
+        let mut stack = Vec::new();
+
+        if let Some(subs) = self.subscribers.get(&source) {
+            stack.extend(subs);
+        }
+
         while let Some(node) = stack.pop() {
+            // mark_stale borrows &mut self, but returns bool.
+            // The borrow ends after the if condition check.
+            #[allow(clippy::collapsible_if)]
             if self.mark_stale(node) {
-                stack.extend(self.get_subscribers(node));
+                if let Some(subs) = self.subscribers.get(&node) {
+                    stack.extend(subs);
+                }
             }
         }
     }

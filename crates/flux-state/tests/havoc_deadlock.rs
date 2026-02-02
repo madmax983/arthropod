@@ -1,4 +1,4 @@
-use flux_state::{Runtime, Signal, Effect, Computed};
+use flux_state::{Computed, Effect, Runtime, Signal};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -16,7 +16,7 @@ fn test_signal_reentrancy_deadlock() {
         // Attempt reentrancy: with -> get (which uses with)
         // This should deadlock because standard Mutex is not reentrant.
         read_clone.with(|_val| {
-             let _ = read_clone.get();
+            let _ = read_clone.get();
         });
         tx.send(()).unwrap();
     });
