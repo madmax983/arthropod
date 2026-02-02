@@ -128,6 +128,9 @@ path = "examples/directcomposition_demo.rs"
 name = "hello_world"
 path = "examples/hello_world.rs"
 
+[features]
+nova = ["arthropod/nova"]
+
 [dependencies]
 arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }

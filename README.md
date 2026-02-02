@@ -2,6 +2,9 @@
 
 > Enterprise-grade cross-platform Rust GUI framework.
 
+> [!NOTE]
+> **REQUIRES FEATURE NOVA**: Some experimental features (like `NarrativeGenerator`) require enabling the `nova` feature flag. See [Experimental Features](#experimental-features-nova) below.
+
 Arthropod is a high-performance, retained-mode GUI framework built for Rust. It combines a fine-grained reactive state management system with a modular ECS architecture and GPU-accelerated rendering to deliver scalable and performant user interfaces.
 
 ## Features
@@ -50,6 +53,23 @@ fn main() -> Result<(), AppError> {
 | `render-engine` | The rendering backend. Manages the Scene Graph and `wgpu` integration. |
 | `widget-core` | The widget library. Contains standard widgets like `Text`, `Button`, `TextInput`. |
 | `plat-core` | Platform abstraction layer. Handles window creation and event loops. |
+
+## Experimental Features (Nova)
+
+Arthropod includes experimental features under the `nova` codename, such as the `NarrativeGenerator` and particle systems. These features are unstable and not enabled by default.
+
+To access these features, you must enable the `nova` feature flag:
+
+```toml
+[dependencies]
+arthropod = { version = "0.1", features = ["nova"] }
+```
+
+You can run the story demo to see it in action:
+
+```bash
+cargo run --example story_demo --features nova
+```
 
 ## License
 
