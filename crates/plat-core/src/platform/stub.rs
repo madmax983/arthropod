@@ -62,6 +62,7 @@ impl HasDisplayHandle for WindowImpl {
 #[allow(clippy::extra_unused_type_parameters)]
 pub fn run<A: Application>() -> Result<(), PlatformError> {
     Err(PlatformError::Initialization(
-        "The current platform is not supported. Arthropod currently supports Windows and macOS.".into(),
+        "The current platform is not supported. Arthropod currently supports Windows and macOS."
+            .into(),
     ))
 }

@@ -564,7 +564,7 @@ impl WidgetContext {
             callback_opt = form_state.on_submit.clone();
 
             for (field_name, field_node_id) in &form_state.field_mapping {
-                 if let Some(state) = self.text_input_states.get(field_node_id) {
+                if let Some(state) = self.text_input_states.get(field_node_id) {
                     form_data.insert(field_name.clone(), state.read_signal.get_untracked());
                 }
             }

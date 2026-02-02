@@ -9,3 +9,7 @@
 ## 2026-02-01 - Decompose MCP Test Tools
 **Tangle:** `crates/arthropod-mcp/src/tools/test.rs` was a "Blob" (1400+ lines) mixing scene creation, state assertion, render verification, and reactivity setup.
 **Blueprint:** Split into `create_scene.rs`, `assert_state.rs`, `verify_render.rs`, and `setup_reactive.rs` under `crates/arthropod-mcp/src/tools/test/`. This improves cohesion and test organization.
+
+## 2026-02-02 - Decompose Arthropod App
+**Tangle:** `crates/arthropod/src/app.rs` was a "Blob" (900+ lines) mixing Application Building, Core Lifecycle, Widget Integration, and High-Level Runtime logic.
+**Blueprint:** Split into `app/core.rs` (ECS/Lifecycle), `app/builder.rs` (Construction), `app/widget.rs` (Widget Runtime), and `app/integration.rs` (Scene Merging). Improved cohesion and maintainability while preserving the public API via facade re-exports.

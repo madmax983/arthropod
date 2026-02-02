@@ -2,14 +2,14 @@ use anyhow::{Context, Result};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Frame, Terminal,
 };
 use regex::Regex;
 use std::{env, fs, io, time::Duration};
@@ -80,7 +80,10 @@ fn main() -> Result<()> {
     // 2. Parse benchmarks
     let benchmarks = parse_benchmarks(&content);
     if benchmarks.is_empty() {
-        eprintln!("No benchmarks found in {}. Ensure the file contains Criterion output.", file_path);
+        eprintln!(
+            "No benchmarks found in {}. Ensure the file contains Criterion output.",
+            file_path
+        );
         return Ok(());
     }
 
@@ -112,7 +115,8 @@ fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
 
     // Regex for time line: "ecs_update/10           time:   [230.40 ns 231.79 ns 233.44 ns]"
     // Captures: 1: Name, 2: min val, 3: min unit, 4: mean val, 5: mean unit, 6: max val, 7: max unit
-    let time_re = Regex::new(r"^(.*?)\s+time:\s+\[([\d\.]+ \w+) ([\d\.]+ \w+) ([\d\.]+ \w+)\]").unwrap();
+    let time_re =
+        Regex::new(r"^(.*?)\s+time:\s+\[([\d\.]+ \w+) ([\d\.]+ \w+) ([\d\.]+ \w+)\]").unwrap();
 
     // Regex for throughput line: "                        thrpt:  [42.837 Melem/s 43.142 Melem/s 43.403 Melem/s]"
     // We only care about mean (middle value) for summary
@@ -207,7 +211,8 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     // Left Pane: List of Benchmarks
-    let items: Vec<ListItem> = app.benchmarks
+    let items: Vec<ListItem> = app
+        .benchmarks
         .iter()
         .map(|b| {
             let content = Line::from(Span::raw(&b.name));
@@ -217,7 +222,11 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("Benchmarks"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Cyan),
+        )
         .highlight_symbol(">> ");
 
     f.render_stateful_widget(list, chunks[0], &mut app.state);
@@ -243,8 +252,8 @@ fn ui(f: &mut Frame, app: &mut App) {
         ];
 
         if let Some(ref thrpt) = b.throughput {
-             text.push(Line::from(""));
-             text.push(Line::from(vec![
+            text.push(Line::from(""));
+            text.push(Line::from(vec![
                 Span::styled("Throughput: ", Style::default().fg(Color::Yellow)),
                 Span::raw(thrpt),
             ]));
