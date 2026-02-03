@@ -6,8 +6,8 @@ use render_engine::{backend::RectInstance, NodeId, Scene};
 use crate::components::SceneNodeRef;
 use crate::systems::{
     collect_renderables_system, layout_system, sync_accessible_nodes_system,
-    update_reactive_colors_system, update_reactive_opacity_system, update_reactive_transforms_system,
-    RenderCommands,
+    update_reactive_colors_system, update_reactive_opacity_system,
+    update_reactive_transforms_system, RenderCommands,
 };
 
 /// Enterprise GUI framework context - wraps ECS World

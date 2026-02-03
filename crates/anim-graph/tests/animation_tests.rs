@@ -287,8 +287,16 @@ fn test_spring_moves_towards_target() {
     let val_after_tick = anim.tick(Duration::from_millis(100));
 
     // It should have moved towards 100
-    assert!(val_after_tick > 0.0, "Spring should move towards target, got {}", val_after_tick);
-    assert!(val_after_tick < 100.0, "Spring shouldn't overshoot immediately, got {}", val_after_tick);
+    assert!(
+        val_after_tick > 0.0,
+        "Spring should move towards target, got {}",
+        val_after_tick
+    );
+    assert!(
+        val_after_tick < 100.0,
+        "Spring shouldn't overshoot immediately, got {}",
+        val_after_tick
+    );
 }
 
 #[test]

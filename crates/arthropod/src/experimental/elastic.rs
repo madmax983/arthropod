@@ -3,7 +3,7 @@ use anim_graph::{Animatable, Animation};
 #[cfg(feature = "nova")]
 use bevy_ecs::prelude::*;
 #[cfg(feature = "nova")]
-use flux_state::{ReadSignal, Signal, WriteSignal, Runtime};
+use flux_state::{ReadSignal, Runtime, Signal, WriteSignal};
 #[cfg(feature = "nova")]
 use std::sync::{Arc, Mutex, Weak};
 #[cfg(feature = "nova")]
@@ -83,11 +83,7 @@ impl<T: Animatable + Send + Sync + 'static> ElasticSignal<T> {
             target_signal: write.clone(),
         }));
 
-        let signal = Self {
-            read,
-            write,
-            state,
-        };
+        let signal = Self { read, write, state };
 
         // Register immediately
         registry.register(&signal);
@@ -100,9 +96,18 @@ impl<T: Animatable + Send + Sync + 'static> ElasticSignal<T> {
     /// The signal will animate towards this value using spring physics.
     pub fn set(&self, target: T) {
         if let Ok(mut state) = self.state.lock() {
-            if let Animation::Spring { target: anim_target, .. } = &mut state.animation {
+            if let Animation::Spring {
+                target: anim_target,
+                ..
+            } = &mut state.animation
+            {
                 *anim_target = target;
-            } else if let Animation::Tween { to: anim_to, elapsed: anim_elapsed, .. } = &mut state.animation {
+            } else if let Animation::Tween {
+                to: anim_to,
+                elapsed: anim_elapsed,
+                ..
+            } = &mut state.animation
+            {
                 // If we were tweening, reset to new target (implementation detail: we only support spring for now)
                 *anim_to = target;
                 *anim_elapsed = Duration::ZERO;

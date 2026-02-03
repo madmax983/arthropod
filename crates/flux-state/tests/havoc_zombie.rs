@@ -1,8 +1,8 @@
 use flux_state::{Effect, Runtime, Signal};
 use std::panic;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::thread;
 
