@@ -1,6 +1,7 @@
 //! Core Widget traits
 
 use crate::context::WidgetContext;
+use indexmap::IndexMap;
 use render_engine::NodeId;
 
 /// The Widget trait - implemented by all UI widgets
@@ -218,7 +219,7 @@ pub trait NamedWidgetTuple {
         &self,
         ctx: &mut WidgetContext,
         parent: NodeId,
-    ) -> std::collections::HashMap<String, NodeId>;
+    ) -> IndexMap<String, NodeId>;
 
     /// Number of named children
     fn len(&self) -> usize;
@@ -235,8 +236,8 @@ impl NamedWidgetTuple for () {
         &self,
         _ctx: &mut WidgetContext,
         _parent: NodeId,
-    ) -> std::collections::HashMap<String, NodeId> {
-        std::collections::HashMap::new()
+    ) -> IndexMap<String, NodeId> {
+        IndexMap::new()
     }
 
     fn len(&self) -> usize {
@@ -251,8 +252,8 @@ impl<W: Widget> NamedWidgetTuple for (&str, W) {
         &self,
         ctx: &mut WidgetContext,
         parent: NodeId,
-    ) -> std::collections::HashMap<String, NodeId> {
-        let mut mapping = std::collections::HashMap::new();
+    ) -> IndexMap<String, NodeId> {
+        let mut mapping = IndexMap::new();
         let id = self.1.build(ctx);
         ctx.reparent_to(id, parent);
         mapping.insert(self.0.to_string(), id);
@@ -268,8 +269,8 @@ impl<W: Widget> NamedWidgetTuple for (&str, W) {
 macro_rules! impl_named_widget_tuple {
     ($($idx:tt : $T:ident),+) => {
         impl<$($T: Widget),+> NamedWidgetTuple for ($((&str, $T),)+) {
-            fn build_all_named(&self, ctx: &mut WidgetContext, parent: NodeId) -> std::collections::HashMap<String, NodeId> {
-                let mut mapping = std::collections::HashMap::new();
+            fn build_all_named(&self, ctx: &mut WidgetContext, parent: NodeId) -> IndexMap<String, NodeId> {
+                let mut mapping = IndexMap::new();
                 $(
                     let id = self.$idx.1.build(ctx);
                     ctx.reparent_to(id, parent);

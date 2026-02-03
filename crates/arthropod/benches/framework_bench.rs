@@ -10,6 +10,7 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use flux_state::{Runtime, Signal};
+use indexmap::IndexMap;
 use layout_engine::{FlexDirection, FlexStyle};
 use plat_core::{ElementState, Event, Key, KeyboardInput, Modifiers, Point, WindowEvent};
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
@@ -188,7 +189,7 @@ fn bench_dispatch_form_submit(c: &mut Criterion) {
     group.bench_function("enter_submit", |b| {
         let mut ctx = WidgetContext::new_test();
         let form_node = NodeId(999);
-        ctx.add_form_state(form_node, HashMap::new(), None);
+        ctx.add_form_state(form_node, IndexMap::new(), None);
 
         let mut dispatcher = EventDispatcher::new(HashMap::new(), Some(form_node));
         let scene = Scene::new();

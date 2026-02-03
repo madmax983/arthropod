@@ -485,7 +485,7 @@ impl WidgetContext {
     pub fn add_form_state(
         &mut self,
         node_id: NodeId,
-        field_mapping: HashMap<String, NodeId>,
+        field_mapping: IndexMap<String, NodeId>,
         on_submit: Option<SubmitCallback>,
     ) {
         self.form_states.insert(

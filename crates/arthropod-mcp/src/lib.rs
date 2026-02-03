@@ -15,8 +15,8 @@
 //!
 //! The MCP server can run in two modes:
 //!
-//! - **Standalone**: Separate process with embedded test harness
-//! - **Embedded**: Library integrated into applications (dev builds)
+//! - **Standalone**: Separate process with embedded test harness (Phase 1 - Current)
+//! - **Embedded**: Library integrated into applications (Phase 2 - Planned/Internal Use Only)
 //!
 //! ## Example
 //!

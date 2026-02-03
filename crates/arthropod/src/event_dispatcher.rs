@@ -236,6 +236,7 @@ impl EventDispatcher {
 mod tests {
     use super::*;
     use flux_state::{Runtime, Signal};
+    use indexmap::IndexMap;
     use plat_core::{KeyboardInput, Modifiers, MouseInput, Point, WindowId};
     use render_engine::Color;
 
@@ -550,7 +551,7 @@ mod tests {
     fn test_dispatch_enter_submits_form() {
         let mut ctx = create_test_context();
         let form_node = NodeId(42);
-        ctx.add_form_state(form_node, HashMap::new(), None);
+        ctx.add_form_state(form_node, IndexMap::new(), None);
 
         let mut dispatcher = EventDispatcher::new(HashMap::new(), Some(form_node));
         let scene = Scene::new();
