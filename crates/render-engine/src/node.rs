@@ -1,9 +1,25 @@
 //! Scene node types.
+//!
+//! Defines the building blocks of the scene graph: `SceneNode`, `NodeContent`,
+//! and fundamental types like `Color` and `Transform2D`.
 
 use crate::NodeId;
 use serde::{Deserialize, Serialize};
 
 /// A node in the scene graph.
+///
+/// Contains visual content, transformation, and hierarchy information.
+///
+/// # Example
+///
+/// ```
+/// use render_engine::{SceneNode, NodeContent, Color, Transform2D};
+/// use plat_core::Rect;
+///
+/// let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+/// node.transform = Transform2D::translate(100.0, 50.0);
+/// node.bounds = Rect::new(0.0, 0.0, 200.0, 100.0);
+/// ```
 #[derive(Serialize, Deserialize)]
 pub struct SceneNode {
     /// Visual content of this node.
@@ -52,6 +68,19 @@ impl SceneNode {
 }
 
 /// The visual content a node can have.
+///
+/// # Example
+///
+/// ```
+/// use render_engine::{NodeContent, Color};
+///
+/// let rect = NodeContent::Rect { color: Color::BLUE };
+/// let text = NodeContent::Text {
+///     text: "Hello".to_string(),
+///     font_size: 16.0,
+///     color: Color::WHITE,
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeContent {
     /// Empty container (for grouping).

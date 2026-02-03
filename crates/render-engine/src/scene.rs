@@ -1,4 +1,17 @@
 //! Scene graph data structures.
+//!
+//! The scene graph is a retained-mode structure that manages visual nodes
+//! in a flattened hierarchy. It uses `NodeId` handles to reference nodes,
+//! allowing for efficient O(1) lookups and updates.
+//!
+//! # Architecture
+//!
+//! - **Flattened Storage**: Nodes are stored in a `HashMap<NodeId, SceneNode>`,
+//!   avoiding deep recursion for lookups.
+//! - **Parent Pointers**: Each node stores its parent's ID, enabling O(1)
+//!   upward traversal.
+//! - **ECS Integration**: `Scene` is designed to be used as a Resource in
+//!   `bevy_ecs`.
 
 use crate::SceneNode;
 use bevy_ecs::prelude::*;
@@ -12,7 +25,7 @@ pub struct NodeId(pub u64);
 /// The scene graph - owns all nodes.
 ///
 /// Scene can now be stored as an ECS Resource, eliminating the need for
-/// unsafe pointer juggling. Systems access Scene via Res<Scene> and ResMut<Scene>.
+/// unsafe pointer juggling. Systems access Scene via `Res<Scene>` and `ResMut<Scene>`.
 #[derive(Resource)]
 pub struct Scene {
     // We use hashbrown::HashMap (AHash) instead of std::HashMap (SipHash)
@@ -50,6 +63,20 @@ impl Scene {
     /// Add a node to the scene, returns its ID.
     ///
     /// Sets the node's parent field automatically for O(1) parent lookup.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use render_engine::{Scene, SceneNode, NodeContent, Color};
+    ///
+    /// let mut scene = Scene::new();
+    /// let root = scene.root();
+    ///
+    /// let child = scene.add_node(
+    ///     root,
+    ///     SceneNode::new(NodeContent::Rect { color: Color::RED })
+    /// );
+    /// ```
     pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
         let id = NodeId(self.next_id);
         self.next_id += 1;
@@ -104,6 +131,26 @@ impl Scene {
     /// Re-parent a node from old parent to new parent.
     ///
     /// Updates the child's parent field for O(1) lookup.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use render_engine::{Scene, SceneNode, NodeContent, Color};
+    ///
+    /// let mut scene = Scene::new();
+    /// let root = scene.root();
+    ///
+    /// // Create container
+    /// let container = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+    ///
+    /// // Create child attached to root
+    /// let child = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+    ///
+    /// // Move child to container
+    /// scene.reparent_node(child, root, container);
+    ///
+    /// assert!(scene.get_node(container).unwrap().children.contains(&child));
+    /// ```
     pub fn reparent_node(&mut self, child_id: NodeId, old_parent: NodeId, new_parent: NodeId) {
         // Remove child from old parent's children list
         if let Some(old_parent_node) = self.nodes.get_mut(&old_parent) {
@@ -171,10 +218,15 @@ impl Scene {
         self.nodes.iter().map(|(id, node)| (*id, node))
     }
 
-    /// Find the topmost visible node at the given screen position.
+    /// Find a visible node at the given screen position.
     ///
-    /// Iterates through all nodes and returns the last (topmost in z-order)
-    /// visible node whose bounds contain the given point.
+    /// # Z-Order Warning
+    ///
+    /// **Behavior for overlapping nodes is undefined.**
+    ///
+    /// This method iterates through the internal node storage (hash map) and returns
+    /// *a* node that contains the point. It does *not* strictly respect Z-order
+    /// or hierarchy depth for overlapping siblings.
     ///
     /// # Arguments
     ///
@@ -183,7 +235,7 @@ impl Scene {
     ///
     /// # Returns
     ///
-    /// `Some(NodeId)` of the topmost node at this position, or `None` if no node found.
+    /// `Some(NodeId)` of a node at this position, or `None` if no node found.
     ///
     /// # Example
     ///

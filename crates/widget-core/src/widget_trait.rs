@@ -89,7 +89,9 @@ pub trait Widget {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// use widget_core::{WidgetTuple, Text, Button};
+///
 /// pub struct Column<C: WidgetTuple> {
 ///     children: C,
 ///     gap: f32,
@@ -99,7 +101,7 @@ pub trait Widget {
 /// Column {
 ///     children: (Text::new("A"), Text::new("B"), Button::new("C")),
 ///     gap: 10.0,
-/// }
+/// };
 /// ```
 pub trait WidgetTuple {
     /// Build all widgets and attach them as children of parent
@@ -185,17 +187,30 @@ impl_widget_tuple!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H, 8: I, 9: J, 1
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// use widget_core::{NamedWidgetTuple, TextInput, Widget};
+/// use flux_state::{Signal, Runtime};
+///
 /// pub struct Form<F: NamedWidgetTuple> {
 ///     fields: F,
 ///     gap: f32,
 /// }
 ///
+/// impl<F: NamedWidgetTuple> Form<F> {
+///     pub fn new(fields: F) -> Self {
+///         Self { fields, gap: 10.0 }
+///     }
+/// }
+///
+/// let runtime = Runtime::new();
+/// let username = Signal::new(runtime.clone(), String::new());
+/// let email = Signal::new(runtime.clone(), String::new());
+///
 /// // Usage with tuple of (name, widget) pairs:
 /// Form::new((
-///     ("username", input!(username)),
-///     ("email", input!(email)),
-/// ))
+///     ("username", TextInput::new(username)),
+///     ("email", TextInput::new(email)),
+/// ));
 /// ```
 pub trait NamedWidgetTuple {
     /// Build all named widgets and attach as children, returning name -> node ID mapping

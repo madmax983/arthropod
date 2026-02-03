@@ -11,3 +11,7 @@
 ## 2024-05-22 - Layout Engine Exports
 **Confusion:** `layout-engine` uses `taffy` internally but does not publicly re-export `Dimension` enum. Users attempting to construct `FlexStyle` manually might try to use `Dimension::Points` based on Taffy docs.
 **Clarification:** `FlexStyle` uses `Option<f32>` for width/height instead of `Dimension`. The conversion happens internally.
+
+## 2024-05-23 - The Illusory Z-Order
+**Confusion:** `Scene::hit_test` documentation claimed to return the "topmost" node, implying a managed Z-order. However, the implementation iterates over a HashMap, making the result non-deterministic for overlapping nodes.
+**Clarification:** Updated docs to explicitly state that behavior for overlapping nodes is undefined in the current implementation.

@@ -97,6 +97,18 @@ impl Easing {
     ///
     /// Returns the eased value, which is usually between 0.0 and 1.0,
     /// but may overshoot for elastic functions (not yet implemented).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use anim_graph::Easing;
+    ///
+    /// let linear = Easing::Linear;
+    /// assert_eq!(linear.apply(0.5), 0.5);
+    ///
+    /// let ease_in = Easing::EaseIn;
+    /// assert_eq!(ease_in.apply(0.5), 0.25); // 0.5 * 0.5
+    /// ```
     pub fn apply(&self, t: f32) -> f32 {
         let t = t.clamp(0.0, 1.0);
         match self {
