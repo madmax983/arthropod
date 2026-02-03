@@ -92,11 +92,14 @@ impl TextEngine {
             .set_text(&mut self.font_system, text, Attrs::new(), Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
-        let mut glyphs = Vec::new();
+        // Collect runs to avoid double-iterating the potentially expensive layout calculation
+        let runs: Vec<_> = self.buffer.layout_runs().collect();
+        let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
+        let mut glyphs = Vec::with_capacity(total_glyphs);
         let mut max_width = 0.0f32;
         let mut max_height = 0.0f32;
 
-        for run in self.buffer.layout_runs() {
+        for run in runs {
             // Use the actual line height from font metrics
             let run_height = run.line_height;
 
