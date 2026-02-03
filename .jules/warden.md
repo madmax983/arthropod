@@ -17,3 +17,15 @@
 ## 2026-02-02 - [Layout Recursion Unsafe Removal]
 **Threat:** `apply_layouts` in `arthropod` used `unsafe` code with a custom `ChildrenGuard` and raw pointers to iterate over scene children while modifying the scene. This was done to avoid cloning `Vec<NodeId>`, violating safety guidelines against premature optimization with unsafe code.
 **Defense:** Removed `ChildrenGuard` and the `unsafe` block. Switched to cloning the `children` vector (which contains `Copy` `NodeId`s) to safely iterate while allowing mutable scene access during recursion.
+
+## 2026-02-03 - [Flux-State Recursion Stack Overflow]
+**Threat:** Synchronous effect execution allows infinite recursion via ping-pong dependencies, causing stack overflow and denial of service. Test `havoc_recursion` demonstrates this by creating two effects that update each other's signals.
+**Defense:** UNMITIGATED.
+
+## 2026-02-03 - [Flux-State Zombie Effect]
+**Threat:** Panics within an `Effect` closure fail to cleanup the tracking context on the current thread. This causes subsequent signal reads on that thread to be erroneously registered as dependencies of the panicked (dead) effect. Confirmed by `havoc_zombie` test.
+**Defense:** UNMITIGATED.
+
+## 2026-02-03 - [Arthropod-ECS Layout Unsafe Regression]
+**Threat:** The `apply_layouts` function in `arthropod-ecs` contains `unsafe` `ChildrenGuard` logic that relies on raw pointers and `transmute` (via `drop`). This code was previously documented as "Removed" in this log (2026-02-02) but is present in the codebase. This represents a regression of a known unsafe pattern.
+**Defense:** UNMITIGATED.
