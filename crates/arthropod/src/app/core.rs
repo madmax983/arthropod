@@ -4,7 +4,7 @@ use arthropod_ecs::{
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
 use flux_state::Runtime;
-use plat_core::Window;
+use plat_core::{EventLoop, Window, WindowConfig};
 use render_engine::{
     NodeId,
     backend::{RectInstance, RenderBackend, WgpuBackend},
@@ -59,10 +59,36 @@ pub struct App {
 }
 
 impl App {
+    /// Create a new App with a window and GPU backend.
+    ///
+    /// This is the standard way to create an application with a visible window.
+    pub fn new_windowed(config: WindowConfig, event_loop: &EventLoop) -> Result<Self, AppError> {
+        // Create window
+        let window = event_loop
+            .create_window(config)
+            .map_err(|e| AppError::WindowCreation(e.to_string()))?;
+
+        let size = window.inner_size();
+
+        // Create GPU backend (standard mode - not using DirectComposition)
+        // SAFETY: Safe because `App` struct guarantees correct drop order (context before window).
+        let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
+            .map_err(|e| AppError::BackendCreation(e.to_string()))?;
+
+        Ok(Self::new_with_backend(Some(window), Some(backend)))
+    }
+
+    /// Create a new headless App (no window, no GPU).
+    ///
+    /// Use this for testing, benchmarking, or server-side rendering.
+    pub fn new_headless() -> Result<Self, AppError> {
+        Ok(Self::new_with_backend(None, None))
+    }
+
     /// Create a new App with optional backend
     ///
-    /// Internal constructor used by AppBuilder.
-    pub(crate) fn new_with_backend(window: Option<Window>, backend: Option<WgpuBackend>) -> Self {
+    /// Internal constructor used by new_windowed and new_headless.
+    fn new_with_backend(window: Option<Window>, backend: Option<WgpuBackend>) -> Self {
         // Create reactive runtime (Runtime::new() already returns Arc<Runtime>)
         // Runtime uses Mutex (thread-safe), so we keep it in App and provide accessor methods
         let runtime = Runtime::new();
@@ -90,7 +116,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let app = AppBuilder::new().build_headless().unwrap();
+    /// # let app = App::new_headless().unwrap();
     /// let scene = app.world().resource::<Scene>();
     /// let root = scene.root();
     /// ```
@@ -106,7 +132,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// let mut scene = app.world_mut().resource_mut::<Scene>();
     /// let root = scene.root();
     /// ```
@@ -122,7 +148,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// # let node_id = app.world().resource::<Scene>().root();
     /// app.spawn(node_id).insert(Renderable);
     /// ```
@@ -139,7 +165,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// # let node_id = app.world().resource::<Scene>().root();
     /// # app.spawn(node_id).insert(Renderable);
     /// if let Some(mut entity) = app.get_entity_mut(node_id) {
@@ -168,7 +194,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// app.update();
     /// ```
     pub fn update(&mut self) {
@@ -185,7 +211,7 @@ impl App {
     /// ```
     /// # use arthropod::prelude::*;
     /// # use bevy_ecs::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// fn my_system() {
     ///     println!("Updating!");
     /// }
@@ -205,7 +231,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new().build_headless().unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// let instances = app.render();
     /// assert!(instances.len() >= 0);
     /// ```
@@ -221,10 +247,7 @@ impl App {
     ///
     /// ```
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new()
-    /// #     .with_window_config(WindowConfig::default())
-    /// #     .build_headless()
-    /// #     .unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// app.render_to_gpu().expect("Render failed");
     /// ```
     pub fn render_to_gpu(&mut self) -> Result<(), AppError> {
@@ -249,10 +272,7 @@ impl App {
     ///
     /// ```
     /// # use arthropod::prelude::*;
-    /// # let mut app = AppBuilder::new()
-    /// #     .with_window_config(WindowConfig::default())
-    /// #     .build_headless()
-    /// #     .unwrap();
+    /// # let mut app = App::new_headless().unwrap();
     /// app.resize(1024, 768);
     /// ```
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -274,7 +294,7 @@ impl App {
     ///
     /// ```no_run
     /// # use arthropod::prelude::*;
-    /// # let app = AppBuilder::new().build_headless().unwrap();
+    /// # let app = App::new_headless().unwrap();
     /// let runtime = app.runtime();
     /// let signal = Signal::new(runtime.clone(), 42);
     /// ```
@@ -326,10 +346,7 @@ impl App {
     /// let mut widget_ctx = WidgetContext::new_test();
     /// // ... build widgets ...
     ///
-    /// let mut app = AppBuilder::new()
-    ///     .with_window_config(WindowConfig::default())
-    ///     .build_headless()
-    ///     .unwrap();
+    /// let mut app = App::new_headless().unwrap();
     ///
     /// // Copy widget scene nodes to app scene, building up node_id_map
     /// let node_id_map: HashMap<NodeId, NodeId> = HashMap::new();

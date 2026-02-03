@@ -33,16 +33,8 @@
 //! use arthropod::prelude::*;
 //! use render_engine::Scene;
 //!
-//! let config = WindowConfig {
-//!     title: "My App".to_string(),
-//!     size: Size { width: 800, height: 600 },
-//!     ..Default::default()
-//! };
-//!
 //! // Create headless app (no window/GPU)
-//! let mut app = AppBuilder::new()
-//!     .with_window_config(config)
-//!     .build_headless()
+//! let mut app = App::new_headless()
 //!     .expect("Failed to create app");
 //!
 //! // Access resources via ECS world
@@ -67,6 +59,6 @@ pub mod layout;
 pub mod prelude;
 
 // Re-export main types
-pub use app::{App, AppBuilder, AppError};
+pub use app::{App, AppError};
 pub use event_dispatcher::{DispatchResult, EventDispatcher};
 pub use layout::{auto_layout, layout_widget_tree};

@@ -4,7 +4,7 @@
 //! Import with `use arthropod::prelude::*;` to get started quickly.
 
 // App builder and context
-pub use crate::app::{App, AppBuilder, AppContext, AppError};
+pub use crate::app::{App, AppContext, AppError};
 pub use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 
 // ECS integration

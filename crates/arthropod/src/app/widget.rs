@@ -1,4 +1,3 @@
-use super::builder::AppBuilder;
 use super::core::{App, AppError};
 use super::integration::integrate_widget_scene;
 use crate::event_dispatcher::{DispatchResult, EventDispatcher};
@@ -139,9 +138,7 @@ impl Application for WidgetApp {
         };
 
         // Create app with window
-        let mut app = AppBuilder::new()
-            .with_window_config(window_config)
-            .build(event_loop)
+        let mut app = App::new_windowed(window_config, event_loop)
             .expect("Failed to create app");
 
         let runtime = app.runtime().clone();
@@ -346,6 +343,12 @@ impl WidgetApp {
                 continue;
             }
 
+if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut node.content {
+    NodeContent::Rect { color } => Some(color),
+    _ => None,
+}) {
+    *color = Color::WHITE;
+}
             if let Some(node) = scene.get_node_mut(app_node) {
                 if let NodeContent::Rect { color } = &mut node.content {
                     *color = Color::WHITE;
@@ -362,6 +365,12 @@ impl WidgetApp {
             return;
         };
 
+if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut node.content {
+    NodeContent::Rect { color } => Some(color),
+    _ => None,
+}) {
+    *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
+}
         if let Some(node) = scene.get_node_mut(app_node) {
             if let NodeContent::Rect { color } = &mut node.content {
                 *color = Color::rgba(0.7, 0.85, 1.0, 1.0);

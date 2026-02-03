@@ -34,7 +34,7 @@ pub fn layout_system(
     let root = scene.root();
     let constraints = constraints_res
         .map(|r| r.0.clone())
-        .unwrap_or(LayoutConstraints::default());
+        .unwrap_or_default();
 
     // 2. Perform layout calculation
     // We use a helper function similar to arthropod::layout::auto_layout

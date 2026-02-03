@@ -244,7 +244,7 @@ pub fn update_particles(
 /// ```
 /// # use arthropod::prelude::*;
 /// # use arthropod::experimental::particles::register_particles;
-/// # let mut app = AppBuilder::new().build_headless().unwrap();
+/// # let mut app = App::new_headless().unwrap();
 /// register_particles(&mut app);
 /// ```
 pub fn register_particles(app: &mut crate::App) {

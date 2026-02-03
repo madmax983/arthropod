@@ -6,12 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Story Demo (Nova Feature Enabled)");
 
     // Create headless app for demo purposes
-    let mut app = AppBuilder::new()
-        .with_window_config(WindowConfig {
-            title: "Nova Story Demo".to_string(),
-            ..Default::default()
-        })
-        .build_headless()?;
+    let mut app = App::new_headless()?;
 
     // Register story system
     register_story(&mut app);
@@ -38,6 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Find the text node
         let mut found = false;
         for &child_id in &root_node.children {
+if let Some(text) = scene.get_node(child_id).and_then(|child| match &child.content {
+    NodeContent::Text { text, .. } => Some(text),
+    _ => None,
+}) {
+    println!("Story says: \"{}\"", text);
+    found = true;
+}
              if let Some(child) = scene.get_node(child_id) {
                  if let NodeContent::Text { text, .. } = &child.content {
                      println!("Story says: \"{}\"", text);

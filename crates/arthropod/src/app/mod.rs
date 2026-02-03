@@ -21,12 +21,10 @@
 //! }
 //! ```
 
-pub mod builder;
 pub mod core;
 pub mod integration;
 pub mod widget;
 
 // Re-export main types to maintain API compatibility
 pub use self::core::{App, AppError};
-pub use builder::AppBuilder;
 pub use widget::{AppContext, WidgetExt};
