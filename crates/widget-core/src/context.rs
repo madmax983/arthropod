@@ -34,14 +34,16 @@ pub struct ReactiveTextState {
 }
 
 /// Validation state for a node
+#[derive(Clone)]
 pub struct ValidationState {
     pub validator: Validator,
     pub error: Option<String>,
 }
 
 /// Form state for tracking form fields and validation
+#[derive(Clone)]
 pub struct FormState {
-    pub field_mapping: HashMap<String, NodeId>, // field name -> field node ID
+    pub field_mapping: IndexMap<String, NodeId>, // field name -> field node ID
     pub is_valid: bool,
     pub on_submit: Option<SubmitCallback>,
     pub submit_error: Option<String>,

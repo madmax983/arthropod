@@ -3,7 +3,7 @@ use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
 use layout_engine::{FlexStyle, LayoutConstraints};
 use render_engine::{Color, NodeId, Transform2D};
-use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 /// Reference to a node in the Scene tree
@@ -170,26 +170,42 @@ impl TextInputState {
 /// Validator component - validates node content
 ///
 /// Stores validation logic and current error state.
-pub type ValidatorFn = Arc<dyn Fn(&str) -> Result<(), String> + Send + Sync>;
-
 #[derive(Component, Clone)]
-pub struct Validator {
-    pub validator: ValidatorFn,
-    pub error: Option<String>,
+pub struct Validator(pub widget_core::context::ValidationState);
+
+impl Deref for Validator {
+    type Target = widget_core::context::ValidationState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Validator {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 /// Form state component - tracks form fields and submission
 ///
 /// Stores the mapping of field names to node IDs, validation state,
 /// and submission callback.
-pub type SubmitCallback = Arc<dyn Fn(HashMap<String, String>) -> Result<(), String> + Send + Sync>;
-
 #[derive(Component, Clone)]
-pub struct FormState {
-    pub field_mapping: HashMap<String, NodeId>,
-    pub is_valid: bool,
-    pub on_submit: Option<SubmitCallback>,
-    pub submit_error: Option<String>,
+pub struct FormState(pub widget_core::context::FormState);
+
+impl Deref for FormState {
+    type Target = widget_core::context::FormState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FormState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 /// Accessibility node component

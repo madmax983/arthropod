@@ -242,6 +242,7 @@ dependencies = [
  "layout-engine",
  "plat-core",
  "render-engine",
+ "widget-core",
 ]
 
 [[package]]
@@ -3883,7 +3884,6 @@ dependencies = [
 name = "widget-core"
 version = "0.1.0"
 dependencies = [
- "arthropod-ecs",
  "bevy_ecs",
  "criterion",
  "flux-state",
