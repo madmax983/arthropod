@@ -22,7 +22,6 @@
 //!
 //! ```
 //! use flux_state::{Runtime, Signal, Effect, Computed};
-//! use std::sync::Arc;
 //!
 //! // 1. Create a runtime (shared via Arc)
 //! let runtime = Runtime::new();
@@ -38,7 +37,8 @@
 //! });
 //!
 //! // 4. Create an effect (side effect)
-//! Effect::new(runtime.clone(), move || {
+//! // Keep the return value to keep the effect alive
+//! let _effect = Effect::new(runtime.clone(), move || {
 //!     println!("Count: {}, Double: {}", read_count.get(), double_count.get());
 //! });
 //!
