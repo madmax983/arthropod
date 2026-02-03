@@ -11,7 +11,7 @@
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
 use widget_core::{
-    Button, Container, FlexDirection, FlexStyle, Form, NodeContent, Text, TextInput, Widget,
+    Button, Checkbox, Container, FlexDirection, FlexStyle, Form, NodeContent, Text, TextInput, Widget,
     WidgetContext,
 };
 
@@ -203,6 +203,25 @@ fn main() {
     println!("    ✓ Built 100 row containers (200 widgets total)");
     println!("    ✓ Build time: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
     println!("    ✓ Children count: {}", large_node.children.len());
+
+    println!("\n11. Checkbox Widget");
+    println!("    - Boolean toggle with label");
+    let checked = Signal::new(runtime.clone(), false);
+    let (read_checked, write_checked) = checked.clone().split();
+
+    let checkbox = Checkbox::new(checked).label("Agree to Terms");
+    let checkbox_id = checkbox.build(&mut ctx);
+    println!("    ✓ Built checkbox widget (node: {:?})", checkbox_id);
+
+    // Simulate toggle
+    // Note: We can't easily trigger click on the checkbox here because interaction logic
+    // is transferred to ECS in integrate_widgets which isn't running in this context test.
+    // But we can verify build and initial state.
+    println!("    ✓ Initial value: {}", read_checked.get_untracked());
+
+    // Manually toggle signal to prove reactivity setup
+    write_checked.set(true);
+    println!("    ✓ Toggled signal manually (value: {})", read_checked.get_untracked());
 
     // Scene statistics
     println!("\n=== Scene Statistics ===");

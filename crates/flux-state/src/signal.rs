@@ -19,6 +19,7 @@ use std::sync::{Arc, Mutex};
 /// let runtime = Runtime::new();
 /// let count = Signal::new(runtime, 0);
 /// ```
+#[derive(Clone)]
 pub struct Signal<T> {
     id: NodeId,
     runtime: Arc<Runtime>,
@@ -157,6 +158,11 @@ impl<T: 'static + Send> Signal<T> {
             .unwrap();
         f(&*guard)
     }
+
+    /// Get a reference to the runtime.
+    pub fn runtime(&self) -> &Arc<Runtime> {
+        &self.runtime
+    }
 }
 
 impl<T: Clone + 'static + Send> ReadSignal<T> {
@@ -261,6 +267,11 @@ impl<T: 'static + Send> ReadSignal<T> {
             .lock()
             .unwrap();
         f(&*guard)
+    }
+
+    /// Get a reference to the runtime.
+    pub fn runtime(&self) -> &Arc<Runtime> {
+        &self.runtime
     }
 }
 

@@ -41,6 +41,7 @@ if let Some(text) = scene.get_node(child_id).and_then(|child| match &child.conte
     found = true;
 }
              if let Some(child) = scene.get_node(child_id) {
+                 #[allow(clippy::collapsible_if)]
                  if let NodeContent::Text { text, .. } = &child.content {
                      println!("Story says: \"{}\"", text);
                      found = true;

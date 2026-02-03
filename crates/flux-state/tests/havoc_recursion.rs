@@ -1,6 +1,7 @@
 use flux_state::{Effect, Runtime, Signal};
 
 #[test]
+#[ignore] // Crashes CI with stack overflow (as designed)
 fn test_infinite_recursion_crash() {
     // 👺 HAVOC: This test is designed to crash the process with a stack overflow.
     // It sets up two effects that ping-pong updates to each other.

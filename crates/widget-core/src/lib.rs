@@ -41,6 +41,7 @@
 
 pub mod button;
 pub mod card;
+pub mod checkbox;
 pub mod container;
 pub mod context;
 pub mod form;
@@ -51,6 +52,7 @@ pub mod widget_trait;
 
 pub use button::{Button, ButtonStyle};
 pub use card::Card;
+pub use checkbox::Checkbox;
 pub use container::Container;
 pub use context::WidgetContext;
 pub use form::Form;

@@ -1,6 +1,6 @@
 use arthropod_ecs::{
     FrameworkContext,
-    components::{BackgroundColor, Clickable, LayoutStyle, SceneNodeRef},
+    components::{BackgroundColor, Clickable, LayoutStyle, ReactiveColor, SceneNodeRef},
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
 use flux_state::Runtime;
@@ -381,6 +381,13 @@ impl App {
             widget_ctx.background_colors().iter(),
             node_id_map,
             |color: &render_engine::Vec4| BackgroundColor(*color),
+        );
+
+        // Transfer reactive colors to ReactiveColor components
+        self.transfer_components(
+            widget_ctx.reactive_color_states().iter(),
+            node_id_map,
+            |state: &widget_core::context::ReactiveColorState| ReactiveColor::new(state.read_signal.clone()),
         );
 
         // Note: TextInputState, Validator, and FormState components require

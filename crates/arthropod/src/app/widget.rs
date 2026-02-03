@@ -350,6 +350,7 @@ if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut nod
     *color = Color::WHITE;
 }
             if let Some(node) = scene.get_node_mut(app_node) {
+                #[allow(clippy::collapsible_if)]
                 if let NodeContent::Rect { color } = &mut node.content {
                     *color = Color::WHITE;
                 }
@@ -372,6 +373,7 @@ if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut nod
     *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
 }
         if let Some(node) = scene.get_node_mut(app_node) {
+            #[allow(clippy::collapsible_if)]
             if let NodeContent::Rect { color } = &mut node.content {
                 *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
             }

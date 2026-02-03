@@ -8,7 +8,7 @@ use flux_state::{ReadSignal, WriteSignal};
 use glam::Vec4;
 use indexmap::IndexMap;
 use layout_engine::{FlexDirection, FlexStyle};
-use render_engine::{NodeContent, NodeId, Scene, SceneNode};
+use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use theme_engine::DesignTokens;
@@ -31,6 +31,12 @@ pub struct TextInputState {
 #[derive(Clone)]
 pub struct ReactiveTextState {
     pub read_signal: ReadSignal<String>,
+}
+
+/// Reactive color state for a node
+#[derive(Clone)]
+pub struct ReactiveColorState {
+    pub read_signal: ReadSignal<Color>,
 }
 
 /// Validation state for a node
@@ -91,6 +97,7 @@ pub struct WidgetContext {
     // Input
     pub(crate) text_input_states: IndexMap<NodeId, TextInputState>,
     pub(crate) reactive_text_states: HashMap<NodeId, ReactiveTextState>,
+    pub(crate) reactive_color_states: HashMap<NodeId, ReactiveColorState>,
     pub(crate) focused_node: Option<NodeId>,
     pub(crate) placeholders: HashSet<NodeId>,
 
@@ -113,6 +120,7 @@ impl WidgetContext {
             background_colors: HashMap::new(),
             text_input_states: IndexMap::new(),
             reactive_text_states: HashMap::new(),
+            reactive_color_states: HashMap::new(),
             focused_node: None,
             placeholders: HashSet::new(),
             validators: HashMap::new(),
@@ -273,6 +281,12 @@ impl WidgetContext {
     pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
         self.reactive_text_states
             .insert(node_id, ReactiveTextState { read_signal });
+    }
+
+    /// Add reactive color state to a node
+    pub fn add_reactive_color_state(&mut self, node_id: NodeId, read_signal: ReadSignal<Color>) {
+        self.reactive_color_states
+            .insert(node_id, ReactiveColorState { read_signal });
     }
 
     /// Add text input state to a node
@@ -699,6 +713,11 @@ impl WidgetContext {
     /// Get all reactive text states (for app-shell integration)
     pub fn reactive_text_states(&self) -> &HashMap<NodeId, ReactiveTextState> {
         &self.reactive_text_states
+    }
+
+    /// Get all reactive color states (for app-shell integration)
+    pub fn reactive_color_states(&self) -> &HashMap<NodeId, ReactiveColorState> {
+        &self.reactive_color_states
     }
 
     /// Get all validators (for app-shell integration)
