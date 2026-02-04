@@ -152,6 +152,32 @@ impl Scene {
     /// assert!(scene.get_node(container).unwrap().children.contains(&child));
     /// ```
     pub fn reparent_node(&mut self, child_id: NodeId, old_parent: NodeId, new_parent: NodeId) {
+        // Prevent reparenting the root
+        if child_id == self.root {
+            return;
+        }
+
+        // Prevent immediate cycle
+        if child_id == new_parent {
+            return;
+        }
+
+        // Prevent cycle: check if child_id is an ancestor of new_parent
+        let mut ancestor = new_parent;
+        loop {
+            if ancestor == child_id {
+                // Cycle detected: child is an ancestor of new_parent!
+                // Abort reparenting.
+                return;
+            }
+            if let Some(p) = self.parent(ancestor) {
+                ancestor = p;
+            } else {
+                // Reached a root (or orphan), no cycle detected in this path
+                break;
+            }
+        }
+
         // Remove child from old parent's children list
         if let Some(old_parent_node) = self.nodes.get_mut(&old_parent) {
             old_parent_node.children.retain(|&id| id != child_id);
