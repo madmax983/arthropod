@@ -13,3 +13,7 @@
 ## 2026-02-02 - Decompose Arthropod App
 **Tangle:** `crates/arthropod/src/app.rs` was a "Blob" (900+ lines) mixing Application Building, Core Lifecycle, Widget Integration, and High-Level Runtime logic.
 **Blueprint:** Split into `app/core.rs` (ECS/Lifecycle), `app/builder.rs` (Construction), `app/widget.rs` (Widget Runtime), and `app/integration.rs` (Scene Merging). Improved cohesion and maintainability while preserving the public API via facade re-exports.
+
+## 2026-02-03 - Enforce Visual Hierarchy
+**Tangle:** `WgpuBackend` and `arthropod-ecs` rendering systems were iterating `Scene` nodes via `HashMap` or ECS Archetype iterators, resulting in arbitrary (random) Z-ordering that violated the "Painter's Algorithm" expected by the 2D Scene Graph.
+**Blueprint:** Introduced `Scene::iter_visuals()` in `render-engine` which enforces a Depth-First Pre-Order traversal (Parent -> Children). Refactored both `WgpuBackend` and `arthropod-ecs` to strictly use this iterator for drawing, decoupling rendering order from storage implementation.

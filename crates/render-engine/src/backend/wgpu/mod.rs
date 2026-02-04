@@ -100,7 +100,7 @@ impl WgpuBackend {
         let mut instances = Vec::new();
         let mut raw_text_nodes = Vec::new();
 
-        for (_node_id, node) in scene.nodes() {
+        for (_node_id, node) in scene.iter_visuals() {
             if !node.visible || node.opacity <= 0.0 {
                 continue;
             }

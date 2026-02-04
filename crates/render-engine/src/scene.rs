@@ -244,6 +244,21 @@ impl Scene {
         self.nodes.iter().map(|(id, node)| (*id, node))
     }
 
+    /// Iterate over visual nodes in depth-first (Painter's Algorithm) order.
+    ///
+    /// This iterator traverses the scene graph starting from the root, yielding
+    /// nodes in the order they should be drawn:
+    /// 1. Parent
+    /// 2. Children (first to last)
+    ///
+    /// This ensures correct Z-ordering for 2D rendering.
+    pub fn iter_visuals(&self) -> VisualIterator<'_> {
+        VisualIterator {
+            scene: self,
+            stack: vec![self.root],
+        }
+    }
+
     /// Find a visible node at the given screen position.
     ///
     /// This method performs a recursive tree traversal starting from the root,
@@ -331,6 +346,29 @@ impl Scene {
             "nodes": nodes,
             "node_count": self.nodes.len(),
         }))
+    }
+}
+
+/// Iterator for visual nodes in depth-first (Painter's Algorithm) order.
+pub struct VisualIterator<'a> {
+    scene: &'a Scene,
+    stack: Vec<NodeId>,
+}
+
+impl<'a> Iterator for VisualIterator<'a> {
+    type Item = (NodeId, &'a SceneNode);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.stack.pop()?;
+        let node = self.scene.get_node(id)?;
+
+        // Push children in reverse order so they are processed in forward order
+        // (stack is LIFO, so pushing [1, 2] means popping 2 then 1, visiting 1 then 2)
+        for &child_id in node.children.iter().rev() {
+            self.stack.push(child_id);
+        }
+
+        Some((id, node))
     }
 }
 
@@ -563,5 +601,26 @@ mod tests {
 
         // At 10,10 (only id1), id1 should be hit
         assert_eq!(scene.hit_test(10.0, 10.0), Some(id1));
+    }
+
+    #[test]
+    fn test_iter_visuals_order() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Tree structure:
+        // Root
+        //  |-> Child1
+        //       |-> Grandchild1
+        //  |-> Child2
+
+        let child1 = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+        let grandchild1 = scene.add_node(child1, SceneNode::new(NodeContent::Empty));
+        let child2 = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+
+        let traversal: Vec<NodeId> = scene.iter_visuals().map(|(id, _)| id).collect();
+
+        // Expected order: Root, Child1, Grandchild1, Child2
+        assert_eq!(traversal, vec![root, child1, grandchild1, child2]);
     }
 }

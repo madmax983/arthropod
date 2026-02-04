@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
-use render_engine::{backend::RectInstance, NodeContent, Scene};
+use render_engine::{backend::RectInstance, NodeContent, NodeId, Scene};
+use std::collections::HashSet;
 
 use crate::components::{Renderable, SceneNodeRef};
 
@@ -24,34 +25,41 @@ pub fn collect_renderables_system(
 ) {
     commands.0.clear();
 
-    // Res<Scene> implements Deref, so we can call Scene methods directly
-    for node_ref in query.iter() {
-        if let Some(node) = scene.get(node_ref.0) {
-            // Skip invisible nodes and fully transparent nodes
-            if !node.visible || node.opacity <= 0.0 {
-                continue;
-            }
+    // 1. Collect renderable NodeIds from ECS to filter the scene traversal
+    let renderable_nodes: HashSet<NodeId> = query.iter().map(|r| r.0).collect();
 
-            // Generate render instances based on node content type
-            match &node.content {
-                NodeContent::Rect { color } | NodeContent::RoundedRect { color, .. } => {
-                    commands.0.push(RectInstance {
-                        pos: [node.bounds.x, node.bounds.y],
-                        size: [node.bounds.width, node.bounds.height],
-                        color: [
-                            color.r(),
-                            color.g(),
-                            color.b(),
-                            color.a() * node.opacity, // Apply opacity
-                        ],
-                    });
-                }
-                NodeContent::Text { .. } => {
-                    // Text is handled directly in wgpu_backend during rendering
-                }
-                NodeContent::Empty => {
-                    // Empty nodes have no visual representation
-                }
+    // 2. Iterate scene in strict visual order (Painter's Algorithm)
+    // Res<Scene> implements Deref, so we can call Scene methods directly
+    for (id, node) in scene.iter_visuals() {
+        // Skip nodes that are not managed by ECS or marked as Renderable
+        if !renderable_nodes.contains(&id) {
+            continue;
+        }
+
+        // Skip invisible nodes and fully transparent nodes
+        if !node.visible || node.opacity <= 0.0 {
+            continue;
+        }
+
+        // Generate render instances based on node content type
+        match &node.content {
+            NodeContent::Rect { color } | NodeContent::RoundedRect { color, .. } => {
+                commands.0.push(RectInstance {
+                    pos: [node.bounds.x, node.bounds.y],
+                    size: [node.bounds.width, node.bounds.height],
+                    color: [
+                        color.r(),
+                        color.g(),
+                        color.b(),
+                        color.a() * node.opacity, // Apply opacity
+                    ],
+                });
+            }
+            NodeContent::Text { .. } => {
+                // Text is handled directly in wgpu_backend during rendering
+            }
+            NodeContent::Empty => {
+                // Empty nodes have no visual representation
             }
         }
     }
