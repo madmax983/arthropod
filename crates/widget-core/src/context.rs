@@ -27,6 +27,82 @@ pub struct TextInputState {
     pub max_length: Option<usize>,
 }
 
+impl TextInputState {
+    /// Insert a character at the current cursor position.
+    pub fn insert_char(&mut self, c: char) {
+        if self.readonly {
+            return;
+        }
+
+        let mut current_value = self.read_signal.get_untracked();
+
+        if let Some(max_len) = self.max_length {
+            if current_value.chars().count() >= max_len {
+                return;
+            }
+        }
+
+        if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position) {
+            current_value.insert(byte_idx, c);
+            self.cursor_position += 1;
+            self.write_signal.set(current_value);
+        }
+    }
+
+    /// Delete the character before the cursor (Backspace).
+    pub fn backspace(&mut self) {
+        if self.readonly {
+            return;
+        }
+
+        if self.cursor_position > 0 {
+            let mut current_value = self.read_signal.get_untracked();
+
+            if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position - 1) {
+                current_value.remove(byte_idx);
+                self.cursor_position -= 1;
+                self.write_signal.set(current_value);
+            }
+        }
+    }
+
+    /// Delete the character after the cursor (Delete).
+    pub fn delete(&mut self) {
+        if self.readonly {
+            return;
+        }
+
+        let current_value = self.read_signal.get_untracked();
+        let char_count = current_value.chars().count();
+
+        if self.cursor_position < char_count {
+            let mut new_value = current_value;
+
+            if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, self.cursor_position) {
+                new_value.remove(byte_idx);
+                self.write_signal.set(new_value);
+            }
+        }
+    }
+
+    /// Move the cursor left.
+    pub fn move_cursor_left(&mut self) {
+        if self.cursor_position > 0 {
+            self.cursor_position -= 1;
+        }
+    }
+
+    /// Move the cursor right.
+    pub fn move_cursor_right(&mut self) {
+        let current_value = self.read_signal.get_untracked();
+        let char_count = current_value.chars().count();
+
+        if self.cursor_position < char_count {
+            self.cursor_position += 1;
+        }
+    }
+}
+
 /// Reactive text state for a node
 #[derive(Clone)]
 pub struct ReactiveTextState {
@@ -339,24 +415,7 @@ impl WidgetContext {
     pub fn send_char(&mut self, c: char) {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                let mut current_value = state.read_signal.get_untracked();
-
-                if let Some(max_len) = state.max_length {
-                    if current_value.chars().count() >= max_len {
-                        return;
-                    }
-                }
-
-                if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, state.cursor_position)
-                {
-                    current_value.insert(byte_idx, c);
-                    state.cursor_position += 1;
-                    state.write_signal.set(current_value);
-                }
+                state.insert_char(c);
             }
         }
     }
@@ -365,21 +424,7 @@ impl WidgetContext {
     pub fn send_backspace(&mut self) {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                if state.cursor_position > 0 {
-                    let mut current_value = state.read_signal.get_untracked();
-
-                    if let Some(byte_idx) =
-                        char_idx_to_byte_idx(&current_value, state.cursor_position - 1)
-                    {
-                        current_value.remove(byte_idx);
-                        state.cursor_position -= 1;
-                        state.write_signal.set(current_value);
-                    }
-                }
+                state.backspace();
             }
         }
     }
@@ -388,22 +433,7 @@ impl WidgetContext {
     pub fn send_delete(&mut self) {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.readonly {
-                    return;
-                }
-
-                let current_value = state.read_signal.get_untracked();
-                let char_count = current_value.chars().count();
-
-                if state.cursor_position < char_count {
-                    let mut new_value = current_value;
-
-                    if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, state.cursor_position)
-                    {
-                        new_value.remove(byte_idx);
-                        state.write_signal.set(new_value);
-                    }
-                }
+                state.delete();
             }
         }
     }
@@ -412,9 +442,7 @@ impl WidgetContext {
     pub fn send_key_left(&mut self) {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                if state.cursor_position > 0 {
-                    state.cursor_position -= 1;
-                }
+                state.move_cursor_left();
             }
         }
     }
@@ -423,12 +451,7 @@ impl WidgetContext {
     pub fn send_key_right(&mut self) {
         if let Some(focused_id) = self.focused_node {
             if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                let current_value = state.read_signal.get_untracked();
-                let char_count = current_value.chars().count();
-
-                if state.cursor_position < char_count {
-                    state.cursor_position += 1;
-                }
+                state.move_cursor_right();
             }
         }
     }
