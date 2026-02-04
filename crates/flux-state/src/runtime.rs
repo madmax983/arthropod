@@ -67,6 +67,16 @@ struct ComputedNode {
     value: Option<Arc<dyn Any + Send + Sync>>,
 }
 
+struct ContextGuard<'a> {
+    runtime: &'a Runtime,
+}
+
+impl<'a> Drop for ContextGuard<'a> {
+    fn drop(&mut self) {
+        self.runtime.inner.lock().unwrap().pop_context();
+    }
+}
+
 impl RuntimeInner {
     fn cleanup_dependencies(&mut self, id: NodeId) {
         if let Some(deps) = self.dependencies.remove(&id) {
@@ -246,13 +256,16 @@ impl Runtime {
             inner.effects.get(&id).cloned()
         };
 
+        // SAFETY: The context guard ensures that `pop_context` is called
+        // even if the effect closure panics.
+        let _guard = ContextGuard { runtime: self };
+
         // Run effect (will re-establish dependencies)
         if let Some(f) = effect_fn {
             f();
         }
 
-        // Clear tracking context
-        self.inner.lock().unwrap().pop_context();
+        // _guard drops here, calling pop_context()
     }
 
     /// Get a handle to the signal value (Arc) without holding the runtime lock.
@@ -310,17 +323,22 @@ impl Runtime {
             computed.compute.clone()
         };
 
+        // SAFETY: The context guard ensures that `pop_context` is called
+        // even if the compute closure panics.
+        let _guard = ContextGuard { runtime: self };
+
         // Call without holding borrow
         let new_value = compute_fn();
 
-        // Store new value and clear tracking context
+        // Store new value
         {
             let mut inner = self.inner.lock().unwrap();
             if let Some(computed) = inner.computeds.get_mut(&id) {
                 computed.value = Some(new_value);
             }
-            inner.pop_context();
         }
+
+        // _guard drops here, calling pop_context()
     }
 
     pub(crate) fn dispose_effect(&self, id: NodeId) {

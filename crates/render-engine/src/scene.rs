@@ -600,15 +600,25 @@ mod tests {
         let id2 = scene.add_node(root, node2);
 
         // Add a third node that is smaller and inside both
-        let mut node3 = SceneNode::new(NodeContent::Rect { color: Color::GREEN });
+        let mut node3 = SceneNode::new(NodeContent::Rect {
+            color: Color::GREEN,
+        });
         node3.bounds = Rect::new(60.0, 60.0, 10.0, 10.0);
         let id3 = scene.add_node(root, node3);
 
         // id3 is added last, so it should be on top of id2, which is on top of id1
-        assert_eq!(scene.hit_test(65.0, 65.0), Some(id3), "Should hit the top-most node (id3)");
+        assert_eq!(
+            scene.hit_test(65.0, 65.0),
+            Some(id3),
+            "Should hit the top-most node (id3)"
+        );
 
         // At 55,55 (overlap of id1 and id2), id2 should be on top
-        assert_eq!(scene.hit_test(55.0, 55.0), Some(id2), "Should hit the middle node (id2) over bottom node (id1)");
+        assert_eq!(
+            scene.hit_test(55.0, 55.0),
+            Some(id2),
+            "Should hit the middle node (id2) over bottom node (id1)"
+        );
 
         // At 10,10 (only id1), id1 should be hit
         assert_eq!(scene.hit_test(10.0, 10.0), Some(id1));

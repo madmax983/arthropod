@@ -33,6 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut found = false;
         for &child_id in &root_node.children {
             if let Some(child) = scene.get_node(child_id) {
+                #[allow(clippy::collapsible_if)]
                 if let NodeContent::Text { text, .. } = &child.content {
                     println!("Story says: \"{}\"", text);
                     found = true;
