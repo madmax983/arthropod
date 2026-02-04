@@ -8,7 +8,6 @@ use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 use plat_core::Rect;
 use render_engine::{NodeId, Scene};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
 /// Layout system - runs in the update schedule
 ///
@@ -94,28 +93,6 @@ fn build_layout_tree(
     }
 }
 
-/// Guard to restore children to a node on Drop, ensuring panic safety.
-struct ChildrenGuard<'a> {
-    scene: *mut Scene,
-    node_id: NodeId,
-    children: Vec<NodeId>,
-    _marker: PhantomData<&'a mut Scene>,
-}
-
-impl<'a> Drop for ChildrenGuard<'a> {
-    fn drop(&mut self) {
-        // SAFETY: The scene pointer is valid because the guard is created from a valid
-        // &mut Scene reference that outlives the guard's scope.
-        unsafe {
-            if let Some(scene) = self.scene.as_mut() {
-                if let Some(node) = scene.get_node_mut(self.node_id) {
-                    node.children = std::mem::take(&mut self.children);
-                }
-            }
-        }
-    }
-}
-
 /// Apply computed layouts to scene node bounds.
 fn apply_layouts(
     scene: &mut Scene,
@@ -132,24 +109,18 @@ fn apply_layouts(
             let abs_y = parent_y + layout.y;
 
             // Update scene node bounds and process children.
-            // We use std::mem::take to avoid cloning the children vector (O(N) allocations).
+            // We clone the children vector to safely iterate while mutating the scene.
+            // This is O(N) but safer than using raw pointers or unsafe blocks.
+            // NodeId is Copy (u64), so this is just a memcpy.
             let children = if let Some(scene_node) = scene.get_node_mut(node_id) {
                 scene_node.bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
-                std::mem::take(&mut scene_node.children)
+                scene_node.children.clone()
             } else {
                 Vec::new()
             };
 
-            // Create guard to restore children on scope exit (or panic)
-            let guard = ChildrenGuard {
-                scene: scene as *mut _,
-                node_id,
-                children,
-                _marker: PhantomData,
-            };
-
-            // Recurse using the children from the guard
-            for &child_id in &guard.children {
+            // Recurse using the cloned children
+            for child_id in children {
                 apply_layouts(scene, child_id, engine, node_map, abs_x, abs_y);
             }
         }
