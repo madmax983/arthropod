@@ -189,6 +189,81 @@ pub fn emit_particles(
     }
 }
 
+/// Component for a force field affecting particles
+#[derive(Component, Debug, Clone)]
+pub enum ForceField {
+    Constant(Vec2),
+    Point {
+        position: Vec2,
+        strength: f32, // Positive = attract, Negative = repel
+        radius: f32,
+        falloff: f32,
+    },
+}
+
+/// System to apply forces to particles
+///
+/// Applies active force fields to all particles.
+///
+/// # Example
+///
+/// ```
+/// # use bevy_ecs::prelude::*;
+/// # use arthropod::experimental::particles::{apply_forces, Particle, ForceField, ParticleTime};
+/// # use render_engine::Scene;
+/// # let mut world = World::new();
+/// # world.insert_resource(ParticleTime::default());
+/// # world.insert_resource(Scene::new());
+/// # let mut schedule = Schedule::default();
+/// # schedule.add_systems(apply_forces);
+/// ```
+pub fn apply_forces(
+    mut particles: Query<&mut Particle>,
+    forces: Query<&ForceField>,
+    time: Res<ParticleTime>,
+    scene: Res<Scene>,
+) {
+    for mut particle in &mut particles {
+        let mut acceleration = Vec2::ZERO;
+
+        // Get particle position from scene node
+        let particle_pos = if let Some(node_id) = particle.node_id {
+            if let Some(node) = scene.get_node(node_id) {
+                Vec2::new(node.bounds.x, node.bounds.y)
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+
+        for force in &forces {
+            match force {
+                ForceField::Constant(v) => {
+                    acceleration += *v;
+                }
+                ForceField::Point {
+                    position,
+                    strength,
+                    radius,
+                    falloff,
+                } => {
+                    let to_force = *position - particle_pos;
+                    let dist = to_force.length();
+
+                    if dist < *radius && dist > 0.001 {
+                        let dir = to_force / dist;
+                        let magnitude = strength / dist.powf(*falloff);
+                        acceleration += dir * magnitude;
+                    }
+                }
+            }
+        }
+
+        particle.velocity += acceleration * time.dt;
+    }
+}
+
 /// System to update existing particles
 ///
 /// Updates particle positions and lifetimes, and handles despawning dead particles.
@@ -251,7 +326,15 @@ pub fn register_particles(app: &mut crate::App) {
     app.world_mut().insert_resource(ParticleTime::default());
     app.world_mut()
         .insert_resource(ParticleGlobalState::default());
-    app.add_update_system((update_particle_time, emit_particles, update_particles).chain());
+    app.add_update_system(
+        (
+            update_particle_time,
+            emit_particles,
+            apply_forces,
+            update_particles,
+        )
+            .chain(),
+    );
 }
 
 #[cfg(test)]
@@ -305,5 +388,65 @@ mod tests {
         // Check scene cleanup
         let scene = world.resource::<Scene>();
         assert_eq!(scene.nodes().count(), 1, "Scene should only have root node");
+    }
+
+    #[test]
+    fn test_particle_gravity() {
+        let mut world = World::new();
+        world.insert_resource(Scene::new());
+        world.insert_resource(ParticleTime { dt: 0.1 });
+        world.insert_resource(ParticleGlobalState::default());
+
+        let mut update_schedule = Schedule::default();
+        update_schedule.add_systems((apply_forces, update_particles).chain());
+
+        // Spawn a single particle
+        let mut scene = world.resource_mut::<Scene>();
+        let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let root = scene.root();
+        let node_id = scene.add_node(root, node);
+
+        world.spawn(Particle {
+            velocity: Vec2::new(10.0, 0.0),
+            lifetime: 5.0,
+            max_lifetime: 5.0,
+            node_id: Some(node_id),
+        });
+
+        // Spawn Gravity Force
+        world.spawn(ForceField::Constant(Vec2::new(0.0, -10.0)));
+
+        // Run for 1.0 seconds (10 steps of 0.1s)
+        for _ in 0..10 {
+            update_schedule.run(&mut world);
+        }
+
+        // Verify Velocity
+        let particle = world.query::<&Particle>().single(&world);
+        // Initial Vy = 0. Gravity = -10. Time = 1.0. Final Vy should be -10.
+        // Gravity should accelerate particle downwards.
+        assert!(
+            (particle.velocity.y - -10.0).abs() < 0.01,
+            "Velocity Y should be approx -10.0, got {}",
+            particle.velocity.y
+        );
+
+        // Verify Position
+        // Initial Y = 0. Dy = 0.5 * -10 * 1^2 = -5.0?
+        // Wait, Euler integration:
+        // Step 1: V = V0 + a*dt = 0 + -10*0.1 = -1. Pos = P0 + V*dt.
+        // Is update_particles using new or old velocity?
+        // apply_forces updates V. update_particles uses V.
+        // So Step 1: V becomes -1. Pos becomes 0 + (-1)*0.1 = -0.1.
+        // ...
+        // Sum of arithmetic series.
+        // Let's just verify it moved down significantly.
+        let scene = world.resource::<Scene>();
+        let node = scene.get_node(node_id).unwrap();
+        assert!(
+            node.bounds.y < -4.0,
+            "Particle should have fallen, y is {}",
+            node.bounds.y
+        );
     }
 }

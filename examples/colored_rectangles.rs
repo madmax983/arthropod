@@ -192,8 +192,8 @@ impl Application for DemoApp {
         };
 
         // Create app with App::new_windowed - handles Window, WgpuBackend, Scene, Runtime automatically!
-        let mut app = arthropod::App::new_windowed(config, event_loop)
-            .expect("Failed to create app");
+        let mut app =
+            arthropod::App::new_windowed(config, event_loop).expect("Failed to create app");
 
         let size = app.window().unwrap().inner_size();
 

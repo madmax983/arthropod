@@ -11,8 +11,8 @@
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
 use widget_core::{
-    Button, Checkbox, Container, FlexDirection, FlexStyle, Form, NodeContent, Text, TextInput, Widget,
-    WidgetContext,
+    Button, Checkbox, Container, FlexDirection, FlexStyle, Form, NodeContent, Text, TextInput,
+    Widget, WidgetContext,
 };
 
 fn main() {
@@ -221,7 +221,10 @@ fn main() {
 
     // Manually toggle signal to prove reactivity setup
     write_checked.set(true);
-    println!("    ✓ Toggled signal manually (value: {})", read_checked.get_untracked());
+    println!(
+        "    ✓ Toggled signal manually (value: {})",
+        read_checked.get_untracked()
+    );
 
     // Scene statistics
     println!("\n=== Scene Statistics ===");

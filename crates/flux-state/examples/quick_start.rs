@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates the core concepts: Runtime, Signal, Computed, and Effect.
 
-use flux_state::{Runtime, Signal, Effect, Computed};
+use flux_state::{Computed, Effect, Runtime, Signal};
 
 fn main() {
     // 1. Create a runtime (shared via Arc)
@@ -34,7 +34,11 @@ fn main() {
     // Effects run automatically when their dependencies change.
     // We must keep the effect handle alive, otherwise it will be dropped and stop listening.
     let _effect = Effect::new(runtime.clone(), move || {
-        println!("Count: {}, Double: {}", read_count.get(), double_count.get());
+        println!(
+            "Count: {}, Double: {}",
+            read_count.get(),
+            double_count.get()
+        );
     });
 
     // 5. Update state

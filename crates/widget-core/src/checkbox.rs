@@ -73,8 +73,16 @@ impl Widget for Checkbox {
         // 1. Create Box Node
         // Initial values
         let initial_checked = read.get_untracked();
-        let initial_bg = if initial_checked { checked_color } else { unchecked_color };
-        let initial_fg = if initial_checked { checkmark_color } else { transparent };
+        let initial_bg = if initial_checked {
+            checked_color
+        } else {
+            unchecked_color
+        };
+        let initial_fg = if initial_checked {
+            checkmark_color
+        } else {
+            transparent
+        };
 
         let box_node = ctx.create_node(
             ctx.root(),
@@ -83,13 +91,16 @@ impl Widget for Checkbox {
                 corner_radius: 4.0,
             },
         );
-        ctx.set_layout_style(box_node, FlexStyle {
-             width: Some(20.0),
-             height: Some(20.0),
-             padding_left: 4.0, // Approximation for centering
-             padding_top: 2.0,
-             ..Default::default()
-        });
+        ctx.set_layout_style(
+            box_node,
+            FlexStyle {
+                width: Some(20.0),
+                height: Some(20.0),
+                padding_left: 4.0, // Approximation for centering
+                padding_top: 2.0,
+                ..Default::default()
+            },
+        );
         ctx.add_reactive_color_state(box_node, box_bg_read);
 
         // 2. Create Checkmark Node
@@ -99,27 +110,33 @@ impl Widget for Checkbox {
                 text: "✓".to_string(),
                 font_size: 14.0,
                 color: initial_fg,
-            }
+            },
         );
         ctx.add_reactive_color_state(check_node, check_fg_read);
 
         // 3. Add Interaction
         if !self.disabled {
             let write_clone = write.clone();
-            ctx.add_clickable(box_node, Arc::new(move || {
-                write_clone.update(|b| *b = !*b);
-            }));
+            ctx.add_clickable(
+                box_node,
+                Arc::new(move || {
+                    write_clone.update(|b| *b = !*b);
+                }),
+            );
             ctx.add_hover_state(box_node);
         }
 
         // 4. Handle Label (Wrap in Row if needed)
         if let Some(label_text) = &self.label {
             let row_node = ctx.create_node(ctx.root(), NodeContent::Empty);
-            ctx.set_layout_style(row_node, FlexStyle {
-                direction: FlexDirection::Row,
-                gap: 8.0,
-                ..Default::default()
-            });
+            ctx.set_layout_style(
+                row_node,
+                FlexStyle {
+                    direction: FlexDirection::Row,
+                    gap: 8.0,
+                    ..Default::default()
+                },
+            );
 
             // Reparent box to row
             ctx.reparent_to(box_node, row_node);
@@ -130,11 +147,14 @@ impl Widget for Checkbox {
             ctx.reparent_to(label_id, row_node);
 
             // Also make label clickable to toggle
-             if !self.disabled {
+            if !self.disabled {
                 let write_clone = write.clone();
-                ctx.add_clickable(label_id, Arc::new(move || {
-                    write_clone.update(|b| *b = !*b);
-                }));
+                ctx.add_clickable(
+                    label_id,
+                    Arc::new(move || {
+                        write_clone.update(|b| *b = !*b);
+                    }),
+                );
             }
 
             row_node

@@ -138,8 +138,7 @@ impl Application for WidgetApp {
         };
 
         // Create app with window
-        let mut app = App::new_windowed(window_config, event_loop)
-            .expect("Failed to create app");
+        let mut app = App::new_windowed(window_config, event_loop).expect("Failed to create app");
 
         let runtime = app.runtime().clone();
 
@@ -343,12 +342,16 @@ impl WidgetApp {
                 continue;
             }
 
-if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut node.content {
-    NodeContent::Rect { color } => Some(color),
-    _ => None,
-}) {
-    *color = Color::WHITE;
-}
+            if let Some(color) =
+                scene
+                    .get_node_mut(app_node)
+                    .and_then(|node| match &mut node.content {
+                        NodeContent::Rect { color } => Some(color),
+                        _ => None,
+                    })
+            {
+                *color = Color::WHITE;
+            }
             if let Some(node) = scene.get_node_mut(app_node) {
                 #[allow(clippy::collapsible_if)]
                 if let NodeContent::Rect { color } = &mut node.content {
@@ -366,12 +369,15 @@ if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut nod
             return;
         };
 
-if let Some(color) = scene.get_node_mut(app_node).and_then(|node| match &mut node.content {
-    NodeContent::Rect { color } => Some(color),
-    _ => None,
-}) {
-    *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
-}
+        if let Some(color) = scene
+            .get_node_mut(app_node)
+            .and_then(|node| match &mut node.content {
+                NodeContent::Rect { color } => Some(color),
+                _ => None,
+            })
+        {
+            *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
+        }
         if let Some(node) = scene.get_node_mut(app_node) {
             #[allow(clippy::collapsible_if)]
             if let NodeContent::Rect { color } = &mut node.content {

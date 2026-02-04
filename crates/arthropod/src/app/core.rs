@@ -387,7 +387,9 @@ impl App {
         self.transfer_components(
             widget_ctx.reactive_color_states().iter(),
             node_id_map,
-            |state: &widget_core::context::ReactiveColorState| ReactiveColor::new(state.read_signal.clone()),
+            |state: &widget_core::context::ReactiveColorState| {
+                ReactiveColor::new(state.read_signal.clone())
+            },
         );
 
         // Note: TextInputState, Validator, and FormState components require

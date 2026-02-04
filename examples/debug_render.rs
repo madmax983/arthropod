@@ -39,8 +39,8 @@ impl Application for DebugApp {
         };
 
         // Create app with App::new_windowed
-        let mut app = arthropod::App::new_windowed(config, event_loop)
-            .expect("Failed to create app");
+        let mut app =
+            arthropod::App::new_windowed(config, event_loop).expect("Failed to create app");
 
         // Set up test scene once (Scene is now a Resource in ECS)
         let node_id = {

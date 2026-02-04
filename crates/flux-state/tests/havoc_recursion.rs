@@ -20,10 +20,10 @@ fn test_infinite_recursion_crash() {
     let _effect1 = Effect::new(runtime.clone(), move || {
         let val = read_a.get();
         if val % 1000 == 0 {
-             println!("Depth: {}", val);
+            println!("Depth: {}", val);
         }
         if val < 10_000_000 {
-             write_b_clone.set(val + 1);
+            write_b_clone.set(val + 1);
         }
     });
 

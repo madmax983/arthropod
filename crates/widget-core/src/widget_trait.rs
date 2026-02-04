@@ -215,11 +215,7 @@ impl_widget_tuple!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H, 8: I, 9: J, 1
 /// ```
 pub trait NamedWidgetTuple {
     /// Build all named widgets and attach as children, returning name -> node ID mapping
-    fn build_all_named(
-        &self,
-        ctx: &mut WidgetContext,
-        parent: NodeId,
-    ) -> IndexMap<String, NodeId>;
+    fn build_all_named(&self, ctx: &mut WidgetContext, parent: NodeId) -> IndexMap<String, NodeId>;
 
     /// Number of named children
     fn len(&self) -> usize;
@@ -248,11 +244,7 @@ impl NamedWidgetTuple for () {
 /// Single named widget directly (no tuple wrapper needed)
 /// Allows: `Form::new(("name", widget))` instead of `Form::new((("name", widget),))`
 impl<W: Widget> NamedWidgetTuple for (&str, W) {
-    fn build_all_named(
-        &self,
-        ctx: &mut WidgetContext,
-        parent: NodeId,
-    ) -> IndexMap<String, NodeId> {
+    fn build_all_named(&self, ctx: &mut WidgetContext, parent: NodeId) -> IndexMap<String, NodeId> {
         let mut mapping = IndexMap::new();
         let id = self.1.build(ctx);
         ctx.reparent_to(id, parent);
