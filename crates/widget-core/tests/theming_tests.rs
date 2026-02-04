@@ -2,8 +2,9 @@
 
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
+use plat_core::BackdropMaterial;
 use render_engine::NodeContent;
-use theme_engine::{BackgroundMaterial, DesignTokens, SystemTheme};
+use theme_engine::{DesignTokens, SystemTheme};
 use widget_core::{Text, TextInput, Widget, WidgetContext};
 
 /// Helper to create a mock SystemTheme for testing
@@ -12,7 +13,7 @@ fn create_test_theme() -> SystemTheme {
         accent_color: Vec4::new(0.0, 0.47, 0.84, 1.0), // Blue accent
         is_dark_mode: false,
         supports_transparency: false,
-        available_materials: vec![BackgroundMaterial::Solid(Vec4::new(0.95, 0.95, 0.95, 1.0))],
+        available_materials: vec![BackdropMaterial::None],
         text_color: Vec4::new(0.1, 0.1, 0.1, 1.0), // Near black
         text_secondary_color: Vec4::new(0.5, 0.5, 0.5, 1.0), // Gray
     }
@@ -99,7 +100,7 @@ fn test_text_input_dark_mode_tokens() {
         accent_color: Vec4::new(0.0, 0.47, 0.84, 1.0),
         is_dark_mode: true,
         supports_transparency: false,
-        available_materials: vec![BackgroundMaterial::Solid(Vec4::new(0.12, 0.12, 0.12, 1.0))],
+        available_materials: vec![BackdropMaterial::None],
         text_color: Vec4::new(0.9, 0.9, 0.9, 1.0), // Light text
         text_secondary_color: Vec4::new(0.6, 0.6, 0.6, 1.0), // Dimmer text
     };
@@ -320,7 +321,7 @@ fn test_text_dark_mode_uses_light_text() {
         accent_color: Vec4::new(0.0, 0.47, 0.84, 1.0),
         is_dark_mode: true,
         supports_transparency: false,
-        available_materials: vec![BackgroundMaterial::Solid(Vec4::new(0.12, 0.12, 0.12, 1.0))],
+        available_materials: vec![BackdropMaterial::None],
         text_color: Vec4::new(0.9, 0.9, 0.9, 1.0), // Light text for dark mode
         text_secondary_color: Vec4::new(0.6, 0.6, 0.6, 1.0), // Dimmer text
     };

@@ -297,13 +297,13 @@ fn test_resolved_style_default_opacity() {
 
 /// Helper to create a test theme for non-Windows platforms or fallback
 fn create_test_theme() -> SystemTheme {
-    use theme_engine::BackgroundMaterial;
+    use plat_core::BackdropMaterial;
 
     SystemTheme {
         accent_color: Vec4::new(0.0, 0.47, 0.84, 1.0),
         is_dark_mode: false,
         supports_transparency: false,
-        available_materials: vec![BackgroundMaterial::Solid(Vec4::new(0.95, 0.95, 0.95, 1.0))],
+        available_materials: vec![BackdropMaterial::None],
         text_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
         text_secondary_color: Vec4::new(0.4, 0.4, 0.4, 1.0),
     }

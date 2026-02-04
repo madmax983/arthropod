@@ -3,8 +3,8 @@
 //! Resolves semantic tokens (surface_primary, text_primary, etc.) from SystemTheme.
 //! Provides consistent design language across the application.
 
-use crate::system_theme::WindowsMaterial;
-use crate::{BackgroundMaterial, Color, SystemTheme};
+use crate::{Color, SystemTheme};
+use plat_core::BackdropMaterial;
 
 /// A token value that can be either a color or a material
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +13,7 @@ pub enum TokenValue {
     Color(Color),
 
     /// Platform-native material
-    Material(BackgroundMaterial),
+    Material(BackdropMaterial),
 }
 
 impl TokenValue {
@@ -21,22 +21,23 @@ impl TokenValue {
     pub fn as_color(&self) -> Color {
         match self {
             TokenValue::Color(c) => *c,
-            TokenValue::Material(BackgroundMaterial::Solid(c)) => *c,
-            TokenValue::Material(BackgroundMaterial::Windows(WindowsMaterial::Mica)) => {
+            TokenValue::Material(BackdropMaterial::None) => {
+                // Should ideally not happen if None is treated as "No special effect",
+                // but we can return transparent or white/black depending on context.
+                // For now, let's assume a generic fallback.
+                Color::new(1.0, 1.0, 1.0, 1.0)
+            }
+            TokenValue::Material(BackdropMaterial::Mica) => {
                 // Mica fallback color (semi-transparent)
                 Color::new(0.95, 0.95, 0.95, 0.8)
             }
-            TokenValue::Material(BackgroundMaterial::Windows(WindowsMaterial::Acrylic)) => {
+            TokenValue::Material(BackdropMaterial::Acrylic) => {
                 // Acrylic fallback color
                 Color::new(0.95, 0.95, 0.95, 0.7)
             }
-            TokenValue::Material(BackgroundMaterial::Windows(WindowsMaterial::MicaAlt)) => {
+            TokenValue::Material(BackdropMaterial::MicaAlt) => {
                 // Mica Alt fallback color
                 Color::new(0.9, 0.9, 0.9, 0.8)
-            }
-            TokenValue::Material(BackgroundMaterial::MacOS(_)) => {
-                // macOS fallback
-                Color::new(0.95, 0.95, 0.95, 0.9)
             }
         }
     }
@@ -107,16 +108,16 @@ impl DesignTokens {
         let surface_primary = theme
             .available_materials
             .iter()
-            .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Mica)))
+            .find(|m| matches!(m, BackdropMaterial::Mica))
             .or_else(|| {
                 theme
                     .available_materials
                     .iter()
-                    .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic)))
+                    .find(|m| matches!(m, BackdropMaterial::Acrylic))
             })
-            .cloned()
+            .map(|m| TokenValue::Material(*m))
             .unwrap_or_else(|| {
-                BackgroundMaterial::Solid(if theme.is_dark_mode {
+                TokenValue::Color(if theme.is_dark_mode {
                     Color::new(0.12, 0.12, 0.12, 1.0)
                 } else {
                     Color::new(0.95, 0.95, 0.95, 1.0)
@@ -134,16 +135,16 @@ impl DesignTokens {
         let surface_elevated = theme
             .available_materials
             .iter()
-            .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::MicaAlt)))
+            .find(|m| matches!(m, BackdropMaterial::MicaAlt))
             .or_else(|| {
                 theme
                     .available_materials
                     .iter()
-                    .find(|m| matches!(m, BackgroundMaterial::Windows(WindowsMaterial::Acrylic)))
+                    .find(|m| matches!(m, BackdropMaterial::Acrylic))
             })
-            .cloned()
+            .map(|m| TokenValue::Material(*m))
             .unwrap_or_else(|| {
-                BackgroundMaterial::Solid(if theme.is_dark_mode {
+                TokenValue::Color(if theme.is_dark_mode {
                     Color::new(0.18, 0.18, 0.18, 1.0)
                 } else {
                     Color::new(1.0, 1.0, 1.0, 1.0)
@@ -165,9 +166,9 @@ impl DesignTokens {
         let accent_pressed = Self::darken_color(accent, 0.1);
 
         Self {
-            surface_primary: TokenValue::Material(surface_primary),
+            surface_primary,
             surface_secondary,
-            surface_elevated: TokenValue::Material(surface_elevated),
+            surface_elevated,
             text_primary,
             text_secondary,
             text_tertiary,
@@ -220,8 +221,9 @@ mod tests {
         let token = TokenValue::Color(color);
         assert_eq!(token.as_color(), color);
 
-        let material = TokenValue::Material(BackgroundMaterial::Solid(color));
-        assert_eq!(material.as_color(), color);
+        // Testing Material fallback is harder without duplicate logic, but we can test identity
+        let material = TokenValue::Material(BackdropMaterial::Mica);
+        assert!(material.as_color().w < 1.0); // Should be transparent
     }
 
     #[test]

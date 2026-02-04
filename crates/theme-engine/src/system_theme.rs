@@ -6,44 +6,7 @@
 //! - Linux: GTK theme colors (future)
 
 use crate::{Color, Result};
-
-/// Platform-native background materials
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BackgroundMaterial {
-    /// Windows-specific materials
-    Windows(WindowsMaterial),
-
-    /// macOS-specific materials (future)
-    #[allow(dead_code)]
-    MacOS(MacOSMaterial),
-
-    /// Solid color fallback
-    Solid(Color),
-}
-
-/// Windows background materials (Windows 10+)
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum WindowsMaterial {
-    /// Mica material (Windows 11+)
-    Mica,
-
-    /// Acrylic material (Windows 10+)
-    Acrylic,
-
-    /// Mica Alt material (Windows 11+)
-    MicaAlt,
-}
-
-/// macOS vibrancy materials (future)
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)]
-pub enum MacOSMaterial {
-    Sidebar,
-    HeaderView,
-    Menu,
-    Popover,
-    Selection,
-}
+use plat_core::BackdropMaterial;
 
 /// System theme information queried from the OS
 #[derive(Debug, Clone)]
@@ -58,7 +21,7 @@ pub struct SystemTheme {
     pub supports_transparency: bool,
 
     /// Available background materials for this platform/OS version
-    pub available_materials: Vec<BackgroundMaterial>,
+    pub available_materials: Vec<BackdropMaterial>,
 
     /// Text color for the current theme
     pub text_color: Color,
@@ -100,7 +63,7 @@ impl SystemTheme {
             accent_color: Color::new(0.0, 0.47, 0.84, 1.0), // Default blue
             is_dark_mode: false,
             supports_transparency: false,
-            available_materials: vec![BackgroundMaterial::Solid(Color::new(1.0, 1.0, 1.0, 1.0))],
+            available_materials: vec![BackdropMaterial::None],
             text_color: Color::new(0.0, 0.0, 0.0, 1.0),
             text_secondary_color: Color::new(0.4, 0.4, 0.4, 1.0),
         }
@@ -144,21 +107,16 @@ impl SystemTheme {
         let mut available_materials = Vec::new();
 
         if supports_mica {
-            available_materials.push(BackgroundMaterial::Windows(WindowsMaterial::Mica));
-            available_materials.push(BackgroundMaterial::Windows(WindowsMaterial::MicaAlt));
+            available_materials.push(BackdropMaterial::Mica);
+            available_materials.push(BackdropMaterial::MicaAlt);
         }
 
         if supports_acrylic {
-            available_materials.push(BackgroundMaterial::Windows(WindowsMaterial::Acrylic));
+            available_materials.push(BackdropMaterial::Acrylic);
         }
 
-        // Always provide solid fallback
-        let bg_color = if is_dark_mode {
-            Color::new(0.12, 0.12, 0.12, 1.0)
-        } else {
-            Color::new(0.95, 0.95, 0.95, 1.0)
-        };
-        available_materials.push(BackgroundMaterial::Solid(bg_color));
+        // Always provide fallback
+        available_materials.push(BackdropMaterial::None);
 
         let (text_color, text_secondary_color) = if is_dark_mode {
             (
