@@ -15,3 +15,7 @@
 ## 2024-05-23 - The Illusory Z-Order
 **Confusion:** `Scene::hit_test` documentation claimed to return the "topmost" node, implying a managed Z-order. However, the implementation iterates over a HashMap, making the result non-deterministic for overlapping nodes.
 **Clarification:** Updated docs to explicitly state that behavior for overlapping nodes is undefined in the current implementation.
+
+## 2024-05-24 - Z-Order Redemption
+**Confusion:** Previous investigation suggested `Scene::hit_test` was non-deterministic due to HashMap iteration.
+**Clarification:** Re-investigation revealed that `hit_test` iterates over the `children` Vector (not the HashMap directly), ensuring deterministic Z-order (last child added is top-most). Docs and tests were updated to reflect this guarantee.

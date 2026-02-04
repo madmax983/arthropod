@@ -16,25 +16,41 @@ pub struct LayoutEngine {
 }
 
 /// Flexbox style properties
+///
+/// Defines how a widget should be laid out relative to its parent and siblings.
 #[derive(Debug, Clone, Default)]
 pub struct FlexStyle {
+    /// Direction of the main axis (Row or Column)
     pub direction: FlexDirection,
+    /// How much this item grows relative to siblings (0.0 = none)
     pub flex_grow: f32,
+    /// How much this item shrinks if space is limited (1.0 = standard)
     pub flex_shrink: f32,
+    /// Fixed width in points (None = auto/flex)
     pub width: Option<f32>,
+    /// Fixed height in points (None = auto/flex)
     pub height: Option<f32>,
+    /// Gap between children in points
     pub gap: f32,
+    /// Left padding in points
     pub padding_left: f32,
+    /// Right padding in points
     pub padding_right: f32,
+    /// Top padding in points
     pub padding_top: f32,
+    /// Bottom padding in points
     pub padding_bottom: f32,
 }
 
 /// Flex direction
+///
+/// Determines the main axis of the layout.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum FlexDirection {
+    /// Children are arranged horizontally (left to right)
     #[default]
     Row,
+    /// Children are arranged vertically (top to bottom)
     Column,
 }
 
@@ -96,6 +112,15 @@ impl LayoutEngine {
     }
 
     /// Compute layout for a node tree
+    ///
+    /// This resolves the flexbox layout algorithm for the entire tree rooted at `root`.
+    ///
+    /// # Root Constraints
+    ///
+    /// If the root node has `auto` size (no explicit width/height), this method
+    /// automatically applies the `constraints` (e.g., window size) to the root style
+    /// before computing layout. This ensures that children with `flex_grow` have
+    /// a defined container size to grow into.
     ///
     /// # Panics
     ///

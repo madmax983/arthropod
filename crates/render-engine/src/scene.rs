@@ -208,8 +208,15 @@ impl Scene {
     /// Remove a node from the scene.
     ///
     /// Removes the node from its parent's children list and deletes the node.
-    /// Note: This does not recursively remove children. Orphaned children will remain in the map
-    /// but have no parent, potentially leaking if not handled.
+    ///
+    /// # ⚠️ Memory Leak Warning
+    ///
+    /// This method does **not** recursively remove children. If the removed node
+    /// has children, they will become "orphaned" (they remain in the internal
+    /// map but are no longer reachable via traversal). This causes a memory leak.
+    ///
+    /// **Recommendation:** If you need to remove a subtree, you must manually
+    /// collect and remove all descendants first, or use a helper that does so.
     ///
     /// # Example
     ///
@@ -262,21 +269,21 @@ impl Scene {
     /// Find a visible node at the given screen position.
     ///
     /// This method performs a recursive tree traversal starting from the root,
-    /// checking children in reverse order (Z-order) to ensure the top-most
-    /// node is returned.
+    /// checking children in **reverse order** (top-most first). This guarantees
+    /// that if multiple nodes overlap at the given point, the one that was
+    /// added last (and thus rendered on top) is returned.
+    ///
+    /// # Performance
     ///
     /// This is an O(log N) operation for typical balanced trees, but can be
-    /// O(N) in the worst case. It is significantly faster than the previous
-    /// O(N) linear scan for large scenes and correctly handles overlapping nodes.
+    /// O(N) in the worst case (deeply nested hierarchies). It is significantly
+    /// faster than a global linear scan and correctly handles Z-ordering.
     ///
-    /// # Arguments
+    /// # Z-Order Guarantee
     ///
-    /// * `x` - X coordinate in screen space
-    /// * `y` - Y coordinate in screen space
-    ///
-    /// # Returns
-    ///
-    /// `Some(NodeId)` of a node at this position, or `None` if no node found.
+    /// The Z-order is determined by the order of children in the parent's list.
+    /// `add_node` appends to this list. `hit_test` checks this list in reverse.
+    /// Therefore, the last added sibling is the "top" node.
     ///
     /// # Example
     ///
@@ -287,12 +294,18 @@ impl Scene {
     /// let mut scene = Scene::new();
     /// let root = scene.root();
     ///
-    /// let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
-    /// node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
-    /// let node_id = scene.add_node(root, node);
+    /// // Bottom node (added first)
+    /// let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+    /// node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
+    /// let id1 = scene.add_node(root, node1);
     ///
-    /// assert_eq!(scene.hit_test(50.0, 50.0), Some(node_id));
-    /// assert_eq!(scene.hit_test(200.0, 200.0), None);
+    /// // Top node (added second)
+    /// let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+    /// node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
+    /// let id2 = scene.add_node(root, node2);
+    ///
+    /// // Hit test in overlap region returns the top node
+    /// assert_eq!(scene.hit_test(75.0, 75.0), Some(id2));
     /// ```
     pub fn hit_test(&self, x: f32, y: f32) -> Option<NodeId> {
         self.hit_test_recursive(self.root, x, y)
@@ -321,7 +334,9 @@ impl Scene {
         }
     }
 
-    /// Serialize the scene to JSON for MCP debugging
+    /// Serialize the scene to JSON for debugging
+    ///
+    /// Useful for inspecting the scene structure via MCP or logging.
     pub fn serialize_to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         use serde_json::json;
 
@@ -430,14 +445,10 @@ mod tests {
         node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
         let id2 = scene.add_node(root, node2);
 
-        // In overlap region, should return one of the overlapping nodes
-        // (HashMap iteration order is not guaranteed)
+        // In overlap region, hit_test should return the top-most node (last added)
+        // This is guaranteed by the reverse iteration order in hit_test.
         let hit = scene.hit_test(75.0, 75.0);
-        assert!(
-            hit == Some(id1) || hit == Some(id2),
-            "Expected id1 or id2, got {:?}",
-            hit
-        );
+        assert_eq!(hit, Some(id2), "Should hit the top-most node (id2)");
 
         // Only in first node
         assert_eq!(scene.hit_test(25.0, 25.0), Some(id1));

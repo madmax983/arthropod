@@ -48,7 +48,7 @@ fn main() -> Result<(), AppError> {
 
 | Crate | Description |
 |-------|-------------|
-| `arthropod` | The main framework crate. Provides `App`, `AppBuilder`, and integration logic. |
+| `arthropod` | The main framework crate. Provides `App` and integration logic. |
 | `flux-state` | The reactive runtime. Implements Signals, Effects, and Computed values. |
 | `render-engine` | The rendering backend. Manages the Scene Graph and `wgpu` integration. |
 | `widget-core` | The widget library. Contains standard widgets like `Text`, `Button`, `TextInput`. |

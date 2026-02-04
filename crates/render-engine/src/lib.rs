@@ -1,6 +1,34 @@
 //! Rendering engine for Arthropod GUI framework.
 //!
 //! Provides a retained-mode scene graph with wgpu backend.
+//!
+//! # Architecture
+//!
+//! The rendering engine is built around a **Scene Graph** (`Scene`) which manages the visual
+//! hierarchy of the application.
+//!
+//! - **Retained Mode**: The scene graph persists across frames. You modify it (add/remove/update nodes),
+//!   and the engine handles rendering the current state.
+//! - **Flattened Hierarchy**: Nodes are stored in a flat `HashMap`, with relationships managed via IDs.
+//!   This enables O(1) lookups and updates.
+//! - **Z-Ordering**: The engine enforces a deterministic Z-order based on the order of children in the
+//!   parent's list. The last child added is drawn on top (Painter's Algorithm).
+//! - **Coordinate System**: Uses a top-left origin (0,0), with Y increasing downwards.
+//!
+//! # Integration
+//!
+//! The `Scene` is designed to be used as a Resource in an ECS (Entity Component System) environment.
+//!
+//! ```no_run
+//! use render_engine::{Scene, SceneNode, NodeContent, Color};
+//!
+//! // Create a scene
+//! let mut scene = Scene::new();
+//! let root = scene.root();
+//!
+//! // Add content
+//! scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+//! ```
 
 pub mod backend;
 pub mod node;
