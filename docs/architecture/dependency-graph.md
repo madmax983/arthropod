@@ -53,7 +53,6 @@ flowchart TB
     widget-core --> text-engine
     widget-core --> layout-engine
     widget-core --> flux-state
-    widget-core --> arthropod-ecs
     widget-core --> widget-macros
     widget-core --> theme-engine
 
@@ -62,6 +61,8 @@ flowchart TB
     arthropod-ecs --> flux-state
     arthropod-ecs --> a11y-engine
     arthropod-ecs --> layout-engine
+    arthropod-ecs --> widget-core
+    arthropod-ecs --> plat-core
 
     %% Core systems dependencies
     render-engine --> plat-core
@@ -114,13 +115,13 @@ flowchart TB
 
 3. **`widget-core` has the widest fan-out** - Pulls from 7 internal crates, integrating nearly every subsystem.
 
-4. **Clear layering** - Dependencies only flow downward (with one exception: `widget-core` → `arthropod-ecs` creates a lateral dependency in the integration layer).
+4. **Clear layering** - Dependencies only flow downward.
 
 ## Dependency Counts
 
 | Crate | Depends On | Depended By |
 |-------|------------|-------------|
-| `plat-core` | 0 | 6 |
+| `plat-core` | 0 | 7 |
 | `flux-state` | 0 | 4 |
 | `layout-engine` | 0 | 3 |
 | `text-engine` | 0 | 2 |
@@ -129,8 +130,8 @@ flowchart TB
 | `render-engine` | 2 | 8 |
 | `a11y-engine` | 2 | 2 |
 | `anim-graph` | 1 | 1 |
-| `arthropod-ecs` | 4 | 3 |
-| `widget-core` | 7 | 1 |
+| `arthropod-ecs` | 6 | 2 |
+| `widget-core` | 6 | 2 |
 | `arthropod-test` | 2 | 1 |
 | `arthropod-mcp` | 5 | 0 |
 | `arthropod` | 8 | 0 |
