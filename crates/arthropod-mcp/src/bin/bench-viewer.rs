@@ -12,9 +12,10 @@ use ratatui::{
     widgets::{BarChart, Block, Borders, Cell, Paragraph, Row, Table, TableState},
 };
 use regex::Regex;
+use serde::Serialize;
 use std::{collections::HashMap, env, fmt, fs, io, time::Duration};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 struct DurationVal {
     value: f64,
     unit: String,
@@ -27,7 +28,7 @@ impl fmt::Display for DurationVal {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 struct Benchmark {
     name: String,
     group: String,
@@ -38,10 +39,19 @@ struct Benchmark {
     throughput: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SortBy {
+    Name,
+    Time,
+    Group,
+}
+
 struct App {
     benchmarks: Vec<Benchmark>,
     state: TableState,
     group_stats: HashMap<String, f64>,
+    sort_by: SortBy,
+    sort_desc: bool,
 }
 
 impl App {
@@ -63,7 +73,41 @@ impl App {
             benchmarks,
             state,
             group_stats,
+            sort_by: SortBy::Group,
+            sort_desc: false,
         }
+    }
+
+    fn sort(&mut self) {
+        self.benchmarks.sort_by(|a, b| {
+            let order = match self.sort_by {
+                SortBy::Name => a.name.cmp(&b.name),
+                SortBy::Group => match a.group.cmp(&b.group) {
+                    std::cmp::Ordering::Equal => a.variant.cmp(&b.variant),
+                    ord => ord,
+                },
+                SortBy::Time => a.time_mean.nanos.partial_cmp(&b.time_mean.nanos).unwrap(),
+            };
+            if self.sort_desc {
+                order.reverse()
+            } else {
+                order
+            }
+        });
+        // Reset selection to top after sort to avoid out of bounds or confusing jump
+        if !self.benchmarks.is_empty() {
+            self.state.select(Some(0));
+        }
+    }
+
+    fn toggle_sort(&mut self, new_sort: SortBy) {
+        if self.sort_by == new_sort {
+            self.sort_desc = !self.sort_desc;
+        } else {
+            self.sort_by = new_sort;
+            self.sort_desc = false;
+        }
+        self.sort();
     }
 
     fn next(&mut self) {
@@ -98,22 +142,24 @@ impl App {
 fn main() -> Result<()> {
     // 1. Parse arguments and read file
     let args: Vec<String> = env::args().collect();
-    let file_path = if args.len() > 1 {
-        &args[1]
-    } else {
-        "benchmark_results.txt"
-    };
+    let json_output = args.iter().any(|arg| arg == "--json");
+
+    // Naive argument parsing for file path
+    let file_path = args.iter()
+        .skip(1)
+        .find(|arg| *arg != "--json")
+        .map(|s| s.as_str())
+        .unwrap_or("benchmark_results.txt");
 
     let content = fs::read_to_string(file_path)
         .with_context(|| format!("Failed to read benchmark file: {}", file_path))?;
 
     // 2. Parse benchmarks
     let benchmarks = parse_benchmarks(&content);
-    if benchmarks.is_empty() {
-        eprintln!(
-            "No benchmarks found in {}. Ensure the file contains Criterion output.",
-            file_path
-        );
+
+    if json_output {
+        let json = serde_json::to_string_pretty(&benchmarks)?;
+        println!("{}", json);
         return Ok(());
     }
 
@@ -220,6 +266,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
                         KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
                         KeyCode::Down => app.next(),
                         KeyCode::Up => app.previous(),
+                        KeyCode::Char('n') => app.toggle_sort(SortBy::Name),
+                        KeyCode::Char('t') => app.toggle_sort(SortBy::Time),
+                        KeyCode::Char('g') => app.toggle_sort(SortBy::Group),
                         _ => {}
                     }
                 }
@@ -229,6 +278,43 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
+    if app.benchmarks.is_empty() {
+        let vertical_center = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(40),
+                Constraint::Percentage(20),
+                Constraint::Percentage(40),
+            ])
+            .split(f.area());
+        let horizontal_center = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(20),
+                Constraint::Percentage(60),
+                Constraint::Percentage(20),
+            ])
+            .split(vertical_center[1]);
+
+        let text = vec![
+            Line::from(Span::styled(
+                "No benchmarks found.",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from("Run `cargo bench` to generate results."),
+            Line::from(""),
+            Line::from("Press 'q' to quit."),
+        ];
+
+        let paragraph = Paragraph::new(text)
+            .alignment(ratatui::layout::Alignment::Center)
+            .block(Block::default().borders(Borders::ALL).title(" Arthropod Bench Viewer "));
+
+        f.render_widget(paragraph, horizontal_center[1]);
+        return;
+    }
+
     // Top-level layout: Header, Main, Footer
     let vertical_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -261,9 +347,37 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(vertical_chunks[1]);
 
     // Left Pane: Table of Benchmarks
-    let header_cells = ["Group", "Variant", "Time", "Throughput"]
-        .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Yellow)));
+    let headers = [
+        ("Group", SortBy::Group),
+        ("Variant", SortBy::Group), // Variant doesn't have its own sort, it follows Group
+        ("Time", SortBy::Time),
+        ("Throughput", SortBy::Time), // Throughput correlates with Time
+    ];
+
+    let header_cells = headers.iter().map(|(title, sort_key)| {
+        let mut style = Style::default().fg(Color::Yellow);
+        let mut text = title.to_string();
+
+        if app.sort_by == *sort_key {
+            style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+            let arrow = if app.sort_desc { " ▼" } else { " ▲" };
+            text.push_str(arrow);
+        }
+
+        // Handle "Name" sort which isn't explicitly a column but we map it conceptually?
+        // Actually, we added SortBy::Name but didn't add a Name column (it's split into Group/Variant).
+        // If sorting by Name, maybe highlight Group and Variant?
+        if app.sort_by == SortBy::Name && (*title == "Group" || *title == "Variant") {
+             style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+             if *title == "Group" {
+                 let arrow = if app.sort_desc { " ▼" } else { " ▲" };
+                 text.push_str(arrow);
+             }
+        }
+
+        Cell::from(text).style(style)
+    });
+
     let header_row = Row::new(header_cells)
         .style(Style::default().add_modifier(Modifier::BOLD))
         .height(1)
@@ -401,9 +515,9 @@ fn ui(f: &mut Frame, app: &mut App) {
     }
 
     // 3. Footer
-    let footer_text = " Navigate: ↑/↓ | Quit: q/Esc | View Group Comparison in Chart ";
+    let footer_text = " n: Name | g: Group | t: Time | ↑/↓: Navigate | q: Quit ";
     let footer = Paragraph::new(footer_text)
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(footer, vertical_chunks[2]);
 }
