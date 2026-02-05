@@ -73,7 +73,12 @@ struct ContextGuard<'a> {
 
 impl<'a> Drop for ContextGuard<'a> {
     fn drop(&mut self) {
-        self.runtime.inner.lock().unwrap().pop_context();
+        // Handle poisoned mutex gracefully to avoid double panic during unwinding
+        let mut inner = match self.runtime.inner.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        inner.pop_context();
     }
 }
 
@@ -126,11 +131,18 @@ impl RuntimeInner {
         }
     }
 
-    fn push_context(&mut self, id: NodeId) {
-        self.tracking_context
+    fn push_context(&mut self, id: NodeId) -> Result<(), String> {
+        let stack = self.tracking_context
             .entry(thread::current().id())
-            .or_default()
-            .push(id);
+            .or_default();
+
+        // Prevent stack overflow from infinite recursion
+        if stack.len() >= 100 {
+            return Err("Reactive recursion limit exceeded (100). Infinite loop in effects?".to_string());
+        }
+
+        stack.push(id);
+        Ok(())
     }
 
     fn pop_context(&mut self) {
@@ -248,13 +260,19 @@ impl Runtime {
 
     pub(crate) fn run_effect(&self, id: NodeId) {
         // Clear old dependencies and set tracking context
-        let effect_fn = {
+        let (effect_fn, error) = {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
-            inner.push_context(id);
-            inner.effects.get(&id).cloned()
+            match inner.push_context(id) {
+                Ok(_) => (inner.effects.get(&id).cloned(), None),
+                Err(e) => (None, Some(e)),
+            }
         };
+
+        if let Some(e) = error {
+            panic!("{}", e);
+        }
 
         // SAFETY: The context guard ensures that `pop_context` is called
         // even if the effect closure panics.
@@ -310,18 +328,28 @@ impl Runtime {
     /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
         // Clear old dependencies and set tracking context, then get compute function
-        let compute_fn = {
+        let (compute_fn, error) = {
             let mut inner = self.inner.lock().unwrap();
             inner.cleanup_dependencies(id);
             inner.stale.remove(&id);
-            inner.push_context(id);
 
-            let computed = inner
-                .computeds
-                .get(&id)
-                .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
-            computed.compute.clone()
+            match inner.push_context(id) {
+                Ok(_) => {
+                    let computed = inner
+                        .computeds
+                        .get(&id)
+                        .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+                    (Some(computed.compute.clone()), None)
+                }
+                Err(e) => (None, Some(e)),
+            }
         };
+
+        if let Some(e) = error {
+            panic!("{}", e);
+        }
+
+        let compute_fn = compute_fn.unwrap();
 
         // SAFETY: The context guard ensures that `pop_context` is called
         // even if the compute closure panics.

@@ -63,10 +63,9 @@ fn test_zombie_effect_pollution() {
     // 4. Check if zombie ran.
     // If it ran, run_count should be 2.
     // If it didn't run (correct behavior), run_count should be 1.
-    // We ASSERT 2 because we are proving the bug exists.
     assert_eq!(
         run_count.load(Ordering::SeqCst),
-        2,
-        "Zombie effect ran! Pollution confirmed. The system is fragile."
+        1,
+        "Zombie effect should NOT run. The system is robust."
     );
 }

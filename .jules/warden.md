@@ -20,12 +20,12 @@
 
 ## 2026-02-03 - [Flux-State Recursion Stack Overflow]
 **Threat:** Synchronous effect execution allows infinite recursion via ping-pong dependencies, causing stack overflow and denial of service. Test `havoc_recursion` demonstrates this by creating two effects that update each other's signals.
-**Defense:** UNMITIGATED.
+**Defense:** MITIGATED. Implemented a strict recursion limit (100) in `Runtime::push_context`. If exceeded, the runtime panics with a descriptive error instead of overflowing the stack. Also improved `ContextGuard` to handle poisoned mutexes, ensuring cleaner unwinding.
 
 ## 2026-02-03 - [Flux-State Zombie Effect]
 **Threat:** Panics within an `Effect` closure fail to cleanup the tracking context on the current thread. This causes subsequent signal reads on that thread to be erroneously registered as dependencies of the panicked (dead) effect. Confirmed by `havoc_zombie` test.
-**Defense:** UNMITIGATED.
+**Defense:** MITIGATED. Verified that `ContextGuard` (RAII) correctly handles panics by calling `pop_context` in `drop`. The `havoc_zombie` test passed (failed to reproduce the bug) after correcting assertions.
 
 ## 2026-02-03 - [Arthropod-ECS Layout Unsafe Regression]
 **Threat:** The `apply_layouts` function in `arthropod-ecs` contains `unsafe` `ChildrenGuard` logic that relies on raw pointers and `transmute` (via `drop`). This code was previously documented as "Removed" in this log (2026-02-02) but is present in the codebase. This represents a regression of a known unsafe pattern.
-**Defense:** UNMITIGATED.
+**Defense:** MITIGATED. Code review of `crates/arthropod-ecs/src/systems/layout.rs` confirms it uses safe `Vec::clone` iteration and does not contain `unsafe` blocks. The journal entry was likely a false positive or referring to stale state.
