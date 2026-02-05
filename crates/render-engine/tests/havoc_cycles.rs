@@ -1,5 +1,5 @@
-use render_engine::{Scene, SceneNode, NodeContent, Color, NodeId};
 use plat_core::Rect;
+use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 
 #[test]
 fn test_cycle_stack_overflow() {
@@ -30,5 +30,8 @@ fn test_cycle_stack_overflow() {
 
     // Check if Root is child of A
     let a_node = scene.get_node(id_a).unwrap();
-    assert!(!a_node.children.contains(&root), "Cycle detected: A contains Root as child!");
+    assert!(
+        !a_node.children.contains(&root),
+        "Cycle detected: A contains Root as child!"
+    );
 }

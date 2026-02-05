@@ -145,7 +145,8 @@ fn main() -> Result<()> {
     let json_output = args.iter().any(|arg| arg == "--json");
 
     // Naive argument parsing for file path
-    let file_path = args.iter()
+    let file_path = args
+        .iter()
         .skip(1)
         .find(|arg| *arg != "--json")
         .map(|s| s.as_str())
@@ -309,7 +310,11 @@ fn ui(f: &mut Frame, app: &mut App) {
 
         let paragraph = Paragraph::new(text)
             .alignment(ratatui::layout::Alignment::Center)
-            .block(Block::default().borders(Borders::ALL).title(" Arthropod Bench Viewer "));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Arthropod Bench Viewer "),
+            );
 
         f.render_widget(paragraph, horizontal_center[1]);
         return;
@@ -368,11 +373,11 @@ fn ui(f: &mut Frame, app: &mut App) {
         // Actually, we added SortBy::Name but didn't add a Name column (it's split into Group/Variant).
         // If sorting by Name, maybe highlight Group and Variant?
         if app.sort_by == SortBy::Name && (*title == "Group" || *title == "Variant") {
-             style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
-             if *title == "Group" {
-                 let arrow = if app.sort_desc { " ▼" } else { " ▲" };
-                 text.push_str(arrow);
-             }
+            style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+            if *title == "Group" {
+                let arrow = if app.sort_desc { " ▼" } else { " ▲" };
+                text.push_str(arrow);
+            }
         }
 
         Cell::from(text).style(style)

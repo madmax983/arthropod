@@ -58,7 +58,16 @@ pub fn auto_layout(
         );
 
         // Apply computed layouts to scene
-        apply_layouts(scene, root, &engine, &node_map, 0.0, 0.0);
+        // We collect updates first to avoid cloning children vectors during recursion
+        let mut updates = Vec::with_capacity(node_map.len());
+        collect_layout_updates(scene, root, &engine, &node_map, 0.0, 0.0, &mut updates);
+
+        // Apply updates
+        for (id, bounds) in updates {
+            if let Some(node) = scene.get_node_mut(id) {
+                node.bounds = bounds;
+            }
+        }
     }
 }
 
@@ -95,14 +104,15 @@ fn build_layout_tree(
     }
 }
 
-/// Apply computed layouts to scene node bounds.
-fn apply_layouts(
-    scene: &mut Scene,
+/// Collect layout updates into a buffer to avoid cloning children vectors.
+fn collect_layout_updates(
+    scene: &Scene,
     node_id: NodeId,
     engine: &LayoutEngine,
     node_map: &HashMap<NodeId, layout_engine::NodeId>,
     parent_x: f32,
     parent_y: f32,
+    updates: &mut Vec<(NodeId, Rect)>,
 ) {
     if let Some(&layout_node) = node_map.get(&node_id) {
         if let Some(layout) = engine.get_layout(layout_node) {
@@ -110,19 +120,19 @@ fn apply_layouts(
             let abs_x = parent_x + layout.x;
             let abs_y = parent_y + layout.y;
 
-            // Update scene node bounds and get children.
-            // We clone the children vector (cheap copy of NodeIds) to avoid holding
-            // a mutable borrow on the scene while recursing.
-            let children = if let Some(scene_node) = scene.get_node_mut(node_id) {
-                scene_node.bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
-                scene_node.children.clone()
-            } else {
-                Vec::new()
-            };
+            // Add update to buffer
+            updates.push((
+                node_id,
+                Rect::new(abs_x, abs_y, layout.width, layout.height),
+            ));
 
-            // Recurse using the cloned children
-            for child_id in children {
-                apply_layouts(scene, child_id, engine, node_map, abs_x, abs_y);
+            // Recurse using reference to children (no clone needed)
+            if let Some(scene_node) = scene.get_node(node_id) {
+                for &child_id in &scene_node.children {
+                    collect_layout_updates(
+                        scene, child_id, engine, node_map, abs_x, abs_y, updates,
+                    );
+                }
             }
         }
     }

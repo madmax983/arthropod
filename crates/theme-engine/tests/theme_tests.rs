@@ -45,8 +45,10 @@ fn test_design_tokens_from_system() {
     let tokens = DesignTokens::from_system(&theme);
 
     // Should have resolved surface tokens
-    let is_valid = matches!(tokens.surface_primary, theme_engine::TokenValue::Material(_))
-        || matches!(tokens.surface_primary, theme_engine::TokenValue::Color(_));
+    let is_valid = matches!(
+        tokens.surface_primary,
+        theme_engine::TokenValue::Material(_)
+    ) || matches!(tokens.surface_primary, theme_engine::TokenValue::Color(_));
     assert!(is_valid);
 }
 
@@ -87,8 +89,10 @@ fn test_windows_material_types() {
     assert!(!theme.available_materials.is_empty());
 
     // Should include at least one material (None is always available as fallback)
-    assert!(theme.available_materials.contains(&BackdropMaterial::None)
-            || !theme.available_materials.is_empty());
+    assert!(
+        theme.available_materials.contains(&BackdropMaterial::None)
+            || !theme.available_materials.is_empty()
+    );
 }
 
 #[test]
