@@ -62,3 +62,7 @@ harness = false
 default = ["standalone"]
 standalone = []
 embedded = []
+
+[[bin]]
+name = "mcp-inspector"
+path = "src/bin/mcp-inspector.rs"
