@@ -28,16 +28,29 @@ pub struct TextInputState {
 }
 
 impl TextInputState {
+    /// Ensure cursor is within bounds relative to current signal value.
+    /// Returns (current_value, char_count)
+    fn ensure_cursor_valid(&mut self) -> (String, usize) {
+        let current_value = self.read_signal.get_untracked();
+        let char_count = current_value.chars().count();
+
+        if self.cursor_position > char_count {
+            self.cursor_position = char_count;
+        }
+
+        (current_value, char_count)
+    }
+
     /// Insert a character at the current cursor position.
     pub fn insert_char(&mut self, c: char) {
         if self.readonly {
             return;
         }
 
-        let mut current_value = self.read_signal.get_untracked();
+        let (mut current_value, char_count) = self.ensure_cursor_valid();
 
         if let Some(max_len) = self.max_length {
-            if current_value.chars().count() >= max_len {
+            if char_count >= max_len {
                 return;
             }
         }
@@ -55,9 +68,9 @@ impl TextInputState {
             return;
         }
 
-        if self.cursor_position > 0 {
-            let mut current_value = self.read_signal.get_untracked();
+        let (mut current_value, _) = self.ensure_cursor_valid();
 
+        if self.cursor_position > 0 {
             if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position - 1) {
                 current_value.remove(byte_idx);
                 self.cursor_position -= 1;
@@ -72,21 +85,20 @@ impl TextInputState {
             return;
         }
 
-        let current_value = self.read_signal.get_untracked();
-        let char_count = current_value.chars().count();
+        let (mut current_value, char_count) = self.ensure_cursor_valid();
 
         if self.cursor_position < char_count {
-            let mut new_value = current_value;
-
-            if let Some(byte_idx) = char_idx_to_byte_idx(&new_value, self.cursor_position) {
-                new_value.remove(byte_idx);
-                self.write_signal.set(new_value);
+            if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position) {
+                current_value.remove(byte_idx);
+                self.write_signal.set(current_value);
             }
         }
     }
 
     /// Move the cursor left.
     pub fn move_cursor_left(&mut self) {
+        let (_, _) = self.ensure_cursor_valid();
+
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
         }
@@ -94,8 +106,7 @@ impl TextInputState {
 
     /// Move the cursor right.
     pub fn move_cursor_right(&mut self) {
-        let current_value = self.read_signal.get_untracked();
-        let char_count = current_value.chars().count();
+        let (_, char_count) = self.ensure_cursor_valid();
 
         if self.cursor_position < char_count {
             self.cursor_position += 1;

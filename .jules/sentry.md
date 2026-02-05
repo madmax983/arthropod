@@ -15,3 +15,7 @@
 ## 2024-10-24 - [Effect Drop Behavior]
 **Learning:** `Effect::new` returns a handle that unsubscribes the effect when dropped. This is subtle and caused a test failure where an effect stopped working immediately because its return value was ignored.
 **Action:** Always bind the result of `Effect::new` (e.g., `let _keep_alive = ...`) in tests or long-lived scopes to keep the subscription active.
+
+## 2024-10-24 - [Reactive State Desynchronization]
+**Learning:** `TextInputState` duplicated state (cursor position) without subscribing to the underlying signal. When the signal was updated externally (e.g., text shortened), the cursor position remained invalid, causing silent failures in subsequent edits.
+**Action:** Implemented "lazy clamping" in all state mutation methods. Always check bounds against the *current* signal value before performing operations. Do not assume cached state is valid in a reactive system.
