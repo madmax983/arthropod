@@ -33,13 +33,19 @@ pub enum AppError {
 
 /// Arthropod application
 ///
-/// Manages the entire application lifecycle including:
-/// - Window and GPU backend (if not headless)
-/// - ECS World with all resources (Scene, Runtime, WgpuBackend)
-/// - Reactive runtime
-/// - Frame updates and rendering
+/// The central coordinator that manages the application lifecycle, including:
+/// - **Window Management**: Handling window creation and events (if not headless).
+/// - **ECS World**: Storing all resources (Scene, Runtime, WgpuBackend) and entities.
+/// - **Reactive Runtime**: Coordinating signals and effects via `flux-state`.
+/// - **Rendering**: Managing the render loop and GPU backend.
 ///
-/// All resources are stored in the ECS World and accessed via `world()` / `world_mut()`.
+/// `App` acts as the container for the `bevy_ecs` World. All resources are stored in the
+/// World and accessed via [`App::world()`] and [`App::world_mut()`].
+///
+/// # Integration
+///
+/// `App` provides the [`App::integrate_widgets()`] method to bridge the gap between
+/// the high-level widget tree (defined in `widget-core`) and the low-level ECS runtime.
 pub struct App {
     /// ECS framework context (contains Scene as Resource)
     ///
@@ -110,15 +116,18 @@ impl App {
 
     /// Access the ECS World (immutable)
     ///
-    /// Use this to read resources like Scene, Runtime, etc.
+    /// Use this to read resources like [`Scene`] or [`Runtime`].
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// # use arthropod::prelude::*;
-    /// # let app = App::new_headless().unwrap();
+    /// # use render_engine::Scene;
+    /// let app = App::new_headless().expect("Failed to create app");
+    ///
+    /// // Read the Scene resource
     /// let scene = app.world().resource::<Scene>();
-    /// let root = scene.root();
+    /// println!("Scene has {} nodes", scene.nodes().count());
     /// ```
     pub fn world(&self) -> &World {
         self.context.world()
@@ -126,15 +135,19 @@ impl App {
 
     /// Access the ECS World (mutable)
     ///
-    /// Use this to modify resources or spawn entities.
+    /// Use this to modify resources, spawn entities, or run queries.
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// # use arthropod::prelude::*;
-    /// # let mut app = App::new_headless().unwrap();
+    /// # use render_engine::Scene;
+    /// let mut app = App::new_headless().expect("Failed to create app");
+    ///
+    /// // Modify the Scene resource
     /// let mut scene = app.world_mut().resource_mut::<Scene>();
     /// let root = scene.root();
+    /// // ... modify scene ...
     /// ```
     pub fn world_mut(&mut self) -> &mut World {
         self.context.world_mut()
@@ -142,15 +155,21 @@ impl App {
 
     /// Spawn a new entity linked to a scene node
     ///
-    /// This is a convenience method that wraps `FrameworkContext::spawn()`.
+    /// Creates a new ECS entity and adds a [`SceneNodeRef`] component pointing to the given `node_id`.
+    /// This links the high-level Scene Graph to the ECS world, allowing you to attach components
+    /// like `Renderable`, `Clickable`, or `ReactiveColor` to scene nodes.
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// # use arthropod::prelude::*;
-    /// # let mut app = App::new_headless().unwrap();
-    /// # let node_id = app.world().resource::<Scene>().root();
-    /// app.spawn(node_id).insert(Renderable);
+    /// # use render_engine::Scene;
+    /// # use arthropod_ecs::components::Renderable;
+    /// let mut app = App::new_headless().unwrap();
+    /// let root = app.world().resource::<Scene>().root();
+    ///
+    /// // Spawn an entity linked to the root node and mark it as renderable
+    /// app.spawn(root).insert(Renderable);
     /// ```
     pub fn spawn(&mut self, node_id: NodeId) -> EntityWorldMut<'_> {
         self.context.spawn(node_id)
@@ -158,17 +177,23 @@ impl App {
 
     /// Get a mutable reference to an entity by its NodeId
     ///
-    /// Finds the entity with a SceneNodeRef component matching the given NodeId.
-    /// Returns None if no entity is linked to this node.
+    /// Finds the entity that has a [`SceneNodeRef`] component matching the given `node_id`.
+    /// Returns `None` if no such entity exists.
+    ///
+    /// This is useful for adding components to an existing widget's entity.
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// # use arthropod::prelude::*;
-    /// # let mut app = App::new_headless().unwrap();
-    /// # let node_id = app.world().resource::<Scene>().root();
-    /// # app.spawn(node_id).insert(Renderable);
-    /// if let Some(mut entity) = app.get_entity_mut(node_id) {
+    /// # use render_engine::Scene;
+    /// # use arthropod_ecs::components::Renderable;
+    /// let mut app = App::new_headless().unwrap();
+    /// let root = app.world().resource::<Scene>().root();
+    /// app.spawn(root); // Create the entity first
+    ///
+    /// // Later, retrieve it to add more components
+    /// if let Some(mut entity) = app.get_entity_mut(root) {
     ///     entity.insert(Renderable);
     /// }
     /// ```
@@ -327,32 +352,49 @@ impl App {
         }
     }
 
-    /// Integrate widgets from a WidgetContext into the ECS world
+    /// Integrate widgets from a WidgetContext into the ECS world.
     ///
-    /// This is the bridge between the widget-core layer (ECS-agnostic) and
-    /// the ECS runtime. It transfers all accumulated widget state (layout styles,
-    /// clickables, validators, etc.) to ECS components.
+    /// This method acts as the **ECS Bridge**, transferring static and reactive state from
+    /// the ECS-agnostic `WidgetContext` to the `arthropod-ecs` World.
     ///
-    /// The `node_id_map` maps widget NodeIds to app NodeIds, since widget scenes
-    /// are typically copied into the app scene with new NodeIds.
+    /// It specifically handles:
+    /// - **Layout**: Transfers [`layout_engine::FlexStyle`] to [`LayoutStyle`] components.
+    /// - **Interactivity**: Transfers click handlers to [`Clickable`] components.
+    /// - **Visuals**: Transfers background colors and reactive color states to [`BackgroundColor`]
+    ///   and [`ReactiveColor`] components.
+    ///
+    /// # Architecture Note
+    ///
+    /// While this method handles *static* component registration, dynamic behavior (like
+    /// text input handling, focus management, and form validation) is currently managed
+    /// by the application controller loop (e.g., `WidgetApp`). This separation ensures
+    /// that the ECS remains focused on data and systems, while the event loop handles
+    /// immediate user interaction.
+    ///
+    /// The `node_id_map` maps widget NodeIds (from the isolated widget context) to
+    /// app NodeIds (in the main scene), enabling correct component attachment.
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// use arthropod::prelude::*;
     /// use widget_core::WidgetContext;
     /// use std::collections::HashMap;
     ///
+    /// // 1. Build a widget in a test context
     /// let mut widget_ctx = WidgetContext::new_test();
-    /// // ... build widgets ...
+    /// let widget_root = widget_ctx.create_node(widget_ctx.root(), NodeContent::Empty);
     ///
+    /// // 2. Initialize the app
     /// let mut app = App::new_headless().unwrap();
     ///
-    /// // Copy widget scene nodes to app scene, building up node_id_map
-    /// let node_id_map: HashMap<NodeId, NodeId> = HashMap::new();
-    /// // ... copy nodes ...
+    /// // 3. Copy the widget's scene node to the app's scene
+    /// // (In a real app, use integration::integrate_widget_scene)
+    /// let mut node_id_map = HashMap::new();
+    /// let app_root = app.world().resource::<Scene>().root();
+    /// node_id_map.insert(widget_root, app_root);
     ///
-    /// // Transfer widget state to ECS components
+    /// // 4. Transfer components (layout, colors, etc.) to the ECS
     /// app.integrate_widgets(&widget_ctx, &node_id_map);
     /// ```
     pub fn integrate_widgets(
@@ -392,10 +434,8 @@ impl App {
             },
         );
 
-        // Note: TextInputState, Validator, and FormState components require
-        // additional implementation in arthropod-ecs. For now, we handle the
-        // core components (layout, clickable, background color).
-        // TODO: Add text_input_states, validators, form_states when needed
+        // Note: Complex state (TextInput, Form) is handled by the higher-level
+        // WidgetApp controller, not by direct ECS component transfer at this time.
     }
 
     /// Run a widget-based application.

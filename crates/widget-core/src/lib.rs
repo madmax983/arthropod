@@ -14,7 +14,12 @@
 //!
 //! # Custom Widgets
 //!
-//! For instructions on creating custom widgets, see the [`Widget`] trait documentation.
+//! To create your own widgets, implement the [`Widget`] trait. It provides the interface for:
+//! - Building the scene graph node(s)
+//! - Registering ECS components (if needed)
+//! - configuring layout
+//!
+//! See [`trait@Widget`] for a detailed guide and example.
 //!
 //! # Examples
 //!

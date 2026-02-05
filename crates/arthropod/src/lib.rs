@@ -44,12 +44,19 @@
 //!
 //! # Architecture
 //!
-//! Arthropod uses a hybrid architecture:
-//! - **Scene Graph**: Custom HashMap-based tree for hierarchical UI layout
-//! - **ECS**: bevy_ecs for cross-cutting concerns (rendering, animation, reactive state)
-//! - **Resources**: Scene, Runtime, WgpuBackend all live in ECS World
+//! Arthropod uses a hybrid architecture combining a retained-mode scene graph with an ECS runtime:
 //!
-//! All resources are managed automatically by the `App` - no manual lifetime management required.
+//! - **Scene Graph**: A [`render_engine::Scene`] manages the visual hierarchy (nodes, transforms, bounds) optimized for rendering.
+//! - **ECS Runtime**: [`bevy_ecs`] manages cross-cutting concerns like input handling, animation, and reactive state updates.
+//! - **Widget Layer**: The `widget-core` crate provides a high-level, declarative API that builds the scene graph.
+//!
+//! ## The Integration Loop
+//!
+//! 1. **Build Phase**: Widgets build a temporary scene graph in a [`widget_core::WidgetContext`].
+//! 2. **Integration**: [`App::integrate_widgets`] bridges this state into the ECS, creating entities with components like [`arthropod_ecs::components::Clickable`] or [`arthropod_ecs::components::ReactiveColor`].
+//! 3. **Update Loop**: The application loop (e.g., [`run_widget_app`](app::widget::run_widget_app)) processes events, updates signals via `flux-state`, and triggers re-renders.
+//!
+//! All resources are managed automatically by the [`App`] struct.
 
 pub mod app;
 pub mod event_dispatcher;
