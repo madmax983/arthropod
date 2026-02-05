@@ -17,3 +17,7 @@
 ## 2026-02-03 - Enforce Visual Hierarchy
 **Tangle:** `WgpuBackend` and `arthropod-ecs` rendering systems were iterating `Scene` nodes via `HashMap` or ECS Archetype iterators, resulting in arbitrary (random) Z-ordering that violated the "Painter's Algorithm" expected by the 2D Scene Graph.
 **Blueprint:** Introduced `Scene::iter_visuals()` in `render-engine` which enforces a Depth-First Pre-Order traversal (Parent -> Children). Refactored both `WgpuBackend` and `arthropod-ecs` to strictly use this iterator for drawing, decoupling rendering order from storage implementation.
+
+## 2026-02-04 - Decompose WidgetContext State
+**Tangle:** `WidgetContext` in `widget-core` had grown again into a "Blob" (1200+ lines), directly defining `TextInputState`, `FormState`, and `ValidationState` and their logic, violating SRP and bloating the context.
+**Blueprint:** Extracted `TextInputState` (and logic) to `input_state.rs`, `FormState` to `form_state.rs`, and `ValidationState` to `validation_state.rs`. `WidgetContext` now acts as a coordinator, importing these types. `form.rs` re-exports types from `form_state.rs` to maintain API compatibility.

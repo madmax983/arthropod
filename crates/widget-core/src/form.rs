@@ -1,16 +1,10 @@
 //! Form widget - container for input fields with validation and submission
 
+pub use crate::form_state::{FormData, SubmitCallback};
 use crate::{NamedWidgetTuple, Widget, WidgetContext};
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
-use std::collections::HashMap;
 use std::sync::Arc;
-
-/// Form data (field name -> field value)
-pub type FormData = HashMap<String, String>;
-
-/// Form submit callback type
-pub type SubmitCallback = Arc<dyn Fn(FormData) -> Result<(), String> + Send + Sync>;
 
 /// Form widget that aggregates child input fields with validation and submission
 ///
