@@ -1,0 +1,10 @@
+[package]
+name = "motion"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+flux-state = { path = "../../crates/flux-state" }
+anim-graph = { path = "../../crates/anim-graph" }
+log = "0.4"

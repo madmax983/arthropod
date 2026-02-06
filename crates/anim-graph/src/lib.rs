@@ -66,6 +66,10 @@ pub trait Animatable: Clone + 'static {
     ///
     /// For `f32`, this is `0.0`. For `Color`, this is a transparent zero vector.
     fn zero() -> Self;
+
+    /// Calculate the squared distance between two values.
+    /// Used for determining when an animation has settled.
+    fn distance_squared(&self, other: &Self) -> f32;
 }
 
 /// Easing function for animations.
@@ -260,16 +264,23 @@ impl<T: Animatable> Animation<T> {
     /// Check if animation is complete.
     ///
     /// - **Tween:** Returns true if `elapsed >= duration`.
-    /// - **Spring:** Currently returns false (springs technically oscillate forever).
-    ///   Future implementations may use a settling threshold.
+    /// - **Spring:** Returns true if the spring has settled (velocity and displacement are negligible).
     pub fn is_complete(&self) -> bool {
         match self {
             Self::Tween {
                 elapsed, duration, ..
             } => elapsed >= duration,
-            Self::Spring { .. } => {
-                // TODO: Implement proper threshold check based on velocity and displacement
-                false
+            Self::Spring {
+                current,
+                target,
+                velocity,
+                ..
+            } => {
+                let dist_sq = current.distance_squared(target);
+                let vel_sq = velocity.distance_squared(&T::zero());
+                // Thresholds: small position error (sqrt(0.0001) = 0.01)
+                // and small velocity (sqrt(0.0001) = 0.01 units/sec)
+                dist_sq < 0.0001 && vel_sq < 0.0001
             }
         }
     }
@@ -295,6 +306,10 @@ impl Animatable for f32 {
 
     fn zero() -> Self {
         0.0
+    }
+
+    fn distance_squared(&self, other: &Self) -> f32 {
+        (self - other).powi(2)
     }
 }
 
@@ -322,5 +337,9 @@ impl Animatable for render_engine::Color {
 
     fn zero() -> Self {
         render_engine::Color::from_vec4(render_engine::Vec4::ZERO)
+    }
+
+    fn distance_squared(&self, other: &Self) -> f32 {
+        self.as_vec4().distance_squared(other.as_vec4())
     }
 }

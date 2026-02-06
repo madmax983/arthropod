@@ -2043,6 +2043,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "motion"
+version = "0.1.0"
+dependencies = [
+ "anim-graph",
+ "flux-state",
+ "log",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
