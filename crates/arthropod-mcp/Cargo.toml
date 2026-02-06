@@ -38,7 +38,7 @@ hashbrown = "0.15"
 glam.workspace = true
 
 # CLI / TUI
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
 regex = "1.10"
 

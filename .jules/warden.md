@@ -29,3 +29,12 @@
 ## 2026-02-03 - [Arthropod-ECS Layout Unsafe Regression]
 **Threat:** The `apply_layouts` function in `arthropod-ecs` contains `unsafe` `ChildrenGuard` logic that relies on raw pointers and `transmute` (via `drop`). This code was previously documented as "Removed" in this log (2026-02-02) but is present in the codebase. This represents a regression of a known unsafe pattern.
 **Defense:** MITIGATED. Code review of `crates/arthropod-ecs/src/systems/layout.rs` confirms it uses safe `Vec::clone` iteration and does not contain `unsafe` blocks. The journal entry was likely a false positive or referring to stale state.
+
+## 2026-02-04 - [Dependency Security Updates]
+**Threat:**
+1. Integer overflow in `bytes` crate (v1.11.0, RUSTSEC-2026-0007).
+2. Unsoundness in `lru` crate (v0.12.5, RUSTSEC-2026-0002) where `IterMut` violates Stacked Borrows.
+**Defense:**
+1. Updated `bytes` to v1.11.1 via `cargo update`.
+2. Updated `ratatui` (in `arthropod-mcp`) from v0.29 to v0.30, which pulls in `lru` v0.16.3 (safe version).
+3. Fixed compilation error in `bench-viewer` caused by stricter `Send`/`Sync` bounds in updated `ratatui`/`anyhow`.
