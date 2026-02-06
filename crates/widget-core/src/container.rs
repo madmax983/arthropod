@@ -1,4 +1,7 @@
 //! Container widget - flexbox layout container
+//!
+//! NOTE: Alignment and justification helpers (align_start, justify_center, etc.) will be added
+//! once layout_engine FlexStyle supports align_items and justify_content properties.
 
 use crate::{Widget, WidgetContext, WidgetTuple};
 use layout_engine::{FlexDirection, FlexStyle};
@@ -20,6 +23,14 @@ use render_engine::{NodeContent, NodeId};
 ///     Text::new("World"),
 /// )).gap(10.0).padding(16.0);
 ///
+/// // With sizing
+/// let sized = Container::row((
+///     Text::new("A"),
+///     Text::new("B"),
+/// ))
+/// .width(200.0)
+/// .height(100.0);
+///
 /// // With generated macros:
 /// // col!([Text::new("Hello"), Text::new("World")], gap: 10.0)
 /// // row!([widget1, widget2], padding: 16.0)
@@ -29,6 +40,9 @@ pub struct Container<C: WidgetTuple> {
     children: C,
     gap: f32,
     padding: f32,
+    width: Option<f32>,
+    height: Option<f32>,
+    flex_grow: f32,
 }
 
 /// Create a column container with children
@@ -125,6 +139,9 @@ impl<C: WidgetTuple> Container<C> {
             children,
             gap: 0.0,
             padding: 0.0,
+            width: None,
+            height: None,
+            flex_grow: 0.0,
         }
     }
 
@@ -135,6 +152,9 @@ impl<C: WidgetTuple> Container<C> {
             children,
             gap: 0.0,
             padding: 0.0,
+            width: None,
+            height: None,
+            flex_grow: 0.0,
         }
     }
 
@@ -147,6 +167,24 @@ impl<C: WidgetTuple> Container<C> {
     /// Set uniform padding
     pub fn padding(mut self, padding: f32) -> Self {
         self.padding = padding;
+        self
+    }
+
+    /// Set fixed width
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Set fixed height
+    pub fn height(mut self, height: f32) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    /// Make container fill available space (flex_grow: 1)
+    pub fn fill(mut self) -> Self {
+        self.flex_grow = 1.0;
         self
     }
 }
@@ -168,11 +206,71 @@ impl<C: WidgetTuple> Widget for Container<C> {
             padding_right: self.padding,
             padding_top: self.padding,
             padding_bottom: self.padding,
+            width: self.width,
+            height: self.height,
+            flex_grow: self.flex_grow,
             ..Default::default()
         };
 
         ctx.set_layout_style(node_id, style);
 
         node_id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Text;
+
+    #[test]
+    fn test_container_row_creation() {
+        let container = Container::row((Text::new("A"), Text::new("B")));
+        assert_eq!(container.gap, 0.0);
+        assert_eq!(container.padding, 0.0);
+        assert_eq!(container.width, None);
+        assert_eq!(container.height, None);
+        assert_eq!(container.flex_grow, 0.0);
+    }
+
+    #[test]
+    fn test_container_column_creation() {
+        let container = Container::column((Text::new("A"), Text::new("B")));
+        assert_eq!(container.gap, 0.0);
+        assert_eq!(container.padding, 0.0);
+    }
+
+    #[test]
+    fn test_container_width() {
+        let container = Container::row((Text::new("A"),)).width(200.0);
+        assert_eq!(container.width, Some(200.0));
+    }
+
+    #[test]
+    fn test_container_height() {
+        let container = Container::row((Text::new("A"),)).height(100.0);
+        assert_eq!(container.height, Some(100.0));
+    }
+
+    #[test]
+    fn test_container_fill() {
+        let container = Container::row((Text::new("A"),)).fill();
+        assert_eq!(container.flex_grow, 1.0);
+    }
+
+    #[test]
+    fn test_container_chained_builders() {
+        let container = Container::column((Text::new("A"), Text::new("B")))
+            .gap(10.0)
+            .padding(20.0)
+            .width(300.0)
+            .height(150.0)
+            .fill();
+
+        assert_eq!(container.gap, 10.0);
+        assert_eq!(container.padding, 20.0);
+        assert_eq!(container.width, Some(300.0));
+        assert_eq!(container.height, Some(150.0));
+        assert_eq!(container.flex_grow, 1.0);
     }
 }

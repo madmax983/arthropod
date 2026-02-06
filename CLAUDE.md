@@ -239,6 +239,143 @@ if let Some(node) = scene.get_node_mut(node_id) {
 }
 ```
 
+### 4. Widget Convenience Layer (widget-core)
+
+**High-level declarative API for building UIs** - See `crates/widget-core/README.md` for full documentation.
+
+#### Widget Categories
+
+**Primitive Widgets:**
+- `Text` - Static or reactive text display
+- `Button` - Clickable button with styles (primary, secondary, disabled)
+- `TextInput` - Single-line text input with validation
+- `Checkbox` - Boolean toggle with label
+
+**Layout Widgets:**
+- `Row` - Horizontal layout with gap/padding
+- `Column` - Vertical layout with gap/padding
+- `Spacer` - Flexible (fills space) or fixed spacing
+- `Divider` - Visual separator line (horizontal or vertical)
+- `Padding` - Add space around a single child
+- `Center` - Center content (horizontal/vertical)
+
+**Advanced Layouts:**
+- `Stack` - Overlay widgets with z-ordering
+- `Grid` - 2D grid layout with fixed columns
+- `List` - Dynamic content from iterators
+
+**Container Widgets:**
+- `Card` - Themed container with padding and background
+- `Container` - Generic flexbox container (legacy, prefer Row/Column)
+
+**Form Widgets:**
+- `Form` - Validated form with field aggregation and submission
+
+#### Common Widget Patterns
+
+**Justified Layout (Row + Spacer):**
+```rust
+use widget_core::{row, btn, Spacer};
+
+row!([
+    btn!("Back"),
+    Spacer::flex(),  // Fills available space
+    btn!("Save", primary),
+    btn!("Share", primary),
+], gap: 8.0)
+```
+
+**Sectioned Layout (Column + Divider):**
+```rust
+use widget_core::{col, txt, Divider};
+
+col!([
+    txt!("Section 1", size: 18.0),
+    txt!("Content 1"),
+    Divider::horizontal(),
+    txt!("Section 2", size: 18.0),
+    txt!("Content 2"),
+], gap: 12.0)
+```
+
+**Centered Modal (Center + Card):**
+```rust
+use widget_core::{Center, Card, Column, Button, Text};
+
+Center::new(
+    Card::new((
+        Column::new((
+            Text::new("Dialog Title").size(18.0),
+            Text::new("Content here"),
+            Button::new("OK").primary(),
+        )).gap(12.0),
+    )).padding(24.0)
+)
+```
+
+**Grid Layout (2D arrangement):**
+```rust
+use widget_core::{Grid, Button};
+
+Grid::new(
+    (
+        Button::new("A"), Button::new("B"), Button::new("C"),
+        Button::new("D"), Button::new("E"), Button::new("F"),
+    ),
+    3, // columns (creates 2 rows)
+).gap(12.0)
+```
+
+**Dynamic List (runtime content):**
+```rust
+use widget_core::{list_from, Row, Text, Button, Spacer};
+
+let items = vec!["Apple", "Banana", "Cherry"];
+list_from(items.iter().map(|item| {
+    Row::new((
+        Text::new(format!("• {}", item)),
+        Spacer::flex(),
+        Button::new("View"),
+    )).gap(8.0)
+})).gap(4.0)
+```
+
+**Reactive State:**
+```rust
+use flux_state::{Runtime, Signal};
+use widget_core::{Text, Button, Column};
+
+let runtime = Runtime::new();
+let counter = Signal::new(runtime.clone(), 0);
+let (read, write) = counter.split();
+
+Column::new((
+    Text::reactive(read.map(|n| format!("Count: {}", n))),
+    Button::new("Increment").on_click(move || {
+        write.update(|n| n + 1);
+    }),
+)).gap(10.0)
+```
+
+#### Widget Examples
+
+Run these examples to see widgets in action:
+
+```bash
+# Comprehensive widget showcase
+cargo run --example widget_gallery
+
+# Real-world examples
+cargo run --example dashboard         # Analytics dashboard
+cargo run --example settings_panel    # Preferences UI
+cargo run --example chat_ui           # Messaging interface
+
+# Macro DSL and forms
+cargo run --example macro_demo
+cargo run --example form_gui
+cargo run --example hello_world
+```
+
 ## Code Conventions
 
 ### Naming

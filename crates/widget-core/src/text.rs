@@ -73,6 +73,38 @@ impl Text {
         self.color = Some(color);
         self
     }
+
+    // Size presets
+
+    /// Large heading text (32px)
+    pub fn heading1(mut self) -> Self {
+        self.font_size = 32.0;
+        self
+    }
+
+    /// Medium heading text (24px)
+    pub fn heading2(mut self) -> Self {
+        self.font_size = 24.0;
+        self
+    }
+
+    /// Small heading text (20px)
+    pub fn heading3(mut self) -> Self {
+        self.font_size = 20.0;
+        self
+    }
+
+    /// Body text (16px, default)
+    pub fn body(mut self) -> Self {
+        self.font_size = 16.0;
+        self
+    }
+
+    /// Caption text (12px)
+    pub fn caption(mut self) -> Self {
+        self.font_size = 12.0;
+        self
+    }
 }
 
 impl Widget for Text {
@@ -115,5 +147,67 @@ impl Widget for Text {
         }
 
         node_id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_text_new() {
+        let text = Text::new("Hello");
+        assert_eq!(text.font_size, 16.0); // Default body size
+    }
+
+    #[test]
+    fn test_text_size() {
+        let text = Text::new("Hello").size(20.0);
+        assert_eq!(text.font_size, 20.0);
+    }
+
+    #[test]
+    fn test_text_heading1() {
+        let text = Text::new("Heading").heading1();
+        assert_eq!(text.font_size, 32.0);
+    }
+
+    #[test]
+    fn test_text_heading2() {
+        let text = Text::new("Heading").heading2();
+        assert_eq!(text.font_size, 24.0);
+    }
+
+    #[test]
+    fn test_text_heading3() {
+        let text = Text::new("Heading").heading3();
+        assert_eq!(text.font_size, 20.0);
+    }
+
+    #[test]
+    fn test_text_body() {
+        let text = Text::new("Body").body();
+        assert_eq!(text.font_size, 16.0);
+    }
+
+    #[test]
+    fn test_text_caption() {
+        let text = Text::new("Caption").caption();
+        assert_eq!(text.font_size, 12.0);
+    }
+
+    #[test]
+    fn test_text_color() {
+        let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
+        let text = Text::new("Colored").color(color);
+        assert_eq!(text.color, Some(color));
+    }
+
+    #[test]
+    fn test_text_chained_builders() {
+        let color = Vec4::new(0.5, 0.5, 0.5, 1.0);
+        let text = Text::new("Test").heading2().color(color);
+        assert_eq!(text.font_size, 24.0);
+        assert_eq!(text.color, Some(color));
     }
 }

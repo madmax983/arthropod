@@ -108,6 +108,44 @@ pub trait WidgetTuple {
     /// Build all widgets and attach them as children of parent
     fn build_all(&self, ctx: &mut WidgetContext, parent: NodeId);
 
+    /// Build all widgets and return their NodeIds in a Vec
+    ///
+    /// This is useful for Grid and Stack widgets that need to process
+    /// children dynamically without attaching them immediately.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use widget_core::{WidgetTuple, Text, WidgetContext};
+    ///
+    /// let mut ctx = WidgetContext::new_test();
+    /// let tuple = (Text::new("A"), Text::new("B"));
+    /// let node_ids = tuple.build_all_to_vec(&mut ctx);
+    /// // node_ids now contains [node_a, node_b]
+    /// ```
+    fn build_all_to_vec(&self, ctx: &mut WidgetContext) -> Vec<NodeId>;
+
+    /// Build all widgets and process each with a custom function
+    ///
+    /// This is useful when you need custom processing per widget
+    /// without allocating a Vec.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use widget_core::{WidgetTuple, Text, WidgetContext};
+    ///
+    /// let mut ctx = WidgetContext::new_test();
+    /// let tuple = (Text::new("A"), Text::new("B"));
+    /// tuple.build_all_with(&mut ctx, |node_id| {
+    ///     // Custom processing for each widget
+    ///     println!("Built widget: {:?}", node_id);
+    /// });
+    /// ```
+    fn build_all_with<Func>(&self, ctx: &mut WidgetContext, f: Func)
+    where
+        Func: FnMut(NodeId);
+
     /// Number of children in this tuple
     fn len(&self) -> usize;
 
@@ -123,6 +161,16 @@ pub trait WidgetTuple {
 impl WidgetTuple for () {
     fn build_all(&self, _ctx: &mut WidgetContext, _parent: NodeId) {}
 
+    fn build_all_to_vec(&self, _ctx: &mut WidgetContext) -> Vec<NodeId> {
+        Vec::new()
+    }
+
+    fn build_all_with<Func>(&self, _ctx: &mut WidgetContext, _f: Func)
+    where
+        Func: FnMut(NodeId),
+    {
+    }
+
     fn len(&self) -> usize {
         0
     }
@@ -134,6 +182,18 @@ impl<W: Widget> WidgetTuple for W {
     fn build_all(&self, ctx: &mut WidgetContext, parent: NodeId) {
         let id = self.build(ctx);
         ctx.reparent_to(id, parent);
+    }
+
+    fn build_all_to_vec(&self, ctx: &mut WidgetContext) -> Vec<NodeId> {
+        vec![self.build(ctx)]
+    }
+
+    fn build_all_with<Func>(&self, ctx: &mut WidgetContext, mut f: Func)
+    where
+        Func: FnMut(NodeId),
+    {
+        let id = self.build(ctx);
+        f(id);
     }
 
     fn len(&self) -> usize {
@@ -149,6 +209,24 @@ macro_rules! impl_widget_tuple {
                 $(
                     let id = self.$idx.build(ctx);
                     ctx.reparent_to(id, parent);
+                )+
+            }
+
+            fn build_all_to_vec(&self, ctx: &mut WidgetContext) -> Vec<NodeId> {
+                let mut vec = Vec::with_capacity(self.len());
+                $(
+                    vec.push(self.$idx.build(ctx));
+                )+
+                vec
+            }
+
+            fn build_all_with<Func>(&self, ctx: &mut WidgetContext, mut f: Func)
+            where
+                Func: FnMut(NodeId),
+            {
+                $(
+                    let id = self.$idx.build(ctx);
+                    f(id);
                 )+
             }
 
@@ -301,6 +379,24 @@ impl_named_widget_tuple!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H, 8: I, 9
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::WidgetContext;
+    use render_engine::{NodeContent, Color};
+
+    // Simple test widget for testing WidgetTuple methods
+    struct TestWidget {
+        label: &'static str,
+    }
+
+    impl Widget for TestWidget {
+        fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+            ctx.create_node(
+                ctx.root(),
+                NodeContent::Rect {
+                    color: Color::rgba(1.0, 0.0, 0.0, 1.0),
+                },
+            )
+        }
+    }
 
     #[test]
     fn test_empty_tuple_len() {
@@ -315,5 +411,62 @@ mod tests {
         // We can't easily test without actual Widget impls,
         // but we can verify the count macro works
         assert_eq!(<[()]>::len(&[(), (), ()]), 3);
+    }
+
+    #[test]
+    fn test_build_all_to_vec_empty() {
+        let mut ctx = WidgetContext::new_test();
+        let t: () = ();
+        let result = t.build_all_to_vec(&mut ctx);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_build_all_to_vec_single_widget() {
+        let mut ctx = WidgetContext::new_test();
+        let widget = TestWidget { label: "A" };
+        let result = widget.build_all_to_vec(&mut ctx);
+        assert_eq!(result.len(), 1);
+
+        // Verify the node was created
+        assert!(ctx.scene().get_node(result[0]).is_some());
+    }
+
+    #[test]
+    fn test_build_all_to_vec_tuple() {
+        let mut ctx = WidgetContext::new_test();
+        let tuple = (
+            TestWidget { label: "A" },
+            TestWidget { label: "B" },
+            TestWidget { label: "C" },
+        );
+        let result = tuple.build_all_to_vec(&mut ctx);
+        assert_eq!(result.len(), 3);
+
+        // Verify all nodes were created
+        for node_id in &result {
+            assert!(ctx.scene().get_node(*node_id).is_some());
+        }
+    }
+
+    #[test]
+    fn test_build_all_with_custom_processing() {
+        let mut ctx = WidgetContext::new_test();
+        let tuple = (
+            TestWidget { label: "A" },
+            TestWidget { label: "B" },
+        );
+
+        let mut collected = Vec::new();
+        tuple.build_all_with(&mut ctx, |node_id| {
+            collected.push(node_id);
+        });
+
+        assert_eq!(collected.len(), 2);
+
+        // Verify all nodes were created
+        for node_id in &collected {
+            assert!(ctx.scene().get_node(*node_id).is_some());
+        }
     }
 }
