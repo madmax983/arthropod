@@ -1,6 +1,6 @@
+use crate::transform::Camera;
 use bevy_ecs::prelude::*;
 use glam::Vec2;
-use crate::transform::Camera;
 
 /// A node in the spatial graph.
 /// This component stores the world position and size of the node.

@@ -12,15 +12,15 @@ use anyhow::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use serde_json::Value;
 use std::{
@@ -145,12 +145,26 @@ async fn main() -> Result<()> {
         if pos + 1 < args.len() {
             (args[pos + 1].clone(), args[pos + 2..].to_vec())
         } else {
-             // Default if "--" is last
-             ("cargo".to_string(), vec!["run".to_string(), "--bin".to_string(), "arthropod-mcp".to_string()])
+            // Default if "--" is last
+            (
+                "cargo".to_string(),
+                vec![
+                    "run".to_string(),
+                    "--bin".to_string(),
+                    "arthropod-mcp".to_string(),
+                ],
+            )
         }
     } else {
-         // Default
-         ("cargo".to_string(), vec!["run".to_string(), "--bin".to_string(), "arthropod-mcp".to_string()])
+        // Default
+        (
+            "cargo".to_string(),
+            vec![
+                "run".to_string(),
+                "--bin".to_string(),
+                "arthropod-mcp".to_string(),
+            ],
+        )
     };
 
     let mut child = Command::new(&program)
@@ -183,7 +197,9 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         let mut reader = BufReader::new(child_stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-            let _ = tx_stderr.send(AppEvent::Message(format!("ERR: {}", line))).await;
+            let _ = tx_stderr
+                .send(AppEvent::Message(format!("ERR: {}", line)))
+                .await;
         }
     });
 
@@ -220,12 +236,18 @@ async fn main() -> Result<()> {
 
     // Send initialize
     let id = app.next_request_id();
-    let init_req = JsonRpcRequest::new(id, "initialize", serde_json::json!({
-        "client_name": "mcp-inspector",
-        "client_version": "0.1.0"
-    }));
+    let init_req = JsonRpcRequest::new(
+        id,
+        "initialize",
+        serde_json::json!({
+            "client_name": "mcp-inspector",
+            "client_version": "0.1.0"
+        }),
+    );
     let init_str = serde_json::to_string(&init_req)?;
-    stdin_writer.write_all(format!("{}\n", init_str).as_bytes()).await?;
+    stdin_writer
+        .write_all(format!("{}\n", init_str).as_bytes())
+        .await?;
     stdin_writer.flush().await?;
     app.logs.push_back(format!("-> {}", init_str));
     app.status = "Initializing...".to_string();
@@ -249,12 +271,18 @@ async fn main() -> Result<()> {
                                         if idx < app.tools.len() {
                                             let tool_name = app.tools[idx].clone();
                                             let id = app.next_request_id();
-                                            let req = JsonRpcRequest::new(id, "tools/call", serde_json::json!({
-                                                "name": tool_name,
-                                                "arguments": {}
-                                            }));
+                                            let req = JsonRpcRequest::new(
+                                                id,
+                                                "tools/call",
+                                                serde_json::json!({
+                                                    "name": tool_name,
+                                                    "arguments": {}
+                                                }),
+                                            );
                                             let req_str = serde_json::to_string(&req)?;
-                                            stdin_writer.write_all(format!("{}\n", req_str).as_bytes()).await?;
+                                            stdin_writer
+                                                .write_all(format!("{}\n", req_str).as_bytes())
+                                                .await?;
                                             stdin_writer.flush().await?;
                                             app.logs.push_back(format!("-> {}", req_str));
                                         }
@@ -266,9 +294,15 @@ async fn main() -> Result<()> {
                                 KeyCode::Char('l') => {
                                     // Refresh tools
                                     let id = app.next_request_id();
-                                    let req = JsonRpcRequest::new(id, "tools/list", serde_json::json!({}));
+                                    let req = JsonRpcRequest::new(
+                                        id,
+                                        "tools/list",
+                                        serde_json::json!({}),
+                                    );
                                     let req_str = serde_json::to_string(&req)?;
-                                    stdin_writer.write_all(format!("{}\n", req_str).as_bytes()).await?;
+                                    stdin_writer
+                                        .write_all(format!("{}\n", req_str).as_bytes())
+                                        .await?;
                                     stdin_writer.flush().await?;
                                     app.logs.push_back(format!("-> {}", req_str));
                                 }
@@ -283,23 +317,32 @@ async fn main() -> Result<()> {
                                     app.input_mode = InputMode::Normal;
 
                                     // Parse input: "method json_params"
-                                    let parts: Vec<&str> = input_cmd.trim().splitn(2, ' ').collect();
+                                    let parts: Vec<&str> =
+                                        input_cmd.trim().splitn(2, ' ').collect();
                                     if !parts.is_empty() {
                                         let method = parts[0];
-                                        let params_str = if parts.len() > 1 { parts[1] } else { "{}" };
+                                        let params_str =
+                                            if parts.len() > 1 { parts[1] } else { "{}" };
 
                                         match serde_json::from_str::<Value>(params_str) {
                                             Ok(params) => {
                                                 let id = app.next_request_id();
                                                 let req = JsonRpcRequest::new(id, method, params);
                                                 if let Ok(req_str) = serde_json::to_string(&req) {
-                                                     stdin_writer.write_all(format!("{}\n", req_str).as_bytes()).await?;
-                                                     stdin_writer.flush().await?;
-                                                     app.logs.push_back(format!("-> {}", req_str));
+                                                    stdin_writer
+                                                        .write_all(
+                                                            format!("{}\n", req_str).as_bytes(),
+                                                        )
+                                                        .await?;
+                                                    stdin_writer.flush().await?;
+                                                    app.logs.push_back(format!("-> {}", req_str));
                                                 }
                                             }
                                             Err(e) => {
-                                                app.logs.push_back(format!("Error parsing params: {}", e));
+                                                app.logs.push_back(format!(
+                                                    "Error parsing params: {}",
+                                                    e
+                                                ));
                                             }
                                         }
                                     }
@@ -322,17 +365,22 @@ async fn main() -> Result<()> {
                     app.logs.push_back(format!("<- {}", msg));
                     // Try to parse message
                     if let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(&msg) {
-                         // Check if it's tools/list response
-                         if let Some(result) = resp.result {
-                             if let Some(tools_val) = result.get("tools") {
-                                 if let Some(tools_arr) = tools_val.as_array() {
-                                     app.tools = tools_arr.iter()
-                                         .filter_map(|t| t.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
-                                         .collect();
-                                     app.status = format!("Connected ({} tools)", app.tools.len());
-                                 }
-                             }
-                         }
+                        // Check if it's tools/list response
+                        if let Some(result) = resp.result {
+                            if let Some(tools_val) = result.get("tools") {
+                                if let Some(tools_arr) = tools_val.as_array() {
+                                    app.tools = tools_arr
+                                        .iter()
+                                        .filter_map(|t| {
+                                            t.get("name")
+                                                .and_then(|n| n.as_str())
+                                                .map(|s| s.to_string())
+                                        })
+                                        .collect();
+                                    app.status = format!("Connected ({} tools)", app.tools.len());
+                                }
+                            }
+                        }
                     }
 
                     // Keep logs trimmed
@@ -381,14 +429,19 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(chunks[1]);
 
     // Tools List
-    let items: Vec<ListItem> = app.tools
+    let items: Vec<ListItem> = app
+        .tools
         .iter()
         .map(|t| ListItem::new(Line::from(vec![Span::raw(t)])))
         .collect();
 
     let tools_list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("Tools"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Yellow),
+        )
         .highlight_symbol(">> ");
 
     f.render_stateful_widget(tools_list, left_chunks[0], &mut app.tool_list_state);
@@ -399,12 +452,16 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     let mut log_lines = Vec::new();
     for entry in recent_logs {
-         log_lines.extend(format_log_entry(entry));
-         log_lines.push(Line::raw("")); // Spacing between entries
+        log_lines.extend(format_log_entry(entry));
+        log_lines.push(Line::raw("")); // Spacing between entries
     }
 
     let logs = Paragraph::new(log_lines)
-        .block(Block::default().borders(Borders::ALL).title(format!("Logs - {}", app.status)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("Logs - {}", app.status)),
+        )
         .wrap(Wrap { trim: true });
 
     f.render_widget(logs, right_chunks[0]);
@@ -447,7 +504,7 @@ fn format_log_entry(entry: &str) -> Vec<Line<'_>> {
 
     // Attempt to pretty print JSON
     let content = if !rest.trim().is_empty() {
-         match serde_json::from_str::<Value>(rest) {
+        match serde_json::from_str::<Value>(rest) {
             Ok(val) => match serde_json::to_string_pretty(&val) {
                 Ok(pretty) => pretty,
                 Err(_) => rest.to_string(),

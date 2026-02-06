@@ -240,10 +240,13 @@ mod tests {
 
         ctx.inner_mut().spawn(node_id).insert(Renderable);
 
+        // Must update() first since render collection happens in update schedule
+        ctx.update();
         let (instances, duration) = ctx.render();
 
-        assert_eq!(ctx.perf_history().len(), 1);
-        assert_eq!(ctx.perf_history()[0].kind, PerfKind::Render);
+        assert_eq!(ctx.perf_history().len(), 2);
+        assert_eq!(ctx.perf_history()[0].kind, PerfKind::Update);
+        assert_eq!(ctx.perf_history()[1].kind, PerfKind::Render);
         assert!(!instances.is_empty());
         assert!(duration.as_micros() < 10000);
     }

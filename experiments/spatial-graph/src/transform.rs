@@ -1,4 +1,4 @@
-use glam::{Vec2};
+use glam::Vec2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
@@ -42,7 +42,10 @@ mod tests {
         assert_eq!(camera.world_to_screen(Vec2::ZERO), Vec2::new(400.0, 300.0));
 
         // Move right 100 units
-        assert_eq!(camera.world_to_screen(Vec2::new(100.0, 0.0)), Vec2::new(500.0, 300.0));
+        assert_eq!(
+            camera.world_to_screen(Vec2::new(100.0, 0.0)),
+            Vec2::new(500.0, 300.0)
+        );
     }
 
     #[test]
@@ -54,7 +57,10 @@ mod tests {
         assert_eq!(camera.screen_to_world(Vec2::new(400.0, 300.0)), Vec2::ZERO);
 
         // 100 units right of center should be (100, 0)
-        assert_eq!(camera.screen_to_world(Vec2::new(500.0, 300.0)), Vec2::new(100.0, 0.0));
+        assert_eq!(
+            camera.screen_to_world(Vec2::new(500.0, 300.0)),
+            Vec2::new(100.0, 0.0)
+        );
     }
 
     #[test]
@@ -67,10 +73,16 @@ mod tests {
         assert_eq!(camera.world_to_screen(Vec2::ZERO), Vec2::new(400.0, 300.0));
 
         // Move right 100 units, should be 200 screen units
-        assert_eq!(camera.world_to_screen(Vec2::new(100.0, 0.0)), Vec2::new(600.0, 300.0));
+        assert_eq!(
+            camera.world_to_screen(Vec2::new(100.0, 0.0)),
+            Vec2::new(600.0, 300.0)
+        );
 
         // Reverse
-        assert_eq!(camera.screen_to_world(Vec2::new(600.0, 300.0)), Vec2::new(100.0, 0.0));
+        assert_eq!(
+            camera.screen_to_world(Vec2::new(600.0, 300.0)),
+            Vec2::new(100.0, 0.0)
+        );
     }
 
     #[test]
@@ -80,7 +92,10 @@ mod tests {
         camera.position = Vec2::new(100.0, 0.0);
 
         // World (100, 0) is now at center
-        assert_eq!(camera.world_to_screen(Vec2::new(100.0, 0.0)), Vec2::new(400.0, 300.0));
+        assert_eq!(
+            camera.world_to_screen(Vec2::new(100.0, 0.0)),
+            Vec2::new(400.0, 300.0)
+        );
 
         // World (0, 0) is to the left
         assert_eq!(camera.world_to_screen(Vec2::ZERO), Vec2::new(300.0, 300.0));

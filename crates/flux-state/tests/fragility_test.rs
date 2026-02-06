@@ -1,7 +1,7 @@
 use flux_state::{Computed, Effect, Runtime, Signal};
+use proptest::prelude::*;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use proptest::prelude::*;
 
 #[test]
 #[should_panic(expected = "Reactive recursion limit exceeded")]
@@ -46,7 +46,7 @@ fn deep_effect_chain_panic() {
     // Create 201 effects
     for i in 0..201 {
         let (read_current, _) = signals[i].clone().split();
-        let (_, write_next) = signals[i+1].clone().split();
+        let (_, write_next) = signals[i + 1].clone().split();
 
         effects.push(Effect::new(runtime.clone(), move || {
             let val = read_current.get();

@@ -59,19 +59,23 @@
 //! let instances = context.render();
 //! ```
 
+pub mod adaptive;
 pub mod components;
 pub mod context;
 pub mod systems;
 
 // Re-export main types for convenience
+pub use adaptive::{AdaptiveThresholds, ThresholdConfig};
 pub use components::{
     Hoverable, MainThreadSignal, ReactiveColor, ReactiveOpacity, ReactiveTransform, Renderable,
     SceneNodeRef,
 };
 pub use context::FrameworkContext;
 pub use systems::{
-    collect_renderables_system, update_reactive_colors_system, update_reactive_opacity_system,
-    update_reactive_transforms_system, RenderCommands,
+    apply_a11y_bounds_system, apply_reactive_changes_system, collect_renderables_system,
+    gather_a11y_bounds_system, gather_reactive_changes_system, sync_accessible_nodes_system,
+    update_all_reactive_system, update_reactive_colors_system, update_reactive_opacity_system,
+    update_reactive_transforms_system, A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
 
 // Re-export accessibility types

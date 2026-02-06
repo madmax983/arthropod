@@ -4,6 +4,17 @@
 //! Provides glyph runs for rendering.
 
 use cosmic_text::{Attrs, Buffer, CacheKeyFlags, FontSystem, Metrics, Shaping};
+use std::cell::RefCell;
+
+// Thread-local storage for parallel text shaping
+thread_local! {
+    static FONT_SYSTEM_POOL: RefCell<(FontSystem, Buffer)> = RefCell::new({
+        let mut font_system = FontSystem::new();
+        let metrics = Metrics::new(16.0, 20.0);
+        let buffer = Buffer::new(&mut font_system, metrics);
+        (font_system, buffer)
+    });
+}
 
 /// Text engine using cosmic-text
 pub struct TextEngine {
@@ -152,6 +163,97 @@ impl Default for TextEngine {
     }
 }
 
+/// Shape text using thread-local FontSystem (safe for parallel execution)
+///
+/// This function uses thread-local storage to maintain per-thread FontSystem and Buffer
+/// instances, allowing safe parallel text shaping via rayon without data races.
+///
+/// # Arguments
+///
+/// * `text` - The text to shape
+/// * `font_size` - Font size in pixels
+///
+/// # Returns
+///
+/// A `ShapedText` containing glyphs and bounds
+///
+/// # Example
+///
+/// ```
+/// use text_engine::shape_text_parallel;
+/// use rayon::prelude::*;
+///
+/// let texts = vec!["Hello", "World", "!"];
+/// let shaped: Vec<_> = texts.par_iter()
+///     .map(|text| shape_text_parallel(text, 16.0))
+///     .collect();
+/// ```
+pub fn shape_text_parallel(text: &str, font_size: f32) -> ShapedText {
+    if text.is_empty() {
+        return ShapedText {
+            glyphs: Vec::new(),
+            bounds: TextBounds::default(),
+        };
+    }
+
+    FONT_SYSTEM_POOL.with(|pool| {
+        let mut pool = pool.borrow_mut();
+        let (font_system, buffer) = &mut *pool;
+
+        // Update metrics for this font size
+        let metrics = Metrics::new(font_size, font_size * 1.2);
+        buffer.set_metrics(font_system, metrics);
+
+        // Set text and shape
+        buffer.set_text(font_system, text, Attrs::new(), Shaping::Advanced);
+
+        // Extract glyphs from the shaped buffer
+        let runs: Vec<_> = buffer.layout_runs().collect();
+        let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
+        let mut glyphs = Vec::with_capacity(total_glyphs);
+        let mut max_width = 0.0f32;
+        let mut max_height = 0.0f32;
+
+        for run in runs {
+            let run_height = run.line_height;
+
+            for glyph in run.glyphs.iter() {
+                let x_end = glyph.x + glyph.w;
+                max_width = max_width.max(x_end);
+                max_height = max_height.max(run_height);
+
+                let (cache_key, _x_bin, _y_bin) = CacheKey::new(
+                    glyph.font_id,
+                    glyph.glyph_id,
+                    glyph.font_size,
+                    (glyph.x_offset, glyph.y_offset),
+                    CacheKeyFlags::empty(),
+                );
+
+                glyphs.push(ShapedGlyph {
+                    cache_key,
+                    glyph_id: glyph.glyph_id,
+                    x_offset: glyph.x,
+                    y_offset: glyph.y,
+                    x_advance: glyph.w,
+                    y_advance: 0.0,
+                    cluster: glyph.start as u32,
+                });
+            }
+        }
+
+        ShapedText {
+            glyphs,
+            bounds: TextBounds {
+                x: 0.0,
+                y: 0.0,
+                width: max_width,
+                height: max_height,
+            },
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +279,54 @@ mod tests {
         let shaped = engine.shape_text("test.com-123", 16.0);
         // Should have glyphs for period and hyphen
         assert!(shaped.glyphs.len() >= 12); // "test.com-123" = 12 characters
+    }
+
+    #[test]
+    fn test_parallel_shaping_single_thread() {
+        let shaped = shape_text_parallel("Hello", 16.0);
+        assert!(!shaped.glyphs.is_empty());
+        assert!(shaped.bounds.width > 0.0);
+    }
+
+    #[test]
+    fn test_parallel_shaping_matches_sequential() {
+        use rayon::prelude::*;
+
+        let texts = vec!["Hello", "World", "Test", "Parallel"];
+
+        // Shape sequentially
+        let mut engine = TextEngine::new();
+        let sequential: Vec<_> = texts
+            .iter()
+            .map(|text| engine.shape_text(text, 16.0))
+            .collect();
+
+        // Shape in parallel
+        let parallel: Vec<_> = texts
+            .par_iter()
+            .map(|text| shape_text_parallel(text, 16.0))
+            .collect();
+
+        // Verify results match
+        for (seq, par) in sequential.iter().zip(parallel.iter()) {
+            assert_eq!(seq.glyphs.len(), par.glyphs.len());
+            assert!((seq.bounds.width - par.bounds.width).abs() < 0.1);
+            assert!((seq.bounds.height - par.bounds.height).abs() < 0.1);
+
+            // Verify glyphs are equivalent (cache keys should match)
+            for (seq_glyph, par_glyph) in seq.glyphs.iter().zip(par.glyphs.iter()) {
+                assert_eq!(seq_glyph.cache_key, par_glyph.cache_key);
+                assert_eq!(seq_glyph.glyph_id, par_glyph.glyph_id);
+                assert!((seq_glyph.x_offset - par_glyph.x_offset).abs() < 0.1);
+                assert!((seq_glyph.y_offset - par_glyph.y_offset).abs() < 0.1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parallel_shaping_with_empty_text() {
+        let shaped = shape_text_parallel("", 16.0);
+        assert!(shaped.glyphs.is_empty());
+        assert_eq!(shaped.bounds.width, 0.0);
     }
 }

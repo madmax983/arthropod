@@ -1,7 +1,7 @@
-use std::time::Duration;
 use anim_graph::{Animatable, Animation, Easing};
-use flux_state::{ReadSignal, Runtime, Signal, Effect};
+use flux_state::{Effect, ReadSignal, Runtime, Signal};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 /// Configuration for motion animations.
 #[derive(Clone, Copy, Debug)]
@@ -83,10 +83,12 @@ where
             };
 
             let anim = match config {
-                MotionConfig::Spring { stiffness, damping } =>
-                    Animation::spring(start, target.clone(), stiffness, damping),
-                MotionConfig::Tween { duration, easing } =>
-                    Animation::tween(start, target.clone(), duration, easing),
+                MotionConfig::Spring { stiffness, damping } => {
+                    Animation::spring(start, target.clone(), stiffness, damping)
+                }
+                MotionConfig::Tween { duration, easing } => {
+                    Animation::tween(start, target.clone(), duration, easing)
+                }
             };
 
             state.animation = Some(anim);
@@ -94,7 +96,11 @@ where
         }
 
         // Check if we need to animate
-        let is_animating = state.animation.as_ref().map(|a| !a.is_complete()).unwrap_or(false);
+        let is_animating = state
+            .animation
+            .as_ref()
+            .map(|a| !a.is_complete())
+            .unwrap_or(false);
 
         if is_animating {
             let time = clock.get(); // Subscribe to clock
@@ -157,7 +163,7 @@ mod tests {
             MotionConfig::Tween {
                 duration: Duration::from_secs(1),
                 easing: Easing::Linear,
-            }
+            },
         );
 
         // Initial state
@@ -195,7 +201,7 @@ mod tests {
             MotionConfig::Spring {
                 stiffness: 100.0,
                 damping: 20.0,
-            }
+            },
         );
 
         write_source.set(10.0);

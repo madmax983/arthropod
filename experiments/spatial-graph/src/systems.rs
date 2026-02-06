@@ -1,15 +1,11 @@
-use bevy_ecs::prelude::*;
-use render_engine::Scene;
+use crate::components::{SpatialNode, Stats, Viewport};
 use arthropod_ecs::SceneNodeRef;
+use bevy_ecs::prelude::*;
 use plat_core::Rect;
-use crate::components::{SpatialNode, Viewport, Stats};
+use render_engine::Scene;
 
 /// Updates the stats resource with total and visible node counts.
-pub fn stats_system(
-    mut stats: ResMut<Stats>,
-    query: Query<&SceneNodeRef>,
-    scene: Res<Scene>,
-) {
+pub fn stats_system(mut stats: ResMut<Stats>, query: Query<&SceneNodeRef>, scene: Res<Scene>) {
     let mut visible = 0;
     let mut total = 0;
 

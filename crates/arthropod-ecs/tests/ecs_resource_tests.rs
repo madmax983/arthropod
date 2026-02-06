@@ -231,7 +231,8 @@ fn test_render_without_passing_scene() {
 
     ctx.spawn(node_id).insert(Renderable);
 
-    // Render without passing scene argument
+    // Update (runs render collection) then extract instances
+    ctx.update();
     let instances = ctx.render();
 
     assert_eq!(instances.len(), 1);

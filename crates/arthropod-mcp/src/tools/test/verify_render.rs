@@ -109,7 +109,8 @@ impl Tool for VerifyRenderOutputTool {
     fn execute(&self, params: Value, ctx: &mut McpFrameworkContext) -> Result<Value> {
         let params: VerifyRenderOutputParams = serde_json::from_value(params)?;
 
-        // Run render to get actual instances
+        // Run update (which includes render collection) then extract instances
+        ctx.update();
         let (instances, _duration) = ctx.render();
 
         let mut failures = Vec::new();

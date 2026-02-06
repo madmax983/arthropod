@@ -12,4 +12,4 @@ flux-state = { path = "../../crates/flux-state" }
 plat-core = { path = "../../crates/plat-core" }
 glam = { workspace = true }
 log = { workspace = true }
-bevy_ecs = "0.15"
+bevy_ecs = { version = "0.15", features = ["multi_threaded"] }

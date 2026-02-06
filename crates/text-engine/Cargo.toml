@@ -11,6 +11,7 @@ cosmic-text = "0.12"
 unicode-bidi = "0.3"
 unicode-segmentation = "1.12"
 glam = "0.29"
+rayon = "1.11"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

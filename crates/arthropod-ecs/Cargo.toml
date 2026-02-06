@@ -6,8 +6,14 @@ authors = ["Arthropod Contributors"]
 license = "MIT OR Apache-2.0"
 description = "ECS integration layer for Arthropod GUI framework"
 
+[features]
+# Enable gather-apply pattern for reactive updates (high overhead, only beneficial at 25K+ entities)
+# See docs/performance/parallelization-analysis.md for crossover analysis
+parallel-reactive = []
+
 [dependencies]
-bevy_ecs = "0.15"
+bevy_ecs = { version = "0.15", features = ["multi_threaded"] }
+bevy_tasks = "0.15"
 render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
@@ -15,6 +21,7 @@ layout-engine = { path = "../layout-engine" }
 widget-core = { path = "../widget-core" }
 plat-core = { path = "../plat-core" }
 glam = "0.29"
+rayon = "1.11"
 accesskit = "0.17"  # For ActionRequest in tests
 
 [dev-dependencies]

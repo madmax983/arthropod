@@ -7,6 +7,8 @@ use crate::backend::text::TextRenderer;
 use crate::{Color, RendererError, Scene, SceneNode};
 use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use rayon::prelude::*;
+use text_engine::{ShapedText, shape_text_parallel};
 use tracing::{Level, instrument, span};
 
 use context::WgpuContext;
@@ -18,6 +20,10 @@ type SceneInstanceData<'a> = (
     Vec<RectInstance>,
     Vec<(&'a SceneNode, &'a String, f32, Color)>,
 );
+
+/// Threshold for parallelizing text shaping
+/// Below this count, sequential shaping is faster due to thread overhead
+const TEXT_PARALLEL_THRESHOLD: usize = 8;
 
 /// Helper to create a RectInstance from a SceneNode.
 ///
@@ -32,12 +38,7 @@ pub fn create_rect_instance(node: &SceneNode) -> Option<RectInstance> {
         NodeContent::Rect { color } => Some(RectInstance::rect(
             [node.bounds.x, node.bounds.y],
             [node.bounds.width, node.bounds.height],
-            [
-                color.r(),
-                color.g(),
-                color.b(),
-                color.a() * node.opacity,
-            ],
+            [color.r(), color.g(), color.b(), color.a() * node.opacity],
         )),
         NodeContent::RoundedRect {
             color,
@@ -45,12 +46,7 @@ pub fn create_rect_instance(node: &SceneNode) -> Option<RectInstance> {
         } => Some(RectInstance::new(
             [node.bounds.x, node.bounds.y],
             [node.bounds.width, node.bounds.height],
-            [
-                color.r(),
-                color.g(),
-                color.b(),
-                color.a() * node.opacity,
-            ],
+            [color.r(), color.g(), color.b(), color.a() * node.opacity],
             *corner_radius,
         )),
         _ => None,
@@ -178,24 +174,51 @@ impl super::RenderBackend for WgpuBackend {
         // Process text nodes
         let mut glyph_instances = Vec::new();
         if !raw_text_nodes.is_empty() {
-            for (node, text, font_size, color) in &raw_text_nodes {
-                if text.is_empty() {
-                    continue;
-                }
+            // Step 1: Shape text in parallel if above threshold
+            // Shaping is CPU-intensive and read-only (uses thread-local FontSystem)
+            let shaped_results: Vec<(glam::Vec2, glam::Vec4, ShapedText)> = if raw_text_nodes.len()
+                >= TEXT_PARALLEL_THRESHOLD
+            {
+                // Parallel shaping
+                raw_text_nodes
+                    .par_iter()
+                    .filter(|(_, text, _, _)| !text.is_empty())
+                    .map(|(node, text, font_size, color)| {
+                        let shaped = shape_text_parallel(text, *font_size);
+                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
+                        let text_color = glam::Vec4::new(
+                            color.r(),
+                            color.g(),
+                            color.b(),
+                            color.a() * node.opacity,
+                        );
+                        (position, text_color, shaped)
+                    })
+                    .collect()
+            } else {
+                // Sequential shaping for small counts
+                raw_text_nodes
+                    .iter()
+                    .filter(|(_, text, _, _)| !text.is_empty())
+                    .map(|(node, text, font_size, color)| {
+                        let shaped = self
+                            .text_renderer
+                            .text_engine_mut()
+                            .shape_text(text, *font_size);
+                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
+                        let text_color = glam::Vec4::new(
+                            color.r(),
+                            color.g(),
+                            color.b(),
+                            color.a() * node.opacity,
+                        );
+                        (position, text_color, shaped)
+                    })
+                    .collect()
+            };
 
-                let shaped = self
-                    .text_renderer
-                    .text_engine_mut()
-                    .shape_text(text, *font_size);
-
-                // Offset Y by font_size to place the baseline within the text block.
-                // Without this, placement_top in generate_instances would push glyphs
-                // above the node's top edge. With it, position.y represents the
-                // approximate baseline, and glyphs render correctly within bounds.
-                let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
-                let text_color =
-                    glam::Vec4::new(color.r(), color.g(), color.b(), color.a() * node.opacity);
-
+            // Step 2: Generate instances sequentially (atlas access is mutable)
+            for (position, text_color, shaped) in shaped_results {
                 let instances = self
                     .text_renderer
                     .generate_instances(&shaped, position, text_color);
@@ -393,5 +416,112 @@ mod tests {
             .find(|i| i.color[0] > 0.9)
             .expect("Flat instance not found");
         assert_eq!(flat_inst.corner_radius, 0.0);
+    }
+
+    #[test]
+    fn test_text_parallel_shaping_below_threshold() {
+        // Create scene with text nodes below parallel threshold
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Add 4 text nodes (below TEXT_PARALLEL_THRESHOLD of 8)
+        for i in 0..4 {
+            let text_node = SceneNode {
+                content: NodeContent::Text {
+                    text: format!("Text {}", i),
+                    font_size: 16.0,
+                    color: Color::rgba(1.0, 1.0, 1.0, 1.0),
+                },
+                transform: Transform2D::identity(),
+                bounds: plat_core::Rect {
+                    x: 0.0,
+                    y: (i * 20) as f32,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                children: vec![],
+                parent: None,
+                visible: true,
+                opacity: 1.0,
+            };
+            scene.add_node(root, text_node);
+        }
+
+        let (_, text_nodes) = WgpuBackend::collect_instances(&scene);
+        assert_eq!(text_nodes.len(), 4);
+        // Sequential path should be taken
+    }
+
+    #[test]
+    fn test_text_parallel_shaping_above_threshold() {
+        // Create scene with text nodes above parallel threshold
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Add 10 text nodes (above TEXT_PARALLEL_THRESHOLD of 8)
+        for i in 0..10 {
+            let text_node = SceneNode {
+                content: NodeContent::Text {
+                    text: format!("Text {}", i),
+                    font_size: 16.0,
+                    color: Color::rgba(1.0, 1.0, 1.0, 1.0),
+                },
+                transform: Transform2D::identity(),
+                bounds: plat_core::Rect {
+                    x: 0.0,
+                    y: (i * 20) as f32,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                children: vec![],
+                parent: None,
+                visible: true,
+                opacity: 1.0,
+            };
+            scene.add_node(root, text_node);
+        }
+
+        let (_, text_nodes) = WgpuBackend::collect_instances(&scene);
+        assert_eq!(text_nodes.len(), 10);
+        // Parallel path should be taken
+    }
+
+    #[test]
+    fn test_text_shaping_with_empty_strings() {
+        // Create scene with mix of empty and non-empty text
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        for i in 0..5 {
+            let text = if i % 2 == 0 {
+                String::new()
+            } else {
+                format!("Text {}", i)
+            };
+
+            let text_node = SceneNode {
+                content: NodeContent::Text {
+                    text,
+                    font_size: 16.0,
+                    color: Color::rgba(1.0, 1.0, 1.0, 1.0),
+                },
+                transform: Transform2D::identity(),
+                bounds: plat_core::Rect {
+                    x: 0.0,
+                    y: (i * 20) as f32,
+                    width: 100.0,
+                    height: 20.0,
+                },
+                children: vec![],
+                parent: None,
+                visible: true,
+                opacity: 1.0,
+            };
+            scene.add_node(root, text_node);
+        }
+
+        let (_, text_nodes) = WgpuBackend::collect_instances(&scene);
+        assert_eq!(text_nodes.len(), 5);
+        // Empty strings should be filtered out during shaping
     }
 }

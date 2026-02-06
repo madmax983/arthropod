@@ -2,13 +2,20 @@ use a11y_engine::{A11yTree, ArthropodActionHandler, FocusManager};
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::RectInstance, NodeId, Scene};
+use std::time::Instant;
 
+use crate::adaptive::AdaptiveThresholds;
 use crate::components::SceneNodeRef;
 use crate::systems::{
-    collect_renderables_system, layout_system, sync_accessible_nodes_system,
-    update_reactive_colors_system, update_reactive_opacity_system,
-    update_reactive_transforms_system, RenderCommands,
+    apply_a11y_bounds_system, collect_renderables_system, gather_a11y_bounds_system, layout_system,
+    A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
+
+#[cfg(feature = "parallel-reactive")]
+use crate::systems::{apply_reactive_changes_system, gather_reactive_changes_system};
+
+#[cfg(not(feature = "parallel-reactive"))]
+use crate::systems::update_all_reactive_system;
 
 /// Enterprise GUI framework context - wraps ECS World
 ///
@@ -49,26 +56,44 @@ use crate::systems::{
 /// ```
 pub struct FrameworkContext {
     world: World,
-    render_schedule: Schedule,
-    update_schedule: Schedule,
+    /// Unified schedule: reactive → layout → [a11y_sync || render_collect]
+    frame_schedule: Schedule,
+}
+
+/// Initialize the bevy_tasks thread pool for multi-threaded system scheduling.
+///
+/// Must be called once before running schedules with the `multi_threaded` feature.
+/// Subsequent calls are no-ops (the pool is a global singleton).
+fn ensure_task_pool_initialized() {
+    use bevy_tasks::ComputeTaskPool;
+    ComputeTaskPool::get_or_init(|| {
+        bevy_tasks::TaskPoolBuilder::new()
+            .thread_name("arthropod-compute".to_string())
+            .build()
+    });
 }
 
 impl FrameworkContext {
     /// Create a new FrameworkContext with initialized ECS World and schedules
     pub fn new() -> Self {
+        // Initialize the compute task pool for multi-threaded scheduling
+        ensure_task_pool_initialized();
+
         let mut world = World::new();
 
         // Initialize resources
-        world.insert_resource(Scene::new()); // Scene lives in the World now!
-        world.insert_resource(A11yTree::new()); // A11yTree for accessibility
-        world.insert_resource(FocusManager::new()); // Focus tracking
-        world.insert_resource(ArthropodActionHandler::new()); // Action handler
+        world.insert_resource(Scene::new());
+        world.insert_resource(A11yTree::new());
+        world.insert_resource(FocusManager::new());
+        world.insert_resource(ArthropodActionHandler::new());
         world.insert_resource(RenderCommands::default());
+        world.insert_resource(ReactiveChangeBuffer::default());
+        world.insert_resource(A11yBoundsBuffer::default());
+        world.insert_resource(AdaptiveThresholds::new());
 
         Self {
             world,
-            render_schedule: Self::build_render_schedule(),
-            update_schedule: Self::build_update_schedule(),
+            frame_schedule: Self::build_frame_schedule(),
         }
     }
 
@@ -107,50 +132,96 @@ impl FrameworkContext {
         self.world.spawn(SceneNodeRef(node_id))
     }
 
-    /// Run all update systems (reactive, animation, etc.)
+    /// Run the full frame schedule (reactive, layout, a11y, render collection).
     ///
-    /// This runs the update schedule which includes:
-    /// - Reactive color updates (polling signals)
-    /// - Reactive transform updates
-    /// - Reactive opacity updates
+    /// System execution order (enforced by explicit ordering constraints):
+    /// 1. `gather_reactive_changes_system` — polls signals into buffer (NO Scene access)
+    /// 2. `apply_reactive_changes_system` — writes buffered changes to Scene (`ResMut<Scene>`)
+    /// 3. `layout_system` — computes flexbox layout (`ResMut<Scene>`)
+    /// 4. `sync_accessible_nodes_system` + `collect_renderables_system` — run in parallel
+    ///    (both use `Res<Scene>` with disjoint `ResMut` resources)
     ///
-    /// Scene is accessed from the World as a Resource (no unsafe code needed!)
+    /// Also records frame metrics for adaptive threshold adjustment.
     pub fn update(&mut self) {
-        self.update_schedule.run(&mut self.world);
+        let start = Instant::now();
+
+        // Count entities before running systems (for adaptive metrics)
+        let entity_count = self.world.entities().len() as usize;
+
+        // Run frame schedule
+        self.frame_schedule.run(&mut self.world);
+
+        // Record frame metrics for adaptive thresholds
+        let frame_time = start.elapsed();
+        self.world
+            .resource_mut::<AdaptiveThresholds>()
+            .record_frame(frame_time, entity_count);
     }
 
-    /// Run all render systems and return render commands
+    /// Run render collection and return render commands.
     ///
-    /// This runs the render schedule which collects all visible Renderable entities
-    /// and generates RectInstance data for the GPU backend.
-    ///
-    /// Returns a Vec of RectInstances that can be passed to WgpuBackend::render_instances.
-    ///
-    /// Scene is accessed from the World as a Resource (no unsafe code needed!)
+    /// Since Phase 3, render collection runs inside `update()` as part of the
+    /// unified frame schedule. This method just extracts the collected instances.
     pub fn render(&mut self) -> Vec<RectInstance> {
-        self.render_schedule.run(&mut self.world);
-
-        // Extract render commands
         std::mem::take(&mut self.world.resource_mut::<RenderCommands>().0)
     }
 
-    /// Build the render schedule with rendering systems
-    fn build_render_schedule() -> Schedule {
+    /// Build the unified frame schedule with explicit ordering.
+    ///
+    /// Pipeline (with `parallel-reactive` feature):
+    /// ```text
+    /// gather_reactive → apply_reactive → layout → [gather_a11y || render_collect] → apply_a11y
+    /// ```
+    ///
+    /// Pipeline (without `parallel-reactive` feature):
+    /// ```text
+    /// update_all_reactive → layout → [gather_a11y || render_collect] → apply_a11y
+    /// ```
+    ///
+    /// The gather-apply split (enabled by `parallel-reactive` feature) decouples signal
+    /// polling from Scene mutation:
+    /// - `gather_reactive_changes_system`: polls signals, NO Scene access
+    /// - `apply_reactive_changes_system`: writes Scene, NO signal access
+    ///
+    /// Without the feature, uses simpler `update_all_reactive_system` which polls signals
+    /// and writes Scene in a single pass (lower overhead for typical UI scales).
+    ///
+    /// After layout, systems can overlap:
+    /// - `gather_a11y_bounds_system`: `Res<Scene>` + `ResMut<A11yBoundsBuffer>`
+    /// - `collect_renderables_system`: `Res<Scene>` + `ResMut<RenderCommands>`
+    /// Both use shared `Res<Scene>` with disjoint mutable resources.
+    ///
+    /// `apply_a11y_bounds_system` runs after gather to write to `ResMut<A11yTree>`.
+    fn build_frame_schedule() -> Schedule {
         let mut schedule = Schedule::default();
-        schedule.add_systems(collect_renderables_system);
-        schedule
-    }
 
-    /// Build the update schedule with reactive and animation systems
-    fn build_update_schedule() -> Schedule {
-        let mut schedule = Schedule::default();
-        schedule.add_systems((
-            update_reactive_colors_system,
-            update_reactive_transforms_system,
-            update_reactive_opacity_system,
-            layout_system,
-            sync_accessible_nodes_system, // Sync after reactive updates
-        ));
+        #[cfg(feature = "parallel-reactive")]
+        {
+            schedule.add_systems((
+                gather_reactive_changes_system,
+                apply_reactive_changes_system.after(gather_reactive_changes_system),
+                layout_system.after(apply_reactive_changes_system),
+                // These two overlap — different ResMut, same Res<Scene>
+                gather_a11y_bounds_system.after(layout_system),
+                collect_renderables_system.after(layout_system),
+                // Apply a11y bounds after gather completes
+                apply_a11y_bounds_system.after(gather_a11y_bounds_system),
+            ));
+        }
+
+        #[cfg(not(feature = "parallel-reactive"))]
+        {
+            schedule.add_systems((
+                update_all_reactive_system,
+                layout_system.after(update_all_reactive_system),
+                // These two overlap — different ResMut, same Res<Scene>
+                gather_a11y_bounds_system.after(layout_system),
+                collect_renderables_system.after(layout_system),
+                // Apply a11y bounds after gather completes
+                apply_a11y_bounds_system.after(gather_a11y_bounds_system),
+            ));
+        }
+
         schedule
     }
 
@@ -166,7 +237,7 @@ impl FrameworkContext {
     /// context.add_update_system(my_system);
     /// ```
     pub fn add_update_system<M>(&mut self, system: impl IntoSystemConfigs<M>) {
-        self.update_schedule.add_systems(system);
+        self.frame_schedule.add_systems(system);
     }
 }
 

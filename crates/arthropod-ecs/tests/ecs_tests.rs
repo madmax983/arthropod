@@ -214,7 +214,8 @@ fn test_collect_renderables_filters_invisible() {
     ctx.spawn(visible_node).insert(Renderable);
     ctx.spawn(hidden_node).insert(Renderable);
 
-    // Render (no scene argument!)
+    // Update (runs render collection) then extract instances
+    ctx.update();
     let instances = ctx.render();
 
     // Should only have 1 instance (the visible one)
@@ -274,7 +275,8 @@ fn test_collect_renderables_filters_zero_opacity() {
     ctx.spawn(opaque_node).insert(Renderable);
     ctx.spawn(transparent_node).insert(Renderable);
 
-    // Render (no scene argument!)
+    // Update (runs render collection) then extract instances
+    ctx.update();
     let instances = ctx.render();
 
     // Should only render the opaque node
@@ -313,7 +315,8 @@ fn test_collect_renderables_applies_opacity() {
     // Setup ECS
     ctx.spawn(node_id).insert(Renderable);
 
-    // Render (no scene argument!)
+    // Update (runs render collection) then extract instances
+    ctx.update();
     let instances = ctx.render();
 
     // Verify opacity is applied to color alpha
@@ -400,7 +403,8 @@ fn test_empty_nodes_not_rendered() {
 
     ctx.spawn(empty_node).insert(Renderable);
 
-    // Render (no scene argument!)
+    // Update (runs render collection) then extract instances
+    ctx.update();
     let instances = ctx.render();
 
     assert_eq!(
