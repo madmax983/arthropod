@@ -9,3 +9,4 @@ description = "Reactive state management for Arthropod GUI framework"
 log.workspace = true
 
 [dev-dependencies]
+proptest = "1.4"
