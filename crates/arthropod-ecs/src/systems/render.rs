@@ -43,17 +43,23 @@ pub fn collect_renderables_system(
 
         // Generate render instances based on node content type
         match &node.content {
-            NodeContent::Rect { color } | NodeContent::RoundedRect { color, .. } => {
-                commands.0.push(RectInstance {
-                    pos: [node.bounds.x, node.bounds.y],
-                    size: [node.bounds.width, node.bounds.height],
-                    color: [
-                        color.r(),
-                        color.g(),
-                        color.b(),
-                        color.a() * node.opacity, // Apply opacity
-                    ],
-                });
+            NodeContent::Rect { color } => {
+                commands.0.push(RectInstance::rect(
+                    [node.bounds.x, node.bounds.y],
+                    [node.bounds.width, node.bounds.height],
+                    [color.r(), color.g(), color.b(), color.a() * node.opacity],
+                ));
+            }
+            NodeContent::RoundedRect {
+                color,
+                corner_radius,
+            } => {
+                commands.0.push(RectInstance::new(
+                    [node.bounds.x, node.bounds.y],
+                    [node.bounds.width, node.bounds.height],
+                    [color.r(), color.g(), color.b(), color.a() * node.opacity],
+                    *corner_radius,
+                ));
             }
             NodeContent::Text { .. } => {
                 // Text is handled directly in wgpu_backend during rendering

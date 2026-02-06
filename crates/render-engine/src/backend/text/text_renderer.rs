@@ -43,13 +43,21 @@ impl TextRenderer {
                 .atlas
                 .get_or_rasterize(glyph.cache_key, self.text_engine.font_system());
 
-            // Calculate glyph position
-            let glyph_x = position.x + glyph.x_offset;
-            let glyph_y = position.y + glyph.y_offset;
+            // Skip zero-size glyphs (spaces, missing glyphs)
+            if coords.pixel_width == 0 || coords.pixel_height == 0 {
+                continue;
+            }
 
-            // Use glyph metrics for size
-            let glyph_width = glyph.x_advance;
-            let glyph_height = 16.0; // Approximate from font size (TODO: get from cache_key)
+            // Use actual rasterized pixel dimensions for the quad
+            let glyph_width = coords.pixel_width as f32;
+            let glyph_height = coords.pixel_height as f32;
+
+            // Position: shaping position + swash placement offsets.
+            // placement_left: pixels from glyph origin to left edge of rasterized image
+            // placement_top: pixels from glyph origin to top edge (positive = above origin)
+            // In our Y-down coordinate system, subtract placement_top to move image upward.
+            let glyph_x = position.x + glyph.x_offset + coords.placement_left as f32;
+            let glyph_y = position.y + glyph.y_offset - coords.placement_top as f32;
 
             instances.push(GlyphInstance {
                 pos: [glyph_x, glyph_y],

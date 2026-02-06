@@ -164,11 +164,12 @@ impl Widget for Button {
             )
         };
 
-        // Create button container with background
+        // Create button container with rounded background
         let button_node = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
+            NodeContent::RoundedRect {
                 color: Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w),
+                corner_radius: 6.0,
             },
         );
 

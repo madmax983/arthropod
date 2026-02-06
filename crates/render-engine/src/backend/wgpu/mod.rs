@@ -106,12 +106,23 @@ impl WgpuBackend {
             }
 
             match &node.content {
-                NodeContent::Rect { color } | NodeContent::RoundedRect { color, .. } => {
-                    instances.push(RectInstance {
-                        pos: [node.bounds.x, node.bounds.y],
-                        size: [node.bounds.width, node.bounds.height],
-                        color: [color.r(), color.g(), color.b(), color.a() * node.opacity],
-                    });
+                NodeContent::Rect { color } => {
+                    instances.push(RectInstance::rect(
+                        [node.bounds.x, node.bounds.y],
+                        [node.bounds.width, node.bounds.height],
+                        [color.r(), color.g(), color.b(), color.a() * node.opacity],
+                    ));
+                }
+                NodeContent::RoundedRect {
+                    color,
+                    corner_radius,
+                } => {
+                    instances.push(RectInstance::new(
+                        [node.bounds.x, node.bounds.y],
+                        [node.bounds.width, node.bounds.height],
+                        [color.r(), color.g(), color.b(), color.a() * node.opacity],
+                        *corner_radius,
+                    ));
                 }
                 NodeContent::Text {
                     text,
@@ -150,7 +161,11 @@ impl super::RenderBackend for WgpuBackend {
                     .text_engine_mut()
                     .shape_text(text, *font_size);
 
-                let position = glam::Vec2::new(node.bounds.x, node.bounds.y);
+                // Offset Y by font_size to place the baseline within the text block.
+                // Without this, placement_top in generate_instances would push glyphs
+                // above the node's top edge. With it, position.y represents the
+                // approximate baseline, and glyphs render correctly within bounds.
+                let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
                 let text_color =
                     glam::Vec4::new(color.r(), color.g(), color.b(), color.a() * node.opacity);
 
@@ -284,5 +299,72 @@ mod tests {
         assert_eq!(blue_instance.pos, [200.0, 100.0]);
         assert_eq!(blue_instance.size, [150.0, 150.0]);
         assert_eq!(blue_instance.color, [0.0, 0.0, 1.0, 0.5]); // opacity applied
+
+        // Both flat rects should have corner_radius = 0.0
+        assert_eq!(red_instance.corner_radius, 0.0);
+        assert_eq!(blue_instance.corner_radius, 0.0);
+    }
+
+    #[test]
+    fn test_rounded_rect_preserves_corner_radius() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Add a RoundedRect with corner_radius
+        let rounded = SceneNode {
+            content: NodeContent::RoundedRect {
+                color: Color::rgba(0.5, 0.5, 0.5, 1.0),
+                corner_radius: 12.0,
+            },
+            transform: Transform2D::identity(),
+            bounds: plat_core::Rect {
+                x: 30.0,
+                y: 30.0,
+                width: 200.0,
+                height: 100.0,
+            },
+            children: vec![],
+            parent: None,
+            visible: true,
+            opacity: 1.0,
+        };
+        scene.add_node(root, rounded);
+
+        // Add a flat Rect for comparison
+        let flat = SceneNode {
+            content: NodeContent::Rect {
+                color: Color::rgba(1.0, 0.0, 0.0, 1.0),
+            },
+            transform: Transform2D::identity(),
+            bounds: plat_core::Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 50.0,
+                height: 50.0,
+            },
+            children: vec![],
+            parent: None,
+            visible: true,
+            opacity: 1.0,
+        };
+        scene.add_node(root, flat);
+
+        let (instances, _) = WgpuBackend::collect_instances(&scene);
+        assert_eq!(instances.len(), 2);
+
+        // Rounded rect should preserve corner_radius
+        let rounded_inst = instances
+            .iter()
+            .find(|i| i.corner_radius > 0.0)
+            .expect("Rounded instance not found");
+        assert_eq!(rounded_inst.corner_radius, 12.0);
+        assert_eq!(rounded_inst.pos, [30.0, 30.0]);
+
+        // Flat rect should have 0.0
+        let flat_inst = instances
+            .iter()
+            .find(|i| i.color[0] > 0.9)
+            .expect("Flat instance not found");
+        assert_eq!(flat_inst.corner_radius, 0.0);
     }
 }

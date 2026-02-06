@@ -41,10 +41,18 @@ fn test_infinite_recursion_crash() {
         Ok(_) => panic!("Should have panicked with recursion limit exceeded"),
         Err(e) => {
             if let Some(msg) = e.downcast_ref::<&str>() {
-                assert!(msg.contains("Reactive recursion limit exceeded"), "Unexpected panic message: {}", msg);
+                assert!(
+                    msg.contains("Reactive recursion limit exceeded"),
+                    "Unexpected panic message: {}",
+                    msg
+                );
                 println!("✅ Recursion limit caught successfully: {}", msg);
             } else if let Some(msg) = e.downcast_ref::<String>() {
-                assert!(msg.contains("Reactive recursion limit exceeded"), "Unexpected panic message: {}", msg);
+                assert!(
+                    msg.contains("Reactive recursion limit exceeded"),
+                    "Unexpected panic message: {}",
+                    msg
+                );
                 println!("✅ Recursion limit caught successfully: {}", msg);
             } else {
                 panic!("Unknown panic type");

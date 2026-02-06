@@ -7,9 +7,29 @@ use wgpu;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RectInstance {
-    pub pos: [f32; 2],   // Position (x, y)
-    pub size: [f32; 2],  // Size (width, height)
-    pub color: [f32; 4], // Color (r, g, b, a)
+    pub pos: [f32; 2],      // Position (x, y)
+    pub size: [f32; 2],     // Size (width, height)
+    pub color: [f32; 4],    // Color (r, g, b, a)
+    pub corner_radius: f32, // Corner radius for rounded rectangles (0.0 = sharp)
+}
+
+impl RectInstance {
+    /// Create a new instance with explicit corner radius.
+    #[inline]
+    pub fn new(pos: [f32; 2], size: [f32; 2], color: [f32; 4], corner_radius: f32) -> Self {
+        Self {
+            pos,
+            size,
+            color,
+            corner_radius,
+        }
+    }
+
+    /// Create a sharp-cornered rectangle (corner_radius = 0.0).
+    #[inline]
+    pub fn rect(pos: [f32; 2], size: [f32; 2], color: [f32; 4]) -> Self {
+        Self::new(pos, size, color, 0.0)
+    }
 }
 
 pub struct RectPipeline {
@@ -44,6 +64,7 @@ impl RectPipeline {
                 0 => Float32x2,  // pos
                 1 => Float32x2,  // size
                 2 => Float32x4,  // color
+                3 => Float32,    // corner_radius
             ],
         };
 
@@ -166,17 +187,22 @@ mod tests {
     #[test]
     fn test_rect_instance_is_pod() {
         // Verify RectInstance can be safely cast to bytes
-        let instance = RectInstance {
-            pos: [10.0, 20.0],
-            size: [100.0, 200.0],
-            color: [1.0, 0.0, 0.0, 1.0],
-        };
+        let instance = RectInstance::rect([10.0, 20.0], [100.0, 200.0], [1.0, 0.0, 0.0, 1.0]);
 
         let bytes = bytemuck::bytes_of(&instance);
         assert_eq!(bytes.len(), std::mem::size_of::<RectInstance>());
+        assert_eq!(instance.corner_radius, 0.0);
 
         let instances = vec![instance];
         let slice = bytemuck::cast_slice::<RectInstance, u8>(&instances);
         assert_eq!(slice.len(), std::mem::size_of::<RectInstance>());
+    }
+
+    #[test]
+    fn test_corner_radius_preserved() {
+        let instance = RectInstance::new([10.0, 20.0], [100.0, 50.0], [1.0, 1.0, 1.0, 1.0], 12.0);
+        assert_eq!(instance.corner_radius, 12.0);
+        assert_eq!(instance.pos, [10.0, 20.0]);
+        assert_eq!(instance.size, [100.0, 50.0]);
     }
 }

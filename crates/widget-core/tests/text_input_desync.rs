@@ -49,7 +49,10 @@ fn test_text_input_cursor_desync_on_external_update() {
     let final_value = ctx.get_text_input_value(node_id).unwrap();
 
     // This assertion will fail if the bug exists
-    assert_eq!(final_value, "Hi!", "Text input should work even after external signal update shortened the text");
+    assert_eq!(
+        final_value, "Hi!",
+        "Text input should work even after external signal update shortened the text"
+    );
 
     let final_pos = ctx.get_cursor_position(node_id).unwrap();
     assert_eq!(final_pos, 3, "Cursor should be at the end of new text");

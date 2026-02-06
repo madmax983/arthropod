@@ -3,22 +3,26 @@
 use cosmic_text::{CacheKey, FontSystem, SwashCache};
 use hashbrown::HashMap;
 
-/// Texture coordinates in atlas (0.0-1.0 normalized)
+/// Texture coordinates in atlas (0.0-1.0 normalized) plus pixel dimensions and placement
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TexCoords {
     pub u0: f32,
     pub v0: f32,
     pub u1: f32,
     pub v1: f32,
+    /// Rasterized glyph width in pixels
+    pub pixel_width: u32,
+    /// Rasterized glyph height in pixels
+    pub pixel_height: u32,
+    /// Horizontal offset from glyph origin to left edge of rasterized image
+    pub placement_left: i32,
+    /// Vertical offset from glyph origin to top edge of rasterized image
+    pub placement_top: i32,
 }
 
 /// Cached glyph entry
 struct CachedGlyph {
     coords: TexCoords,
-    #[allow(dead_code)]
-    width: u32,
-    #[allow(dead_code)]
-    height: u32,
 }
 
 /// Glyph atlas for texture packing and caching
@@ -65,36 +69,51 @@ impl GlyphAtlas {
         }
 
         // Rasterize glyph using cosmic-text
-        let (coords, width, height) = self.rasterize_glyph(cache_key, font_system);
+        let coords = self.rasterize_glyph(cache_key, font_system);
 
         // Cache it
-        self.cache.insert(
-            cache_key,
-            CachedGlyph {
-                coords,
-                width,
-                height,
-            },
-        );
+        self.cache.insert(cache_key, CachedGlyph { coords });
 
         coords
     }
 
     /// Rasterize a glyph and pack it into the atlas
-    fn rasterize_glyph(
-        &mut self,
-        cache_key: CacheKey,
-        font_system: &mut FontSystem,
-    ) -> (TexCoords, u32, u32) {
+    fn rasterize_glyph(&mut self, cache_key: CacheKey, font_system: &mut FontSystem) -> TexCoords {
+        use cosmic_text::SwashContent;
+
         // Rasterize using cosmic-text's SwashCache
         // We extract the data we need immediately to avoid borrow conflicts
-        let (glyph_width, glyph_height, glyph_data) =
+        let (glyph_width, glyph_height, place_left, place_top, alpha_data) =
             match self.swash_cache.get_image(font_system, cache_key) {
                 Some(img) => {
                     let w = img.placement.width;
                     let h = img.placement.height;
-                    let data = img.data.clone(); // Clone to release borrow on self
-                    (w, h, data)
+                    let pl = img.placement.left;
+                    let pt = img.placement.top;
+                    // Extract alpha channel based on content format
+                    let alpha = match img.content {
+                        SwashContent::Mask => {
+                            // Already 1 byte per pixel (alpha mask)
+                            img.data.clone()
+                        }
+                        SwashContent::SubpixelMask => {
+                            // 4 bytes per pixel — R/G/B hold per-channel coverage.
+                            // Average the RGB channels for a grayscale alpha mask.
+                            img.data
+                                .chunks_exact(4)
+                                .map(|rgba| {
+                                    let avg =
+                                        (rgba[0] as u16 + rgba[1] as u16 + rgba[2] as u16) / 3;
+                                    avg as u8
+                                })
+                                .collect()
+                        }
+                        SwashContent::Color => {
+                            // 4 bytes per pixel (RGBA bitmap) — extract alpha channel
+                            img.data.chunks_exact(4).map(|rgba| rgba[3]).collect()
+                        }
+                    };
+                    (w, h, pl, pt, alpha)
                 }
                 None => {
                     // Return valid small coords for missing glyphs (1x1 pixel)
@@ -103,7 +122,16 @@ impl GlyphAtlas {
                     let u1 = (self.current_x + 1) as f32 / self.width as f32;
                     let v1 = (self.current_y + 1) as f32 / self.height as f32;
                     self.current_x += 1;
-                    return (TexCoords { u0, v0, u1, v1 }, 1, 1);
+                    return TexCoords {
+                        u0,
+                        v0,
+                        u1,
+                        v1,
+                        pixel_width: 1,
+                        pixel_height: 1,
+                        placement_left: 0,
+                        placement_top: 0,
+                    };
                 }
             };
 
@@ -116,9 +144,6 @@ impl GlyphAtlas {
 
         // Check if atlas is full
         if self.current_y + glyph_height > self.height {
-            // Atlas full - reset to beginning and clear cache
-            // This is a simple eviction strategy that clears all glyphs
-            // Future improvement: implement LRU eviction or atlas expansion
             tracing::warn!(
                 width = self.width,
                 height = self.height,
@@ -137,8 +162,7 @@ impl GlyphAtlas {
         let u1 = (x + glyph_width) as f32 / self.width as f32;
         let v1 = (y + glyph_height) as f32 / self.height as f32;
 
-        // Copy glyph data to texture (R8 format - just alpha channel)
-        // cosmic-text's image data is already in alpha format
+        // Copy alpha data to texture (R8 format)
         for row in 0..glyph_height {
             for col in 0..glyph_width {
                 let src_idx = (row * glyph_width + col) as usize;
@@ -146,9 +170,8 @@ impl GlyphAtlas {
                 let dst_y = y + row;
                 let dst_idx = (dst_y * self.width + dst_x) as usize;
 
-                if dst_idx < self.texture_data.len() && src_idx < glyph_data.len() {
-                    let alpha = glyph_data[src_idx];
-                    self.texture_data[dst_idx] = alpha; // R8: single alpha channel
+                if dst_idx < self.texture_data.len() && src_idx < alpha_data.len() {
+                    self.texture_data[dst_idx] = alpha_data[src_idx];
                 }
             }
         }
@@ -157,7 +180,16 @@ impl GlyphAtlas {
         self.current_x += glyph_width;
         self.row_height = self.row_height.max(glyph_height);
 
-        (TexCoords { u0, v0, u1, v1 }, glyph_width, glyph_height)
+        TexCoords {
+            u0,
+            v0,
+            u1,
+            v1,
+            pixel_width: glyph_width,
+            pixel_height: glyph_height,
+            placement_left: place_left,
+            placement_top: place_top,
+        }
     }
 
     /// Get the texture data
@@ -207,12 +239,18 @@ mod tests {
             v0: 0.0,
             u1: 0.5,
             v1: 0.5,
+            pixel_width: 10,
+            pixel_height: 16,
+            placement_left: 1,
+            placement_top: 14,
         };
 
         assert!(coords.u0 >= 0.0 && coords.u0 <= 1.0);
         assert!(coords.v0 >= 0.0 && coords.v0 <= 1.0);
         assert!(coords.u1 >= 0.0 && coords.u1 <= 1.0);
         assert!(coords.v1 >= 0.0 && coords.v1 <= 1.0);
+        assert_eq!(coords.pixel_width, 10);
+        assert_eq!(coords.pixel_height, 16);
     }
 
     #[test]
@@ -274,25 +312,16 @@ mod tests {
 
         // Ensure we have at least one glyph
         if shaped.glyphs.is_empty() {
-            // If no system fonts are found or "A" produces no glyphs, we skip the test
-            // or print a warning, but we expect "A" to work on most systems.
-            // On CI environments without fonts this might be an issue.
-            // But let's assume there is a font.
             return;
         }
 
         let glyph = &shaped.glyphs[0];
 
-        atlas.get_or_rasterize(glyph.cache_key, engine.font_system());
+        let coords = atlas.get_or_rasterize(glyph.cache_key, engine.font_system());
 
-        let cached = atlas
-            .cache
-            .get(&glyph.cache_key)
-            .expect("Glyph should be cached");
-
-        // Allow for the possibility that one dimension could legitimately be zero
+        // Pixel dimensions should be available via TexCoords
         assert!(
-            cached.width > 0 || cached.height > 0,
+            coords.pixel_width > 0 || coords.pixel_height > 0,
             "At least one glyph dimension should be > 0"
         );
     }

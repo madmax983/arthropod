@@ -1,6 +1,6 @@
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Scene, SceneNode};
 use proptest::prelude::*;
+use render_engine::{Color, NodeContent, Scene, SceneNode};
 
 #[test]
 #[ignore] // Crashes the test runner (Stack Overflow)

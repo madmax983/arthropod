@@ -132,13 +132,16 @@ impl RuntimeInner {
     }
 
     fn push_context(&mut self, id: NodeId) -> Result<(), String> {
-        let stack = self.tracking_context
+        let stack = self
+            .tracking_context
             .entry(thread::current().id())
             .or_default();
 
         // Prevent stack overflow from infinite recursion
         if stack.len() >= 100 {
-            return Err("Reactive recursion limit exceeded (100). Infinite loop in effects?".to_string());
+            return Err(
+                "Reactive recursion limit exceeded (100). Infinite loop in effects?".to_string(),
+            );
         }
 
         stack.push(id);

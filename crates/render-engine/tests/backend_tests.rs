@@ -278,21 +278,9 @@ fn test_render_instances_api() {
     // without building a Scene graph
 
     let instances = vec![
-        RectInstance {
-            pos: [0.0, 0.0],
-            size: [100.0, 100.0],
-            color: [1.0, 0.0, 0.0, 1.0], // Red
-        },
-        RectInstance {
-            pos: [100.0, 0.0],
-            size: [100.0, 100.0],
-            color: [0.0, 1.0, 0.0, 1.0], // Green
-        },
-        RectInstance {
-            pos: [200.0, 0.0],
-            size: [100.0, 100.0],
-            color: [0.0, 0.0, 1.0, 1.0], // Blue
-        },
+        RectInstance::rect([0.0, 0.0], [100.0, 100.0], [1.0, 0.0, 0.0, 1.0]), // Red
+        RectInstance::rect([100.0, 0.0], [100.0, 100.0], [0.0, 1.0, 0.0, 1.0]), // Green
+        RectInstance::rect([200.0, 0.0], [100.0, 100.0], [0.0, 0.0, 1.0, 1.0]), // Blue
     ];
 
     // Note: We can't actually test rendering without a window, but we can test
