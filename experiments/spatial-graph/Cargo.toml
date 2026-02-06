@@ -1,0 +1,15 @@
+[package]
+name = "spatial-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arthropod = { path = "../../crates/arthropod" }
+arthropod-ecs = { path = "../../crates/arthropod-ecs" }
+render-engine = { path = "../../crates/render-engine" }
+flux-state = { path = "../../crates/flux-state" }
+plat-core = { path = "../../crates/plat-core" }
+glam = { workspace = true }
+log = { workspace = true }
+bevy_ecs = "0.15"
