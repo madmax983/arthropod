@@ -19,10 +19,48 @@ type SceneInstanceData<'a> = (
     Vec<(&'a SceneNode, &'a String, f32, Color)>,
 );
 
+/// Helper to create a RectInstance from a SceneNode.
+///
+/// Returns None if the node is not a rectangle/rounded-rectangle, or is invisible.
+pub fn create_rect_instance(node: &SceneNode) -> Option<RectInstance> {
+    use crate::NodeContent;
+    if !node.visible || node.opacity <= 0.0 {
+        return None;
+    }
+
+    match &node.content {
+        NodeContent::Rect { color } => Some(RectInstance::rect(
+            [node.bounds.x, node.bounds.y],
+            [node.bounds.width, node.bounds.height],
+            [
+                color.r(),
+                color.g(),
+                color.b(),
+                color.a() * node.opacity,
+            ],
+        )),
+        NodeContent::RoundedRect {
+            color,
+            corner_radius,
+        } => Some(RectInstance::new(
+            [node.bounds.x, node.bounds.y],
+            [node.bounds.width, node.bounds.height],
+            [
+                color.r(),
+                color.g(),
+                color.b(),
+                color.a() * node.opacity,
+            ],
+            *corner_radius,
+        )),
+        _ => None,
+    }
+}
+
 /// wgpu-based rendering backend.
 #[derive(Resource)]
 pub struct WgpuBackend {
-    pub context: WgpuContext,
+    pub(crate) context: WgpuContext,
     rect_pipeline: RectPipeline,
     glyph_pipeline: GlyphPipeline,
     text_renderer: TextRenderer,
@@ -101,29 +139,18 @@ impl WgpuBackend {
         let mut raw_text_nodes = Vec::new();
 
         for (_node_id, node) in scene.iter_visuals() {
+            // Use helper for rect instances
+            if let Some(instance) = create_rect_instance(node) {
+                instances.push(instance);
+                continue;
+            }
+
+            // Handle other content (Text)
             if !node.visible || node.opacity <= 0.0 {
                 continue;
             }
 
             match &node.content {
-                NodeContent::Rect { color } => {
-                    instances.push(RectInstance::rect(
-                        [node.bounds.x, node.bounds.y],
-                        [node.bounds.width, node.bounds.height],
-                        [color.r(), color.g(), color.b(), color.a() * node.opacity],
-                    ));
-                }
-                NodeContent::RoundedRect {
-                    color,
-                    corner_radius,
-                } => {
-                    instances.push(RectInstance::new(
-                        [node.bounds.x, node.bounds.y],
-                        [node.bounds.width, node.bounds.height],
-                        [color.r(), color.g(), color.b(), color.a() * node.opacity],
-                        *corner_radius,
-                    ));
-                }
                 NodeContent::Text {
                     text,
                     font_size,
@@ -131,7 +158,7 @@ impl WgpuBackend {
                 } => {
                     raw_text_nodes.push((node, text, *font_size, *color));
                 }
-                NodeContent::Empty => {}
+                _ => {}
             }
         }
         (instances, raw_text_nodes)

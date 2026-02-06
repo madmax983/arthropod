@@ -21,3 +21,7 @@
 ## 2026-02-04 - Decompose WidgetContext State
 **Tangle:** `WidgetContext` in `widget-core` had grown again into a "Blob" (1200+ lines), directly defining `TextInputState`, `FormState`, and `ValidationState` and their logic, violating SRP and bloating the context.
 **Blueprint:** Extracted `TextInputState` (and logic) to `input_state.rs`, `FormState` to `form_state.rs`, and `ValidationState` to `validation_state.rs`. `WidgetContext` now acts as a coordinator, importing these types. `form.rs` re-exports types from `form_state.rs` to maintain API compatibility.
+
+## 2026-02-06 - Centralize Render Logic
+**Tangle:** `arthropod-ecs` duplicated the logic for converting `SceneNode` to `RectInstance` from `WgpuBackend`, violating DRY and creating a "Shotgun" maintenance burden where adding new node types required updating multiple crates.
+**Blueprint:** Extracted the conversion logic into a public helper `create_rect_instance` in `render-engine`. Both `WgpuBackend` and `arthropod-ecs` now consume this helper, ensuring consistent behavior and encapsulation.

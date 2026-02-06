@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use render_engine::{backend::RectInstance, NodeContent, NodeId, Scene};
+use render_engine::{backend::RectInstance, NodeId, Scene};
 use std::collections::HashSet;
 
 use crate::components::{Renderable, SceneNodeRef};
@@ -36,37 +36,10 @@ pub fn collect_renderables_system(
             continue;
         }
 
-        // Skip invisible nodes and fully transparent nodes
-        if !node.visible || node.opacity <= 0.0 {
-            continue;
-        }
-
-        // Generate render instances based on node content type
-        match &node.content {
-            NodeContent::Rect { color } => {
-                commands.0.push(RectInstance::rect(
-                    [node.bounds.x, node.bounds.y],
-                    [node.bounds.width, node.bounds.height],
-                    [color.r(), color.g(), color.b(), color.a() * node.opacity],
-                ));
-            }
-            NodeContent::RoundedRect {
-                color,
-                corner_radius,
-            } => {
-                commands.0.push(RectInstance::new(
-                    [node.bounds.x, node.bounds.y],
-                    [node.bounds.width, node.bounds.height],
-                    [color.r(), color.g(), color.b(), color.a() * node.opacity],
-                    *corner_radius,
-                ));
-            }
-            NodeContent::Text { .. } => {
-                // Text is handled directly in wgpu_backend during rendering
-            }
-            NodeContent::Empty => {
-                // Empty nodes have no visual representation
-            }
+        // Use helper for rect instances
+        // Note: This helper handles visibility and opacity checks internally
+        if let Some(instance) = render_engine::backend::wgpu::create_rect_instance(node) {
+            commands.0.push(instance);
         }
     }
 }

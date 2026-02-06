@@ -14,15 +14,15 @@ pub struct Globals {
 /// Wraps the WGPU instance, surface, device, queue, and global resources.
 pub struct WgpuContext {
     #[allow(dead_code)]
-    pub instance: wgpu::Instance,
-    pub surface: wgpu::Surface<'static>,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
-    pub globals_buffer: wgpu::Buffer,
-    pub globals_bind_group: wgpu::BindGroup,
-    pub globals_bind_group_layout: wgpu::BindGroupLayout,
-    pub clear_color: crate::Color,
+    pub(crate) instance: wgpu::Instance,
+    pub(crate) surface: wgpu::Surface<'static>,
+    pub(crate) device: wgpu::Device,
+    pub(crate) queue: wgpu::Queue,
+    pub(crate) config: wgpu::SurfaceConfiguration,
+    pub(crate) globals_buffer: wgpu::Buffer,
+    pub(crate) globals_bind_group: wgpu::BindGroup,
+    pub(crate) globals_bind_group_layout: wgpu::BindGroupLayout,
+    pub(crate) clear_color: crate::Color,
 }
 
 impl WgpuContext {
