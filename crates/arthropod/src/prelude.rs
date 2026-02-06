@@ -3,6 +3,9 @@
 //! This module re-exports the most commonly used types and traits.
 //! Import with `use arthropod::prelude::*;` to get started quickly.
 
+// Standard library time
+pub use std::time::{Duration, Instant};
+
 // App builder and context
 pub use crate::app::{App, AppContext, AppError};
 pub use crate::event_dispatcher::{DispatchResult, EventDispatcher};
@@ -28,11 +31,29 @@ pub use render_engine::{
     backend::{RenderBackend, WgpuBackend},
 };
 
-// Platform
+// Theme engine
+pub use theme_engine::{DesignTokens, SystemTheme};
+
+// Platform - Core types
 pub use plat_core::{
     Application, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig, WindowEvent,
     WindowId,
 };
+
+// Platform - Input types
+pub use plat_core::{ElementState, Key, MouseButton};
+
+// Platform - Materials
+pub use plat_core::{BackdropMaterial, HasBackdropMaterial};
+
+// Widget system - Core widgets
+pub use widget_core::{
+    Button, Card, Center, Checkbox, Column, Container, Divider, Form, Grid, List, Padding, Row,
+    Spacer, Stack, Text, TextInput, Widget, WidgetContext,
+};
+
+// Widget system - Macros
+pub use widget_core::{btn, col, form, input, row, txt};
 
 // bevy_ecs core types
 pub use bevy_ecs::prelude::*;
