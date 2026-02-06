@@ -56,6 +56,9 @@ flowchart TB
     widget-core --> widget-macros
     widget-core --> theme-engine
 
+    %% theme-engine dependencies
+    theme-engine --> plat-core
+
     %% arthropod-ecs dependencies
     arthropod-ecs --> render-engine
     arthropod-ecs --> flux-state
@@ -121,11 +124,11 @@ flowchart TB
 
 | Crate | Depends On | Depended By |
 |-------|------------|-------------|
-| `plat-core` | 0 | 7 |
+| `plat-core` | 0 | 8 |
 | `flux-state` | 0 | 4 |
 | `layout-engine` | 0 | 3 |
 | `text-engine` | 0 | 2 |
-| `theme-engine` | 0 | 1 |
+| `theme-engine` | 1 | 1 |
 | `widget-macros` | 0 | 1 |
 | `render-engine` | 2 | 8 |
 | `a11y-engine` | 2 | 2 |
