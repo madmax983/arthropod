@@ -25,7 +25,7 @@ fn test_zombie_effect_pollution() {
     let handle = thread::spawn(move || {
         // 1. Attempt to create an effect that panics
         let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            Effect::new(r_runtime.clone(), move || {
+            let _ = Effect::new(r_runtime.clone(), move || {
                 // If this runs again, increment counter
                 let count = r_c.fetch_add(1, Ordering::SeqCst);
 

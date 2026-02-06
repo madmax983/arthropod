@@ -12,7 +12,7 @@ fn test_signal_with_untracked() {
     let run_count_clone = run_count.clone();
 
     // First run tracks dependencies
-    Effect::new(runtime.clone(), move || {
+    let _keep_alive = Effect::new(runtime.clone(), move || {
         // This should NOT track dependency on signal
         let _ = read.with_untracked(|v| *v);
         *run_count_clone.lock().unwrap() += 1;
@@ -47,7 +47,7 @@ fn test_computed_with_untracked() {
     let run_count_clone = run_count.clone();
 
     let computed_clone = computed.clone();
-    Effect::new(runtime.clone(), move || {
+    let _keep_alive = Effect::new(runtime.clone(), move || {
         // This should NOT track dependency on computed
         let _ = computed_clone.with_untracked(|v| *v);
         *run_count_clone.lock().unwrap() += 1;

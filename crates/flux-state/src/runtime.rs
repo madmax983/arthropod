@@ -32,6 +32,15 @@ pub struct NodeId(pub u64);
 /// let runtime = Runtime::new();
 /// // Pass runtime.clone() to signals/effects
 /// ```
+///
+/// # Limits
+///
+/// To prevent stack overflows from infinite reactive loops (e.g., Effect A triggers Signal B,
+/// which triggers Effect A), the runtime enforces a **recursion limit of 100**.
+///
+/// If this limit is exceeded, the runtime will **panic** with a descriptive message.
+///
+/// This limit applies to the depth of the dependency chain (e.g., Computed A -> Computed B -> ...).
 pub struct Runtime {
     inner: Mutex<RuntimeInner>,
 }

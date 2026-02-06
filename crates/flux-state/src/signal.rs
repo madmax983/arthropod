@@ -79,13 +79,18 @@ impl<T: 'static + Send> Signal<T> {
     /// This is useful when you want to pass read access to some components
     /// and write access to others, or when capturing in closures.
     ///
+    /// **Note:** This method consumes the `Signal`. If you need to keep the original
+    /// signal handle, you should clone it first.
+    ///
     /// # Example
     ///
     /// ```
     /// # use flux_state::{Runtime, Signal};
     /// # let runtime = Runtime::new();
     /// let count = Signal::new(runtime, 0);
-    /// let (read, write) = count.split();
+    ///
+    /// // Clone before splitting if you need to keep 'count'
+    /// let (read, write) = count.clone().split();
     /// ```
     pub fn split(self) -> (ReadSignal<T>, WriteSignal<T>) {
         (
@@ -170,6 +175,9 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     ///
     /// Call this inside an Effect or Computed closure to subscribe to updates.
     ///
+    /// If called outside of a tracking context (e.g., in `main` or a regular function),
+    /// it will simply return the current value without creating a subscription.
+    ///
     /// # Example
     ///
     /// ```
@@ -178,9 +186,14 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// let count = Signal::new(runtime.clone(), 0);
     /// let (read, _) = count.split();
     ///
-    /// Effect::new(runtime, move || {
-    ///     println!("Count is: {}", read.get()); // Auto-subscribes
+    /// // 1. Inside an effect (Tracks dependency)
+    /// let read_clone = read.clone();
+    /// let _e = Effect::new(runtime, move || {
+    ///     println!("Count is: {}", read_clone.get()); // Auto-subscribes
     /// });
+    ///
+    /// // 2. Outside an effect (Just reads value)
+    /// let value = read.get(); // No tracking
     /// ```
     pub fn get(&self) -> T {
         self.with(|v| v.clone())

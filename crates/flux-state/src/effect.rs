@@ -33,6 +33,28 @@ use std::sync::Arc;
 ///
 /// write.set(1); // Prints "Count changed to: 1"
 /// ```
+///
+/// # Pitfalls
+///
+/// Effects are **dropped immediately** if they are not bound to a variable,
+/// because `Effect` implements `Drop` to clean up dependencies.
+///
+/// ❌ **Wrong:**
+/// ```rust
+/// # use flux_state::{Runtime, Effect};
+/// # let runtime = Runtime::new();
+/// // This effect runs once, then is dropped and stopped immediately!
+/// Effect::new(runtime, || println!("I will only run once!"));
+/// ```
+///
+/// ✅ **Correct:**
+/// ```rust
+/// # use flux_state::{Runtime, Effect};
+/// # let runtime = Runtime::new();
+/// // Assign to `_variable` (not `_`) to keep it alive
+/// let _keep_alive = Effect::new(runtime, || println!("I will keep running!"));
+/// ```
+#[must_use = "Effects are dropped (and stopped) immediately if not stored. Assign to a variable to keep alive."]
 pub struct Effect {
     id: NodeId,
     runtime: Arc<Runtime>,
