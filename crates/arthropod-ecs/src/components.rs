@@ -171,10 +171,10 @@ impl TextInputState {
 ///
 /// Stores validation logic and current error state.
 #[derive(Component, Clone)]
-pub struct Validator(pub widget_core::context::ValidationState);
+pub struct Validator(pub widget_core::validation_state::ValidationState);
 
 impl Deref for Validator {
-    type Target = widget_core::context::ValidationState;
+    type Target = widget_core::validation_state::ValidationState;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -192,10 +192,10 @@ impl DerefMut for Validator {
 /// Stores the mapping of field names to node IDs, validation state,
 /// and submission callback.
 #[derive(Component, Clone)]
-pub struct FormState(pub widget_core::context::FormState);
+pub struct FormState(pub widget_core::form_state::FormState);
 
 impl Deref for FormState {
-    type Target = widget_core::context::FormState;
+    type Target = widget_core::form_state::FormState;
 
     fn deref(&self) -> &Self::Target {
         &self.0

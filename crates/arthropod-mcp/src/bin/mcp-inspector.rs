@@ -394,22 +394,119 @@ fn ui(f: &mut Frame, app: &mut App) {
     f.render_stateful_widget(tools_list, left_chunks[0], &mut app.tool_list_state);
 
     // Logs
-    // Extract last 20 lines (from back of deque)
-    let log_text: String = app.logs.iter().rev().take(20).rev().cloned().collect::<Vec<_>>().join("\n");
+    // Extract last 20 entries
+    let recent_logs: Vec<&String> = app.logs.iter().rev().take(20).rev().collect();
 
-    let logs = Paragraph::new(log_text)
+    let mut log_lines = Vec::new();
+    for entry in recent_logs {
+         log_lines.extend(format_log_entry(entry));
+         log_lines.push(Line::raw("")); // Spacing between entries
+    }
+
+    let logs = Paragraph::new(log_lines)
         .block(Block::default().borders(Borders::ALL).title(format!("Logs - {}", app.status)))
         .wrap(Wrap { trim: true });
 
     f.render_widget(logs, right_chunks[0]);
 
     // Input
+    let input_title = match app.input_mode {
+        InputMode::Normal => "Input (i: edit, q: quit, l: refresh)",
+        InputMode::Editing => "Input (Esc: cancel, Enter: send)",
+    };
+
     let input = Paragraph::new(app.input.as_str())
         .style(match app.input_mode {
             InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),
         })
-        .block(Block::default().borders(Borders::ALL).title("Input"));
+        .block(Block::default().borders(Borders::ALL).title(input_title));
 
     f.render_widget(input, right_chunks[1]);
+}
+
+fn format_log_entry(entry: &str) -> Vec<Line<'_>> {
+    let (prefix, rest) = if let Some(stripped) = entry.strip_prefix("-> ") {
+        ("-> ", stripped)
+    } else if let Some(stripped) = entry.strip_prefix("<- ") {
+        ("<- ", stripped)
+    } else if let Some(stripped) = entry.strip_prefix("ERR: ") {
+        ("ERR: ", stripped)
+    } else {
+        ("", entry)
+    };
+
+    let style = match prefix {
+        "-> " => Style::default().fg(Color::Blue),
+        "<- " => Style::default().fg(Color::Green),
+        "ERR: " => Style::default().fg(Color::Red),
+        _ => Style::default(),
+    };
+
+    let mut lines = Vec::new();
+
+    // Attempt to pretty print JSON
+    let content = if !rest.trim().is_empty() {
+         match serde_json::from_str::<Value>(rest) {
+            Ok(val) => match serde_json::to_string_pretty(&val) {
+                Ok(pretty) => pretty,
+                Err(_) => rest.to_string(),
+            },
+            Err(_) => rest.to_string(),
+        }
+    } else {
+        rest.to_string()
+    };
+
+    // Add first line with prefix
+    let mut content_lines = content.lines();
+    if let Some(first) = content_lines.next() {
+        lines.push(Line::from(vec![
+            Span::styled(prefix, style),
+            Span::raw(first.to_string()),
+        ]));
+    } else {
+        // Empty content, just prefix
+        lines.push(Line::from(Span::styled(prefix, style)));
+    }
+
+    // Add remaining lines indented
+    for line in content_lines {
+        lines.push(Line::from(vec![
+            Span::raw("   "), // Indentation matching prefix length roughly
+            Span::raw(line.to_string()),
+        ]));
+    }
+
+    lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_log_entry_json() {
+        let entry = r#"-> {"jsonrpc":"2.0","method":"test"}"#;
+        let lines = format_log_entry(entry);
+
+        // Should have multiple lines due to pretty printing
+        assert!(lines.len() > 1);
+
+        // First line should have blue prefix
+        let first_line = &lines[0];
+        assert_eq!(first_line.spans[0].content, "-> ");
+        assert_eq!(first_line.spans[0].style.fg, Some(Color::Blue));
+    }
+
+    #[test]
+    fn test_format_log_entry_error() {
+        let entry = "ERR: Connection failed";
+        let lines = format_log_entry(entry);
+
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].spans[0].content, "ERR: ");
+        assert_eq!(lines[0].spans[0].style.fg, Some(Color::Red));
+        assert_eq!(lines[0].spans[1].content, "Connection failed");
+    }
 }
