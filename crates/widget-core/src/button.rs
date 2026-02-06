@@ -174,7 +174,8 @@ impl Widget for Button {
         );
 
         // Create text child
-        let text_widget = Text::new(self.text.clone()).color(text_color);
+        let text_widget = Text::new(self.text.clone())
+            .color(Color::rgba(text_color.x, text_color.y, text_color.z, text_color.w));
         let text_id = text_widget.build(ctx);
 
         // Re-parent text to button

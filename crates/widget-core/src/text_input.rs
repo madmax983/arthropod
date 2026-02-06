@@ -180,7 +180,8 @@ impl Widget for TextInput {
             text_color_primary // Use themed text color
         };
 
-        let text_widget = Text::new(display_text).color(text_color);
+        let text_widget = Text::new(display_text)
+            .color(Color::rgba(text_color.x, text_color.y, text_color.z, text_color.w));
         let text_id = text_widget.build(ctx);
 
         // Re-parent text to input

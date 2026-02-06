@@ -10,7 +10,7 @@
 //! Run with: cargo run --example widget_gallery
 
 use flux_state::{Runtime, Signal};
-use glam::Vec4;
+use render_engine::Color;
 use widget_core::{
     list_from, Button, Card, Center, Checkbox, Column, Container, Divider, FlexDirection,
     FlexStyle, Form, Grid, NodeContent, Padding, Row, Spacer, Stack, Text, TextInput, Widget,
@@ -27,7 +27,7 @@ fn main() {
     println!("   - Static text with color and size");
     let text1 = Text::new("Hello, Arthropod!")
         .size(24.0)
-        .color(Vec4::new(0.0, 0.47, 0.84, 1.0)); // Blue
+        .color(Color::rgba(0.0, 0.47, 0.84, 1.0)); // Blue
     let text1_id = text1.build(&mut ctx);
     println!("   ✓ Built text widget (node: {:?})", text1_id);
 

@@ -2,7 +2,6 @@
 
 use crate::{Widget, WidgetContext};
 use flux_state::ReadSignal;
-use glam::Vec4;
 use render_engine::{Color, NodeContent, NodeId};
 
 /// Text widget
@@ -13,16 +12,16 @@ use render_engine::{Color, NodeContent, NodeId};
 ///
 /// ```no_run
 /// use widget_core::Text;
-/// use glam::Vec4;
+/// use render_engine::Color;
 ///
 /// // Static text
 /// let text = Text::new("Hello World")
 ///     .size(20.0)
-///     .color(Vec4::ONE);
+///     .color(Color::rgba(1.0, 1.0, 1.0, 1.0));
 ///
 /// // With generated macro:
 /// // txt!("Hello World")
-/// // txt!("Title", size: 20.0, color: Vec4::ONE)
+/// // txt!("Title", size: 20.0)
 /// // txt!(@signal, size: 20.0)  // Reactive
 /// ```
 #[derive(Widget)]
@@ -35,7 +34,7 @@ pub struct Text {
     font_size: f32,
 
     #[param]
-    color: Option<Vec4>,
+    color: Option<Color>,
 }
 
 enum TextContent {
@@ -69,7 +68,7 @@ impl Text {
     }
 
     /// Set text color
-    pub fn color(mut self, color: Vec4) -> Self {
+    pub fn color(mut self, color: Color) -> Self {
         self.color = Some(color);
         self
     }
@@ -112,10 +111,13 @@ impl Widget for Text {
         // Resolve color: explicit > theme > hardcoded fallback
         let resolved_color = match self.color {
             Some(c) => c,
-            None => ctx
-                .design_tokens()
-                .map(|t| t.text_primary)
-                .unwrap_or(Vec4::new(0.0, 0.0, 0.0, 1.0)),
+            None => {
+                let theme_color = ctx
+                    .design_tokens()
+                    .map(|t| t.text_primary)
+                    .unwrap_or(glam::Vec4::new(0.0, 0.0, 0.0, 1.0));
+                Color::rgba(theme_color.x, theme_color.y, theme_color.z, theme_color.w)
+            }
         };
 
         // Get text content
@@ -133,12 +135,7 @@ impl Widget for Text {
             NodeContent::Text {
                 text: text_string,
                 font_size: self.font_size,
-                color: Color::rgba(
-                    resolved_color.x,
-                    resolved_color.y,
-                    resolved_color.z,
-                    resolved_color.w,
-                ),
+                color: resolved_color,
             },
         );
 
@@ -198,14 +195,14 @@ mod tests {
 
     #[test]
     fn test_text_color() {
-        let color = Vec4::new(1.0, 0.0, 0.0, 1.0);
+        let color = Color::rgba(1.0, 0.0, 0.0, 1.0);
         let text = Text::new("Colored").color(color);
         assert_eq!(text.color, Some(color));
     }
 
     #[test]
     fn test_text_chained_builders() {
-        let color = Vec4::new(0.5, 0.5, 0.5, 1.0);
+        let color = Color::rgba(0.5, 0.5, 0.5, 1.0);
         let text = Text::new("Test").heading2().color(color);
         assert_eq!(text.font_size, 24.0);
         assert_eq!(text.color, Some(color));
