@@ -17,6 +17,13 @@ use crate::SceneNode;
 use bevy_ecs::prelude::*;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+
+thread_local! {
+    /// Reusable stack for hit_test to avoid allocations.
+    /// Stores (NodeId, next_child_index_to_visit).
+    static HIT_TEST_STACK: RefCell<Vec<(NodeId, usize)>> = RefCell::new(Vec::with_capacity(64));
+}
 
 /// Unique identifier for scene nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -268,7 +275,7 @@ impl Scene {
 
     /// Find a visible node at the given screen position.
     ///
-    /// This method performs a recursive tree traversal starting from the root,
+    /// This method performs an iterative tree traversal starting from the root,
     /// checking children in **reverse order** (top-most first). This guarantees
     /// that if multiple nodes overlap at the given point, the one that was
     /// added last (and thus rendered on top) is returned.
@@ -278,6 +285,11 @@ impl Scene {
     /// This is an O(log N) operation for typical balanced trees, but can be
     /// O(N) in the worst case (deeply nested hierarchies). It is significantly
     /// faster than a global linear scan and correctly handles Z-ordering.
+    ///
+    /// # Safety
+    ///
+    /// This method uses an iterative approach with a heap-allocated stack to
+    /// prevent stack overflows on deeply nested scene graphs (e.g. >10k nodes deep).
     ///
     /// # Z-Order Guarantee
     ///
@@ -308,30 +320,63 @@ impl Scene {
     /// assert_eq!(scene.hit_test(75.0, 75.0), Some(id2));
     /// ```
     pub fn hit_test(&self, x: f32, y: f32) -> Option<NodeId> {
-        self.hit_test_recursive(self.root, x, y)
-    }
+        // Use a thread-local stack for iterative traversal to avoid recursion limits
+        // and allocations.
+        HIT_TEST_STACK.with(|stack_cell| {
+            let mut stack = stack_cell.borrow_mut();
+            stack.clear();
 
-    /// Recursive helper for hit testing.
-    fn hit_test_recursive(&self, node_id: NodeId, x: f32, y: f32) -> Option<NodeId> {
-        let node = self.nodes.get(&node_id)?;
-
-        if !node.visible {
-            return None;
-        }
-
-        // Iterate children in reverse order (top-most first)
-        for &child_id in node.children.iter().rev() {
-            if let Some(hit) = self.hit_test_recursive(child_id, x, y) {
-                return Some(hit);
+            // Start with root
+            if let Some(root_node) = self.nodes.get(&self.root) {
+                stack.push((self.root, root_node.children.len()));
+            } else {
+                return None;
             }
-        }
 
-        // Check self
-        if node.bounds.contains(x, y) {
-            Some(node_id)
-        } else {
+            while !stack.is_empty() {
+                // Peek at the current node state
+                let (node_id, child_index) = *stack.last().unwrap();
+
+                let node = match self.nodes.get(&node_id) {
+                    Some(n) => n,
+                    None => {
+                        // Should not happen in a valid scene, but handle safely
+                        stack.pop();
+                        continue;
+                    }
+                };
+
+                if !node.visible {
+                    stack.pop();
+                    continue;
+                }
+
+                if child_index > 0 {
+                    // Visit next child. We iterate in reverse order (back to front).
+                    let next_child_idx = child_index - 1;
+
+                    // Update the state on the stack to mark this child as visited
+                    stack.last_mut().unwrap().1 = next_child_idx;
+
+                    let child_id = node.children[next_child_idx];
+
+                    // Push child to stack
+                    if let Some(child_node) = self.nodes.get(&child_id) {
+                        stack.push((child_id, child_node.children.len()));
+                    }
+                } else {
+                    // All children visited (and none returned a hit).
+                    // Check self.
+                    stack.pop();
+
+                    if node.bounds.contains(x, y) {
+                        return Some(node_id);
+                    }
+                }
+            }
+
             None
-        }
+        })
     }
 
     /// Serialize the scene to JSON for debugging

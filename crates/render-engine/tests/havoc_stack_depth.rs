@@ -3,7 +3,7 @@ use proptest::prelude::*;
 use render_engine::{Color, NodeContent, Scene, SceneNode};
 
 #[test]
-#[ignore] // Crashes the test runner (Stack Overflow)
+// #[ignore] // Crashes the test runner (Stack Overflow) - Fixed by Bolt ⚡
 fn test_stack_depth_overflow_deterministic() {
     let mut scene = Scene::new();
     let mut current_parent = scene.root();
