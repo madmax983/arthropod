@@ -24,3 +24,10 @@ impl Default for Viewport {
         }
     }
 }
+
+/// Statistics for the spatial graph system.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct Stats {
+    pub total_nodes: usize,
+    pub visible_nodes: usize,
+}

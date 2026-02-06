@@ -1,5 +1,5 @@
 use arthropod::prelude::*;
-use spatial_graph::{SpatialNode, Viewport, spatial_transform_system};
+use spatial_graph::{SpatialNode, Viewport, Stats, spatial_transform_system, stats_system};
 use render_engine::{Scene, SceneNode, NodeContent, Color};
 use glam::Vec2;
 use std::time::{Instant, Duration};
@@ -55,29 +55,24 @@ fn animate_camera(
 }
 
 fn main() -> Result<(), AppError> {
-    let config = WindowConfig {
-        title: "Infinite Canvas".to_string(),
-        size: plat_core::Size { width: 800, height: 600 },
-        ..Default::default()
-    };
-
-    // We use build_headless for CI/CD environments where display might not be available
-    let mut app = AppBuilder::new()
-        .with_window_config(config)
-        .build_headless()?;
+    // We use new_headless for CI/CD environments where display might not be available
+    let mut app = App::new_headless()?;
 
     app.world_mut().insert_resource(Viewport::default());
+    app.world_mut().insert_resource(Stats::default());
     app.world_mut().insert_resource(AnimationState { start_time: Instant::now() });
 
     app.add_update_system(setup_scene.run_if(run_once));
     app.add_update_system(animate_camera);
     app.add_update_system(spatial_transform_system);
+    app.add_update_system(stats_system);
 
     // Run a few frames
     for _ in 0..10 {
         app.update();
         let instances = app.render();
-        println!("Rendered {} instances", instances.len());
+        let stats = app.world().resource::<Stats>();
+        println!("Rendered {} instances | Stats: Visible {} / Total {}", instances.len(), stats.visible_nodes, stats.total_nodes);
         std::thread::sleep(Duration::from_millis(16));
     }
 
