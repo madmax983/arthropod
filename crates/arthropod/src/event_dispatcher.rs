@@ -9,7 +9,9 @@
 // Allow collapsible_if since nested if-let chains are more readable in this context
 #![allow(clippy::collapsible_if)]
 
-use plat_core::{ElementState, Event, Key, MouseButton, WindowEvent};
+use plat_core::{
+    ElementState, Event, Key, KeyboardInput, MouseButton, MouseInput, Point, WindowEvent,
+};
 use render_engine::{NodeContent, NodeId, Scene};
 use std::collections::HashMap;
 use widget_core::WidgetContext;
@@ -92,40 +94,57 @@ impl EventDispatcher {
     ) -> DispatchResult {
         match event {
             Event::Window {
-                event: WindowEvent::KeyboardInput(keyboard_input),
+                event: window_event,
                 ..
-            } => {
-                if keyboard_input.state == ElementState::Pressed {
-                    self.handle_key_press(&keyboard_input.key, widget_ctx)
-                } else if keyboard_input.state == ElementState::Released
-                    && matches!(keyboard_input.key, Key::Shift)
-                {
-                    self.shift_held = false;
-                    DispatchResult::Handled
-                } else {
-                    DispatchResult::Ignored
-                }
-            }
-            Event::Window {
-                event: WindowEvent::CursorMoved { position },
-                ..
-            } => {
-                self.mouse_pos = (position.x as f32, position.y as f32);
-                DispatchResult::Handled
-            }
-            Event::Window {
-                event: WindowEvent::MouseInput(mouse_input),
-                ..
-            } => {
-                if mouse_input.button == MouseButton::Left
-                    && mouse_input.state == ElementState::Pressed
-                {
-                    self.handle_click(widget_ctx, app_scene)
-                } else {
-                    DispatchResult::Ignored
-                }
-            }
+            } => self.handle_window_event(window_event, widget_ctx, app_scene),
             _ => DispatchResult::Ignored,
+        }
+    }
+
+    fn handle_window_event(
+        &mut self,
+        event: &WindowEvent,
+        widget_ctx: &mut WidgetContext,
+        app_scene: &Scene,
+    ) -> DispatchResult {
+        match event {
+            WindowEvent::KeyboardInput(input) => self.handle_keyboard_input(input, widget_ctx),
+            WindowEvent::CursorMoved { position } => self.handle_cursor_moved(position),
+            WindowEvent::MouseInput(input) => self.handle_mouse_input(input, widget_ctx, app_scene),
+            _ => DispatchResult::Ignored,
+        }
+    }
+
+    fn handle_keyboard_input(
+        &mut self,
+        input: &KeyboardInput,
+        widget_ctx: &mut WidgetContext,
+    ) -> DispatchResult {
+        if input.state == ElementState::Pressed {
+            self.handle_key_press(&input.key, widget_ctx)
+        } else if input.state == ElementState::Released && matches!(input.key, Key::Shift) {
+            self.shift_held = false;
+            DispatchResult::Handled
+        } else {
+            DispatchResult::Ignored
+        }
+    }
+
+    fn handle_cursor_moved(&mut self, position: &Point<f64>) -> DispatchResult {
+        self.mouse_pos = (position.x as f32, position.y as f32);
+        DispatchResult::Handled
+    }
+
+    fn handle_mouse_input(
+        &mut self,
+        input: &MouseInput,
+        widget_ctx: &mut WidgetContext,
+        app_scene: &Scene,
+    ) -> DispatchResult {
+        if input.button == MouseButton::Left && input.state == ElementState::Pressed {
+            self.handle_click(widget_ctx, app_scene)
+        } else {
+            DispatchResult::Ignored
         }
     }
 
@@ -169,15 +188,16 @@ impl EventDispatcher {
                 }
                 DispatchResult::FocusChanged
             }
-            _ => {
-                // Try to convert to character
-                if let Some(c) = key.to_char(self.shift_held) {
-                    widget_ctx.send_char(c);
-                    DispatchResult::TextChanged
-                } else {
-                    DispatchResult::Ignored
-                }
-            }
+            _ => self.handle_char_input(key, widget_ctx),
+        }
+    }
+
+    fn handle_char_input(&self, key: &Key, widget_ctx: &mut WidgetContext) -> DispatchResult {
+        if let Some(c) = key.to_char(self.shift_held) {
+            widget_ctx.send_char(c);
+            DispatchResult::TextChanged
+        } else {
+            DispatchResult::Ignored
         }
     }
 
@@ -190,32 +210,37 @@ impl EventDispatcher {
         let (x, y) = self.mouse_pos;
 
         // Hit test against app scene
-        if let Some(mut app_node_id) = app_scene.hit_test(x, y) {
-            // Check if we hit a text node - if so, get its parent (the input container)
-            if let Some(hit_node) = app_scene.get_node(app_node_id) {
-                if matches!(hit_node.content, NodeContent::Text { .. }) {
-                    if let Some(parent_id) = app_scene.find_parent(app_node_id) {
-                        app_node_id = parent_id;
-                    }
+        let Some(mut app_node_id) = app_scene.hit_test(x, y) else {
+            return DispatchResult::Ignored;
+        };
+
+        // Check if we hit a text node - if so, get its parent (the input container)
+        if let Some(hit_node) = app_scene.get_node(app_node_id) {
+            if matches!(hit_node.content, NodeContent::Text { .. }) {
+                if let Some(parent_id) = app_scene.find_parent(app_node_id) {
+                    app_node_id = parent_id;
                 }
             }
+        }
 
-            // Find the corresponding widget node ID
-            let widget_node_id = self
-                .node_id_map
-                .iter()
-                .find(|&(_, &app_id)| app_id == app_node_id)
-                .map(|(&widget_id, _)| widget_id);
+        // Find the corresponding widget node ID
+        let Some(widget_node_id) = self
+            .node_id_map
+            .iter()
+            .find(|&(_, &app_id)| app_id == app_node_id)
+            .map(|(&widget_id, _)| widget_id)
+        else {
+            return DispatchResult::Ignored;
+        };
 
-            if let Some(widget_node_id) = widget_node_id {
-                if widget_ctx.is_text_input(widget_node_id) {
-                    widget_ctx.focus_node(widget_node_id);
-                    return DispatchResult::FocusChanged;
-                } else if widget_ctx.is_clickable(widget_node_id) {
-                    widget_ctx.trigger_click(widget_node_id);
-                    return DispatchResult::Handled;
-                }
-            }
+        if widget_ctx.is_text_input(widget_node_id) {
+            widget_ctx.focus_node(widget_node_id);
+            return DispatchResult::FocusChanged;
+        }
+
+        if widget_ctx.is_clickable(widget_node_id) {
+            widget_ctx.trigger_click(widget_node_id);
+            return DispatchResult::Handled;
         }
 
         DispatchResult::Ignored
