@@ -1,7 +1,5 @@
 # Arthropod 🦀
 
-> Enterprise-grade cross-platform Rust GUI framework.
-
 > [!WARNING]
 > **REQUIRES FEATURE NOVA**: Experimental features (like `NarrativeGenerator`) **must** have the `nova` feature flag enabled. See [Experimental Features](#experimental-features-nova) below.
 
