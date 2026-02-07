@@ -11,6 +11,38 @@ Reactive state management for Arthropod GUI framework.
 - **Effect**: A side effect that runs automatically when its dependencies change.
 - **Runtime**: The coordinator that manages the dependency graph and propagates updates.
 
+## When to Use Each
+
+| Primitive | Use For | Returns | Example |
+|-----------|---------|---------|---------|
+| **Signal** | Mutable state | Value (via `.get()`) | User input, app state |
+| **Computed** | Derived values | Reactive value | Formatted text, filtered lists |
+| **Effect** | Side effects | Nothing | Logging, persistence, network |
+
+**Rule of thumb:** If you need a reactive **value**, use `Computed`. If you need to **DO** something, use `Effect`.
+
+### Common Pattern: Computed for Derived State
+
+```rust
+use flux_state::{Runtime, Signal, Computed};
+
+let runtime = Runtime::new();
+let counter = Signal::new(runtime.clone(), 0);
+let (read, write) = counter.split();
+
+// ✅ GOOD: Computed for derived reactive value
+let text = Computed::new(runtime.clone(), move || {
+    format!("Count: {}", read.get())
+});
+
+// ❌ BAD: Effect to sync signals (overcomplicated)
+let text_signal = Signal::new(runtime.clone(), String::from("Count: 0"));
+let (_, text_write) = text_signal.split();
+let _effect = Effect::new(runtime.clone(), move || {
+    text_write.set(format!("Count: {}", read.get()));
+});
+```
+
 ## Thread Safety
 
 Core primitives (`Signal`, `ReadSignal`, `WriteSignal`, `Computed`, `Effect`) are thread-safe (`Send + Sync`) when their inner state types are `Send + Sync`, and are designed to be shared across threads in that case. The `Runtime` uses internal locking to ensure consistency.

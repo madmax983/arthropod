@@ -202,21 +202,48 @@ backend.render_instances(&instances)?;
 
 ### 2. Reactive State Pattern
 
-```rust
-// Create signal
-let runtime = Runtime::new();
-let signal = Signal::new(runtime.clone(), initial_value);
-let (read, write) = signal.split();
+Arthropod uses a MobX-inspired reactive system with three primitives:
 
-// Create effect (auto-subscribes to dependencies)
-Effect::new(runtime.clone(), move || {
-    let value = read.get();
-    // This runs whenever value changes
+**Signal** - Observable mutable state:
+```rust
+let runtime = Runtime::new();
+let counter = Signal::new(runtime.clone(), 0);
+let (read, write) = counter.split();
+
+write.set(42);  // Update the value
+let value = read.get();  // Read the value
+```
+
+**Computed** - Derived reactive values (lazy + memoized):
+```rust
+// Derives text from counter - automatically updates when counter changes
+let counter_text = Computed::new(runtime.clone(), move || {
+    format!("Count: {}", read.get())
 });
 
-// Update signal
-write.set(new_value);  // Effects run automatically
+// Use in widgets
+Text::computed(counter_text)
 ```
+
+**Effect** - Side effects in response to state changes:
+```rust
+// Runs when counter changes - for logging, persistence, etc.
+Effect::new(runtime.clone(), move || {
+    let value = read.get();
+    println!("Counter changed to: {}", value);
+    localStorage.set("count", value);  // Side effect
+});
+```
+
+**When to Use Each:**
+
+| Primitive | Use For | Returns | Example |
+|-----------|---------|---------|---------|
+| **Signal** | Mutable state | Value (via `.get()`) | User input, app state |
+| **Computed** | Derived values | Reactive value | Formatted text, filtered lists |
+| **Effect** | Side effects | Nothing | Logging, persistence, network |
+
+**Rule of thumb:** If you need a reactive value, use Computed. If you need to DO something, use Effect.
 
 ### 3. Scene Management
 
@@ -342,17 +369,22 @@ list_from(items.iter().map(|item| {
 
 **Reactive State:**
 ```rust
-use flux_state::{Runtime, Signal};
+use flux_state::{Runtime, Signal, Computed};
 use widget_core::{Text, Button, Column};
 
 let runtime = Runtime::new();
 let counter = Signal::new(runtime.clone(), 0);
 let (read, write) = counter.split();
 
+// Use Computed for derived reactive values
+let counter_text = Computed::new(runtime.clone(), move || {
+    format!("Count: {}", read.get())
+});
+
 Column::new((
-    Text::reactive(read.map(|n| format!("Count: {}", n))),
+    Text::computed(counter_text),
     Button::new("Increment").on_click(move || {
-        write.update(|n| n + 1);
+        write.update(|n| *n + 1);
     }),
 )).gap(10.0)
 ```
@@ -447,11 +479,21 @@ cargo run --example hello_world
 
 ### Adding a Reactive Component
 
-1. Create signal type in component (e.g., `MainThreadSignal<T>`)
-2. Create reactive component wrapper (e.g., `ReactiveOpacity`)
-3. Implement update system (e.g., `update_reactive_opacity_system`)
-4. Add to update schedule in `FrameworkContext::build_update_schedule()`
-5. Test with signals changing
+**For Signal-based reactivity (mutable state):**
+1. Define reactive state type in `widget-core/src/input_state.rs` (e.g., `ReactiveColorState`)
+2. Create ECS component in `arthropod-ecs/src/components.rs` (e.g., `ReactiveColor`)
+3. Add polling logic to `update_all_reactive_system` in `arthropod-ecs/src/systems/reactive.rs`
+4. Wire up in widget context (e.g., `ctx.add_reactive_color_state()`)
+5. Test with signal changes
+
+**For Computed-based reactivity (derived state):**
+1. Define computed state type in `widget-core/src/input_state.rs` (e.g., `ComputedTextState`)
+2. Create ECS component in `arthropod-ecs/src/components.rs` (e.g., `ReactiveComputedText`)
+3. Add polling logic to `update_all_reactive_system` (e.g., `computed_text_query`)
+4. Wire up in widget context (e.g., `ctx.add_computed_text_state()`)
+5. Test with dependency changes
+
+**Pattern:** All reactive updates are polled by `update_all_reactive_system` in a single pass for performance.
 
 ## Debugging
 
@@ -535,16 +577,19 @@ See `docs/design/arthropod-design-doc.md` for roadmap. Key upcoming features:
 ### Key Concepts to Understand
 
 1. **Hybrid Architecture**: Why we use both Scene tree and ECS
-2. **Signals**: How reactive state propagates to UI
-3. **ECS Systems**: How updates flow through the pipeline
+2. **Reactive State**: Signal for mutable state, Computed for derived values, Effect for side effects
+3. **ECS Systems**: How updates flow through the pipeline (polling reactive state)
 4. **Instanced Rendering**: How we batch GPU draw calls
 
 ### Common Pitfalls
 
 - **Forgetting to update context**: Call `context.update(&mut scene)` before render
-- **Signal runtime lifetime**: Must keep Runtime alive (use Rc)
+- **Signal runtime lifetime**: Must keep Runtime alive (use Arc/Rc)
 - **Scene node bounds**: Must manually update on resize (not in ECS yet)
 - **MainThreadSignal**: Don't try to send across threads
+- **Using Effect for derived values**: If you're using Effect just to `.set()` another signal, use Computed instead
+- **Not storing Effects**: Effects drop immediately unless stored (use `ctx.store_effect()` in widgets)
+- **Computed vs Effect confusion**: Use Computed when you need a VALUE, Effect when you need to DO something
 
 ## Commit Guidelines
 

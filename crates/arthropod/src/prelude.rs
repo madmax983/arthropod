@@ -2,6 +2,35 @@
 //!
 //! This module re-exports the most commonly used types and traits.
 //! Import with `use arthropod::prelude::*;` to get started quickly.
+//!
+//! ## Reactive State Primitives
+//!
+//! Arthropod uses a MobX-inspired reactive system:
+//!
+//! - **`Signal`** - Mutable reactive state (like MobX `observable`)
+//! - **`Computed`** - Derived values that update automatically (like MobX `computed`)
+//! - **`Effect`** - Side effects in response to state changes (like MobX `reaction`)
+//!
+//! ### Quick Example
+//!
+//! ```rust,no_run
+//! use arthropod::prelude::*;
+//!
+//! App::run("Counter", 400, 300, |ctx| {
+//!     let counter = ctx.signal(0);
+//!     let (read, write) = counter.split();
+//!
+//!     // Computed: derived value that auto-updates
+//!     let text = Computed::new(ctx.runtime().clone(), move || {
+//!         format!("Count: {}", read.get())
+//!     });
+//!
+//!     Column::new((
+//!         Text::computed(text),
+//!         Button::new("Click").on_click(move || write.update(|n| *n + 1)),
+//!     ))
+//! })
+//! ```
 
 // Standard library time
 pub use std::time::{Duration, Instant};

@@ -113,21 +113,40 @@ let row = Row::new((
 
 ### Reactive State
 
+Use `Computed` for derived reactive values:
+
 ```rust
-use flux_state::{Runtime, Signal};
+use flux_state::{Runtime, Signal, Computed};
 use widget_core::{Text, Button, Column};
 
 let runtime = Runtime::new();
 let counter = Signal::new(runtime.clone(), 0);
 let (read, write) = counter.split();
 
+// Computed value auto-updates when counter changes
+let counter_text = Computed::new(runtime.clone(), move || {
+    format!("Count: {}", read.get())
+});
+
 let ui = Column::new((
-    Text::reactive(read.map(|n| format!("Count: {}", n))),
+    Text::computed(counter_text),
     Button::new("Increment").on_click(move || {
-        write.update(|n| n + 1);
+        write.update(|n| *n + 1);
     }),
 ))
 .gap(10.0);
+```
+
+**For simple reactive text without computation**, use `Text::reactive()`:
+
+```rust
+use flux_state::Signal;
+use widget_core::Text;
+
+let username = Signal::new(runtime.clone(), String::from("Alice"));
+let (read, write) = username.split();
+
+Text::reactive(read) // Displays the signal value directly
 ```
 
 ## Practical Examples

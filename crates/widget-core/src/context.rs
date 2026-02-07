@@ -244,6 +244,57 @@ impl WidgetContext {
     /// Effects must be stored to prevent them from being dropped immediately.
     /// Use this when you have Effects that need to run continuously to sync
     /// reactive state (e.g., Checkbox color synchronization).
+    ///
+    /// # When to Use
+    ///
+    /// - **Synchronizing Signals**: When one signal needs to update another based on state changes
+    /// - **Side effects in widgets**: Logging, persistence, or other non-value-producing reactions
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use flux_state::{Runtime, Signal, Effect};
+    /// # use widget_core::WidgetContext;
+    /// # let mut ctx = WidgetContext::new_test();
+    /// # let runtime = Runtime::new();
+    ///
+    /// let checked = Signal::new(runtime.clone(), false);
+    /// let (read, write) = checked.split();
+    ///
+    /// let color = Signal::new(runtime.clone(), render_engine::Color::GRAY);
+    /// let (_, color_write) = color.split();
+    ///
+    /// // Effect synchronizes checkbox state to color
+    /// let effect = Effect::new(runtime.clone(), move || {
+    ///     if read.get() {
+    ///         color_write.set(render_engine::Color::BLUE);
+    ///     } else {
+    ///         color_write.set(render_engine::Color::GRAY);
+    ///     }
+    /// });
+    ///
+    /// ctx.store_effect(effect); // Keep Effect alive!
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// For derived values (not side effects), prefer `Computed` instead:
+    ///
+    /// ```rust,no_run
+    /// use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// # let checked = Signal::new(runtime.clone(), false);
+    /// # let (read, _) = checked.split();
+    ///
+    /// // Better: Use Computed for derived values
+    /// let color = Computed::new(runtime.clone(), move || {
+    ///     if read.get() {
+    ///         render_engine::Color::BLUE
+    ///     } else {
+    ///         render_engine::Color::GRAY
+    ///     }
+    /// });
+    /// ```
     pub fn store_effect(&mut self, effect: flux_state::Effect) {
         self.effects.push(effect);
     }

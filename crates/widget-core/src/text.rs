@@ -85,6 +85,26 @@ impl Text {
     /// # text
     /// # });
     /// ```
+    /// Create a text widget with computed reactive content
+    ///
+    /// Use this for derived text that automatically updates when dependencies change.
+    /// Computed values are lazy (only recompute when read) and memoized (cache results).
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use arthropod::prelude::*;
+    ///
+    /// let counter = ctx.signal(0);
+    /// let (read, _write) = counter.split();
+    ///
+    /// // Text automatically updates when counter changes
+    /// let text = Computed::new(ctx.runtime().clone(), move || {
+    ///     format!("Count: {}", read.get())
+    /// });
+    ///
+    /// Text::computed(text)
+    /// ```
     pub fn computed(computed: Computed<String>) -> Self {
         Self {
             content: TextContent::Computed(computed),
