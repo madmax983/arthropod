@@ -21,10 +21,6 @@
 //! **Run with:** cargo run --example chat_ui
 
 use arthropod::prelude::*;
-use render_engine::Color;
-use widget_core::{
-    Button, Card, Column, Divider, List, Row, Spacer, Stack, Text, TextInput,
-};
 
 fn main() -> Result<(), AppError> {
     App::run("Chat", 500, 700, |ctx| {

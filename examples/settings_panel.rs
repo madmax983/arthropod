@@ -21,10 +21,6 @@
 //! **Run with:** cargo run --example settings_panel
 
 use arthropod::prelude::*;
-use render_engine::Color;
-use widget_core::{
-    Button, Checkbox, Column, Divider, Form, Row, Spacer, Text, TextInput,
-};
 
 fn main() -> Result<(), AppError> {
     App::run("Settings Panel", 600, 800, |ctx| {

@@ -20,8 +20,6 @@
 //! **Run with:** cargo run --example dashboard
 
 use arthropod::prelude::*;
-use render_engine::Color;
-use widget_core::{Button, Card, Column, Divider, Grid, Row, Spacer, Text};
 
 fn main() -> Result<(), AppError> {
     App::run("Analytics Dashboard", 1000, 700, |_ctx| {
