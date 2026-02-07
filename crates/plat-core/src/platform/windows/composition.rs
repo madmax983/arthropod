@@ -9,7 +9,6 @@ use windows::{
     Win32::{
         Foundation::*,
         Graphics::{Direct3D::*, Direct3D11::*, DirectComposition::*, Dxgi::*},
-        System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize},
     },
     core::*,
 };
@@ -95,7 +94,7 @@ impl CompositionDevice {
     ) -> Result<CompositionSurface> {
         // Cast device to IUnknown to access CreateSurfaceFromSwapChain
         // Note: Method signature varies by DirectComposition version
-        let surface: IUnknown = unsafe { swap_chain.cast()? };
+        let surface: IUnknown = swap_chain.cast()?;
         Ok(CompositionSurface { surface })
     }
 
@@ -120,6 +119,7 @@ impl CompositionTarget {
     }
 
     /// Returns the underlying IDCompositionTarget.
+    #[allow(dead_code)] // Future API surface
     pub fn raw_target(&self) -> &IDCompositionTarget {
         &self.target
     }
@@ -168,6 +168,7 @@ impl CompositionVisual {
     }
 
     /// Returns the underlying IDCompositionVisual2.
+    #[allow(dead_code)] // Future API surface
     pub fn raw_visual(&self) -> &IDCompositionVisual2 {
         &self.visual
     }
@@ -184,11 +185,13 @@ pub struct CompositionSurface {
 /// behind content rendered to it.
 pub struct BackdropVisual {
     visual: CompositionVisual,
+    #[allow(dead_code)] // Future API surface
     material: crate::materials::BackdropMaterial,
 }
 
 impl BackdropVisual {
     /// Returns the backdrop material for this visual.
+    #[allow(dead_code)] // Future API surface
     pub fn material(&self) -> crate::materials::BackdropMaterial {
         self.material
     }
@@ -199,6 +202,7 @@ impl BackdropVisual {
     }
 
     /// Returns the raw IDCompositionVisual2.
+    #[allow(dead_code)] // Future API surface
     pub fn raw_visual(&self) -> &IDCompositionVisual2 {
         self.visual.raw_visual()
     }
@@ -234,7 +238,10 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use windows::Win32::{System::LibraryLoader::*, UI::WindowsAndMessaging::*};
+    use windows::Win32::{
+        System::{Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize}, LibraryLoader::*},
+        UI::WindowsAndMessaging::*,
+    };
 
     #[test]
     fn test_composition_device_creation() {

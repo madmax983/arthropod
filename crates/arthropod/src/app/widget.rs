@@ -264,7 +264,14 @@ impl Application for WidgetApp {
                     }
                 }
             }
-            DispatchResult::Handled | DispatchResult::Ignored => {}
+            DispatchResult::Handled => {
+                // Button clicks and other handled events may trigger reactive state changes
+                // Request a redraw so the reactive system can update the UI
+                if let Some(window) = self.app.window() {
+                    window.request_redraw();
+                }
+            }
+            DispatchResult::Ignored => {}
         }
     }
 

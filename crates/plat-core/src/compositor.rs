@@ -150,7 +150,7 @@ impl Layer {
 #[cfg(target_os = "windows")]
 mod platform {
     use super::*;
-    use crate::platform::windows::composition::{CompositionDevice, CompositionVisual};
+    use crate::platform::windows::composition::CompositionVisual;
 
     pub struct CompositorImpl {
         composition: std::sync::Arc<crate::platform::windows::WindowComposition>,

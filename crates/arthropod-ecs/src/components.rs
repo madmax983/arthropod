@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use flux_state::{ReadSignal, WriteSignal};
+use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
 use layout_engine::{FlexStyle, LayoutConstraints};
 use render_engine::{Color, NodeId, Transform2D};
@@ -89,6 +89,41 @@ impl ReactiveOpacity {
         Self {
             signal: MainThreadSignal::new(signal),
         }
+    }
+}
+
+/// Reactive text - polls signal to update scene node text content
+///
+/// When this component is present, the reactive text system will poll the signal
+/// and update the corresponding scene node's text content each frame.
+#[derive(Component, Clone)]
+pub struct ReactiveText {
+    pub signal: MainThreadSignal<String>,
+}
+
+impl ReactiveText {
+    /// Create a new ReactiveText from a ReadSignal
+    pub fn new(signal: ReadSignal<String>) -> Self {
+        Self {
+            signal: MainThreadSignal::new(signal),
+        }
+    }
+}
+
+/// Reactive computed text - polls computed value to update scene node text content
+///
+/// When this component is present, the reactive computed text system will poll the computed
+/// and update the corresponding scene node's text content each frame.
+/// Computed values automatically update when their dependencies change.
+#[derive(Component, Clone)]
+pub struct ReactiveComputedText {
+    pub computed: Computed<String>,
+}
+
+impl ReactiveComputedText {
+    /// Create a new ReactiveComputedText from a Computed
+    pub fn new(computed: Computed<String>) -> Self {
+        Self { computed }
     }
 }
 

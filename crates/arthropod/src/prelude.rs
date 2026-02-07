@@ -12,8 +12,8 @@ pub use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 
 // ECS integration
 pub use arthropod_ecs::{
-    FrameworkContext, MainThreadSignal, ReactiveColor, ReactiveOpacity, ReactiveTransform,
-    Renderable, SceneNodeRef,
+    FrameworkContext, MainThreadSignal, ReactiveColor, ReactiveOpacity, ReactiveText,
+    ReactiveTransform, Renderable, SceneNodeRef,
 };
 
 // Accessibility
@@ -23,7 +23,7 @@ pub use a11y_engine::{
 };
 
 // Reactive state
-pub use flux_state::{Effect, Runtime, Signal, WriteSignal};
+pub use flux_state::{Computed, Effect, Runtime, Signal, WriteSignal};
 
 // Rendering
 pub use render_engine::{

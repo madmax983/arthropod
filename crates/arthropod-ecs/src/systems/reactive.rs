@@ -1,18 +1,23 @@
 use bevy_ecs::prelude::*;
 use render_engine::{NodeContent, Scene};
 
-use crate::components::{ReactiveColor, ReactiveOpacity, ReactiveTransform, SceneNodeRef};
+use crate::components::{
+    ReactiveColor, ReactiveComputedText, ReactiveOpacity, ReactiveText, ReactiveTransform,
+    SceneNodeRef,
+};
 
 /// Merged reactive update system - polls all reactive signals in a single pass
 ///
-/// This system combines color, transform, and opacity reactive updates into one
+/// This system combines color, text, transform, and opacity reactive updates into one
 /// system, reducing scheduling overhead and acquiring `ResMut<Scene>` only once
-/// instead of three times.
+/// instead of multiple times.
 ///
-/// Replaces the individual `update_reactive_colors_system`,
+/// Replaces the individual `update_reactive_colors_system`, `update_reactive_text_system`,
 /// `update_reactive_transforms_system`, and `update_reactive_opacity_system`.
 pub fn update_all_reactive_system(
     color_query: Query<(&SceneNodeRef, &ReactiveColor)>,
+    text_query: Query<(&SceneNodeRef, &ReactiveText)>,
+    computed_text_query: Query<(&SceneNodeRef, &ReactiveComputedText)>,
     transform_query: Query<(&SceneNodeRef, &ReactiveTransform)>,
     opacity_query: Query<(&SceneNodeRef, &ReactiveOpacity)>,
     mut scene: ResMut<Scene>,
@@ -38,6 +43,34 @@ pub fn update_all_reactive_system(
                 },
                 NodeContent::Empty => NodeContent::Empty,
             };
+        }
+    }
+
+    // Text content
+    for (node_ref, reactive) in text_query.iter() {
+        if let Some(node) = scene.get_mut(node_ref.0) {
+            let new_text = reactive.signal.inner().get_untracked();
+            if let NodeContent::Text { font_size, color, .. } = node.content {
+                node.content = NodeContent::Text {
+                    text: new_text,
+                    font_size,
+                    color,
+                };
+            }
+        }
+    }
+
+    // Computed text content
+    for (node_ref, reactive) in computed_text_query.iter() {
+        if let Some(node) = scene.get_mut(node_ref.0) {
+            let new_text = reactive.computed.get();
+            if let NodeContent::Text { font_size, color, .. } = node.content {
+                node.content = NodeContent::Text {
+                    text: new_text,
+                    font_size,
+                    color,
+                };
+            }
         }
     }
 

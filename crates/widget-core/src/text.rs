@@ -1,7 +1,8 @@
 //! Text widget - displays text
 
 use crate::{Widget, WidgetContext};
-use flux_state::ReadSignal;
+use flux_state::{Computed, ReadSignal};
+use layout_engine;
 use render_engine::{Color, NodeContent, NodeId};
 
 /// Text widget
@@ -40,6 +41,7 @@ pub struct Text {
 enum TextContent {
     Static(String),
     Reactive(ReadSignal<String>),
+    Computed(Computed<String>),
 }
 
 impl Text {
@@ -56,6 +58,36 @@ impl Text {
     pub fn reactive(signal: ReadSignal<String>) -> Self {
         Self {
             content: TextContent::Reactive(signal),
+            font_size: 16.0,
+            color: None, // Use theme default
+        }
+    }
+
+    /// Create a text widget with computed content
+    ///
+    /// Computed values automatically update when their dependencies change.
+    /// Use this when deriving text from other signals.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use arthropod::prelude::*;
+    /// # use flux_state::Computed;
+    /// # use widget_core::Text;
+    /// # App::run("Test", 400, 300, |ctx| {
+    /// let counter = ctx.signal(0);
+    /// let (read, _write) = counter.split();
+    ///
+    /// // Text automatically updates when counter changes
+    /// let text = Text::computed(Computed::new(ctx.runtime().clone(), move || {
+    ///     format!("Count: {}", read.get())
+    /// }));
+    /// # text
+    /// # });
+    /// ```
+    pub fn computed(computed: Computed<String>) -> Self {
+        Self {
+            content: TextContent::Computed(computed),
             font_size: 16.0,
             color: None, // Use theme default
         }
@@ -127,6 +159,10 @@ impl Widget for Text {
                 // Get untracked value for initial build
                 signal.get_untracked()
             }
+            TextContent::Computed(computed) => {
+                // Get current computed value for initial build
+                computed.get()
+            }
         };
 
         // Create text node with raw text (backend will shape it during rendering)
@@ -139,9 +175,25 @@ impl Widget for Text {
             },
         );
 
-        if let TextContent::Reactive(signal) = &self.content {
-            ctx.add_reactive_text_state(node_id, signal.clone());
+        // Register reactive or computed text for ECS updates
+        match &self.content {
+            TextContent::Reactive(signal) => {
+                ctx.add_reactive_text_state(node_id, signal.clone());
+            }
+            TextContent::Computed(computed) => {
+                ctx.add_computed_text_state(node_id, computed.clone());
+            }
+            TextContent::Static(_) => {}
         }
+
+        // Set layout style with estimated dimensions
+        // Height is approximately font_size * 1.4 (accounts for line height)
+        // Width is auto (will grow to fit content)
+        let style = layout_engine::FlexStyle {
+            height: Some(self.font_size * 1.4),
+            ..Default::default()
+        };
+        ctx.set_layout_style(node_id, style);
 
         node_id
     }

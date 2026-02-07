@@ -3,10 +3,10 @@
 //! Provides API for widgets to build scene nodes and configure components.
 
 use crate::form_state::{FormData, FormState, SubmitCallback};
-use crate::input_state::{ReactiveColorState, ReactiveTextState, TextInputState};
+use crate::input_state::{ComputedTextState, ReactiveColorState, ReactiveTextState, TextInputState};
 use crate::validation::Validator;
 use crate::validation_state::ValidationState;
-use flux_state::{ReadSignal, WriteSignal};
+use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
 use indexmap::IndexMap;
 use layout_engine::{FlexDirection, FlexStyle};
@@ -41,6 +41,7 @@ pub struct WidgetContext {
     // Input
     pub(crate) text_input_states: IndexMap<NodeId, TextInputState>,
     pub(crate) reactive_text_states: HashMap<NodeId, ReactiveTextState>,
+    pub(crate) computed_text_states: HashMap<NodeId, ComputedTextState>,
     pub(crate) reactive_color_states: HashMap<NodeId, ReactiveColorState>,
     pub(crate) focused_node: Option<NodeId>,
     pub(crate) placeholders: HashSet<NodeId>,
@@ -51,6 +52,9 @@ pub struct WidgetContext {
 
     /// Design tokens for theming (optional for backwards compatibility)
     design_tokens: Option<DesignTokens>,
+
+    /// Effects that must be kept alive for reactive synchronization
+    effects: Vec<flux_state::Effect>,
 }
 
 impl WidgetContext {
@@ -64,12 +68,14 @@ impl WidgetContext {
             background_colors: HashMap::new(),
             text_input_states: IndexMap::new(),
             reactive_text_states: HashMap::new(),
+            computed_text_states: HashMap::new(),
             reactive_color_states: HashMap::new(),
             focused_node: None,
             placeholders: HashSet::new(),
             validators: HashMap::new(),
             form_states: HashMap::new(),
             design_tokens: None,
+            effects: Vec::new(),
         }
     }
 
@@ -225,6 +231,21 @@ impl WidgetContext {
     pub fn add_reactive_text_state(&mut self, node_id: NodeId, read_signal: ReadSignal<String>) {
         self.reactive_text_states
             .insert(node_id, ReactiveTextState { read_signal });
+    }
+
+    /// Add computed text state to a node
+    pub fn add_computed_text_state(&mut self, node_id: NodeId, computed: Computed<String>) {
+        self.computed_text_states
+            .insert(node_id, ComputedTextState { computed });
+    }
+
+    /// Store an Effect to keep it alive for reactive synchronization.
+    ///
+    /// Effects must be stored to prevent them from being dropped immediately.
+    /// Use this when you have Effects that need to run continuously to sync
+    /// reactive state (e.g., Checkbox color synchronization).
+    pub fn store_effect(&mut self, effect: flux_state::Effect) {
+        self.effects.push(effect);
     }
 
     /// Add reactive color state to a node
@@ -604,6 +625,10 @@ impl WidgetContext {
     /// Get all reactive text states (for app-shell integration)
     pub fn reactive_text_states(&self) -> &HashMap<NodeId, ReactiveTextState> {
         &self.reactive_text_states
+    }
+
+    pub fn computed_text_states(&self) -> &HashMap<NodeId, ComputedTextState> {
+        &self.computed_text_states
     }
 
     /// Get all reactive color states (for app-shell integration)

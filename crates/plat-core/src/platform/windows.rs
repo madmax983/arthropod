@@ -97,6 +97,7 @@ pub struct WindowImpl {
 #[cfg(target_os = "windows")]
 pub struct WindowComposition {
     pub device: composition::CompositionDevice,
+    #[allow(dead_code)] // Future API surface
     pub target: composition::CompositionTarget,
     pub root_visual: composition::CompositionVisual,
 }
@@ -265,6 +266,7 @@ impl WindowImpl {
     }
 
     #[cfg(target_os = "windows")]
+    #[allow(dead_code)] // Future API for accessibility integration
     pub fn register_a11y_provider(&self, provider: IRawElementProviderSimple) {
         // Register the provider for this window's HWND
         A11Y_PROVIDERS.with(|providers| {

@@ -59,7 +59,7 @@ impl Widget for Checkbox {
 
         // Effect to sync state
         let read_clone = read.clone();
-        Effect::new(runtime.clone(), move || {
+        let effect = Effect::new(runtime.clone(), move || {
             let is_checked = read_clone.get();
             if is_checked {
                 box_bg_write.set(checked_color);
@@ -69,6 +69,7 @@ impl Widget for Checkbox {
                 check_fg_write.set(transparent);
             }
         });
+        ctx.store_effect(effect);
 
         // 1. Create Box Node
         // Initial values

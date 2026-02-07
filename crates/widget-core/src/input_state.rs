@@ -1,8 +1,8 @@
 //! Input state types
 //!
-//! Contains state definitions for text input, reactive text, and reactive color.
+//! Contains state definitions for text input, reactive text, computed text, and reactive color.
 
-use flux_state::{ReadSignal, WriteSignal};
+use flux_state::{Computed, ReadSignal, WriteSignal};
 use render_engine::Color;
 
 /// Text input state for a node
@@ -106,6 +106,12 @@ impl TextInputState {
 #[derive(Clone)]
 pub struct ReactiveTextState {
     pub read_signal: ReadSignal<String>,
+}
+
+/// Computed text state for a node
+#[derive(Clone)]
+pub struct ComputedTextState {
+    pub computed: Computed<String>,
 }
 
 /// Reactive color state for a node

@@ -1,6 +1,9 @@
 use arthropod_ecs::{
     FrameworkContext,
-    components::{BackgroundColor, Clickable, LayoutStyle, ReactiveColor, SceneNodeRef},
+    components::{
+        BackgroundColor, Clickable, LayoutStyle, ReactiveColor, ReactiveComputedText, ReactiveText,
+        SceneNodeRef,
+    },
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
 use flux_state::Runtime;
@@ -431,6 +434,24 @@ impl App {
             node_id_map,
             |state: &widget_core::input_state::ReactiveColorState| {
                 ReactiveColor::new(state.read_signal.clone())
+            },
+        );
+
+        // Transfer reactive text to ReactiveText components
+        self.transfer_components(
+            widget_ctx.reactive_text_states().iter(),
+            node_id_map,
+            |state: &widget_core::input_state::ReactiveTextState| {
+                ReactiveText::new(state.read_signal.clone())
+            },
+        );
+
+        // Transfer computed text to ReactiveComputedText components
+        self.transfer_components(
+            widget_ctx.computed_text_states().iter(),
+            node_id_map,
+            |state: &widget_core::input_state::ComputedTextState| {
+                ReactiveComputedText::new(state.computed.clone())
             },
         );
 
