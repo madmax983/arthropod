@@ -12,7 +12,7 @@ fn test_simple_text_shaping() {
     let shaped = engine.shape_text(text, font_size);
 
     // Should have glyphs for all characters (11 including space)
-    assert!(shaped.glyphs.len() > 0, "Should have glyphs");
+    assert!(!shaped.glyphs.is_empty(), "Should have glyphs");
 
     // Glyphs should have positive advance widths
     for glyph in &shaped.glyphs {
@@ -69,7 +69,7 @@ fn test_unicode_text_shaping() {
         let shaped = engine.shape_text(text, 16.0);
 
         // Should successfully shape all text
-        assert!(shaped.glyphs.len() > 0, "Should shape {}", text);
+        assert!(!shaped.glyphs.is_empty(), "Should shape {}", text);
     }
 }
 

@@ -329,7 +329,7 @@ mod tests {
         let node_id = ctx.get_named_node("hidden").unwrap();
         let node = ctx.scene().get_node(node_id).unwrap();
 
-        assert_eq!(node.visible, false);
+        assert!(!node.visible);
         assert_eq!(node.opacity, 0.5);
     }
 

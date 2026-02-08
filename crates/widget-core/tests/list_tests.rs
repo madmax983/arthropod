@@ -58,7 +58,7 @@ fn test_list_row_with_items() {
 fn test_list_extend() {
     let mut ctx = WidgetContext::new_test();
 
-    let items = vec!["A", "B", "C", "D"];
+    let items = ["A", "B", "C", "D"];
     let mut list = List::column();
     list.extend(items.iter().map(|s| Text::new(*s)));
 
@@ -102,7 +102,7 @@ fn test_list_with_padding() {
 fn test_list_from_helper() {
     let mut ctx = WidgetContext::new_test();
 
-    let items = vec!["Item 1", "Item 2", "Item 3"];
+    let items = ["Item 1", "Item 2", "Item 3"];
     let list = widget_core::list_from(items.iter().map(|s| Text::new(*s)));
 
     let node_id = list.build(&mut ctx);

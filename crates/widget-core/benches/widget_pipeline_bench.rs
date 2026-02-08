@@ -318,7 +318,8 @@ fn bench_form_revalidation(c: &mut Criterion) {
 
         // Benchmark revalidation
         b.iter(|| {
-            black_box(ctx.revalidate_form(form_id));
+            ctx.revalidate_form(form_id);
+            black_box(());
         });
     });
 
@@ -362,7 +363,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
                 // Add some inputs
                 for i in 0..(size / 3) {
                     let value = Signal::new(runtime.clone(), String::new());
-                    let input = TextInput::new(value).placeholder(&format!("Input {}", i));
+                    let input = TextInput::new(value).placeholder(format!("Input {}", i));
                     let input_id = input.build(&mut ctx);
                     ctx.reparent_to(input_id, container_id);
                 }
@@ -394,7 +395,8 @@ fn bench_text_input_editing(c: &mut Criterion) {
         ctx.focus_node(input_id);
 
         b.iter(|| {
-            black_box(ctx.send_char('!'));
+            ctx.send_char('!');
+            black_box(());
         });
     });
 
@@ -407,7 +409,8 @@ fn bench_text_input_editing(c: &mut Criterion) {
         ctx.focus_node(input_id);
 
         b.iter(|| {
-            black_box(ctx.send_backspace());
+            ctx.send_backspace();
+            black_box(());
         });
     });
 
@@ -420,8 +423,10 @@ fn bench_text_input_editing(c: &mut Criterion) {
         ctx.focus_node(input_id);
 
         b.iter(|| {
-            black_box(ctx.send_key_left());
-            black_box(ctx.send_key_right());
+            ctx.send_key_left();
+            black_box(());
+            ctx.send_key_right();
+            black_box(());
         });
     });
 

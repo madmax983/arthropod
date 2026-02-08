@@ -99,6 +99,6 @@ mod tests {
     #[test]
     fn test_text_renderer_creation() {
         let renderer = TextRenderer::new();
-        assert!(renderer.atlas().texture_data().len() > 0);
+        assert!(!renderer.atlas().texture_data().is_empty());
     }
 }

@@ -27,7 +27,7 @@ fn test_text_input_displays_value() {
 
     // Should have text child displaying value
     let node = ctx.scene().get_node(node_id).unwrap();
-    assert!(node.children.len() > 0, "Input should have text display");
+    assert!(!node.children.is_empty(), "Input should have text display");
 }
 
 #[test]

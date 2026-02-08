@@ -446,7 +446,7 @@ mod tests {
             .unwrap();
 
         let entities = result.get("entities").unwrap().as_array().unwrap();
-        assert!(entities.len() >= 1); // At least entity1 has Renderable
+        assert!(!entities.is_empty()); // At least entity1 has Renderable
     }
 
     #[test]

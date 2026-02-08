@@ -116,7 +116,7 @@ fn test_flex_gap() {
 
     engine.compute_layout(root, constraints);
 
-    let layout1 = engine.get_layout(child1).unwrap();
+    let _layout1 = engine.get_layout(child1).unwrap();
     let layout2 = engine.get_layout(child2).unwrap();
 
     // Child 2 should be positioned 10px after child 1

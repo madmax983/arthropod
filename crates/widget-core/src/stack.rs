@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     struct TestWidget {
-        label: &'static str,
+        _label: &'static str,
     }
 
     impl Widget for TestWidget {
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_stack_creates_container() {
         let mut ctx = WidgetContext::new_test();
-        let stack = Stack::new((TestWidget { label: "A" },));
+        let stack = Stack::new((TestWidget { _label: "A" },));
 
         let node_id = stack.build(&mut ctx);
 
@@ -131,9 +131,9 @@ mod tests {
     fn test_stack_children_count() {
         let mut ctx = WidgetContext::new_test();
         let stack = Stack::new((
-            TestWidget { label: "A" },
-            TestWidget { label: "B" },
-            TestWidget { label: "C" },
+            TestWidget { _label: "A" },
+            TestWidget { _label: "B" },
+            TestWidget { _label: "C" },
         ));
 
         let node_id = stack.build(&mut ctx);
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn test_stack_padding() {
         let mut ctx = WidgetContext::new_test();
-        let stack = Stack::new((TestWidget { label: "A" },)).padding(10.0);
+        let stack = Stack::new((TestWidget { _label: "A" },)).padding(10.0);
 
         let node_id = stack.build(&mut ctx);
         let layout = ctx.get_layout_style(node_id).unwrap();
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_stack_flex_grow() {
         let mut ctx = WidgetContext::new_test();
-        let stack = Stack::new((TestWidget { label: "A" },));
+        let stack = Stack::new((TestWidget { _label: "A" },));
 
         let node_id = stack.build(&mut ctx);
         let layout = ctx.get_layout_style(node_id).unwrap();

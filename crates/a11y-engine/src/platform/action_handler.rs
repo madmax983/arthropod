@@ -119,8 +119,6 @@ impl Default for ArthropodActionHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
-    use std::rc::Rc;
 
     #[test]
     fn test_action_handler_click_invokes_callback() {

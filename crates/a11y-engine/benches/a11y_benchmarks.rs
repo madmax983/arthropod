@@ -161,7 +161,8 @@ fn bench_remove_node(c: &mut Criterion) {
             }
 
             // Benchmark removing group (cascades to children)
-            black_box(tree.remove_node(group));
+            tree.remove_node(group);
+            black_box(());
         });
     });
 }
@@ -190,14 +191,14 @@ fn bench_realistic_ui(c: &mut Criterion) {
 
                         let parent = if i % 20 == 0 {
                             // Create some groups
-                            let group = tree.add_node(
+                            
+                            tree.add_node(
                                 root,
                                 A11yNode {
                                     role: Role::Group,
                                     ..Default::default()
                                 },
-                            );
-                            group
+                            )
                         } else {
                             root
                         };
@@ -208,8 +209,8 @@ fn bench_realistic_ui(c: &mut Criterion) {
                                 role,
                                 name: AccessibleName::Text(format!("Widget {}", i)),
                                 bounds: Rect::new(
-                                    ((i as f32 * 10.0) % 800.0),
-                                    ((i as f32 / 80.0) * 50.0),
+                                    (i as f32 * 10.0) % 800.0,
+                                    (i as f32 / 80.0) * 50.0,
                                     100.0,
                                     40.0,
                                 ),

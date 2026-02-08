@@ -289,7 +289,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
         assert_eq!(result.get("failures").unwrap().as_array().unwrap().len(), 0);
     }
 
@@ -329,9 +329,9 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), false);
+        assert!(!result.get("passed").unwrap().as_bool().unwrap());
         let failures = result.get("failures").unwrap().as_array().unwrap();
-        assert!(failures.len() > 0);
+        assert!(!failures.is_empty());
     }
 
     #[test]
@@ -367,7 +367,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
     }
 
     #[test]
@@ -407,7 +407,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
     }
 
     #[test]

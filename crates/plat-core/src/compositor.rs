@@ -248,14 +248,13 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_layer_bounds() {
-        let bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
-
         #[cfg(not(target_os = "windows"))]
         {
+            let bounds = Rect::new(10.0, 20.0, 100.0, 200.0);
             let mut layer = Layer { inner: () };
             assert!(layer.set_bounds(bounds).is_ok());
         }

@@ -654,7 +654,7 @@ mod tests {
 
         // Should not include the hidden rect2
         for node in nodes {
-            assert_eq!(node.get("visible").unwrap().as_bool().unwrap(), true);
+            assert!(node.get("visible").unwrap().as_bool().unwrap());
         }
     }
 
@@ -727,7 +727,7 @@ mod tests {
 
         // Verify the change
         let node = ctx.scene().get_node(nodes[0]).unwrap();
-        assert_eq!(node.visible, false);
+        assert!(!node.visible);
     }
 
     #[test]

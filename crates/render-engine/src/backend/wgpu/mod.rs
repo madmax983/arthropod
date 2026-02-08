@@ -146,15 +146,12 @@ impl WgpuBackend {
                 continue;
             }
 
-            match &node.content {
-                NodeContent::Text {
+            if let NodeContent::Text {
                     text,
                     font_size,
                     color,
-                } => {
-                    raw_text_nodes.push((node, text, *font_size, *color));
-                }
-                _ => {}
+                } = &node.content {
+                raw_text_nodes.push((node, text, *font_size, *color));
             }
         }
         (instances, raw_text_nodes)

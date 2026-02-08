@@ -289,7 +289,7 @@ fn test_text_falls_back_without_tokens() {
 #[test]
 fn test_text_explicit_color_overrides_tokens() {
     // Create a text widget with explicit red color
-    let explicit_color = Vec4::new(1.0, 0.0, 0.0, 1.0); // Red
+    let explicit_color = Color::rgba(1.0, 0.0, 0.0, 1.0); // Red
     let text = Text::new("Hello World").color(explicit_color);
 
     // Create context with design tokens (which would set a different color)

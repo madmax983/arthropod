@@ -11,7 +11,7 @@ fn test_create_event_loop() {
     // Test that we can create an event loop
     let event_loop = EventLoop::new();
     // On unsupported platforms, this might fail, which is expected behavior for now
-    if let Err(_) = event_loop {
+    if event_loop.is_err() {
         return;
     }
     assert!(

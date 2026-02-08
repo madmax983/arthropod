@@ -146,7 +146,7 @@ mod tests {
     use super::*;
 
     struct TestWidget {
-        label: &'static str,
+        _label: &'static str,
     }
 
     impl Widget for TestWidget {
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn test_grid_creates_container() {
         let mut ctx = WidgetContext::new_test();
-        let grid = Grid::new((TestWidget { label: "A" },), 1);
+        let grid = Grid::new((TestWidget { _label: "A" },), 1);
 
         let node_id = grid.build(&mut ctx);
 
@@ -178,10 +178,10 @@ mod tests {
         // 4 items, 2 columns = 2 rows
         let grid = Grid::new(
             (
-                TestWidget { label: "A" },
-                TestWidget { label: "B" },
-                TestWidget { label: "C" },
-                TestWidget { label: "D" },
+                TestWidget { _label: "A" },
+                TestWidget { _label: "B" },
+                TestWidget { _label: "C" },
+                TestWidget { _label: "D" },
             ),
             2,
         );
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_grid_column_layout() {
         let mut ctx = WidgetContext::new_test();
-        let grid = Grid::new((TestWidget { label: "A" },), 1);
+        let grid = Grid::new((TestWidget { _label: "A" },), 1);
 
         let node_id = grid.build(&mut ctx);
         let layout = ctx.get_layout_style(node_id).unwrap();
@@ -212,7 +212,7 @@ mod tests {
     fn test_grid_row_direction() {
         let mut ctx = WidgetContext::new_test();
         let grid = Grid::new(
-            (TestWidget { label: "A" }, TestWidget { label: "B" }),
+            (TestWidget { _label: "A" }, TestWidget { _label: "B" }),
             2,
         );
 
@@ -232,6 +232,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "Grid must have at least 1 column")]
     fn test_grid_zero_columns_panics() {
-        Grid::new((TestWidget { label: "A" },), 0);
+        Grid::new((TestWidget { _label: "A" },), 0);
     }
 }

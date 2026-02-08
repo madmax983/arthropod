@@ -82,7 +82,7 @@ fn test_accessible_name_variants() {
 
 #[test]
 fn test_relations_labelled_by() {
-    let mut relations = A11yRelations::default();
+    let relations = A11yRelations::default();
     assert!(relations.labelled_by.is_empty());
 
     // We'll implement A11yId properly in node.rs

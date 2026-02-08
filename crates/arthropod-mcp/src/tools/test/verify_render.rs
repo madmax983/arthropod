@@ -240,7 +240,7 @@ mod tests {
             .execute(json!({ "expected_count": 1 }), &mut ctx)
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
         assert_eq!(result.get("actual_count").unwrap().as_u64().unwrap(), 1);
     }
 
@@ -280,7 +280,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
         assert_eq!(result.get("failures").unwrap().as_array().unwrap().len(), 0);
     }
 
@@ -318,9 +318,9 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), false);
+        assert!(!result.get("passed").unwrap().as_bool().unwrap());
         let failures = result.get("failures").unwrap().as_array().unwrap();
-        assert!(failures.len() > 0);
+        assert!(!failures.is_empty());
     }
 
     #[test]
@@ -359,7 +359,7 @@ mod tests {
             .execute(json!({ "expected_count": 2 }), &mut ctx)
             .unwrap();
 
-        assert_eq!(result.get("passed").unwrap().as_bool().unwrap(), true);
+        assert!(result.get("passed").unwrap().as_bool().unwrap());
         assert_eq!(result.get("actual_count").unwrap().as_u64().unwrap(), 2);
     }
 }

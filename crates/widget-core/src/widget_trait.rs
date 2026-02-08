@@ -384,7 +384,7 @@ mod tests {
 
     // Simple test widget for testing WidgetTuple methods
     struct TestWidget {
-        label: &'static str,
+        _label: &'static str,
     }
 
     impl Widget for TestWidget {
@@ -424,7 +424,7 @@ mod tests {
     #[test]
     fn test_build_all_to_vec_single_widget() {
         let mut ctx = WidgetContext::new_test();
-        let widget = TestWidget { label: "A" };
+        let widget = TestWidget { _label: "A" };
         let result = widget.build_all_to_vec(&mut ctx);
         assert_eq!(result.len(), 1);
 
@@ -436,9 +436,9 @@ mod tests {
     fn test_build_all_to_vec_tuple() {
         let mut ctx = WidgetContext::new_test();
         let tuple = (
-            TestWidget { label: "A" },
-            TestWidget { label: "B" },
-            TestWidget { label: "C" },
+            TestWidget { _label: "A" },
+            TestWidget { _label: "B" },
+            TestWidget { _label: "C" },
         );
         let result = tuple.build_all_to_vec(&mut ctx);
         assert_eq!(result.len(), 3);
@@ -453,8 +453,8 @@ mod tests {
     fn test_build_all_with_custom_processing() {
         let mut ctx = WidgetContext::new_test();
         let tuple = (
-            TestWidget { label: "A" },
-            TestWidget { label: "B" },
+            TestWidget { _label: "A" },
+            TestWidget { _label: "B" },
         );
 
         let mut collected = Vec::new();
