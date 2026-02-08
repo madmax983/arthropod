@@ -136,6 +136,9 @@ cargo audit
 
 # Dependency check
 cargo deny check
+
+# Miri (unsafe code validation)
+cargo +nightly miri test -p flux-state
 ```
 
 ### CI/CD Pipeline
@@ -147,6 +150,8 @@ Every PR runs:
 - ✅ Example builds
 - ✅ Security audit
 - ✅ Dependency validation
+- ✅ Miri (undefined behavior detection)
+- ✅ Unsafe code audit
 - ✅ Mutation testing (weekly + on PR)
 - ✅ Performance regression detection
 
