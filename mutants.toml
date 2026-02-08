@@ -1,0 +1,75 @@
+# cargo-mutants configuration
+# https://mutants.rs/configuration.html
+
+# Exclude specific files/modules from mutation testing
+exclude_globs = [
+    # Generated code
+    "target/**",
+    "*/target/**",
+
+    # Examples (not critical for mutation testing)
+    "examples/**",
+    "*/examples/**",
+
+    # Benchmarks
+    "benches/**",
+    "*/benches/**",
+
+    # Experiments
+    "experiments/**",
+
+    # Test utilities
+    "crates/arthropod-test/**",
+
+    # Platform-specific bindings (hard to test mutations)
+    "crates/plat-core/src/platform/windows/**",
+    "crates/plat-core/src/compositor.rs",
+]
+
+# Minimum test timeout (in seconds)
+# Increase if tests are legitimately slow
+minimum_test_timeout = 60
+
+# Build timeout (in seconds)
+build_timeout = 300
+
+# Test timeout multiplier
+# Each mutant test gets (baseline_time * timeout_multiplier)
+timeout_multiplier = 5.0
+
+# Additional build args
+additional_build_args = ["--all-features"]
+
+# Additional test args
+additional_test_args = ["--all-features"]
+
+# Exclude specific functions from mutation
+# (for generated code, unsafe blocks, or platform-specific code)
+exclude_re = [
+    # Skip test helper functions
+    "^test_.*",
+    "^setup_.*",
+
+    # Skip Drop implementations (hard to test mutations)
+    ".*::drop$",
+
+    # Skip From/Into trait impls (usually trivial)
+    ".*::from$",
+    ".*::into$",
+
+    # Skip Default implementations
+    ".*::default$",
+]
+
+# Jobs to run in parallel
+# Set based on available CPU cores
+jobs = 0  # 0 = auto-detect
+
+# Show times for caught/missed mutants
+show_times = true
+
+# Show line numbers in output
+show_line_numbers = true
+
+# Colors in output
+colors = true

@@ -1,5 +1,10 @@
 # Arthropod 🦀
 
+[![CI](https://github.com/madmax983/arthropod/workflows/CI/badge.svg)](https://github.com/madmax983/arthropod/actions/workflows/ci.yml)
+[![Mutation Testing](https://github.com/madmax983/arthropod/workflows/Mutation%20Testing/badge.svg)](https://github.com/madmax983/arthropod/actions/workflows/mutation-testing.yml)
+[![Security Audit](https://github.com/madmax983/arthropod/workflows/CI/badge.svg?job=audit)](https://github.com/madmax983/arthropod/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/madmax983/arthropod/branch/trunk/graph/badge.svg)](https://codecov.io/gh/madmax983/arthropod)
+
 > [!WARNING]
 > **REQUIRES FEATURE NOVA**: Experimental features (like `NarrativeGenerator`) **must** have the `nova` feature flag enabled. See [Experimental Features](#experimental-features-nova) below.
 
@@ -78,6 +83,70 @@ error[E0433]: failed to resolve: could not find `experimental` in `arthropod`
 ```
 
 This indicates that the `nova` feature flag is not enabled. Please verify your `Cargo.toml` configuration or ensure the `--features nova` flag is included in your `cargo run` command.
+
+## Development & Testing
+
+Arthropod follows strict TDD principles with comprehensive CI/CD:
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test --all --all-features
+
+# Run specific crate tests
+cargo test -p arthropod-ecs
+
+# Run benchmarks
+cargo bench --all
+```
+
+### Mutation Testing
+
+We use `cargo-mutants` to ensure test quality:
+
+```bash
+# Install cargo-mutants
+cargo install cargo-mutants
+
+# Run mutation testing (PowerShell)
+.\scripts\mutation-test.ps1
+
+# Run on specific package
+.\scripts\mutation-test.ps1 -Package flux-state
+```
+
+**Mutation testing verifies that tests actually catch bugs** by introducing small code changes (mutants) and checking if tests fail. We maintain >80% mutation score.
+
+### Code Quality Checks
+
+```bash
+# Format check
+cargo fmt --all -- --check
+
+# Clippy lints (strict mode)
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Security audit
+cargo audit
+
+# Dependency check
+cargo deny check
+```
+
+### CI/CD Pipeline
+
+Every PR runs:
+- ✅ Format check (`cargo fmt`)
+- ✅ Clippy lints (zero warnings)
+- ✅ Full test suite (all platforms)
+- ✅ Example builds
+- ✅ Security audit
+- ✅ Dependency validation
+- ✅ Mutation testing (weekly + on PR)
+- ✅ Performance regression detection
+
+See [`.github/workflows/`](.github/workflows/) for full CI configuration.
 
 ## License
 

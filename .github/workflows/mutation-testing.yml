@@ -1,0 +1,96 @@
+name: Mutation Testing
+
+on:
+  # Run on PRs to main/trunk
+  pull_request:
+    branches: [ trunk, main ]
+  # Allow manual trigger
+  workflow_dispatch:
+  # Run weekly on trunk
+  schedule:
+    - cron: '0 0 * * 0'  # Sunday at midnight
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutation-testing:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Mutation testing can take a while
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run mutation testing
+        run: |
+          cargo mutants --no-shuffle --timeout 300 --in-diff git.json -- --all-features
+        continue-on-error: true
+
+      - name: Archive mutants results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutants-results
+          path: |
+            mutants.out/
+            mutants.out.json
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let results = '## 🧬 Mutation Testing Results\n\n';
+
+            try {
+              const data = JSON.parse(fs.readFileSync('mutants.out.json', 'utf8'));
+              const total = data.total_mutants;
+              const caught = data.caught;
+              const missed = data.missed;
+              const timeout = data.timeout;
+              const score = ((caught / total) * 100).toFixed(1);
+
+              results += `- **Total Mutants**: ${total}\n`;
+              results += `- **Caught**: ${caught} ✅\n`;
+              results += `- **Missed**: ${missed} ⚠️\n`;
+              results += `- **Timeout**: ${timeout}\n`;
+              results += `- **Score**: ${score}%\n\n`;
+
+              if (missed > 0) {
+                results += `⚠️ **${missed} mutants survived** - some tests may not be catching bugs!\n\n`;
+                results += `See artifacts for details on which mutations weren't caught.\n`;
+              } else {
+                results += `🎉 **All mutants caught!** Your tests are solid.\n`;
+              }
+            } catch (e) {
+              results += `❌ Failed to parse mutation testing results.\n`;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: results
+            });
+
+      - name: Fail if mutation score too low
+        run: |
+          SCORE=$(jq -r '(.caught / .total_mutants * 100)' mutants.out.json)
+          echo "Mutation score: $SCORE%"
+          if (( $(echo "$SCORE < 80.0" | bc -l) )); then
+            echo "❌ Mutation score ($SCORE%) is below 80% threshold"
+            exit 1
+          fi
+        shell: bash
