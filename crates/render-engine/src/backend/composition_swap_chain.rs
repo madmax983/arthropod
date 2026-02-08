@@ -3,8 +3,6 @@
 //! Provides utilities for creating DXGI swap chains compatible with
 //! DirectComposition visual trees.
 
-#![cfg(target_os = "windows")]
-
 /// Creates a surface configuration compatible with DirectComposition.
 ///
 /// DirectComposition requires:

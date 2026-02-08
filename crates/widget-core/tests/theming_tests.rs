@@ -3,7 +3,7 @@
 use flux_state::{Runtime, Signal};
 use glam::Vec4;
 use plat_core::BackdropMaterial;
-use render_engine::NodeContent;
+use render_engine::{Color, NodeContent};
 use theme_engine::{DesignTokens, SystemTheme};
 use widget_core::{Text, TextInput, Widget, WidgetContext};
 

@@ -189,6 +189,7 @@ fn bench_mark_dirty(c: &mut Criterion) {
 
     group.bench_function("take_dirty", |b| {
         // First mark some as dirty
+        #[allow(clippy::needless_range_loop)]
         for i in 0..100 {
             scene.mark_dirty(nodes[i]);
         }

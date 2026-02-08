@@ -201,6 +201,8 @@ impl WindowImpl {
                     .set_root(&root_visual)
                     .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
 
+                // Windows COM DirectComposition wrappers are inherently single-threaded, Arc is for ref counting
+                #[allow(clippy::arc_with_non_send_sync)]
                 Some(std::sync::Arc::new(WindowComposition {
                     device,
                     target,

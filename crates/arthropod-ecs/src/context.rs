@@ -189,6 +189,7 @@ impl FrameworkContext {
     /// After layout, systems can overlap:
     /// - `gather_a11y_bounds_system`: `Res<Scene>` + `ResMut<A11yBoundsBuffer>`
     /// - `collect_renderables_system`: `Res<Scene>` + `ResMut<RenderCommands>`
+    ///
     /// Both use shared `Res<Scene>` with disjoint mutable resources.
     ///
     /// `apply_a11y_bounds_system` runs after gather to write to `ResMut<A11yTree>`.

@@ -217,6 +217,8 @@ mod platform {
                 .add_child(visual.visual())
                 .map_err(|e| PlatformError::Initialization(format!("Add child: {}", e)))?;
 
+            // Windows COM wrappers are inherently single-threaded, Arc is used for ref counting only
+            #[allow(clippy::arc_with_non_send_sync)]
             let wrapped = std::sync::Arc::new(CompositionVisualWrapper {
                 visual: visual.visual().clone(),
             });
