@@ -74,15 +74,17 @@ You can run the story demo to see it in action:
 cargo run --example story_demo --features nova
 ```
 
+> **Note:** If you run the demo *without* the `--features nova` flag, it will exit with a helpful error message explaining the requirement.
+
 ### Troubleshooting
 
-If you encounter the following error when trying to use experimental features:
+If you encounter the following compiler error when using `arthropod` in your own code:
 
 ```text
 error[E0433]: failed to resolve: could not find `experimental` in `arthropod`
 ```
 
-This indicates that the `nova` feature flag is not enabled. Please verify your `Cargo.toml` configuration or ensure the `--features nova` flag is included in your `cargo run` command.
+This indicates that you are trying to use an experimental feature (like `arthropod::experimental`) but the `nova` feature flag is not enabled. Please update your `Cargo.toml` to include `features = ["nova"]`.
 
 ## Development & Testing
 
