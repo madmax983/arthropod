@@ -107,18 +107,20 @@ cargo bench --all
 
 We use `cargo-mutants` to ensure test quality:
 
+⚠️ **Windows Users**: cargo-mutants has a known bug on Windows (v26.2.0). Use WSL or check CI results instead.
+
 ```bash
-# Install cargo-mutants
+# Linux/macOS/WSL
 cargo install cargo-mutants
+cargo mutants -p flux-state --no-shuffle --timeout 60
 
-# Run mutation testing (PowerShell)
-.\scripts\mutation-test.ps1
-
-# Run on specific package
-.\scripts\mutation-test.ps1 -Package flux-state
+# Windows - use WSL or wait for CI
+# Mutation testing runs automatically in GitHub Actions
 ```
 
 **Mutation testing verifies that tests actually catch bugs** by introducing small code changes (mutants) and checking if tests fail. We maintain >80% mutation score.
+
+See [`docs/testing/mutation-testing.md`](docs/testing/mutation-testing.md) for detailed guide and troubleshooting.
 
 ### Code Quality Checks
 
