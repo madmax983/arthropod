@@ -23,10 +23,7 @@ fn test_grid_single_row() {
     let mut ctx = WidgetContext::new_test();
 
     // 3 items, 3 columns = 1 row
-    let grid = Grid::new(
-        (Text::new("A"), Text::new("B"), Text::new("C")),
-        3,
-    );
+    let grid = Grid::new((Text::new("A"), Text::new("B"), Text::new("C")), 3);
 
     let node_id = grid.build(&mut ctx);
 
@@ -65,7 +62,11 @@ fn test_grid_multiple_rows() {
     for row_idx in 0..3 {
         let row_id = scene_node.children[row_idx];
         let row_node = ctx.scene().get_node(row_id).unwrap();
-        assert_eq!(row_node.children.len(), 2, "Each row should have 2 children");
+        assert_eq!(
+            row_node.children.len(),
+            2,
+            "Each row should have 2 children"
+        );
     }
 }
 
@@ -106,10 +107,7 @@ fn test_grid_partial_last_row() {
 fn test_grid_with_gap() {
     let mut ctx = WidgetContext::new_test();
 
-    let grid = Grid::new(
-        (Text::new("A"), Text::new("B")),
-        2,
-    ).gap(10.0);
+    let grid = Grid::new((Text::new("A"), Text::new("B")), 2).gap(10.0);
 
     let node_id = grid.build(&mut ctx);
 
@@ -122,10 +120,7 @@ fn test_grid_with_gap() {
 fn test_grid_with_column_gap() {
     let mut ctx = WidgetContext::new_test();
 
-    let grid = Grid::new(
-        (Text::new("A"), Text::new("B")),
-        2,
-    ).column_gap(8.0);
+    let grid = Grid::new((Text::new("A"), Text::new("B")), 2).column_gap(8.0);
 
     let node_id = grid.build(&mut ctx);
     let scene_node = ctx.scene().get_node(node_id).unwrap();
@@ -148,7 +143,8 @@ fn test_grid_with_row_gap() {
             Text::new("D"),
         ),
         2,
-    ).row_gap(12.0);
+    )
+    .row_gap(12.0);
 
     let node_id = grid.build(&mut ctx);
 
@@ -161,10 +157,7 @@ fn test_grid_with_row_gap() {
 fn test_grid_with_padding() {
     let mut ctx = WidgetContext::new_test();
 
-    let grid = Grid::new(
-        (Text::new("A"), Text::new("B")),
-        2,
-    ).padding(16.0);
+    let grid = Grid::new((Text::new("A"), Text::new("B")), 2).padding(16.0);
 
     let node_id = grid.build(&mut ctx);
 
@@ -180,10 +173,7 @@ fn test_grid_single_column() {
     let mut ctx = WidgetContext::new_test();
 
     // 3 items, 1 column = 3 rows
-    let grid = Grid::new(
-        (Text::new("A"), Text::new("B"), Text::new("C")),
-        1,
-    );
+    let grid = Grid::new((Text::new("A"), Text::new("B"), Text::new("C")), 1);
 
     let node_id = grid.build(&mut ctx);
 

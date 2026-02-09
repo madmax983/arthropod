@@ -77,9 +77,12 @@ impl<C: WidgetTuple> Widget for Card<C> {
         let root_id = ctx.root();
         let node_id = ctx.create_node(
             root_id,
-            NodeContent::RoundedRect {
-                color: self.background,
-                corner_radius: self.corner_radius,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(self.background.as_vec4())
+                        .corner_radius(self.corner_radius),
+                ),
             },
         );
 

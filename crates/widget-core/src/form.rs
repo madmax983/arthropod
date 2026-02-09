@@ -104,8 +104,10 @@ impl<F: NamedWidgetTuple> Widget for Form<F> {
         // Create form container with themed background
         let form_node = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w),
+            NodeContent::Styled {
+                style: Box::new(render_engine::VisualStyle::new().solid_fill(
+                    Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w).as_vec4(),
+                )),
             },
         );
 

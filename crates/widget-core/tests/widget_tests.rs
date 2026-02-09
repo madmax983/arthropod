@@ -1,7 +1,7 @@
 //! Widget system integration tests - Written FIRST following TDD
 
 use flux_state::{Runtime, Signal};
-use glam::Vec4;
+use render_engine::Color;
 use widget_core::{Container, Text, Widget, WidgetContext};
 
 #[test]
@@ -66,7 +66,7 @@ fn test_text_widget_creates_text_node() {
 
     let text = Text::new("Hello World")
         .size(20.0)
-        .color(Vec4::new(1.0, 0.0, 0.0, 1.0)); // Red
+        .color(Color::rgba(1.0, 0.0, 0.0, 1.0)); // Red
 
     let node_id = text.build(&mut ctx);
 

@@ -28,8 +28,13 @@ fn main() -> Result<(), AppError> {
         let message_input = ctx.signal(String::new());
 
         // Helper to create message bubble
-        fn message(sender: &'static str, text: &'static str, is_own: bool) -> Row<(Spacer, Card<(Column<(Text, Text)>,)>)> {
-            let bubble_color = if is_own {
+        #[allow(clippy::type_complexity)]
+        fn message(
+            sender: &'static str,
+            text: &'static str,
+            is_own: bool,
+        ) -> Row<(Spacer, Card<(Column<(Text, Text)>,)>)> {
+            let _bubble_color = if is_own {
                 Color::rgba(0.0, 0.47, 0.84, 0.15) // Blue tint for own messages
             } else {
                 Color::rgba(0.9, 0.9, 0.9, 1.0) // Gray for others
@@ -83,7 +88,11 @@ fn main() -> Result<(), AppError> {
             {
                 let mut messages = List::column();
                 messages.push(message("Alice", "Hey! How are you?", false));
-                messages.push(message("You", "I'm good, thanks! Working on the new UI.", true));
+                messages.push(message(
+                    "You",
+                    "I'm good, thanks! Working on the new UI.",
+                    true,
+                ));
                 messages.push(message("Alice", "That sounds exciting!", false));
                 messages.push(message(
                     "You",

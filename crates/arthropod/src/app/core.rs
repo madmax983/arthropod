@@ -10,7 +10,7 @@ use flux_state::Runtime;
 use plat_core::{EventLoop, Window, WindowConfig};
 use render_engine::{
     NodeId,
-    backend::{RectInstance, RenderBackend, WgpuBackend},
+    backend::{PrimitiveInstance, RenderBackend, WgpuBackend},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -263,7 +263,7 @@ impl App {
     /// let instances = app.render();
     /// assert!(instances.len() >= 0);
     /// ```
-    pub fn render(&mut self) -> Vec<RectInstance> {
+    pub fn render(&mut self) -> Vec<PrimitiveInstance> {
         self.context.render()
     }
 

@@ -111,8 +111,11 @@ mod tests {
         let mut scene = render_engine::Scene::new();
         let root = scene.root();
         let scene_node = render_engine::SceneNode {
-            content: render_engine::NodeContent::Rect {
-                color: render_engine::Color::RED,
+            content: render_engine::NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::RED.as_vec4()),
+                ),
             },
             transform: render_engine::Transform2D::identity(),
             bounds: Rect::new(10.0, 20.0, 200.0, 100.0),
@@ -164,8 +167,11 @@ mod tests {
         let mut scene = render_engine::Scene::new();
         let root = scene.root();
         let scene_node = render_engine::SceneNode {
-            content: render_engine::NodeContent::Rect {
-                color: render_engine::Color::RED,
+            content: render_engine::NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::RED.as_vec4()),
+                ),
             },
             transform: render_engine::Transform2D::identity(),
             bounds: Rect::new(5.0, 10.0, 50.0, 30.0),

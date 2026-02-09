@@ -70,13 +70,16 @@ const FOCUS_BORDER: Color = Color::rgba(124.0 / 255.0, 58.0 / 255.0, 237.0 / 255
 const UNFOCUS_BORDER: Color = Color::rgba(70.0 / 255.0, 70.0 / 255.0, 100.0 / 255.0, 0.6);
 
 impl ThemedFormApp {
+    #[allow(clippy::collapsible_if)]
     fn set_focus(&mut self, field: Option<usize>) {
         // Restore previous focus border
         if let Some(prev) = self.focused_field
             && let Some(node) = self.scene.get_node_mut(self.field_border_ids[prev])
-            && let NodeContent::RoundedRect { ref mut color, .. } = node.content
+            && let NodeContent::Styled { ref mut style } = node.content
         {
-            *color = UNFOCUS_BORDER;
+            if !style.fills.is_empty() {
+                style.fills[0] = render_engine::Paint::Solid(UNFOCUS_BORDER.as_vec4());
+            }
         }
 
         self.focused_field = field;
@@ -84,12 +87,15 @@ impl ThemedFormApp {
         // Highlight new focus border
         if let Some(idx) = field
             && let Some(node) = self.scene.get_node_mut(self.field_border_ids[idx])
-            && let NodeContent::RoundedRect { ref mut color, .. } = node.content
+            && let NodeContent::Styled { ref mut style } = node.content
         {
-            *color = FOCUS_BORDER;
+            if !style.fills.is_empty() {
+                style.fills[0] = render_engine::Paint::Solid(FOCUS_BORDER.as_vec4());
+            }
         }
     }
 
+    #[allow(clippy::collapsible_if)]
     fn update_field_text(&mut self, idx: usize) {
         let display = if idx == 2 {
             // Password field: show dots
@@ -99,9 +105,11 @@ impl ThemedFormApp {
         };
 
         if let Some(node) = self.scene.get_node_mut(self.field_text_node_ids[idx])
-            && let NodeContent::Text { ref mut text, .. } = node.content
+            && let NodeContent::Styled { ref mut style } = node.content
         {
-            *text = display;
+            if let Some(ref mut text_content) = style.text {
+                text_content.text = display;
+            }
         }
     }
 
@@ -343,9 +351,12 @@ fn add_rounded_rect(
     color: Color,
     corner_radius: f32,
 ) -> NodeId {
-    let node = SceneNode::new(NodeContent::RoundedRect {
-        color,
-        corner_radius,
+    let node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new()
+                .solid_fill(color.as_vec4())
+                .corner_radius(corner_radius),
+        ),
     });
     let id = scene.add_node(parent, node);
     if let Some(n) = scene.get_node_mut(id) {
@@ -367,10 +378,12 @@ fn add_text(
     font_size: f32,
     color: Color,
 ) -> NodeId {
-    let node = SceneNode::new(NodeContent::Text {
-        text: text.to_string(),
-        font_size,
-        color,
+    let node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new()
+                .solid_fill(color.as_vec4())
+                .text(render_engine::TextContent::new(text.to_string(), font_size)),
+        ),
     });
     let id = scene.add_node(parent, node);
     if let Some(n) = scene.get_node_mut(id) {

@@ -69,8 +69,11 @@ fn setup_accessible_button(context: &mut FrameworkContext, click_count: Arc<Mute
     let mut scene = context.world_mut().resource_mut::<Scene>();
     let button_scene = scene.add_node(
         root_scene,
-        SceneNode::new(NodeContent::Rect {
-            color: Color::rgba(0.2, 0.4, 0.8, 1.0),
+        SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(0.2, 0.4, 0.8, 1.0).as_vec4()),
+            ),
         }),
     );
     scene.get_node_mut(button_scene).unwrap().bounds = Rect::new(50.0, 50.0, 150.0, 50.0);
@@ -126,8 +129,11 @@ fn setup_accessible_checkbox(context: &mut FrameworkContext, click_count: Arc<Mu
     let mut scene = context.world_mut().resource_mut::<Scene>();
     let checkbox_scene = scene.add_node(
         root_scene,
-        SceneNode::new(NodeContent::Rect {
-            color: Color::rgba(0.2, 0.8, 0.2, 1.0),
+        SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(0.2, 0.8, 0.2, 1.0).as_vec4()),
+            ),
         }),
     );
     scene.get_node_mut(checkbox_scene).unwrap().bounds = Rect::new(50.0, 120.0, 30.0, 30.0);

@@ -28,9 +28,8 @@ use render_engine::NodeId;
 ///
 /// ```
 /// use widget_core::{Widget, WidgetContext};
-/// use render_engine::{NodeContent, NodeId, Color};
+/// use render_engine::{NodeContent, NodeId, Color, VisualStyle};
 /// use layout_engine::FlexStyle;
-/// use glam::Vec4;
 ///
 /// pub struct ColoredBox {
 ///     color: Color,
@@ -49,8 +48,8 @@ use render_engine::NodeId;
 ///         // 1. Create the scene node attached to the root (initially)
 ///         let node_id = ctx.create_node(
 ///             ctx.root(),
-///             NodeContent::Rect {
-///                 color: self.color,
+///             NodeContent::Styled {
+///                 style: Box::new(VisualStyle::new().solid_fill(self.color.as_vec4())),
 ///             },
 ///         );
 ///
@@ -380,7 +379,7 @@ impl_named_widget_tuple!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H, 8: I, 9
 mod tests {
     use super::*;
     use crate::context::WidgetContext;
-    use render_engine::{NodeContent, Color};
+    use render_engine::{Color, NodeContent};
 
     // Simple test widget for testing WidgetTuple methods
     struct TestWidget {
@@ -391,8 +390,11 @@ mod tests {
         fn build(&self, ctx: &mut WidgetContext) -> NodeId {
             ctx.create_node(
                 ctx.root(),
-                NodeContent::Rect {
-                    color: Color::rgba(1.0, 0.0, 0.0, 1.0),
+                NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4()),
+                    ),
                 },
             )
         }
@@ -452,10 +454,7 @@ mod tests {
     #[test]
     fn test_build_all_with_custom_processing() {
         let mut ctx = WidgetContext::new_test();
-        let tuple = (
-            TestWidget { _label: "A" },
-            TestWidget { _label: "B" },
-        );
+        let tuple = (TestWidget { _label: "A" }, TestWidget { _label: "B" });
 
         let mut collected = Vec::new();
         tuple.build_all_with(&mut ctx, |node_id| {

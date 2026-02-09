@@ -1,2 +1,1 @@
-pub mod glyph_pipeline;
-pub mod rect_pipeline;
+pub mod primitive_pipeline;

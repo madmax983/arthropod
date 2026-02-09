@@ -164,8 +164,10 @@ fn create_demo_scene(tokens: &DesignTokens) -> Scene {
     // Card 1: Elevated surface with semi-transparency (top-left)
     // Uses theme's elevated surface color with reduced alpha
     let elevated_color = tokens.surface_elevated.as_color();
-    let card1 = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(elevated_color.x, elevated_color.y, elevated_color.z, 0.85),
+    let card1 = SceneNode::new(NodeContent::Styled {
+        style: Box::new(render_engine::VisualStyle::new().solid_fill(
+            Color::rgba(elevated_color.x, elevated_color.y, elevated_color.z, 0.85).as_vec4(),
+        )),
     });
     let card1_id = scene.add_node(root, card1);
     if let Some(node) = scene.get_node_mut(card1_id) {
@@ -175,8 +177,11 @@ fn create_demo_scene(tokens: &DesignTokens) -> Scene {
     // Card 2: Accent colored card (top-right)
     // Uses system accent color with slight transparency
     let accent = tokens.accent;
-    let card2 = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(accent.x, accent.y, accent.z, 0.9),
+    let card2 = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new()
+                .solid_fill(Color::rgba(accent.x, accent.y, accent.z, 0.9).as_vec4()),
+        ),
     });
     let card2_id = scene.add_node(root, card2);
     if let Some(node) = scene.get_node_mut(card2_id) {
@@ -186,8 +191,11 @@ fn create_demo_scene(tokens: &DesignTokens) -> Scene {
     // Card 3: Secondary surface (bottom, spanning width)
     // More transparent to show off the Mica effect
     let secondary = tokens.surface_secondary.as_color();
-    let card3 = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(secondary.x, secondary.y, secondary.z, 0.75),
+    let card3 = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new()
+                .solid_fill(Color::rgba(secondary.x, secondary.y, secondary.z, 0.75).as_vec4()),
+        ),
     });
     let card3_id = scene.add_node(root, card3);
     if let Some(node) = scene.get_node_mut(card3_id) {
@@ -195,8 +203,10 @@ fn create_demo_scene(tokens: &DesignTokens) -> Scene {
     }
 
     // Card 4: Very transparent card to really show the backdrop
-    let card4 = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(1.0, 1.0, 1.0, 0.3),
+    let card4 = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 1.0, 1.0, 0.3).as_vec4()),
+        ),
     });
     let card4_id = scene.add_node(root, card4);
     if let Some(node) = scene.get_node_mut(card4_id) {

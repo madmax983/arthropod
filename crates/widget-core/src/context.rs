@@ -3,7 +3,9 @@
 //! Provides API for widgets to build scene nodes and configure components.
 
 use crate::form_state::{FormData, FormState, SubmitCallback};
-use crate::input_state::{ComputedTextState, ReactiveColorState, ReactiveTextState, TextInputState};
+use crate::input_state::{
+    ComputedTextState, ReactiveColorState, ReactiveTextState, TextInputState,
+};
 use crate::validation::Validator;
 use crate::validation_state::ValidationState;
 use flux_state::{Computed, ReadSignal, WriteSignal};
@@ -127,7 +129,11 @@ impl WidgetContext {
     /// Check if node is a text node
     pub fn is_text_node(&self, node_id: NodeId) -> bool {
         if let Some(node) = self.scene.get_node(node_id) {
-            matches!(node.content, NodeContent::Text { .. })
+            if let NodeContent::Styled { ref style } = node.content {
+                style.text.is_some()
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -147,8 +153,10 @@ impl WidgetContext {
 
         // Fallback to static content in node
         if let Some(node) = self.scene.get_node(node_id) {
-            if let NodeContent::Text { text, .. } = &node.content {
-                return Some(text.clone());
+            if let NodeContent::Styled { ref style } = node.content {
+                if let Some(ref text_content) = style.text {
+                    return Some(text_content.text.clone());
+                }
             }
         }
 
@@ -261,7 +269,7 @@ impl WidgetContext {
     /// let checked = Signal::new(runtime.clone(), false);
     /// let (read, write) = checked.split();
     ///
-    /// let color = Signal::new(runtime.clone(), render_engine::Color::GRAY);
+    /// let color = Signal::new(runtime.clone(), render_engine::Color::rgba(0.5, 0.5, 0.5, 1.0));
     /// let (_, color_write) = color.split();
     ///
     /// // Effect synchronizes checkbox state to color
@@ -269,7 +277,7 @@ impl WidgetContext {
     ///     if read.get() {
     ///         color_write.set(render_engine::Color::BLUE);
     ///     } else {
-    ///         color_write.set(render_engine::Color::GRAY);
+    ///         color_write.set(render_engine::Color::rgba(0.5, 0.5, 0.5, 1.0));
     ///     }
     /// });
     ///
@@ -291,7 +299,7 @@ impl WidgetContext {
     ///     if read.get() {
     ///         render_engine::Color::BLUE
     ///     } else {
-    ///         render_engine::Color::GRAY
+    ///         render_engine::Color::rgba(0.5, 0.5, 0.5, 1.0)
     ///     }
     /// });
     /// ```
@@ -721,8 +729,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -746,8 +756,10 @@ mod tests {
 
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -767,8 +779,10 @@ mod tests {
         let mut ctx = WidgetContext::new_test();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_clickable(node_id, Arc::new(|| {}));
@@ -787,8 +801,10 @@ mod tests {
         let mut ctx = WidgetContext::new_test();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.focus_node(node_id);
@@ -934,8 +950,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -1060,8 +1078,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
 
@@ -1092,10 +1112,12 @@ mod tests {
         let mut ctx = WidgetContext::new_test();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Text {
-                text: "Hello".to_string(),
-                font_size: 16.0,
-                color: Color::BLACK,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(Color::BLACK.as_vec4())
+                        .text(render_engine::TextContent::new("Hello", 16.0)),
+                ),
             },
         );
 
@@ -1116,10 +1138,12 @@ mod tests {
         // 2. Create node
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Text {
-                text: initial,
-                font_size: 16.0,
-                color: Color::BLACK,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(Color::BLACK.as_vec4())
+                        .text(render_engine::TextContent::new(initial, 16.0)),
+                ),
             },
         );
 

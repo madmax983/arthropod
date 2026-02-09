@@ -10,7 +10,9 @@ fn test_stack_depth_overflow_deterministic() {
 
     println!("👺 Constructing deep scene graph (Depth: 50,000)...");
     for _ in 0..50_000 {
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(0.0, 0.0, 1000.0, 1000.0);
         current_parent = scene.add_node(current_parent, node);
     }
@@ -30,7 +32,7 @@ proptest! {
         let mut current_parent = scene.root();
 
         for _ in 0..depth {
-             let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+             let mut node = SceneNode::new(NodeContent::Styled { style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())) });
              node.bounds = Rect::new(0.0, 0.0, 1000.0, 1000.0);
              current_parent = scene.add_node(current_parent, node);
         }

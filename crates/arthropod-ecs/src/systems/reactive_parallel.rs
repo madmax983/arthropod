@@ -72,25 +72,15 @@ pub fn apply_reactive_changes_system(buffer: Res<ReactiveChangeBuffer>, mut scen
         match change {
             ReactiveChange::Color(node_id, new_color) => {
                 if let Some(node) = scene.get_mut(*node_id) {
-                    node.content = match node.content {
-                        NodeContent::Rect { .. } => NodeContent::Rect { color: *new_color },
-                        NodeContent::RoundedRect { corner_radius, .. } => {
-                            NodeContent::RoundedRect {
-                                color: *new_color,
-                                corner_radius,
-                            }
+                    if let NodeContent::Styled { ref mut style } = node.content {
+                        if !style.fills.is_empty() {
+                            style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                        } else {
+                            style
+                                .fills
+                                .push(render_engine::Paint::Solid(new_color.as_vec4()));
                         }
-                        NodeContent::Text {
-                            ref text,
-                            font_size,
-                            ..
-                        } => NodeContent::Text {
-                            text: text.clone(),
-                            font_size,
-                            color: *new_color,
-                        },
-                        NodeContent::Empty => NodeContent::Empty,
-                    };
+                    }
                 }
             }
             ReactiveChange::Transform(node_id, new_transform) => {
@@ -166,8 +156,10 @@ mod tests {
         let node_id = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
@@ -202,10 +194,14 @@ mod tests {
 
         // Color
         match &node.content {
-            NodeContent::Rect { color } => {
-                assert!((color.b() - 1.0).abs() < 0.001, "Should be BLUE");
+            NodeContent::Styled { style } => {
+                if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                    assert!((color.z - 1.0).abs() < 0.001, "Should be BLUE");
+                } else {
+                    panic!("Expected solid fill");
+                }
             }
-            _ => panic!("Expected Rect"),
+            _ => panic!("Expected Styled node"),
         }
 
         // Transform
@@ -238,8 +234,10 @@ mod tests {
         let node_id = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
@@ -278,10 +276,21 @@ mod tests {
         let node = scene.get_node(node_id).unwrap();
 
         match &node.content {
-            NodeContent::Rect { color } => {
-                assert!((color.b() - 1.0).abs() < 0.001, "Color should be BLUE");
+            NodeContent::Styled { style } => {
+                let fill_color = style
+                    .fills
+                    .first()
+                    .and_then(|fill| match fill {
+                        render_engine::Paint::Solid(c) => Some(*c),
+                        _ => None,
+                    })
+                    .unwrap();
+                assert!(
+                    (fill_color.z - 1.0).abs() < 0.001,
+                    "Color blue channel should be 1.0"
+                );
             }
-            _ => panic!("Expected Rect"),
+            _ => panic!("Expected Styled"),
         }
 
         let point = glam::Vec2::ZERO;

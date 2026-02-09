@@ -15,8 +15,11 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// use render_engine::{SceneNode, NodeContent, Color, Transform2D};
 /// use plat_core::Rect;
+/// use style_engine::VisualStyle;
 ///
-/// let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+/// let mut node = SceneNode::new(NodeContent::Styled {
+///     style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+/// });
 /// node.transform = Transform2D::translate(100.0, 50.0);
 /// node.bounds = Rect::new(0.0, 0.0, 200.0, 100.0);
 /// ```
@@ -73,34 +76,40 @@ impl SceneNode {
 ///
 /// ```
 /// use render_engine::{NodeContent, Color};
+/// use style_engine::VisualStyle;
 ///
-/// let rect = NodeContent::Rect { color: Color::BLUE };
-/// let text = NodeContent::Text {
-///     text: "Hello".to_string(),
-///     font_size: 16.0,
-///     color: Color::WHITE,
+/// // Solid fill rectangle
+/// let rect = NodeContent::Styled {
+///     style: Box::new(VisualStyle::new()
+///         .solid_fill(Color::BLUE.as_vec4())),
+/// };
+///
+/// // Rounded rectangle
+/// let rounded = NodeContent::Styled {
+///     style: Box::new(VisualStyle::new()
+///         .solid_fill(Color::RED.as_vec4())
+///         .corner_radius(12.0)),
+/// };
+///
+/// // Text with style
+/// let text = NodeContent::Styled {
+///     style: Box::new(VisualStyle::new()
+///         .solid_fill(Color::WHITE.as_vec4())
+///         .text(style_engine::TextContent::new("Hello", 16.0))),
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeContent {
     /// Empty container (for grouping).
     Empty,
-    /// Solid color rectangle.
-    Rect { color: Color },
-    /// Rounded rectangle.
-    RoundedRect { color: Color, corner_radius: f32 },
-    /// Text content that will be shaped during rendering.
+    /// Styled primitive (rectangles, text, gradients, strokes, effects).
     ///
-    /// Text is stored as a raw string and shaped on-demand using the rendering backend's
-    /// TextEngine. This ensures the FontSystem used for shaping matches the one used for
-    /// rasterization, avoiding CacheKey mismatches.
-    Text {
-        /// The text string to render
-        text: String,
-        /// Font size in pixels
-        font_size: f32,
-        /// Text color
-        color: Color,
+    /// This unified variant replaces the old Rect, RoundedRect, and Text variants.
+    /// It uses VisualStyle from style-engine which maps 1:1 to Figma's visual properties.
+    /// Boxed to reduce enum size (VisualStyle is 304 bytes).
+    Styled {
+        /// The visual style (fills, stroke, effects, text, etc.)
+        style: Box<style_engine::VisualStyle>,
     },
 }
 

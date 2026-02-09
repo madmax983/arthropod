@@ -63,8 +63,11 @@ fn setup_test_scene(ctx: &mut McpFrameworkContext) {
         let root = scene.root();
 
         // Background rectangle
-        let mut bg_node = SceneNode::new(NodeContent::Rect {
-            color: Color::rgba(0.1, 0.1, 0.1, 1.0),
+        let mut bg_node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(0.1, 0.1, 0.1, 1.0).as_vec4()),
+            ),
         });
         bg_node.bounds = plat_core::Rect::new(0.0, 0.0, 800.0, 600.0);
         bg_node.visible = true;
@@ -72,16 +75,21 @@ fn setup_test_scene(ctx: &mut McpFrameworkContext) {
         let background = scene.add_node(root, bg_node);
 
         // Red rectangle
-        let mut rect1_node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut rect1_node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         rect1_node.bounds = plat_core::Rect::new(100.0, 100.0, 200.0, 150.0);
         rect1_node.visible = true;
         rect1_node.opacity = 1.0;
         let rect1 = scene.add_node(background, rect1_node);
 
         // Blue rounded rectangle
-        let mut rect2_node = SceneNode::new(NodeContent::RoundedRect {
-            color: Color::BLUE,
-            corner_radius: 8.0,
+        let mut rect2_node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::BLUE.as_vec4())
+                    .corner_radius(8.0),
+            ),
         });
         rect2_node.bounds = plat_core::Rect::new(400.0, 200.0, 250.0, 180.0);
         rect2_node.visible = true;

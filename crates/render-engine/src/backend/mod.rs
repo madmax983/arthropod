@@ -6,7 +6,7 @@ pub mod text;
 pub mod wgpu;
 
 pub use text::{GlyphAtlas, GlyphInstance, TexCoords, TextRenderer};
-pub use wgpu::{RectInstance, WgpuBackend};
+pub use wgpu::{PrimitiveInstance, WgpuBackend};
 
 use crate::Scene;
 

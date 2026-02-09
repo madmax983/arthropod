@@ -263,8 +263,10 @@ impl Application for DemoApp {
             // Create scene node with initial bounds
             let bounds = rect.bounds_for_size(size.width as f32, size.height as f32);
             let rect_node = SceneNode {
-                content: NodeContent::Rect {
-                    color: rect.base_color,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(rect.base_color.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds,

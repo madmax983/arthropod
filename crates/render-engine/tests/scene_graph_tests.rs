@@ -30,19 +30,29 @@ fn test_get_added_node() {
     let root = scene.root();
 
     let color = Color::RED;
-    let node_id = scene.add_node(root, SceneNode::new(NodeContent::Rect { color }));
+    let node_id = scene.add_node(
+        root,
+        SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(color.as_vec4())),
+        }),
+    );
 
     let node = scene.get_node(node_id);
     assert!(node.is_some(), "Should be able to retrieve added node");
 
     if let Some(node) = node {
-        match node.content {
-            NodeContent::Rect { color: c } => {
-                assert_eq!(c.r(), color.r());
-                assert_eq!(c.g(), color.g());
-                assert_eq!(c.b(), color.b());
+        match &node.content {
+            NodeContent::Styled { style } => {
+                assert!(!style.fills.is_empty(), "Expected at least one fill");
+                if let render_engine::Paint::Solid(c) = &style.fills[0] {
+                    assert_eq!(c.x, color.r());
+                    assert_eq!(c.y, color.g());
+                    assert_eq!(c.z, color.b());
+                } else {
+                    panic!("Expected solid fill color");
+                }
             }
-            _ => panic!("Expected Rect content"),
+            _ => panic!("Expected Styled content"),
         }
     }
 }
@@ -54,22 +64,31 @@ fn test_modify_node() {
 
     let node_id = scene.add_node(
         root,
-        SceneNode::new(NodeContent::Rect { color: Color::RED }),
+        SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        }),
     );
 
     // Modify the node
     if let Some(node) = scene.get_node_mut(node_id) {
-        node.content = NodeContent::Rect { color: Color::BLUE };
+        node.content = NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        };
         node.opacity = 0.5;
     }
 
     // Verify modification
     let node = scene.get_node(node_id).expect("Node should exist");
-    match node.content {
-        NodeContent::Rect { color } => {
-            assert_eq!(color.b(), 1.0, "Color should be blue");
+    match &node.content {
+        NodeContent::Styled { style } => {
+            assert!(!style.fills.is_empty(), "Expected at least one fill");
+            if let render_engine::Paint::Solid(color) = &style.fills[0] {
+                assert_eq!(color.z, 1.0, "Color should be blue");
+            } else {
+                panic!("Expected solid fill color");
+            }
         }
-        _ => panic!("Expected Rect content"),
+        _ => panic!("Expected Styled content"),
     }
     assert_eq!(node.opacity, 0.5);
 }

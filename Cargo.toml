@@ -15,6 +15,7 @@ members = [
     "crates/text-engine",
     "crates/widget-core",
     "crates/widget-macros",
+    "crates/style-engine",
     "experiments/chronos", "experiments/spatial-graph", "experiments/motion",
 ]
 

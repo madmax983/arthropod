@@ -87,9 +87,12 @@ impl Widget for Checkbox {
 
         let box_node = ctx.create_node(
             ctx.root(),
-            NodeContent::RoundedRect {
-                color: initial_bg,
-                corner_radius: 4.0,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(initial_bg.as_vec4())
+                        .corner_radius(4.0),
+                ),
             },
         );
         ctx.set_layout_style(
@@ -107,10 +110,12 @@ impl Widget for Checkbox {
         // 2. Create Checkmark Node
         let check_node = ctx.create_node(
             box_node, // Child of box
-            NodeContent::Text {
-                text: "✓".to_string(),
-                font_size: 14.0,
-                color: initial_fg,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(initial_fg.as_vec4())
+                        .text(render_engine::TextContent::new("✓".to_string(), 14.0)),
+                ),
             },
         );
         ctx.add_reactive_color_state(check_node, check_fg_read);

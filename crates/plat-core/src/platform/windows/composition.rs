@@ -239,7 +239,10 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
 mod tests {
     use super::*;
     use windows::Win32::{
-        System::{Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize}, LibraryLoader::*},
+        System::{
+            Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize},
+            LibraryLoader::*,
+        },
         UI::WindowsAndMessaging::*,
     };
 

@@ -7,7 +7,9 @@ fn test_cycle_stack_overflow() {
     let root = scene.root();
 
     // Create Node A attached to Root
-    let mut node_a = SceneNode::new(NodeContent::Rect { color: Color::RED });
+    let mut node_a = SceneNode::new(NodeContent::Styled {
+        style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+    });
     node_a.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
     let id_a = scene.add_node(root, node_a);
 

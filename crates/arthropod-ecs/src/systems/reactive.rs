@@ -26,23 +26,15 @@ pub fn update_all_reactive_system(
     for (node_ref, reactive) in color_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
             let new_color = reactive.signal.inner().get_untracked();
-            node.content = match node.content {
-                NodeContent::Rect { .. } => NodeContent::Rect { color: new_color },
-                NodeContent::RoundedRect { corner_radius, .. } => NodeContent::RoundedRect {
-                    color: new_color,
-                    corner_radius,
-                },
-                NodeContent::Text {
-                    ref text,
-                    font_size,
-                    ..
-                } => NodeContent::Text {
-                    text: text.clone(),
-                    font_size,
-                    color: new_color,
-                },
-                NodeContent::Empty => NodeContent::Empty,
-            };
+            if let NodeContent::Styled { ref mut style } = node.content {
+                if !style.fills.is_empty() {
+                    style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                } else {
+                    style
+                        .fills
+                        .push(render_engine::Paint::Solid(new_color.as_vec4()));
+                }
+            }
         }
     }
 
@@ -50,12 +42,10 @@ pub fn update_all_reactive_system(
     for (node_ref, reactive) in text_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
             let new_text = reactive.signal.inner().get_untracked();
-            if let NodeContent::Text { font_size, color, .. } = node.content {
-                node.content = NodeContent::Text {
-                    text: new_text,
-                    font_size,
-                    color,
-                };
+            if let NodeContent::Styled { ref mut style } = node.content {
+                if let Some(ref mut text_content) = style.text {
+                    text_content.text = new_text;
+                }
             }
         }
     }
@@ -64,12 +54,10 @@ pub fn update_all_reactive_system(
     for (node_ref, reactive) in computed_text_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
             let new_text = reactive.computed.get();
-            if let NodeContent::Text { font_size, color, .. } = node.content {
-                node.content = NodeContent::Text {
-                    text: new_text,
-                    font_size,
-                    color,
-                };
+            if let NodeContent::Styled { ref mut style } = node.content {
+                if let Some(ref mut text_content) = style.text {
+                    text_content.text = new_text;
+                }
             }
         }
     }
@@ -106,23 +94,15 @@ pub fn update_reactive_colors_system(
     for (node_ref, reactive) in query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
             let new_color = reactive.signal.inner().get_untracked();
-            node.content = match node.content {
-                NodeContent::Rect { .. } => NodeContent::Rect { color: new_color },
-                NodeContent::RoundedRect { corner_radius, .. } => NodeContent::RoundedRect {
-                    color: new_color,
-                    corner_radius,
-                },
-                NodeContent::Text {
-                    ref text,
-                    font_size,
-                    ..
-                } => NodeContent::Text {
-                    text: text.clone(),
-                    font_size,
-                    color: new_color,
-                },
-                NodeContent::Empty => NodeContent::Empty,
-            };
+            if let NodeContent::Styled { ref mut style } = node.content {
+                if !style.fills.is_empty() {
+                    style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                } else {
+                    style
+                        .fills
+                        .push(render_engine::Paint::Solid(new_color.as_vec4()));
+                }
+            }
         }
     }
 }
@@ -195,7 +175,11 @@ mod tests {
         let node_id = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                    ),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
                 children: vec![],
@@ -231,14 +215,18 @@ mod tests {
 
         // Color should be BLUE
         match &node.content {
-            NodeContent::Rect { color } => {
-                assert!(
-                    (color.r() - Color::BLUE.r()).abs() < 0.001
-                        && (color.b() - Color::BLUE.b()).abs() < 0.001,
-                    "Color should be BLUE"
-                );
+            NodeContent::Styled { style } => {
+                if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                    assert!(
+                        (color.x - Color::BLUE.r()).abs() < 0.001
+                            && (color.z - Color::BLUE.b()).abs() < 0.001,
+                        "Color should be BLUE"
+                    );
+                } else {
+                    panic!("Expected solid fill");
+                }
             }
-            _ => panic!("Expected Rect node"),
+            _ => panic!("Expected Styled node"),
         }
 
         // Transform should be translated
@@ -271,8 +259,10 @@ mod tests {
         let node1 = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(0.0, 0.0, 50.0, 50.0),
@@ -315,13 +305,14 @@ mod tests {
         // Node 1: color changed, opacity unchanged
         let n1 = scene.get_node(node1).unwrap();
         match &n1.content {
-            NodeContent::Rect { color } => {
-                assert!(
-                    (color.b() - 1.0).abs() < 0.001,
-                    "Node1 color should be BLUE"
-                );
+            NodeContent::Styled { style } => {
+                if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                    assert!((color.z - 1.0).abs() < 0.001, "Node1 color should be BLUE");
+                } else {
+                    panic!("Expected solid fill");
+                }
             }
-            _ => panic!("Expected Rect"),
+            _ => panic!("Expected Styled node"),
         }
         assert!((n1.opacity - 1.0).abs() < 0.001, "Node1 opacity unchanged");
 

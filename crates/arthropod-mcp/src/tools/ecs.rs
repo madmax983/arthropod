@@ -401,17 +401,21 @@ impl Tool for VerifyLinkageTool {
 mod tests {
     use super::*;
     use crate::context::McpFrameworkContext;
-    use render_engine::{Color, NodeContent, SceneNode};
+    use render_engine::{Color, NodeContent, SceneNode, VisualStyle};
 
     fn create_test_entities(ctx: &mut McpFrameworkContext) -> Vec<Entity> {
         let scene = ctx.scene_mut();
 
         // Create test nodes
-        let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node1 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node1.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
         let node_id1 = scene.add_node(scene.root(), node1);
 
-        let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+        let mut node2 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        });
         node2.bounds = plat_core::Rect::new(100.0, 100.0, 100.0, 100.0);
         let node_id2 = scene.add_node(scene.root(), node2);
 

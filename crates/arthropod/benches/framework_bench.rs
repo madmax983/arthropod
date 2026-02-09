@@ -82,7 +82,9 @@ fn create_scene_with_nodes(count: usize) -> (Scene, Vec<NodeId>, HashMap<NodeId,
     );
 
     for _ in 0..count {
-        let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         let node_id = scene.add_node(root, node);
         node_ids.push(node_id);
 
@@ -268,7 +270,11 @@ fn bench_auto_layout_nested(c: &mut Criterion) {
 
                 // Add a few children at each level
                 for _ in 0..3 {
-                    let child = SceneNode::new(NodeContent::Rect { color: Color::RED });
+                    let child = SceneNode::new(NodeContent::Styled {
+                        style: Box::new(
+                            render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                        ),
+                    });
                     let child_id = scene.add_node(container_id, child);
 
                     styles.insert(
@@ -316,7 +322,11 @@ fn bench_auto_layout_row(c: &mut Criterion) {
             );
 
             for _ in 0..count {
-                let child = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+                let child = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::BLUE.as_vec4()),
+                    ),
+                });
                 let child_id = scene.add_node(root, child);
 
                 styles.insert(

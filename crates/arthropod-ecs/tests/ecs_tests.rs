@@ -3,7 +3,7 @@ use arthropod_ecs::{
 };
 use flux_state::{Runtime, Signal};
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, Vec2};
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, Vec2, VisualStyle};
 
 #[test]
 fn test_reactive_color_updates_scene_node() {
@@ -22,8 +22,10 @@ fn test_reactive_color_updates_scene_node() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect {
@@ -53,16 +55,21 @@ fn test_reactive_color_updates_scene_node() {
     let scene = ctx.world().resource::<Scene>();
     let node = scene.get_node(node_id).unwrap();
     match &node.content {
-        NodeContent::Rect { color } => {
-            assert!(
-                (color.r() - Color::BLUE.r()).abs() < 0.001
-                    && (color.g() - Color::BLUE.g()).abs() < 0.001
-                    && (color.b() - Color::BLUE.b()).abs() < 0.001
-                    && (color.a() - Color::BLUE.a()).abs() < 0.001,
-                "Color should be updated to BLUE"
-            );
+        NodeContent::Styled { style } => {
+            assert!(!style.fills.is_empty(), "Expected at least one fill");
+            if let render_engine::Paint::Solid(color) = &style.fills[0] {
+                assert!(
+                    (color.x - Color::BLUE.r()).abs() < 0.001
+                        && (color.y - Color::BLUE.g()).abs() < 0.001
+                        && (color.z - Color::BLUE.b()).abs() < 0.001
+                        && (color.w - Color::BLUE.a()).abs() < 0.001,
+                    "Color should be updated to BLUE"
+                );
+            } else {
+                panic!("Expected solid fill color");
+            }
         }
-        _ => panic!("Expected Rect node"),
+        _ => panic!("Expected Styled node"),
     }
 }
 
@@ -174,7 +181,9 @@ fn test_collect_renderables_filters_invisible() {
         let visible = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 0.0,
@@ -192,7 +201,9 @@ fn test_collect_renderables_filters_invisible() {
         let hidden = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::BLUE },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 100.0,
@@ -235,7 +246,9 @@ fn test_collect_renderables_filters_zero_opacity() {
         let opaque = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 0.0,
@@ -253,7 +266,9 @@ fn test_collect_renderables_filters_zero_opacity() {
         let transparent = scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::BLUE },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 100.0,
@@ -294,8 +309,11 @@ fn test_collect_renderables_applies_opacity() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::rgba(1.0, 0.0, 0.0, 1.0),
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect {
@@ -343,8 +361,10 @@ fn test_framework_context_update_and_render() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect {

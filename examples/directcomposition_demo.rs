@@ -137,8 +137,10 @@ fn create_demo_scene(width: u32, height: u32) -> Scene {
     let root = scene.root();
 
     // Sidebar region - semi-transparent to show Mica
-    let sidebar = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(1.0, 1.0, 1.0, 0.1), // Very transparent white
+    let sidebar = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 1.0, 1.0, 0.1).as_vec4()),
+        ), // Very transparent white
     });
     let sidebar_id = scene.add_node(root, sidebar);
     if let Some(node) = scene.get_node_mut(sidebar_id) {
@@ -148,8 +150,11 @@ fn create_demo_scene(width: u32, height: u32) -> Scene {
     // Sidebar items (semi-transparent cards)
     let items = ["Dashboard", "Documents", "Settings", "Help"];
     for (i, label) in items.iter().enumerate() {
-        let item = SceneNode::new(NodeContent::Rect {
-            color: Color::rgba(1.0, 1.0, 1.0, 0.15), // Semi-transparent card
+        let item = SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(1.0, 1.0, 1.0, 0.15).as_vec4()),
+            ), // Semi-transparent card
         });
         let item_id = scene.add_node(sidebar_id, item);
         if let Some(node) = scene.get_node_mut(item_id) {
@@ -159,8 +164,11 @@ fn create_demo_scene(width: u32, height: u32) -> Scene {
     }
 
     // Content region - solid opaque background
-    let content = SceneNode::new(NodeContent::Rect {
-        color: Color::rgba(0.98, 0.98, 0.98, 1.0), // Solid light gray
+    let content = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            render_engine::VisualStyle::new()
+                .solid_fill(Color::rgba(0.98, 0.98, 0.98, 1.0).as_vec4()),
+        ), // Solid light gray
     });
     let content_id = scene.add_node(root, content);
     if let Some(node) = scene.get_node_mut(content_id) {
@@ -174,8 +182,11 @@ fn create_demo_scene(width: u32, height: u32) -> Scene {
 
     // Content cards (solid, demonstrating opaque rendering)
     for i in 0..3 {
-        let card = SceneNode::new(NodeContent::Rect {
-            color: Color::rgba(1.0, 1.0, 1.0, 1.0), // Solid white
+        let card = SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(1.0, 1.0, 1.0, 1.0).as_vec4()),
+            ), // Solid white
         });
         let card_id = scene.add_node(content_id, card);
         if let Some(node) = scene.get_node_mut(card_id) {

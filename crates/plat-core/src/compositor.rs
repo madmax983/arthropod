@@ -250,7 +250,6 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_layer_bounds() {

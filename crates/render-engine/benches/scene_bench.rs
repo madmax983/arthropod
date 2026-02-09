@@ -23,7 +23,9 @@ fn create_scene_with_nodes(count: usize) -> Scene {
         let row = i / grid_size;
         let col = i % grid_size;
 
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(
             col as f32 * spacing,
             row as f32 * spacing,
@@ -42,7 +44,9 @@ fn create_scene_with_overlapping_nodes(count: usize) -> Scene {
     let root = scene.root();
 
     for i in 0..count {
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         // All nodes overlap at center with slight offset
         node.bounds = Rect::new(
             100.0 + (i as f32 * 0.1),
@@ -151,7 +155,9 @@ fn bench_add_node(c: &mut Criterion) {
         let root = scene.root();
 
         b.iter(|| {
-            let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+            let node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            });
             black_box(scene.add_node(root, node));
         });
     });
@@ -162,7 +168,9 @@ fn bench_add_node(c: &mut Criterion) {
             let root = scene.root();
 
             for _ in 0..100 {
-                let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+                let node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+                });
                 scene.add_node(root, node);
             }
 

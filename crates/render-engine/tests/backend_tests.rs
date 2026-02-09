@@ -1,10 +1,8 @@
 //! Tests for the wgpu rendering backend.
 
 use plat_core::{Rect, Size};
-use render_engine::{
-    Color, NodeContent, Scene, SceneNode, Transform2D,
-    backend::{RectInstance, WgpuBackend},
-};
+use render_engine::backend::wgpu::PrimitiveInstance;
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, backend::WgpuBackend};
 
 #[test]
 fn test_backend_creation() {
@@ -47,7 +45,9 @@ fn test_render_single_rectangle() {
     let mut scene = Scene::new();
 
     let rect_node = SceneNode {
-        content: NodeContent::Rect { color: Color::RED },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 100.0,
@@ -75,7 +75,9 @@ fn test_render_multiple_rectangles() {
     let root = scene.root();
 
     let rect1 = SceneNode {
-        content: NodeContent::Rect { color: Color::RED },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 0.0,
@@ -90,8 +92,8 @@ fn test_render_multiple_rectangles() {
     };
 
     let rect2 = SceneNode {
-        content: NodeContent::Rect {
-            color: Color::GREEN,
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4())),
         },
         transform: Transform2D::identity(),
         bounds: Rect {
@@ -119,7 +121,9 @@ fn test_render_respects_visibility() {
     let root = scene.root();
 
     let invisible_node = SceneNode {
-        content: NodeContent::Rect { color: Color::RED },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 0.0,
@@ -145,7 +149,9 @@ fn test_render_respects_opacity() {
     let root = scene.root();
 
     let semi_transparent = SceneNode {
-        content: NodeContent::Rect { color: Color::RED },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 0.0,
@@ -173,7 +179,9 @@ fn test_render_respects_transform() {
     let transform = Transform2D::translate(50.0, 50.0);
 
     let transformed_node = SceneNode {
-        content: NodeContent::Rect { color: Color::BLUE },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        },
         transform,
         bounds: Rect {
             x: 0.0,
@@ -199,9 +207,12 @@ fn test_rounded_rectangles() {
     let root = scene.root();
 
     let rounded = SceneNode {
-        content: NodeContent::RoundedRect {
-            color: Color::BLUE,
-            corner_radius: 10.0,
+        content: NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::BLUE.as_vec4())
+                    .corner_radius(10.0),
+            ),
         },
         transform: Transform2D::identity(),
         bounds: Rect {
@@ -229,7 +240,9 @@ fn test_dirty_tracking_optimization() {
     let root = scene.root();
 
     let node = SceneNode {
-        content: NodeContent::Rect { color: Color::RED },
+        content: NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        },
         transform: Transform2D::identity(),
         bounds: Rect {
             x: 0.0,
@@ -278,13 +291,13 @@ fn test_render_instances_api() {
     // without building a Scene graph
 
     let instances = vec![
-        RectInstance::rect([0.0, 0.0], [100.0, 100.0], [1.0, 0.0, 0.0, 1.0]), // Red
-        RectInstance::rect([100.0, 0.0], [100.0, 100.0], [0.0, 1.0, 0.0, 1.0]), // Green
-        RectInstance::rect([200.0, 0.0], [100.0, 100.0], [0.0, 0.0, 1.0, 1.0]), // Blue
+        PrimitiveInstance::solid([0.0, 0.0], [100.0, 100.0], [1.0, 0.0, 0.0, 1.0]), // Red
+        PrimitiveInstance::solid([100.0, 0.0], [100.0, 100.0], [0.0, 1.0, 0.0, 1.0]), // Green
+        PrimitiveInstance::solid([200.0, 0.0], [100.0, 100.0], [0.0, 0.0, 1.0, 1.0]), // Blue
     ];
 
     // Note: We can't actually test rendering without a window, but we can test
-    // that the RectInstance type exists and can be created with the right fields.
+    // that the PrimitiveInstance type exists and can be created with the right fields.
     // The actual render_instances method will be tested visually in examples.
 
     // Verify the instances can be created and have the right shape

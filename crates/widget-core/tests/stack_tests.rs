@@ -40,10 +40,7 @@ fn test_stack_render_order() {
 
     // First child should be rendered first (background)
     // Last child should be rendered last (foreground, on top)
-    let stack = Stack::new((
-        Text::new("Back"),
-        Text::new("Front"),
-    ));
+    let stack = Stack::new((Text::new("Back"), Text::new("Front")));
 
     let node_id = stack.build(&mut ctx);
 

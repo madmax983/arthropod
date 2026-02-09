@@ -17,10 +17,15 @@ pub fn generate_narrative(
         println!("NarrativeGenerator: Generating story...");
 
         // Create a text node for the story
-        let node = SceneNode::new(NodeContent::Text {
-            text: "Once upon a time...".to_string(),
-            font_size: 32.0,
-            color: Color::BLACK,
+        let node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(
+                render_engine::VisualStyle::new()
+                    .solid_fill(Color::BLACK.as_vec4())
+                    .text(render_engine::TextContent::new(
+                        "Once upon a time...".to_string(),
+                        32.0,
+                    )),
+            ),
         });
 
         // Add to scene root

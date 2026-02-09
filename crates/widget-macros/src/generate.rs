@@ -384,7 +384,7 @@ pub fn generate_widget_impl(
     // Determine node content based on style config
     let node_content = if config.style.background.is_some() || config.style.corner_radius.is_some()
     {
-        quote! { render_engine::NodeContent::Rect { color: __background_color } }
+        quote! { render_engine::NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(__background_color.as_vec4())) } }
     } else {
         quote! { render_engine::NodeContent::Group }
     };

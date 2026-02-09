@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 use rayon::prelude::*;
-use render_engine::{backend::RectInstance, NodeId, Scene};
+use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 use std::collections::HashSet;
 
 use crate::adaptive::AdaptiveThresholds;
@@ -11,7 +11,7 @@ use crate::components::{Renderable, SceneNodeRef};
 /// Systems write RenderCommands into this resource, which is then
 /// extracted and passed to the GPU backend for rendering.
 #[derive(Resource, Default, Debug)]
-pub struct RenderCommands(pub Vec<RectInstance>);
+pub struct RenderCommands(pub Vec<PrimitiveInstance>);
 
 /// Collect all visible renderables into GPU instances
 ///
@@ -47,13 +47,13 @@ pub fn collect_renderables_system(
     if visual_nodes.len() >= threshold {
         commands.0 = visual_nodes
             .par_iter()
-            .filter_map(|(_, node)| render_engine::backend::wgpu::create_rect_instance(node))
+            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
     } else {
         for (_, node) in &visual_nodes {
-            if let Some(instance) = render_engine::backend::wgpu::create_rect_instance(node) {
-                commands.0.push(instance);
-            }
+            commands
+                .0
+                .extend(render_engine::backend::wgpu::create_node_instances(node));
         }
     }
 }
@@ -74,8 +74,11 @@ mod tests {
         let mut node_ids = Vec::new();
         for i in 0..300 {
             let node = SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::rgba(i as f32 / 300.0, 0.0, 0.0, 1.0),
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(Color::rgba(i as f32 / 300.0, 0.0, 0.0, 1.0).as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(i as f32, 0.0, 10.0, 10.0),
@@ -97,13 +100,13 @@ mod tests {
         // Sequential
         let sequential: Vec<_> = visual_nodes
             .iter()
-            .filter_map(|(_, node)| render_engine::backend::wgpu::create_rect_instance(node))
+            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
 
         // Parallel
         let parallel: Vec<_> = visual_nodes
             .par_iter()
-            .filter_map(|(_, node)| render_engine::backend::wgpu::create_rect_instance(node))
+            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
 
         assert_eq!(sequential.len(), parallel.len());
@@ -121,7 +124,9 @@ mod tests {
         let root = scene.root();
 
         let node = SceneNode {
-            content: NodeContent::Rect { color: Color::RED },
+            content: NodeContent::Styled {
+                style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            },
             transform: Transform2D::identity(),
             bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
             children: vec![],

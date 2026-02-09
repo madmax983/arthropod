@@ -1,7 +1,7 @@
 use a11y_engine::{A11yTree, ArthropodActionHandler, FocusManager};
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
-use render_engine::{backend::RectInstance, NodeId, Scene};
+use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 use std::time::Instant;
 
 use crate::adaptive::AdaptiveThresholds;
@@ -162,7 +162,7 @@ impl FrameworkContext {
     ///
     /// Since Phase 3, render collection runs inside `update()` as part of the
     /// unified frame schedule. This method just extracts the collected instances.
-    pub fn render(&mut self) -> Vec<RectInstance> {
+    pub fn render(&mut self) -> Vec<PrimitiveInstance> {
         std::mem::take(&mut self.world.resource_mut::<RenderCommands>().0)
     }
 

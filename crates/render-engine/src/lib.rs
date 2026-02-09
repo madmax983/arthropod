@@ -21,13 +21,16 @@
 //!
 //! ```no_run
 //! use render_engine::{Scene, SceneNode, NodeContent, Color};
+//! use style_engine::VisualStyle;
 //!
 //! // Create a scene
 //! let mut scene = Scene::new();
 //! let root = scene.root();
 //!
-//! // Add content
-//! scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+//! // Add styled content
+//! scene.add_node(root, SceneNode::new(NodeContent::Styled {
+//!     style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+//! }));
 //! ```
 
 pub mod backend;
@@ -51,6 +54,11 @@ pub type GlamTransform = Affine2;
 
 pub use node::*;
 pub use scene::*;
+
+// Re-export style-engine types for convenient API
+pub use style_engine::{
+    BlendMode, ColorStop, CornerRadii, Effect, Paint, StrokeStyle, TextContent, VisualStyle,
+};
 
 use thiserror::Error;
 

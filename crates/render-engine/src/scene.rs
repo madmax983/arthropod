@@ -75,13 +75,14 @@ impl Scene {
     ///
     /// ```
     /// use render_engine::{Scene, SceneNode, NodeContent, Color};
+    /// use style_engine::VisualStyle;
     ///
     /// let mut scene = Scene::new();
     /// let root = scene.root();
     ///
     /// let child = scene.add_node(
     ///     root,
-    ///     SceneNode::new(NodeContent::Rect { color: Color::RED })
+    ///     SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) })
     /// );
     /// ```
     pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
@@ -229,9 +230,10 @@ impl Scene {
     ///
     /// ```
     /// # use render_engine::{Scene, SceneNode, NodeContent, Color};
+    /// # use style_engine::VisualStyle;
     /// # let mut scene = Scene::new();
     /// # let root = scene.root();
-    /// let node = scene.add_node(root, SceneNode::new(NodeContent::Rect { color: Color::RED }));
+    /// let node = scene.add_node(root, SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) }));
     /// scene.remove_node(node);
     /// assert!(scene.get_node(node).is_none());
     /// ```
@@ -301,18 +303,19 @@ impl Scene {
     ///
     /// ```
     /// use render_engine::{Scene, SceneNode, NodeContent, Color};
+    /// use style_engine::VisualStyle;
     /// use plat_core::Rect;
     ///
     /// let mut scene = Scene::new();
     /// let root = scene.root();
     ///
     /// // Bottom node (added first)
-    /// let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+    /// let mut node1 = SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) });
     /// node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
     /// let id1 = scene.add_node(root, node1);
     ///
     /// // Top node (added second)
-    /// let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+    /// let mut node2 = SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())) });
     /// node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
     /// let id2 = scene.add_node(root, node2);
     ///
@@ -435,7 +438,7 @@ impl<'a> Iterator for VisualIterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Color, NodeContent};
+    use crate::{Color, NodeContent, VisualStyle};
     use plat_core::Rect;
 
     #[test]
@@ -449,7 +452,9 @@ mod tests {
         let mut scene = Scene::new();
         let root = scene.root();
 
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
         let node_id = scene.add_node(root, node);
 
@@ -464,7 +469,9 @@ mod tests {
         let mut scene = Scene::new();
         let root = scene.root();
 
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
         scene.add_node(root, node);
 
@@ -482,11 +489,15 @@ mod tests {
         let root = scene.root();
 
         // Add two overlapping nodes
-        let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node1 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
         let id1 = scene.add_node(root, node1);
 
-        let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+        let mut node2 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        });
         node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
         let id2 = scene.add_node(root, node2);
 
@@ -507,7 +518,9 @@ mod tests {
         let mut scene = Scene::new();
         let root = scene.root();
 
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
         node.visible = false;
         scene.add_node(root, node);
@@ -522,14 +535,16 @@ mod tests {
         let root = scene.root();
 
         // Parent container
-        let mut parent = SceneNode::new(NodeContent::Rect {
-            color: Color::WHITE,
+        let mut parent = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::WHITE.as_vec4())),
         });
         parent.bounds = Rect::new(0.0, 0.0, 200.0, 200.0);
         let parent_id = scene.add_node(root, parent);
 
         // Child inside parent
-        let mut child = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut child = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         child.bounds = Rect::new(50.0, 50.0, 50.0, 50.0);
         let child_id = scene.add_node(parent_id, child);
 
@@ -551,7 +566,9 @@ mod tests {
         let mut scene = Scene::new();
         let root = scene.root();
 
-        let mut node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
         let node_id = scene.add_node(root, node);
 
@@ -567,7 +584,9 @@ mod tests {
         let root = scene.root();
 
         // Create a child node
-        let mut child = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut child = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         child.bounds = Rect::new(10.0, 10.0, 100.0, 100.0);
         let child_id = scene.add_node(root, child);
 
@@ -592,13 +611,17 @@ mod tests {
         // Create parent
         let parent_id = scene.add_node(
             root,
-            SceneNode::new(NodeContent::Rect { color: Color::RED }),
+            SceneNode::new(NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            }),
         );
 
         // Create child
         let child_id = scene.add_node(
             parent_id,
-            SceneNode::new(NodeContent::Rect { color: Color::BLUE }),
+            SceneNode::new(NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+            }),
         );
 
         // Remove parent
@@ -636,17 +659,21 @@ mod tests {
         let root = scene.root();
 
         // Add two overlapping nodes
-        let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node1 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
         let id1 = scene.add_node(root, node1);
 
-        let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+        let mut node2 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        });
         node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
         let id2 = scene.add_node(root, node2);
 
         // Add a third node that is smaller and inside both
-        let mut node3 = SceneNode::new(NodeContent::Rect {
-            color: Color::GREEN,
+        let mut node3 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::GREEN.as_vec4())),
         });
         node3.bounds = Rect::new(60.0, 60.0, 10.0, 10.0);
         let id3 = scene.add_node(root, node3);

@@ -134,11 +134,8 @@ fn main() -> Result<(), AppError> {
                 Divider::horizontal(),
                 activity_item("emma@example.com", "Signed up", "12m ago"),
                 Divider::horizontal(),
-                Row::new((
-                    Spacer::flex(),
-                    Button::new("View All Activity").secondary(),
-                ))
-                .padding(8.0),
+                Row::new((Spacer::flex(), Button::new("View All Activity").secondary()))
+                    .padding(8.0),
             ))
             .gap(8.0),))
             .padding(20.0),

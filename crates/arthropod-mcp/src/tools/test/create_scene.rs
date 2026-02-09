@@ -1,7 +1,7 @@
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
 use anyhow::{Result, anyhow};
-use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
+use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -181,15 +181,21 @@ impl Tool for CreateSceneTool {
 
             // Create the node content
             let content = match &spec.content {
-                NodeContentSpec::Rect { color } => NodeContent::Rect {
-                    color: Color::rgba(color[0], color[1], color[2], color[3]),
+                NodeContentSpec::Rect { color } => NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(glam::Vec4::new(color[0], color[1], color[2], color[3])),
+                    ),
                 },
                 NodeContentSpec::RoundedRect {
                     color,
                     corner_radius,
-                } => NodeContent::RoundedRect {
-                    color: Color::rgba(color[0], color[1], color[2], color[3]),
-                    corner_radius: *corner_radius,
+                } => NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(glam::Vec4::new(color[0], color[1], color[2], color[3]))
+                            .corner_radius(*corner_radius),
+                    ),
                 },
             };
 

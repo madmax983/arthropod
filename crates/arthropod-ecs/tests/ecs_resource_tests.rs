@@ -11,7 +11,7 @@ use arthropod_ecs::{
 };
 use flux_state::{Runtime, Signal};
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, Vec2};
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, Vec2, VisualStyle};
 
 #[test]
 fn test_scene_owned_by_context() {
@@ -34,7 +34,9 @@ fn test_add_node_via_world_resource() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 0.0,
@@ -72,8 +74,10 @@ fn test_reactive_color_updates_without_passing_scene() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect {
@@ -103,16 +107,21 @@ fn test_reactive_color_updates_without_passing_scene() {
     let scene = ctx.world().resource::<Scene>();
     let node = scene.get_node(node_id).unwrap();
     match &node.content {
-        NodeContent::Rect { color } => {
-            assert!(
-                (color.r() - Color::BLUE.r()).abs() < 0.001
-                    && (color.g() - Color::BLUE.g()).abs() < 0.001
-                    && (color.b() - Color::BLUE.b()).abs() < 0.001
-                    && (color.a() - Color::BLUE.a()).abs() < 0.001,
-                "Color should be updated to BLUE"
-            );
+        NodeContent::Styled { style } => {
+            if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                let blue = Color::BLUE.as_vec4();
+                assert!(
+                    (color.x - blue.x).abs() < 0.001
+                        && (color.y - blue.y).abs() < 0.001
+                        && (color.z - blue.z).abs() < 0.001
+                        && (color.w - blue.w).abs() < 0.001,
+                    "Color should be updated to BLUE"
+                );
+            } else {
+                panic!("Expected solid fill color");
+            }
         }
-        _ => panic!("Expected Rect node"),
+        _ => panic!("Expected Styled node"),
     }
 }
 
@@ -213,7 +222,9 @@ fn test_render_without_passing_scene() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 0.0,
@@ -253,8 +264,10 @@ fn test_integration_reactive_and_render_no_scene_args() {
         scene.add_node(
             root,
             SceneNode {
-                content: NodeContent::Rect {
-                    color: Color::GREEN,
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::GREEN.as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect {

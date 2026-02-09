@@ -191,7 +191,7 @@ fn bench_realistic_ui(c: &mut Criterion) {
 
                         let parent = if i % 20 == 0 {
                             // Create some groups
-                            
+
                             tree.add_node(
                                 root,
                                 A11yNode {

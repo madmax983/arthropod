@@ -153,8 +153,10 @@ pub fn emit_particles(
             emitter.accumulator -= 1.0;
 
             // Create SceneNode
-            let mut node = SceneNode::new(NodeContent::Rect {
-                color: emitter.color,
+            let mut node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(emitter.color.as_vec4()),
+                ),
             });
             node.bounds = Rect::new(
                 emitter.position.x,
@@ -402,7 +404,9 @@ mod tests {
 
         // Spawn a single particle
         let mut scene = world.resource_mut::<Scene>();
-        let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         let root = scene.root();
         let node_id = scene.add_node(root, node);
 

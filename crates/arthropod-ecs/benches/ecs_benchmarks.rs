@@ -29,7 +29,9 @@ fn create_test_scene(n: usize) -> (FrameworkContext, Vec<Arc<Runtime>>) {
         let (read, _write) = color_signal.split();
 
         let rect_node = SceneNode {
-            content: NodeContent::Rect { color: Color::RED },
+            content: NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            },
             transform: Transform2D::identity(),
             bounds: Rect {
                 x: (i % 10) as f32 * 100.0,
@@ -82,7 +84,9 @@ fn create_full_reactive_scene(n: usize) -> (FrameworkContext, Vec<Arc<Runtime>>)
         let (opacity_read, _) = opacity_signal.split();
 
         let rect_node = SceneNode {
-            content: NodeContent::Rect { color: Color::RED },
+            content: NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            },
             transform: Transform2D::identity(),
             bounds: Rect {
                 x: (i % 10) as f32 * 100.0,
@@ -225,7 +229,11 @@ fn benchmark_entity_spawn(c: &mut Criterion) {
                     let mut node_ids = Vec::new();
                     for i in 0..size {
                         let rect_node = SceneNode {
-                            content: NodeContent::Rect { color: Color::RED },
+                            content: NodeContent::Styled {
+                                style: Box::new(
+                                    VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                                ),
+                            },
                             transform: Transform2D::identity(),
                             bounds: Rect {
                                 x: (i % 10) as f32 * 100.0,

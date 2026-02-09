@@ -299,7 +299,6 @@ impl Application for WidgetApp {
 impl WidgetApp {
     /// Sync text nodes in app scene with widget context values.
     fn sync_text_nodes(&mut self) {
-        const FONT_SIZE: f32 = 16.0;
         const TEXT_COLOR: Color = Color::rgba(0.2, 0.2, 0.2, 1.0);
         const PLACEHOLDER_COLOR: Color = Color::rgba(0.5, 0.5, 0.5, 1.0);
 
@@ -329,16 +328,20 @@ impl WidgetApp {
                 } else {
                     TEXT_COLOR
                 };
-                text_node.content = NodeContent::Text {
-                    text: value.clone(),
-                    font_size: FONT_SIZE,
-                    color,
-                };
+                if let NodeContent::Styled { ref mut style } = text_node.content {
+                    if let Some(ref mut text_content) = style.text {
+                        text_content.text = value.clone();
+                    }
+                    if !style.fills.is_empty() {
+                        style.fills[0] = render_engine::Paint::Solid(color.as_vec4());
+                    }
+                }
             }
         }
     }
 
     /// Sync focus visual state.
+    #[allow(clippy::collapsible_if)]
     fn sync_focus_visuals(&mut self) {
         let focused = self.widget_ctx.focused_node();
         let mut scene = self.app.world_mut().resource_mut::<Scene>();
@@ -349,20 +352,11 @@ impl WidgetApp {
                 continue;
             }
 
-            if let Some(color) =
-                scene
-                    .get_node_mut(app_node)
-                    .and_then(|node| match &mut node.content {
-                        NodeContent::Rect { color } => Some(color),
-                        _ => None,
-                    })
-            {
-                *color = Color::WHITE;
-            }
             if let Some(node) = scene.get_node_mut(app_node) {
-                #[allow(clippy::collapsible_if)]
-                if let NodeContent::Rect { color } = &mut node.content {
-                    *color = Color::WHITE;
+                if let NodeContent::Styled { ref mut style } = node.content {
+                    if !style.fills.is_empty() {
+                        style.fills[0] = render_engine::Paint::Solid(Color::WHITE.as_vec4());
+                    }
                 }
             }
         }
@@ -376,19 +370,12 @@ impl WidgetApp {
             return;
         };
 
-        if let Some(color) = scene
-            .get_node_mut(app_node)
-            .and_then(|node| match &mut node.content {
-                NodeContent::Rect { color } => Some(color),
-                _ => None,
-            })
-        {
-            *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
-        }
         if let Some(node) = scene.get_node_mut(app_node) {
-            #[allow(clippy::collapsible_if)]
-            if let NodeContent::Rect { color } = &mut node.content {
-                *color = Color::rgba(0.7, 0.85, 1.0, 1.0);
+            if let NodeContent::Styled { ref mut style } = node.content {
+                if !style.fills.is_empty() {
+                    style.fills[0] =
+                        render_engine::Paint::Solid(Color::rgba(0.7, 0.85, 1.0, 1.0).as_vec4());
+                }
             }
         }
     }

@@ -104,8 +104,10 @@ impl List {
         I: IntoIterator<Item = W>,
         W: Widget + 'static,
     {
-        self.children
-            .extend(iter.into_iter().map(|w| Box::new(w) as Box<dyn WidgetBoxed>));
+        self.children.extend(
+            iter.into_iter()
+                .map(|w| Box::new(w) as Box<dyn WidgetBoxed>),
+        );
     }
 }
 
@@ -168,8 +170,11 @@ mod tests {
         fn build(&self, ctx: &mut WidgetContext) -> NodeId {
             ctx.create_node(
                 ctx.root(),
-                NodeContent::Rect {
-                    color: render_engine::Color::rgba(1.0, 0.0, 0.0, 1.0),
+                NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(render_engine::Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4()),
+                    ),
                 },
             )
         }

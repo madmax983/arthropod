@@ -284,12 +284,16 @@ mod tests {
         let scene = ctx.scene();
         let node = scene.get_node(node_id).unwrap();
 
-        if let NodeContent::Rect { color } = &node.content {
-            // Color should be blue now
-            assert!((color.b() - 1.0).abs() < 0.001);
-            assert!((color.r() - 0.0).abs() < 0.001);
+        if let NodeContent::Styled { style } = &node.content {
+            if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                // Color should be blue now
+                assert!((color.z - 1.0).abs() < 0.001);
+                assert!((color.x - 0.0).abs() < 0.001);
+            } else {
+                panic!("Expected solid fill");
+            }
         } else {
-            panic!("Expected Rect node");
+            panic!("Expected Styled node");
         }
     }
 

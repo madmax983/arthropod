@@ -3,7 +3,7 @@ use arthropod_ecs::{
     FrameworkContext,
 };
 use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints};
-use render_engine::{Color, NodeContent, Scene, SceneNode};
+use render_engine::{Color, NodeContent, Scene, SceneNode, VisualStyle};
 
 #[test]
 fn test_layout_system_integration() {
@@ -17,7 +17,9 @@ fn test_layout_system_integration() {
         // Add child
         let child = scene.add_node(
             root,
-            SceneNode::new(NodeContent::Rect { color: Color::RED }),
+            SceneNode::new(NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+            }),
         );
 
         (root, child)

@@ -167,15 +167,24 @@ impl Widget for Button {
         // Create button container with rounded background
         let button_node = ctx.create_node(
             ctx.root(),
-            NodeContent::RoundedRect {
-                color: Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w),
-                corner_radius: 6.0,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(
+                            Color::rgba(bg_color.x, bg_color.y, bg_color.z, bg_color.w).as_vec4(),
+                        )
+                        .corner_radius(6.0),
+                ),
             },
         );
 
         // Create text child
-        let text_widget = Text::new(self.text.clone())
-            .color(Color::rgba(text_color.x, text_color.y, text_color.z, text_color.w));
+        let text_widget = Text::new(self.text.clone()).color(Color::rgba(
+            text_color.x,
+            text_color.y,
+            text_color.z,
+            text_color.w,
+        ));
         let text_id = text_widget.build(ctx);
 
         // Re-parent text to button

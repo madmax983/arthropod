@@ -8,7 +8,7 @@
 
 use arthropod_ecs::FrameworkContext;
 use hashbrown::HashMap;
-use render_engine::{NodeId, Scene, backend::RectInstance};
+use render_engine::{NodeId, Scene, backend::PrimitiveInstance};
 use std::time::{Duration, Instant};
 
 use crate::registry::SignalRegistry;
@@ -133,7 +133,7 @@ impl McpFrameworkContext {
     }
 
     /// Run render systems with performance tracking
-    pub fn render(&mut self) -> (Vec<RectInstance>, Duration) {
+    pub fn render(&mut self) -> (Vec<PrimitiveInstance>, Duration) {
         let start = Instant::now();
         let instances = self.inner.render();
         let duration = start.elapsed();
@@ -191,8 +191,11 @@ mod tests {
 
         let node_id = {
             let scene = ctx.scene_mut();
-            let mut node = SceneNode::new(NodeContent::Rect {
-                color: render_engine::Color::RED,
+            let mut node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::RED.as_vec4()),
+                ),
             });
             node.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
             node.visible = true;
@@ -230,8 +233,11 @@ mod tests {
         // Create a visible node with content
         let node_id = {
             let scene = ctx.scene_mut();
-            let mut node = SceneNode::new(NodeContent::Rect {
-                color: render_engine::Color::RED,
+            let mut node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::RED.as_vec4()),
+                ),
             });
             node.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
             node.visible = true;
@@ -257,16 +263,22 @@ mod tests {
 
         let node1 = {
             let scene = ctx.scene_mut();
-            let node = SceneNode::new(NodeContent::Rect {
-                color: render_engine::Color::RED,
+            let node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::RED.as_vec4()),
+                ),
             });
             scene.add_node(scene.root(), node)
         };
 
         let node2 = {
             let scene = ctx.scene_mut();
-            let node = SceneNode::new(NodeContent::Rect {
-                color: render_engine::Color::BLUE,
+            let node = SceneNode::new(NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::BLUE.as_vec4()),
+                ),
             });
             scene.add_node(scene.root(), node)
         };

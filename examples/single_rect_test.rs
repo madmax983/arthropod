@@ -40,7 +40,11 @@ impl Application for TestApp {
             let root = scene.root();
 
             let red_rect = SceneNode {
-                content: NodeContent::Rect { color: Color::RED },
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                    ),
+                },
                 transform: Transform2D::identity(),
                 bounds: Rect {
                     x: 100.0,

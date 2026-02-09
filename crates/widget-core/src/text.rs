@@ -70,7 +70,7 @@ impl Text {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// # use arthropod::prelude::*;
     /// # use flux_state::Computed;
     /// # use widget_core::Text;
@@ -93,17 +93,19 @@ impl Text {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use arthropod::prelude::*;
+    /// use flux_state::{Runtime, Signal, Computed};
+    /// use widget_core::Text;
     ///
-    /// let counter = ctx.signal(0);
+    /// let runtime = Runtime::new();
+    /// let counter = Signal::new(runtime.clone(), 0);
     /// let (read, _write) = counter.split();
     ///
     /// // Text automatically updates when counter changes
-    /// let text = Computed::new(ctx.runtime().clone(), move || {
+    /// let text = Computed::new(runtime.clone(), move || {
     ///     format!("Count: {}", read.get())
     /// });
     ///
-    /// Text::computed(text)
+    /// Text::computed(text);
     /// ```
     pub fn computed(computed: Computed<String>) -> Self {
         Self {
@@ -188,10 +190,12 @@ impl Widget for Text {
         // Create text node with raw text (backend will shape it during rendering)
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Text {
-                text: text_string,
-                font_size: self.font_size,
-                color: resolved_color,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(resolved_color.as_vec4())
+                        .text(render_engine::TextContent::new(text_string, self.font_size)),
+                ),
             },
         );
 

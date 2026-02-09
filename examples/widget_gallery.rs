@@ -12,9 +12,9 @@
 use flux_state::{Runtime, Signal};
 use render_engine::Color;
 use widget_core::{
-    list_from, Button, Card, Center, Checkbox, Column, Container, Divider, FlexDirection,
-    FlexStyle, Form, Grid, NodeContent, Padding, Row, Spacer, Stack, Text, TextInput, Widget,
-    WidgetContext,
+    Button, Card, Center, Checkbox, Column, Container, Divider, FlexDirection, FlexStyle, Form,
+    Grid, NodeContent, Padding, Row, Spacer, Stack, Text, TextInput, Widget, WidgetContext,
+    list_from,
 };
 
 fn main() {
@@ -400,10 +400,7 @@ fn main() {
         // Middle layer
         Center::new(Text::new("Overlay Text").size(20.0)),
         // Top layer
-        Row::new((
-            Spacer::flex(),
-            Text::new("Badge").size(12.0),
-        )),
+        Row::new((Spacer::flex(), Text::new("Badge").size(12.0))),
     ));
     let stack_id = stack.build(&mut ctx);
     println!("    ✓ Built stack with 3 layers");
@@ -455,9 +452,7 @@ fn main() {
     .padding(20.0);
     let gallery_id = gallery.build(&mut ctx);
     println!("    ✓ Built 4-column gallery grid");
-    println!(
-        "    ✓ Pattern: 8 items -> 2 rows, 4 columns",
-    );
+    println!("    ✓ Pattern: 8 items -> 2 rows, 4 columns",);
     let gallery_node = ctx.scene().get_node(gallery_id).unwrap();
     println!("    ✓ Rows: {}", gallery_node.children.len());
 
@@ -496,7 +491,10 @@ fn main() {
     let large_list_id = large_list.build(&mut ctx);
     let elapsed_list = start_list.elapsed();
     println!("    ✓ Built 50-item list");
-    println!("    ✓ Build time: {:.2}ms", elapsed_list.as_secs_f64() * 1000.0);
+    println!(
+        "    ✓ Build time: {:.2}ms",
+        elapsed_list.as_secs_f64() * 1000.0
+    );
     println!(
         "    ✓ Children: {}",
         ctx.scene().get_node(large_list_id).unwrap().children.len()
@@ -546,7 +544,10 @@ fn main() {
     println!("    ✓ Built centered modal dialog");
     println!("    ✓ Pattern: Center -> Card -> Column -> Buttons");
     let modal_node = ctx.scene().get_node(modal_id).unwrap();
-    println!("    ✓ Has 1 child (Card): {}", modal_node.children.len() == 1);
+    println!(
+        "    ✓ Has 1 child (Card): {}",
+        modal_node.children.len() == 1
+    );
 
     println!("\n28. Sectioned Settings Panel");
     println!("    - Vertically stacked sections with dividers");
@@ -558,7 +559,12 @@ fn main() {
         Checkbox::new(Signal::new(runtime.clone(), false)).label("Auto-save"),
         Divider::horizontal(),
         Text::new("Appearance").size(16.0),
-        Row::new((Text::new("Theme:"), Button::new("Light"), Button::new("Dark"))).gap(8.0),
+        Row::new((
+            Text::new("Theme:"),
+            Button::new("Light"),
+            Button::new("Dark"),
+        ))
+        .gap(8.0),
         Divider::horizontal(),
         Text::new("Privacy").size(16.0),
         Checkbox::new(Signal::new(runtime.clone(), true)).label("Share analytics"),

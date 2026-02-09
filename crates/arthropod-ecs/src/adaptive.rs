@@ -14,8 +14,11 @@
 //!
 //! ```no_run
 //! use arthropod_ecs::adaptive::AdaptiveThresholds;
+//! use std::time::Duration;
 //!
 //! let mut thresholds = AdaptiveThresholds::new();
+//! let entity_count = 1000; // Example entity count
+//! let frame_time = Duration::from_micros(16666); // Example frame time
 //!
 //! // At frame start, get current thresholds
 //! let config = thresholds.current();
@@ -28,7 +31,7 @@
 //! }
 //!
 //! // At frame end, record metrics for adaptation
-//! thresholds.record_frame(frame_time_us, entity_count);
+//! thresholds.record_frame(frame_time, entity_count);
 //! ```
 
 use std::collections::VecDeque;

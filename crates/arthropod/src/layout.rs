@@ -185,14 +185,16 @@ pub fn layout_widget_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use render_engine::{Color, NodeContent, SceneNode};
+    use render_engine::{Color, NodeContent, SceneNode, VisualStyle};
 
     // =========================================================================
     // Helper functions
     // =========================================================================
 
     fn create_rect_node(scene: &mut Scene, parent: NodeId) -> NodeId {
-        let node = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         scene.add_node(parent, node)
     }
 
@@ -683,7 +685,12 @@ mod tests {
         let root = widget_ctx.root();
 
         // Add a child node
-        let child_id = widget_ctx.create_node(root, NodeContent::Rect { color: Color::BLUE });
+        let child_id = widget_ctx.create_node(
+            root,
+            NodeContent::Styled {
+                style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+            },
+        );
 
         // Set layout styles
         widget_ctx.set_layout_style(

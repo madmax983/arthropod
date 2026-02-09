@@ -20,7 +20,9 @@ fn setup_scene(mut commands: Commands, mut scene: ResMut<Scene>) {
         let color = if i % 2 == 0 { Color::RED } else { Color::BLUE };
 
         // Create SceneNode (visual)
-        let node = SceneNode::new(NodeContent::Rect { color });
+        let node = SceneNode::new(NodeContent::Styled {
+            style: Box::new(render_engine::VisualStyle::new().solid_fill(color.as_vec4())),
+        });
         let node_id = scene.add_node(root, node);
 
         // Spawn ECS entity with SpatialNode

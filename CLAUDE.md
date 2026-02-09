@@ -101,10 +101,19 @@ fn test_reactive_color_updates_scene_node() {
    - Fine-grained reactivity (only update what changed)
    - Integrates with ECS via reactive components
 
-3. **GPU-Accelerated Rendering** (ADR 0004)
+3. **Figma-Compatible Rendering Pipeline** (Phase 1 complete, Feb 2026)
+   - Unified `PrimitivePipeline` replacing separate Rect/Glyph pipelines
+   - `NodeContent::Styled { style: Box<VisualStyle> }` - single variant for all primitives
+   - `VisualStyle` from style-engine maps 1:1 to Figma visual properties
+   - Per-corner radii, gradients, strokes, shadows, effects (Phase 2+)
+   - 96-byte `PrimitiveInstance` format (vs old 36b RectInstance + 40b GlyphInstance)
+   - Single `primitive.wgsl` shader with SDF-based rendering
+   - See: `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`
+
+4. **GPU-Accelerated Rendering** (ADR 0004)
    - wgpu backend (Vulkan/Metal/D3D12)
-   - Instanced rendering (1 draw call for thousands of rectangles)
-   - ECS systems generate RectInstances
+   - Instanced rendering (1 draw call per primitive type)
+   - ECS systems generate PrimitiveInstances
 
 ### Crate Structure
 

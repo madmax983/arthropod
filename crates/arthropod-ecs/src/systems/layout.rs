@@ -209,8 +209,11 @@ mod tests {
         // Add 100 nodes with layout styles
         for i in 0..100 {
             let node = SceneNode {
-                content: NodeContent::Rect {
-                    color: render_engine::Color::rgba(1.0, 1.0, 1.0, 1.0),
+                content: NodeContent::Styled {
+                    style: Box::new(
+                        render_engine::VisualStyle::new()
+                            .solid_fill(render_engine::Color::rgba(1.0, 1.0, 1.0, 1.0).as_vec4()),
+                    ),
                 },
                 transform: Transform2D::identity(),
                 bounds: Rect::new(0.0, 0.0, 100.0, 50.0),
@@ -281,8 +284,11 @@ mod tests {
 
         // Add a single flex-grow node
         let node = SceneNode {
-            content: NodeContent::Rect {
-                color: render_engine::Color::rgba(1.0, 1.0, 1.0, 1.0),
+            content: NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(render_engine::Color::rgba(1.0, 1.0, 1.0, 1.0).as_vec4()),
+                ),
             },
             transform: Transform2D::identity(),
             bounds: Rect::new(0.0, 0.0, 100.0, 50.0),

@@ -216,9 +216,11 @@ impl EventDispatcher {
 
         // Check if we hit a text node - if so, get its parent (the input container)
         if let Some(hit_node) = app_scene.get_node(app_node_id) {
-            if matches!(hit_node.content, NodeContent::Text { .. }) {
-                if let Some(parent_id) = app_scene.find_parent(app_node_id) {
-                    app_node_id = parent_id;
+            if let NodeContent::Styled { ref style } = hit_node.content {
+                if style.text.is_some() {
+                    if let Some(parent_id) = app_scene.find_parent(app_node_id) {
+                        app_node_id = parent_id;
+                    }
                 }
             }
         }
@@ -279,8 +281,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -425,8 +429,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -450,8 +456,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -482,8 +490,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
@@ -510,8 +520,10 @@ mod tests {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
-                color: Color::WHITE,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(Color::WHITE.as_vec4()),
+                ),
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);

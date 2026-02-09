@@ -111,12 +111,17 @@ impl Widget for Divider {
         let root_id = ctx.root();
         let node_id = ctx.create_node(
             root_id,
-            NodeContent::Rect {
-                color: Color::rgba(
-                    resolved_color.x,
-                    resolved_color.y,
-                    resolved_color.z,
-                    resolved_color.w,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new().solid_fill(
+                        Color::rgba(
+                            resolved_color.x,
+                            resolved_color.y,
+                            resolved_color.z,
+                            resolved_color.w,
+                        )
+                        .as_vec4(),
+                    ),
                 ),
             },
         );
@@ -187,10 +192,7 @@ mod tests {
     #[test]
     fn test_divider_chained_builders() {
         let color = Vec4::new(0.5, 0.5, 0.5, 1.0);
-        let divider = Divider::vertical()
-            .thickness(3.0)
-            .color(color)
-            .margin(8.0);
+        let divider = Divider::vertical().thickness(3.0).color(color).margin(8.0);
 
         assert!(matches!(divider.orientation, Orientation::Vertical));
         assert_eq!(divider.thickness, 3.0);

@@ -169,13 +169,26 @@ impl Tool for AssertNodeStateTool {
 
         // Check color (extract from NodeContent)
         if let Some(expected_color) = &params.expected.color {
-            let actual_color = match &node.content {
-                NodeContent::Rect { color } | NodeContent::RoundedRect { color, .. } => color,
+            let actual_color_vec4 = match &node.content {
+                NodeContent::Styled { style } => {
+                    if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
+                        *c
+                    } else {
+                        failures.push("Node does not have a solid fill color".to_string());
+                        glam::Vec4::ZERO
+                    }
+                }
                 _ => {
                     failures.push("Node does not have a color property".to_string());
-                    &Color::rgba(0.0, 0.0, 0.0, 0.0)
+                    glam::Vec4::ZERO
                 }
             };
+            let actual_color = Color::rgba(
+                actual_color_vec4.x,
+                actual_color_vec4.y,
+                actual_color_vec4.z,
+                actual_color_vec4.w,
+            );
 
             let expected = Color::rgba(
                 expected_color[0],
@@ -221,16 +234,17 @@ impl Tool for AssertNodeStateTool {
         // Check corner_radius
         if let Some(expected_radius) = params.expected.corner_radius {
             match &node.content {
-                NodeContent::RoundedRect { corner_radius, .. } => {
-                    if (corner_radius - expected_radius).abs() > params.tolerance {
+                NodeContent::Styled { style } => {
+                    let actual_radius = style.corner_radii.top_left; // Use top_left as representative
+                    if (actual_radius - expected_radius).abs() > params.tolerance {
                         failures.push(format!(
                             "corner_radius: expected {}, got {} (tolerance: {})",
-                            expected_radius, corner_radius, params.tolerance
+                            expected_radius, actual_radius, params.tolerance
                         ));
                     }
                 }
                 _ => {
-                    failures.push("Node is not a RoundedRect".to_string());
+                    failures.push("Node is not a Styled node".to_string());
                 }
             }
         }

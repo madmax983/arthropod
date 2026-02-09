@@ -87,9 +87,17 @@ impl Tool for ListNodesTool {
 
             if let Some(ref content_type) = params.filter.content_type {
                 let node_type = match &node.content {
-                    NodeContent::Rect { .. } => "Rect",
-                    NodeContent::RoundedRect { .. } => "RoundedRect",
-                    NodeContent::Text { .. } => "Text",
+                    NodeContent::Styled { style } => {
+                        if style.text.is_some() {
+                            "Text"
+                        } else if !style.corner_radii.is_zero() {
+                            "RoundedRect"
+                        } else if !style.fills.is_empty() {
+                            "Rect"
+                        } else {
+                            "Empty"
+                        }
+                    }
                     NodeContent::Empty => "Empty",
                 };
                 if node_type != content_type {
@@ -110,9 +118,17 @@ impl Tool for ListNodesTool {
             }
 
             let content_type = match &node.content {
-                NodeContent::Rect { .. } => "Rect",
-                NodeContent::RoundedRect { .. } => "RoundedRect",
-                NodeContent::Text { .. } => "Text",
+                NodeContent::Styled { style } => {
+                    if style.text.is_some() {
+                        "Text"
+                    } else if !style.corner_radii.is_zero() {
+                        "RoundedRect"
+                    } else if !style.fills.is_empty() {
+                        "Rect"
+                    } else {
+                        "Empty"
+                    }
+                }
                 NodeContent::Empty => "Empty",
             };
 
@@ -204,25 +220,31 @@ impl Tool for GetNodeTool {
             .ok_or_else(|| anyhow!("Node {} not found", params.id))?;
 
         let content = match &node.content {
-            NodeContent::Rect { color } => NodeContentData::Rect {
-                color: [color.r(), color.g(), color.b(), color.a()],
-            },
-            NodeContent::RoundedRect {
-                color,
-                corner_radius,
-            } => NodeContentData::RoundedRect {
-                color: [color.r(), color.g(), color.b(), color.a()],
-                corner_radius: *corner_radius,
-            },
-            NodeContent::Text {
-                text,
-                font_size,
-                color,
-            } => NodeContentData::Text {
-                text: text.clone(),
-                font_size: *font_size,
-                color: [color.r(), color.g(), color.b(), color.a()],
-            },
+            NodeContent::Styled { style } => {
+                // Extract color from first fill if present
+                let color = if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
+                    [c.x, c.y, c.z, c.w]
+                } else {
+                    [0.0, 0.0, 0.0, 1.0]
+                };
+
+                if let Some(ref text_content) = style.text {
+                    NodeContentData::Text {
+                        text: text_content.text.clone(),
+                        font_size: text_content.font_size,
+                        color,
+                    }
+                } else if !style.corner_radii.is_zero() {
+                    NodeContentData::RoundedRect {
+                        color,
+                        corner_radius: style.corner_radii.top_left, // Use top_left as representative
+                    }
+                } else if !style.fills.is_empty() {
+                    NodeContentData::Rect { color }
+                } else {
+                    NodeContentData::Empty
+                }
+            }
             NodeContent::Empty => NodeContentData::Empty,
         };
 
@@ -316,9 +338,17 @@ impl Tool for QueryHierarchyTool {
             let node = scene.get_node(node_id)?;
 
             let content_type = match &node.content {
-                NodeContent::Rect { .. } => "Rect",
-                NodeContent::RoundedRect { .. } => "RoundedRect",
-                NodeContent::Text { .. } => "Text",
+                NodeContent::Styled { style } => {
+                    if style.text.is_some() {
+                        "Text"
+                    } else if !style.corner_radii.is_zero() {
+                        "RoundedRect"
+                    } else if !style.fills.is_empty() {
+                        "Rect"
+                    } else {
+                        "Empty"
+                    }
+                }
                 NodeContent::Empty => "Empty",
             };
 
@@ -531,20 +561,11 @@ impl Tool for UpdateNodeTool {
             );
 
             match &mut node.content {
-                NodeContent::Rect { color: node_color } => {
-                    *node_color = color;
-                    updated_fields.push("color");
-                }
-                NodeContent::RoundedRect {
-                    color: node_color, ..
-                } => {
-                    *node_color = color;
-                    updated_fields.push("color");
-                }
-                NodeContent::Text {
-                    color: node_color, ..
-                } => {
-                    *node_color = color;
+                NodeContent::Styled { style } => {
+                    if style.fills.is_empty() {
+                        return Err(anyhow!("Cannot set color on node without fills"));
+                    }
+                    style.fills[0] = render_engine::Paint::Solid(color.as_vec4());
                     updated_fields.push("color");
                 }
                 NodeContent::Empty => {
@@ -608,18 +629,22 @@ impl Tool for MarkDirtyTool {
 mod tests {
     use super::*;
     use crate::context::McpFrameworkContext;
-    use render_engine::{Color, NodeContent, SceneNode};
+    use render_engine::{Color, NodeContent, SceneNode, VisualStyle};
 
     fn create_test_scene(ctx: &mut McpFrameworkContext) -> Vec<NodeId> {
         let scene = ctx.scene_mut();
 
-        let mut node1 = SceneNode::new(NodeContent::Rect { color: Color::RED });
+        let mut node1 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
+        });
         node1.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
         node1.visible = true;
         node1.opacity = 1.0;
         let rect1 = scene.add_node(scene.root(), node1);
 
-        let mut node2 = SceneNode::new(NodeContent::Rect { color: Color::BLUE });
+        let mut node2 = SceneNode::new(NodeContent::Styled {
+            style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())),
+        });
         node2.bounds = plat_core::Rect::new(50.0, 50.0, 100.0, 100.0);
         node2.visible = false;
         node2.opacity = 0.5;
@@ -748,10 +773,14 @@ mod tests {
 
         // Verify the change
         let node = ctx.scene().get_node(nodes[0]).unwrap();
-        if let NodeContent::Rect { color } = &node.content {
-            assert_eq!(color.g(), 1.0);
+        if let NodeContent::Styled { style } = &node.content {
+            if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
+                assert_eq!(color.y, 1.0);
+            } else {
+                panic!("Expected solid fill");
+            }
         } else {
-            panic!("Expected Rect content");
+            panic!("Expected Styled content");
         }
     }
 

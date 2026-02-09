@@ -198,7 +198,7 @@ pub fn elastic_tick_system(registry: Res<ElasticRegistry>, time: Res<ElasticTime
 /// use arthropod::prelude::*;
 /// use arthropod::experimental::elastic::register_elastic_feature;
 ///
-/// let mut app = AppBuilder::new().build_headless().unwrap();
+/// let mut app = App::new_headless().unwrap();
 /// register_elastic_feature(app.world_mut());
 /// app.add_update_system(arthropod::experimental::elastic::update_elastic_time_system);
 /// app.add_update_system(arthropod::experimental::elastic::elastic_tick_system);

@@ -10,15 +10,15 @@ mod tui_app {
     use crossterm::{
         event::{self, Event, KeyCode, KeyEventKind},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
     use ratatui::{
+        Terminal,
         backend::CrosstermBackend,
         layout::{Alignment, Constraint, Direction, Layout},
         style::{Color, Modifier, Style},
         text::{Line, Span},
         widgets::{Block, Borders, Paragraph, Wrap},
-        Terminal,
     };
     use render_engine::{NodeContent, Scene};
 
@@ -59,9 +59,8 @@ mod tui_app {
         Ok(())
     }
 
-    fn run_app(
-        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    ) -> io::Result<()> {
+    #[allow(clippy::collapsible_if)]
+    fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Result<()> {
         let mut state = AppState::Intro;
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(100);
@@ -101,7 +100,11 @@ mod tui_app {
                     if start_time.elapsed() > Duration::from_millis(1500) {
                         match generate_story() {
                             Ok(text) => state = AppState::Display { story: text },
-                            Err(e) => state = AppState::Error { message: e.to_string() },
+                            Err(e) => {
+                                state = AppState::Error {
+                                    message: e.to_string(),
+                                }
+                            }
                         }
                     }
                 }
@@ -109,6 +112,7 @@ mod tui_app {
         }
     }
 
+    #[allow(clippy::collapsible_if)]
     fn generate_story() -> Result<String, Box<dyn std::error::Error>> {
         let mut app = App::new_headless()?;
         register_story(&mut app);
@@ -124,8 +128,10 @@ mod tui_app {
         if !root_node.children.is_empty() {
             for &child_id in &root_node.children {
                 if let Some(child) = scene.get_node(child_id) {
-                    if let NodeContent::Text { text, .. } = &child.content {
-                        return Ok(text.clone());
+                    if let NodeContent::Styled { style } = &child.content {
+                        if let Some(text_content) = &style.text {
+                            return Ok(text_content.text.clone());
+                        }
                     }
                 }
             }
@@ -146,16 +152,20 @@ mod tui_app {
 
         // Title
         let title = Paragraph::new(" ✨ Nova Story Generator ✨ ")
-            .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+            .style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
             .alignment(Alignment::Center)
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(title, chunks[0]);
 
         // Footer
         let footer_text = match state {
-             AppState::Intro => " Press <ENTER> to Generate | q: Quit ",
-             AppState::Generating { .. } => " Generating... | q: Quit ",
-             AppState::Display { .. } | AppState::Error { .. } => " r: Retry | q: Quit ",
+            AppState::Intro => " Press <ENTER> to Generate | q: Quit ",
+            AppState::Generating { .. } => " Generating... | q: Quit ",
+            AppState::Display { .. } | AppState::Error { .. } => " r: Retry | q: Quit ",
         };
         let footer = Paragraph::new(footer_text)
             .style(Style::default().fg(Color::Cyan))
@@ -170,7 +180,9 @@ mod tui_app {
                 let text = vec![
                     Line::from("Welcome to the Narrative Engine."),
                     Line::from(""),
-                    Line::from("This tool demonstrates the procedural story generation capabilities"),
+                    Line::from(
+                        "This tool demonstrates the procedural story generation capabilities",
+                    ),
                     Line::from("of the experimental 'Nova' feature set."),
                     Line::from(""),
                     Line::from(Span::styled(
@@ -196,21 +208,20 @@ mod tui_app {
                 f.render_widget(p, v_center[1]);
             }
             AppState::Generating { start_time } => {
-                 let elapsed = start_time.elapsed().as_millis();
-                 let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-                 let i = (elapsed / 100) as usize % frames.len();
-                 let spinner = frames[i];
+                let elapsed = start_time.elapsed().as_millis();
+                let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                let i = (elapsed / 100) as usize % frames.len();
+                let spinner = frames[i];
 
-                 let text = vec![
-                    Line::from(Span::styled(
-                        format!("{} Weaving destiny...", spinner),
-                        Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
-                    )),
-                 ];
-                 let p = Paragraph::new(text)
-                    .alignment(Alignment::Center);
+                let text = vec![Line::from(Span::styled(
+                    format!("{} Weaving destiny...", spinner),
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                ))];
+                let p = Paragraph::new(text).alignment(Alignment::Center);
 
-                 let v_center = Layout::default()
+                let v_center = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Percentage(45),
@@ -219,7 +230,7 @@ mod tui_app {
                     ])
                     .split(content_area);
 
-                 f.render_widget(p, v_center[1]);
+                f.render_widget(p, v_center[1]);
             }
             AppState::Display { story } => {
                 let text = vec![
@@ -228,7 +239,11 @@ mod tui_app {
                     Line::from(""),
                 ];
                 let p = Paragraph::new(text)
-                    .block(Block::default().title(" Generated Narrative ").borders(Borders::ALL))
+                    .block(
+                        Block::default()
+                            .title(" Generated Narrative ")
+                            .borders(Borders::ALL),
+                    )
                     .wrap(Wrap { trim: true });
                 f.render_widget(p, content_area);
             }
