@@ -21,7 +21,9 @@ fn bench_create_nodes(c: &mut Criterion) {
                 let y = (i / 40) as f32 * 25.0;
 
                 let node = SceneNode::new(NodeContent::Styled {
-                    style: VisualStyle::new().solid_fill(Color::rgba(0.5, 0.5, 0.5, 1.0).as_vec4()),
+                    style: Box::new(
+                        VisualStyle::new().solid_fill(Color::rgba(0.5, 0.5, 0.5, 1.0).as_vec4()),
+                    ),
                 });
 
                 let node_id = scene.add_node(root, node);
@@ -50,9 +52,11 @@ fn bench_create_rounded_nodes(c: &mut Criterion) {
                 let radius = (i % 16) as f32;
 
                 let node = SceneNode::new(NodeContent::Styled {
-                    style: VisualStyle::new()
-                        .solid_fill(Color::rgba(0.5, 0.5, 0.5, 1.0).as_vec4())
-                        .corner_radius(radius),
+                    style: Box::new(
+                        VisualStyle::new()
+                            .solid_fill(Color::rgba(0.5, 0.5, 0.5, 1.0).as_vec4())
+                            .corner_radius(radius),
+                    ),
                 });
 
                 let node_id = scene.add_node(root, node);
@@ -74,9 +78,9 @@ fn bench_node_lookup(c: &mut Criterion) {
     let root = scene.root();
     let mut node_ids = Vec::with_capacity(1000);
 
-    for i in 0..1000 {
+    for _ in 0..1000 {
         let node = SceneNode::new(NodeContent::Styled {
-            style: VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
         });
         let id = scene.add_node(root, node);
         node_ids.push(id);
@@ -100,7 +104,7 @@ fn bench_node_mutation(c: &mut Criterion) {
 
     for _ in 0..100 {
         let node = SceneNode::new(NodeContent::Styled {
-            style: VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+            style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
         });
         let id = scene.add_node(root, node);
         node_ids.push(id);
@@ -147,7 +151,7 @@ fn bench_scene_iteration(c: &mut Criterion) {
             let y = (i / 100) as f32 * 10.0;
 
             let node = SceneNode::new(NodeContent::Styled {
-                style: VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
             });
             let id = scene.add_node(root, node);
 
@@ -180,7 +184,7 @@ fn bench_visual_iterator(c: &mut Criterion) {
             let y = (i / 100) as f32 * 10.0;
 
             let node = SceneNode::new(NodeContent::Styled {
-                style: VisualStyle::new().solid_fill(Color::RED.as_vec4()),
+                style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
             });
             let id = scene.add_node(root, node);
 

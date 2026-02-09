@@ -115,13 +115,24 @@ fn test_reactive_color_updates_scene_node() {
    - Instanced rendering (1 draw call per primitive type)
    - ECS systems generate PrimitiveInstances
 
+5. **Unified Rendering Pipeline** (Phase 1+2 - Feb 2026)
+   - **PrimitivePipeline**: Single pipeline for all content (rectangles, rounded rects, text glyphs)
+   - **96-byte instance format**: Replaces separate RectInstance (36b) and GlyphInstance (40b)
+   - **Per-corner SDF shader**: Uses rounded_rect_sdf_4 with smoothstep anti-aliasing
+   - **Fast path optimization**: Corner radii < 0.01px skip SDF (epsilon check for float precision)
+   - **NodeContent::Styled**: Unified content type with `Box<VisualStyle>` (8-byte enum via Box)
+   - **style-engine crate**: VisualStyle, CornerRadii, Paint, TextContent, etc.
+   - **Performance**: 285μs for 1000 solid nodes, 2.2ns per scene lookup, 3.9μs iter 1000 visuals
+   - See `docs/plans/2026-02-08-figma-rendering-pipeline-design.md` for full architecture
+
 ### Crate Structure
 
 ```
 arthropod/
 ├── crates/
 │   ├── plat-core/         # Platform abstraction (windows, events, input)
-│   ├── render-engine/     # Scene graph, rendering backend (wgpu)
+│   ├── render-engine/     # Scene graph, rendering backend (wgpu), PrimitivePipeline
+│   ├── style-engine/      # Visual styling (VisualStyle, Paint, CornerRadii, etc.)
 │   ├── flux-state/        # Reactive state (signals, effects)
 │   ├── arthropod-ecs/     # ECS integration (bevy_ecs wrapper)
 │   ├── anim-graph/        # Animation system (future)
@@ -254,26 +265,40 @@ Effect::new(runtime.clone(), move || {
 
 **Rule of thumb:** If you need a reactive value, use Computed. If you need to DO something, use Effect.
 
-### 3. Scene Management
+### 3. Scene Management & Visual Styling
 
 ```rust
 // Create scene (once, persistent)
 let mut scene = Scene::new();
 
-// Add nodes
-let node_id = scene.add_node(parent, SceneNode {
-    content: NodeContent::Rect { color },
-    bounds: Rect { x, y, width, height },
-    visible: true,
-    opacity: 1.0,
-    // ...
+// Add nodes with VisualStyle (unified pattern)
+let node = SceneNode::new(NodeContent::Styled {
+    style: Box::new(
+        VisualStyle::new()
+            .solid_fill(Color::rgba(0.8, 0.2, 0.2, 1.0).as_vec4())
+            .corner_radius(12.0),
+    ),
 });
+let node_id = scene.add_node(parent, node);
 
-// Update node properties
+// Set bounds (spatial properties)
 if let Some(node) = scene.get_node_mut(node_id) {
-    node.bounds = new_bounds;
+    node.bounds = Rect::new(x, y, width, height);
+}
+
+// Update visual properties
+if let Some(node) = scene.get_node_mut(node_id) {
+    if let NodeContent::Styled { ref mut style } = node.content {
+        // Update fill color (e.g., from reactive component)
+        style.fills[0] = Paint::Solid(Color::BLUE.as_vec4());
+    }
 }
 ```
+
+**Migration Patterns** (Phase 1+2):
+- Old `NodeContent::Rect { color }` → `NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(color.as_vec4())) }`
+- Old `NodeContent::RoundedRect { color, corner_radius }` → `.solid_fill(...).corner_radius(r)`
+- Old `NodeContent::Text { text, font_size, color }` → `.solid_fill(...).text(TextContent::new(text, size))`
 
 ### 4. Widget Convenience Layer (widget-core)
 

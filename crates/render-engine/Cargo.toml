@@ -33,6 +33,10 @@ naga = { version = "28.0", features = ["wgsl-in"] }
 name = "scene_bench"
 harness = false
 
+[[bench]]
+name = "primitive_rendering"
+harness = false
+
 [features]
 default = []
 renderdoc = ["dep:renderdoc"]
