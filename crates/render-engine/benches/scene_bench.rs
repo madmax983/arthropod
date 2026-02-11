@@ -8,7 +8,7 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Scene, SceneNode};
+use render_engine::{Color, NodeContent, Scene, SceneNode, VisualStyle};
 
 /// Create a scene with many non-overlapping nodes
 fn create_scene_with_nodes(count: usize) -> Scene {

@@ -6,4 +6,4 @@ pub mod glyph_atlas;
 pub mod text_renderer;
 
 pub use glyph_atlas::{GlyphAtlas, TexCoords};
-pub use text_renderer::{GlyphInstance, TextRenderer};
+pub use text_renderer::TextRenderer;

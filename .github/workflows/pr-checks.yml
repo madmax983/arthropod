@@ -67,6 +67,22 @@ jobs:
             echo "Ensure they have proper safety documentation"
           fi
 
+      # 9. Performance guardrail: path cache hot path
+      - name: Path hot-path benchmark guardrail
+        env:
+          MAX_NS: "200"
+        run: bash .github/scripts/check-path-hot-bench.sh
+      - name: Style boolean-op benchmark guardrail
+        env:
+          BENCH_NAME: "path_boolean_ops/intersect/128"
+          MAX_NS: "50000"
+        run: bash .github/scripts/check-style-path-bench.sh
+      - name: Style hit-test benchmark guardrail
+        env:
+          BENCH_NAME: "path_hit_test/contains_point_inside"
+          MAX_NS: "5000"
+        run: bash .github/scripts/check-style-path-bench.sh
+
   # Size check - ensure binary size doesn't explode
   size-check:
     name: Binary Size Check

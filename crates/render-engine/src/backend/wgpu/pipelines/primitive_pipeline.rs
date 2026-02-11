@@ -4,11 +4,55 @@ use glam::Vec2;
 #[cfg(test)]
 use glam::Vec4;
 use hashbrown::HashMap;
-use style_engine::{ColorStop, CornerRadii, Paint, VisualStyle};
+use style_engine::{BlendMode, ColorStop, CornerRadii, Paint, StrokeCap, StrokeJoin, VisualStyle};
+
+pub const FLAG_FILL_TYPE_MASK: u32 = 0xF;
+pub const FLAG_HAS_STROKE: u32 = 1 << 4;
+pub const FLAG_BLEND_MODE_SHIFT: u32 = 5;
+pub const FLAG_BLEND_MODE_MASK: u32 = 0x1F << FLAG_BLEND_MODE_SHIFT;
+pub const FLAG_STROKE_CAP_SHIFT: u32 = 10;
+pub const FLAG_STROKE_CAP_MASK: u32 = 0x3 << FLAG_STROKE_CAP_SHIFT;
+pub const FLAG_STROKE_JOIN_SHIFT: u32 = 12;
+pub const FLAG_STROKE_JOIN_MASK: u32 = 0x3 << FLAG_STROKE_JOIN_SHIFT;
+pub const FLAG_IS_GLYPH: u32 = 1 << 14;
+pub const FLAG_IS_SHADOW: u32 = 1 << 31;
+
+fn with_fill_type(flags: u32, fill_type: u32) -> u32 {
+    (flags & !FLAG_FILL_TYPE_MASK) | (fill_type & FLAG_FILL_TYPE_MASK)
+}
+
+fn with_blend_mode(flags: u32, blend_mode: BlendMode) -> u32 {
+    let blend_bits = (blend_mode.to_flag_bits() as u32) << FLAG_BLEND_MODE_SHIFT;
+    (flags & !FLAG_BLEND_MODE_MASK) | (blend_bits & FLAG_BLEND_MODE_MASK)
+}
+
+fn stroke_cap_bits(cap: StrokeCap) -> u32 {
+    match cap {
+        StrokeCap::Butt => 0,
+        StrokeCap::Round => 1,
+        StrokeCap::Square => 2,
+    }
+}
+
+fn stroke_join_bits(join: StrokeJoin) -> u32 {
+    match join {
+        StrokeJoin::Miter => 0,
+        StrokeJoin::Bevel => 1,
+        StrokeJoin::Round => 2,
+    }
+}
+
+fn with_stroke_cap_join(flags: u32, cap: StrokeCap, join: StrokeJoin) -> u32 {
+    let cap_bits = stroke_cap_bits(cap) << FLAG_STROKE_CAP_SHIFT;
+    let join_bits = stroke_join_bits(join) << FLAG_STROKE_JOIN_SHIFT;
+    (flags & !(FLAG_STROKE_CAP_MASK | FLAG_STROKE_JOIN_MASK))
+        | (cap_bits & FLAG_STROKE_CAP_MASK)
+        | (join_bits & FLAG_STROKE_JOIN_MASK)
+}
 
 /// Unified primitive instance data (96 bytes)
 ///
-/// This replaces both RectInstance (36b) and GlyphInstance (40b) with a single
+/// This replaces legacy Rect/Glyph instance payloads with a single
 /// unified type that supports solid fills, gradients, strokes, shadows, and text.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -68,7 +112,7 @@ impl PrimitiveInstance {
             gradient_params: [0.0; 4],
             tex_coords,
             stroke_params: [0.0; 2],
-            flags: 1 << 14, // is_glyph flag (bit 14)
+            flags: FLAG_IS_GLYPH, // is_glyph flag (bit 14)
             _padding: 0,
         }
     }
@@ -77,20 +121,59 @@ impl PrimitiveInstance {
 /// Gradient parameters for shader (32 bytes)
 ///
 /// Passed to shader via storage buffer to describe how to sample the gradient atlas.
+/// Must match WGSL struct layout exactly (16-byte alignment for vec2/vec3/vec4).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GradientParams {
-    pub atlas_row: u32,     // Row index in gradient atlas texture
-    pub num_stops: u32,     // Number of color stops
-    pub _padding: [u32; 6], // Pad to 32 bytes
+    pub start: [f32; 2],        // 8 bytes: Gradient start point (normalized 0-1)
+    pub end: [f32; 2],          // 8 bytes: Gradient end point (normalized 0-1)
+    pub atlas_row: f32,         // 4 bytes: Row in atlas (normalized v coord)
+    pub gradient_type: u32,     // 4 bytes: 0=linear, 1=radial, 2=angular, 3=diamond
+    pub _padding: [f32; 2],     // 8 bytes: Padding to 32 bytes
 }
 
 impl GradientParams {
-    pub fn new(atlas_row: u32, num_stops: u32) -> Self {
+    /// Create gradient params for linear gradient
+    pub fn linear(start: [f32; 2], end: [f32; 2], atlas_row: u32) -> Self {
         Self {
-            atlas_row,
-            num_stops,
-            _padding: [0; 6],
+            start,
+            end,
+            atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+            gradient_type: 0,
+            _padding: [0.0; 2],
+        }
+    }
+
+    /// Create gradient params for radial gradient
+    pub fn radial(center: [f32; 2], radius: f32, atlas_row: u32) -> Self {
+        Self {
+            start: center,
+            end: [center[0] + radius, center[1]],
+            atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+            gradient_type: 1,
+            _padding: [0.0; 2],
+        }
+    }
+
+    /// Create gradient params for angular gradient
+    pub fn angular(center: [f32; 2], atlas_row: u32) -> Self {
+        Self {
+            start: center,
+            end: center, // Not used for angular
+            atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+            gradient_type: 2,
+            _padding: [0.0; 2],
+        }
+    }
+
+    /// Create gradient params for diamond gradient (Figma-specific)
+    pub fn diamond(center: [f32; 2], scale: [f32; 2], atlas_row: u32) -> Self {
+        Self {
+            start: center,
+            end: [center[0] + scale[0], center[1] + scale[1]],
+            atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+            gradient_type: 3,
+            _padding: [0.0; 2],
         }
     }
 }
@@ -106,6 +189,14 @@ pub struct GradientAtlas {
     next_row: u32,
     /// Texture data (1024 rows x 1024 texels x 4 channels x f16)
     data: Vec<u16>, // f16 stored as u16
+    /// GPU texture (owned by GradientAtlas)
+    texture: Option<wgpu::Texture>,
+    /// Texture view
+    texture_view: Option<wgpu::TextureView>,
+    /// Sampler
+    sampler: Option<wgpu::Sampler>,
+    /// Dirty flag: true if data has changed and needs GPU upload
+    dirty: bool,
 }
 
 impl GradientAtlas {
@@ -119,11 +210,93 @@ impl Default for GradientAtlas {
             cache: HashMap::new(),
             next_row: 0,
             data: vec![0u16; Self::ATLAS_SIZE * Self::TEXELS_PER_ROW * 4],
+            texture: None,
+            texture_view: None,
+            sampler: None,
+            dirty: false,
         }
     }
 }
 
 impl GradientAtlas {
+    /// Initialize GPU resources (must be called after construction)
+    pub fn init_gpu(&mut self, device: &wgpu::Device) {
+        // Create 1024x1024 Rgba16Float texture
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Gradient Atlas Texture"),
+            size: wgpu::Extent3d {
+                width: Self::ATLAS_SIZE as u32,
+                height: Self::ATLAS_SIZE as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Gradient Atlas Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            ..Default::default()
+        });
+
+        self.texture = Some(texture);
+        self.texture_view = Some(texture_view);
+        self.sampler = Some(sampler);
+        self.dirty = true; // Mark for initial upload
+    }
+
+    /// Upload dirty data to GPU
+    pub fn upload_to_gpu(&mut self, queue: &wgpu::Queue) {
+        if !self.dirty {
+            return;
+        }
+
+        if let Some(ref texture) = self.texture {
+            // Upload entire texture (1024x1024x4 half-floats = 8MB)
+            let data_bytes = bytemuck::cast_slice(&self.data);
+
+            let bytes_per_row = Self::TEXELS_PER_ROW as u32 * 4 * 2; // 4 channels * 2 bytes (f16)
+
+            queue.write_texture(
+                texture.as_image_copy(),
+                data_bytes,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(Self::ATLAS_SIZE as u32),
+                },
+                wgpu::Extent3d {
+                    width: Self::ATLAS_SIZE as u32,
+                    height: Self::ATLAS_SIZE as u32,
+                    depth_or_array_layers: 1,
+                },
+            );
+
+            self.dirty = false;
+        }
+    }
+
+    /// Get texture view (if initialized)
+    pub fn texture_view(&self) -> Option<&wgpu::TextureView> {
+        self.texture_view.as_ref()
+    }
+
+    /// Get sampler (if initialized)
+    pub fn sampler(&self) -> Option<&wgpu::Sampler> {
+        self.sampler.as_ref()
+    }
+
     /// Rasterize a gradient into the atlas and return the row index
     pub fn add_gradient(&mut self, stops: &[ColorStop]) -> u32 {
         // Compute hash for deduplication
@@ -143,6 +316,9 @@ impl GradientAtlas {
 
         // Cache it
         self.cache.insert(hash, row);
+
+        // Mark for GPU upload
+        self.dirty = true;
 
         row
     }
@@ -206,7 +382,8 @@ impl GradientAtlas {
 /// - One for stroke (if present)
 /// - One per effect (shadows, blur)
 /// - Text glyphs (if text is present)
-pub fn create_primitive_instances(
+fn create_primitive_instances_impl(
+    mut pipeline: Option<&mut PrimitivePipeline>,
     style: &VisualStyle,
     pos: Vec2,
     size: Vec2,
@@ -220,29 +397,429 @@ pub fn create_primitive_instances(
         return instances;
     }
 
-    // For now, just create a single solid instance from the first fill (if any)
-    // TODO: Full implementation in later steps (gradients, strokes, effects, text)
-    if let Some(first_fill) = style.fills.first() {
-        use style_engine::Paint;
-        match first_fill {
-            Paint::Solid(color) => {
-                let mut final_color = *color;
-                final_color.w *= opacity; // Apply opacity
+    // 1. Render shadows FIRST (behind everything)
+    for effect in &style.effects {
+        if let style_engine::Effect::DropShadow(shadow) = effect {
+            if shadow.visible {
+                // Create shadow instance with offset position
+                let shadow_pos = pos + shadow.offset;
 
-                instances.push(PrimitiveInstance::rounded(
-                    [pos.x, pos.y],
+                let mut shadow_color = shadow.color;
+                shadow_color.w *= opacity;
+
+                let mut shadow_instance = PrimitiveInstance::rounded(
+                    [shadow_pos.x, shadow_pos.y],
                     [size.x, size.y],
-                    [final_color.x, final_color.y, final_color.z, final_color.w],
+                    [shadow_color.x, shadow_color.y, shadow_color.z, shadow_color.w],
                     style.corner_radii,
-                ));
-            }
-            _ => {
-                // TODO: Gradient fills in Step 11
+                );
+
+                // Store blur radius in stroke_params[0] (shadows don't use stroke)
+                shadow_instance.stroke_params[0] = shadow.blur;
+
+                // Set blend mode and internal shadow flag
+                shadow_instance.flags = with_blend_mode(shadow_instance.flags, style.blend_mode);
+                shadow_instance.flags |= FLAG_IS_SHADOW;
+
+                instances.push(shadow_instance);
             }
         }
     }
 
+    // 2. Render fills (solid or gradient backgrounds)
+    for fill in &style.fills {
+        let fill_instance = if let Some(pipeline) = pipeline.as_deref_mut() {
+            create_fill_instance(
+                pipeline,
+                fill,
+                pos,
+                size,
+                opacity,
+                &style.corner_radii,
+                style.blend_mode,
+            )
+        } else {
+            create_fill_instance_without_pipeline(
+                fill,
+                pos,
+                size,
+                opacity,
+                &style.corner_radii,
+                style.blend_mode,
+            )
+        };
+        instances.push(fill_instance);
+    }
+
+    // 3. Render stroke (on top of fill)
+    if let Some(stroke) = &style.stroke {
+        let stroke_instance = if let Some(pipeline) = pipeline.as_deref_mut() {
+            create_stroke_instance(
+                pipeline,
+                stroke,
+                pos,
+                size,
+                opacity,
+                &style.corner_radii,
+                style.blend_mode,
+            )
+        } else {
+            create_stroke_instance_without_pipeline(
+                stroke,
+                pos,
+                size,
+                opacity,
+                &style.corner_radii,
+                style.blend_mode,
+            )
+        };
+        instances.push(stroke_instance);
+    }
+
     instances
+}
+
+pub fn create_primitive_instances(
+    style: &VisualStyle,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+) -> Vec<PrimitiveInstance> {
+    create_primitive_instances_impl(None, style, pos, size, opacity)
+}
+
+pub fn create_primitive_instances_with_pipeline(
+    pipeline: &mut PrimitivePipeline,
+    style: &VisualStyle,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+) -> Vec<PrimitiveInstance> {
+    create_primitive_instances_impl(Some(pipeline), style, pos, size, opacity)
+}
+
+/// Create a stroke instance
+fn create_stroke_instance(
+    pipeline: &mut PrimitivePipeline,
+    stroke: &style_engine::StrokeStyle,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+    corner_radii: &CornerRadii,
+    blend_mode: BlendMode,
+) -> PrimitiveInstance {
+    use style_engine::StrokeAlign;
+
+    let stroke_width = stroke.weight;
+    let stroke_align = match stroke.align {
+        StrokeAlign::Center => 0.0,
+        StrokeAlign::Inside => 1.0,
+        StrokeAlign::Outside => -1.0,
+    };
+
+    let Some(stroke_paint) = stroke.top_paint() else {
+        let mut instance = PrimitiveInstance::rounded(
+            [pos.x, pos.y],
+            [size.x, size.y],
+            [1.0, 0.0, 1.0, opacity],
+            *corner_radii,
+        );
+        instance.stroke_params = [stroke_width, stroke_align];
+        instance.flags |= FLAG_HAS_STROKE;
+        instance.flags = with_blend_mode(instance.flags, blend_mode);
+        instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+        return instance;
+    };
+
+    match stroke_paint {
+        Paint::Solid(color) => {
+            let mut final_color = *color;
+            final_color.w *= opacity;
+
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [final_color.x, final_color.y, final_color.z, final_color.w],
+                *corner_radii,
+            );
+            instance.stroke_params = [stroke_width, stroke_align];
+            instance.flags |= FLAG_HAS_STROKE;
+            instance.flags = with_blend_mode(instance.flags, blend_mode);
+            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+            instance
+        }
+        Paint::Linear(gradient) => {
+            let atlas_row = pipeline.add_gradient(&gradient.stops);
+            let params = GradientParams {
+                start: gradient.start.to_array(),
+                end: gradient.end.to_array(),
+                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                gradient_type: 0,
+                _padding: [0.0; 2],
+            };
+            let param_index = pipeline.add_gradient_params(params);
+
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity],
+                *corner_radii,
+            );
+            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+            instance.stroke_params = [stroke_width, stroke_align];
+            instance.flags = with_fill_type(instance.flags, 1);
+            instance.flags |= FLAG_HAS_STROKE;
+            instance.flags = with_blend_mode(instance.flags, blend_mode);
+            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+            instance
+        }
+        _ => {
+            // Other gradient types for strokes (implement if needed)
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity],
+                *corner_radii,
+            );
+            instance.stroke_params = [stroke_width, stroke_align];
+            instance.flags |= FLAG_HAS_STROKE;
+            instance.flags = with_blend_mode(instance.flags, blend_mode);
+            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+            instance
+        }
+    }
+}
+
+fn fallback_gradient_color(stops: &[ColorStop], opacity: f32) -> [f32; 4] {
+    let mut color = style_engine::Paint::interpolate_stops(0.5, stops);
+    color.w *= opacity;
+    [color.x, color.y, color.z, color.w]
+}
+
+fn create_stroke_instance_without_pipeline(
+    stroke: &style_engine::StrokeStyle,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+    corner_radii: &CornerRadii,
+    blend_mode: BlendMode,
+) -> PrimitiveInstance {
+    use style_engine::StrokeAlign;
+
+    let stroke_width = stroke.weight;
+    let stroke_align = match stroke.align {
+        StrokeAlign::Center => 0.0,
+        StrokeAlign::Inside => 1.0,
+        StrokeAlign::Outside => -1.0,
+    };
+
+    let stroke_color = match stroke.top_paint() {
+        Some(Paint::Solid(color)) => {
+            let mut final_color = *color;
+            final_color.w *= opacity;
+            [final_color.x, final_color.y, final_color.z, final_color.w]
+        }
+        Some(Paint::Linear(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
+        Some(Paint::Radial(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
+        Some(Paint::Angular(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
+        Some(Paint::Diamond(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
+        Some(Paint::Image(_)) | None => [1.0, 0.0, 1.0, opacity],
+    };
+
+    let mut instance =
+        PrimitiveInstance::rounded([pos.x, pos.y], [size.x, size.y], stroke_color, *corner_radii);
+    instance.stroke_params = [stroke_width, stroke_align];
+    instance.flags |= FLAG_HAS_STROKE;
+    instance.flags = with_blend_mode(instance.flags, blend_mode);
+    instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+    instance
+}
+
+/// Create a single fill instance (solid or gradient)
+fn create_fill_instance(
+    pipeline: &mut PrimitivePipeline,
+    fill: &Paint,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+    corner_radii: &CornerRadii,
+    blend_mode: BlendMode,
+) -> PrimitiveInstance {
+    let mut instance = match fill {
+        Paint::Solid(color) => {
+            let mut final_color = *color;
+            final_color.w *= opacity;
+
+            PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [final_color.x, final_color.y, final_color.z, final_color.w],
+                *corner_radii,
+            )
+        }
+        Paint::Linear(gradient) => {
+            // Add gradient to atlas
+            let atlas_row = pipeline.add_gradient(&gradient.stops);
+
+            // Create gradient params
+            let params = GradientParams {
+                start: gradient.start.to_array(),
+                end: gradient.end.to_array(),
+                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                gradient_type: 0, // Linear
+                _padding: [0.0; 2],
+            };
+            let param_index = pipeline.add_gradient_params(params);
+
+            // Create instance with gradient
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity], // Color unused for gradients, just alpha
+                *corner_radii,
+            );
+            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+            instance.flags = with_fill_type(instance.flags, 1);
+            instance
+        }
+        Paint::Radial(gradient) => {
+            let atlas_row = pipeline.add_gradient(&gradient.stops);
+            let params = GradientParams {
+                start: gradient.center.to_array(),
+                end: (gradient.center + Vec2::new(gradient.radius, 0.0)).to_array(), // End = center + radius vector
+                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                gradient_type: 1, // Radial
+                _padding: [0.0; 2],
+            };
+            let param_index = pipeline.add_gradient_params(params);
+
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity],
+                *corner_radii,
+            );
+            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+            instance.flags = with_fill_type(instance.flags, 2);
+            instance
+        }
+        Paint::Angular(gradient) => {
+            let atlas_row = pipeline.add_gradient(&gradient.stops);
+            let params = GradientParams {
+                start: gradient.center.to_array(),
+                end: gradient.center.to_array(), // End unused for angular
+                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                gradient_type: 2, // Angular
+                _padding: [0.0; 2],
+            };
+            let param_index = pipeline.add_gradient_params(params);
+
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity],
+                *corner_radii,
+            );
+            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+            instance.flags = with_fill_type(instance.flags, 3);
+            instance
+        }
+        Paint::Diamond(gradient) => {
+            let atlas_row = pipeline.add_gradient(&gradient.stops);
+            let params = GradientParams {
+                start: gradient.center.to_array(),
+                end: (gradient.center + Vec2::new(gradient.scale, gradient.scale)).to_array(),
+                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                gradient_type: 3, // Diamond
+                _padding: [0.0; 2],
+            };
+            let param_index = pipeline.add_gradient_params(params);
+
+            let mut instance = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [1.0, 1.0, 1.0, opacity],
+                *corner_radii,
+            );
+            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+            instance.flags = with_fill_type(instance.flags, 4);
+            instance
+        }
+        Paint::Image(_) => {
+            // TODO: Image fills in Phase 3
+            PrimitiveInstance::solid([pos.x, pos.y], [size.x, size.y], [1.0, 0.0, 1.0, 1.0])
+        }
+    };
+    instance.flags = with_blend_mode(instance.flags, blend_mode);
+    instance
+}
+
+fn create_fill_instance_without_pipeline(
+    fill: &Paint,
+    pos: Vec2,
+    size: Vec2,
+    opacity: f32,
+    corner_radii: &CornerRadii,
+    blend_mode: BlendMode,
+) -> PrimitiveInstance {
+    let mut instance = match fill {
+        Paint::Solid(color) => {
+            let mut final_color = *color;
+            final_color.w *= opacity;
+
+            PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                [final_color.x, final_color.y, final_color.z, final_color.w],
+                *corner_radii,
+            )
+        }
+        Paint::Linear(gradient) => {
+            let mut inst = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                fallback_gradient_color(&gradient.stops, opacity),
+                *corner_radii,
+            );
+            inst.flags = with_fill_type(inst.flags, 1);
+            inst
+        }
+        Paint::Radial(gradient) => {
+            let mut inst = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                fallback_gradient_color(&gradient.stops, opacity),
+                *corner_radii,
+            );
+            inst.flags = with_fill_type(inst.flags, 2);
+            inst
+        }
+        Paint::Angular(gradient) => {
+            let mut inst = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                fallback_gradient_color(&gradient.stops, opacity),
+                *corner_radii,
+            );
+            inst.flags = with_fill_type(inst.flags, 3);
+            inst
+        }
+        Paint::Diamond(gradient) => {
+            let mut inst = PrimitiveInstance::rounded(
+                [pos.x, pos.y],
+                [size.x, size.y],
+                fallback_gradient_color(&gradient.stops, opacity),
+                *corner_radii,
+            );
+            inst.flags = with_fill_type(inst.flags, 4);
+            inst
+        }
+        Paint::Image(_) => {
+            PrimitiveInstance::solid([pos.x, pos.y], [size.x, size.y], [1.0, 0.0, 1.0, 1.0])
+        }
+    };
+    instance.flags = with_blend_mode(instance.flags, blend_mode);
+    instance
 }
 
 /// Unified primitive rendering pipeline
@@ -250,12 +827,18 @@ pub struct PrimitivePipeline {
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     vertex_buffer_capacity: usize,
-    #[allow(dead_code)] // Reserved for Phase 2 gradient support
+    /// Gradient atlas (1024x1024 texture storing rasterized gradients)
     gradient_atlas: GradientAtlas,
-    #[allow(dead_code)] // Reserved for Phase 2 gradient support
+    /// Gradient params storage buffer
+    gradient_params_buffer: wgpu::Buffer,
+    gradient_params_capacity: usize,
+    /// Gradient params data (CPU-side)
+    gradient_params: Vec<GradientParams>,
+    /// Gradient bind group (Group 1)
     gradient_bind_group: Option<wgpu::BindGroup>,
-    #[allow(dead_code)] // Reserved for Phase 2 gradient support
+    /// Gradient bind group layout (kept for potential rebind)
     gradient_bind_group_layout: wgpu::BindGroupLayout,
+    /// Glyph bind group (Group 2)
     glyph_bind_group: wgpu::BindGroup,
 }
 
@@ -277,12 +860,12 @@ impl PrimitivePipeline {
 
         // Create bind group layouts
 
-        // Group 1: Gradient atlas (TODO: implement texture creation)
+        // Group 1: Gradient atlas
         let gradient_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Gradient Atlas Bind Group Layout"),
                 entries: &[
-                    // Texture
+                    // Binding 0: Gradient texture (1024x1024 LUT)
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
@@ -293,11 +876,22 @@ impl PrimitivePipeline {
                         },
                         count: None,
                     },
-                    // Sampler
+                    // Binding 1: Gradient sampler
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    // Binding 2: Gradient params storage buffer
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
                         count: None,
                     },
                 ],
@@ -329,48 +923,44 @@ impl PrimitivePipeline {
                 ],
             });
 
-        // Create dummy gradient texture (1x1 white pixel) for Phase 1
-        // TODO: Replace with real gradient atlas in Phase 2+
-        let dummy_gradient_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Dummy Gradient Texture"),
-            size: wgpu::Extent3d {
-                width: 1,
-                height: 1,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let dummy_gradient_view = dummy_gradient_texture.create_view(&Default::default());
-        let dummy_gradient_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Dummy Gradient Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
+        // Initialize gradient atlas with GPU resources
+        let mut gradient_atlas = GradientAtlas::default();
+        gradient_atlas.init_gpu(device);
+
+        // Create gradient params storage buffer
+        const INITIAL_GRADIENT_CAPACITY: usize = 256;
+        let gradient_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Gradient Params Storage Buffer"),
+            size: (INITIAL_GRADIENT_CAPACITY * std::mem::size_of::<GradientParams>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
-        // Create gradient bind group with dummy texture
-        let gradient_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Gradient Atlas Bind Group (Dummy)"),
-            layout: &gradient_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&dummy_gradient_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&dummy_gradient_sampler),
-                },
-            ],
-        });
+        // Create gradient bind group with texture, sampler, and storage buffer
+        let gradient_bind_group = if let (Some(view), Some(sampler)) =
+            (gradient_atlas.texture_view(), gradient_atlas.sampler())
+        {
+            Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Gradient Atlas Bind Group"),
+                layout: &gradient_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: gradient_params_buffer.as_entire_binding(),
+                    },
+                ],
+            }))
+        } else {
+            None
+        };
 
         // Create glyph bind group
         let glyph_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -468,11 +1058,36 @@ impl PrimitivePipeline {
             pipeline,
             vertex_buffer,
             vertex_buffer_capacity: INITIAL_CAPACITY,
-            gradient_atlas: GradientAtlas::default(),
-            gradient_bind_group: Some(gradient_bind_group),
+            gradient_atlas,
+            gradient_params_buffer,
+            gradient_params_capacity: INITIAL_GRADIENT_CAPACITY,
+            gradient_params: Vec::new(),
+            gradient_bind_group,
             gradient_bind_group_layout,
             glyph_bind_group,
         }
+    }
+
+    /// Add a gradient to the atlas and return its row index
+    pub fn add_gradient(&mut self, stops: &[ColorStop]) -> u32 {
+        self.gradient_atlas.add_gradient(stops)
+    }
+
+    /// Upload any pending gradient atlas changes to GPU
+    pub fn upload_gradient_atlas(&mut self, queue: &wgpu::Queue) {
+        self.gradient_atlas.upload_to_gpu(queue);
+    }
+
+    /// Add gradient parameters and return the index into the storage buffer
+    pub fn add_gradient_params(&mut self, params: GradientParams) -> u32 {
+        let index = self.gradient_params.len() as u32;
+        self.gradient_params.push(params);
+        index
+    }
+
+    /// Clear all gradient params (call at start of frame)
+    pub fn clear_gradient_params(&mut self) {
+        self.gradient_params.clear();
     }
 
     pub fn prepare(
@@ -481,6 +1096,53 @@ impl PrimitivePipeline {
         queue: &wgpu::Queue,
         instances: &[PrimitiveInstance],
     ) {
+        // Upload gradient atlas if dirty
+        self.gradient_atlas.upload_to_gpu(queue);
+
+        // Upload gradient params if any
+        if !self.gradient_params.is_empty() {
+            // Resize gradient params buffer if needed
+            if self.gradient_params.len() > self.gradient_params_capacity {
+                let new_capacity = self.gradient_params.len().next_power_of_two();
+                self.gradient_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Gradient Params Storage Buffer"),
+                    size: (new_capacity * std::mem::size_of::<GradientParams>()) as u64,
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.gradient_params_capacity = new_capacity;
+
+                // Recreate bind group with new buffer
+                if let (Some(view), Some(sampler)) =
+                    (self.gradient_atlas.texture_view(), self.gradient_atlas.sampler())
+                {
+                    self.gradient_bind_group =
+                        Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Gradient Atlas Bind Group"),
+                            layout: &self.gradient_bind_group_layout,
+                            entries: &[
+                                wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: wgpu::BindingResource::TextureView(view),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 1,
+                                    resource: wgpu::BindingResource::Sampler(sampler),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 2,
+                                    resource: self.gradient_params_buffer.as_entire_binding(),
+                                },
+                            ],
+                        }));
+                }
+            }
+
+            // Upload gradient params data
+            let params_bytes = bytemuck::cast_slice(&self.gradient_params);
+            queue.write_buffer(&self.gradient_params_buffer, 0, params_bytes);
+        }
+
         if instances.is_empty() {
             return;
         }
@@ -642,6 +1304,91 @@ mod tests {
     }
 
     #[test]
+    fn test_gradient_fill_types_are_distinct() {
+        let linear = VisualStyle::new().fill(Paint::Linear(style_engine::LinearGradient {
+            start: Vec2::new(0.0, 0.0),
+            end: Vec2::new(1.0, 0.0),
+            stops: vec![
+                ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                ColorStop::new(1.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
+            ],
+        }));
+        let radial = VisualStyle::new().fill(Paint::Radial(style_engine::RadialGradient {
+            center: Vec2::new(0.5, 0.5),
+            radius: 0.5,
+            stops: vec![
+                ColorStop::new(0.0, Vec4::new(1.0, 1.0, 1.0, 1.0)),
+                ColorStop::new(1.0, Vec4::new(0.0, 0.0, 0.0, 1.0)),
+            ],
+        }));
+        let angular = VisualStyle::new().fill(Paint::Angular(style_engine::AngularGradient {
+            center: Vec2::new(0.5, 0.5),
+            angle: 0.0,
+            stops: vec![
+                ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                ColorStop::new(1.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+            ],
+        }));
+        let diamond = VisualStyle::new().fill(Paint::Diamond(style_engine::DiamondGradient {
+            center: Vec2::new(0.5, 0.5),
+            scale: 0.5,
+            stops: vec![
+                ColorStop::new(0.0, Vec4::new(1.0, 1.0, 0.0, 1.0)),
+                ColorStop::new(1.0, Vec4::new(0.5, 0.0, 0.5, 1.0)),
+            ],
+        }));
+
+        let linear_i = create_primitive_instances(&linear, Vec2::ZERO, Vec2::ONE, 1.0);
+        let radial_i = create_primitive_instances(&radial, Vec2::ZERO, Vec2::ONE, 1.0);
+        let angular_i = create_primitive_instances(&angular, Vec2::ZERO, Vec2::ONE, 1.0);
+        let diamond_i = create_primitive_instances(&diamond, Vec2::ZERO, Vec2::ONE, 1.0);
+
+        assert_eq!(linear_i[0].flags & FLAG_FILL_TYPE_MASK, 1);
+        assert_eq!(radial_i[0].flags & FLAG_FILL_TYPE_MASK, 2);
+        assert_eq!(angular_i[0].flags & FLAG_FILL_TYPE_MASK, 3);
+        assert_eq!(diamond_i[0].flags & FLAG_FILL_TYPE_MASK, 4);
+    }
+
+    #[test]
+    fn test_shadow_flag_uses_internal_high_bit() {
+        let style = VisualStyle::new()
+            .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
+            .drop_shadow(Vec2::new(2.0, 2.0), 6.0, Vec4::new(0.0, 0.0, 0.0, 0.3));
+        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+
+        assert!(instances.iter().any(|i| (i.flags & FLAG_IS_SHADOW) != 0));
+    }
+
+    #[test]
+    fn test_stroke_packs_cap_join_and_blend_mode_bits() {
+        let mut stroke = style_engine::StrokeStyle::solid(
+            Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)),
+            2.0,
+            style_engine::StrokeAlign::Inside,
+        );
+        stroke.cap = style_engine::StrokeCap::Square;
+        stroke.join = style_engine::StrokeJoin::Round;
+
+        let style = VisualStyle::new()
+            .solid_fill(Vec4::new(0.2, 0.2, 0.2, 1.0))
+            .blend_mode(style_engine::BlendMode::Screen)
+            .stroke(stroke);
+        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let stroke_instance = instances
+            .iter()
+            .find(|i| (i.flags & FLAG_HAS_STROKE) != 0)
+            .expect("missing stroke instance");
+
+        let blend = (stroke_instance.flags & FLAG_BLEND_MODE_MASK) >> FLAG_BLEND_MODE_SHIFT;
+        let cap = (stroke_instance.flags & FLAG_STROKE_CAP_MASK) >> FLAG_STROKE_CAP_SHIFT;
+        let join = (stroke_instance.flags & FLAG_STROKE_JOIN_MASK) >> FLAG_STROKE_JOIN_SHIFT;
+
+        assert_eq!(blend, style_engine::BlendMode::Screen.to_flag_bits() as u32);
+        assert_eq!(cap, 2);
+        assert_eq!(join, 2);
+    }
+
+    #[test]
     fn test_create_primitive_instances_solid() {
         let style = VisualStyle::new()
             .solid_fill(Vec4::new(1.0, 0.0, 0.0, 1.0))
@@ -792,161 +1539,185 @@ mod tests {
         assert_eq!(
             std::mem::size_of::<GradientParams>(),
             32,
-            "GradientParams must be exactly 32 bytes"
+            "GradientParams must be exactly 32 bytes to match WGSL struct"
         );
     }
 
-    // TODO Phase 2+: GradientAtlas tests disabled until gradient rendering is fully implemented
     #[test]
-    #[ignore = "Phase 2+ - GradientAtlas not yet implemented"]
+    fn test_gradient_params_constructors() {
+        // Test linear gradient
+        let linear = GradientParams::linear([0.0, 0.0], [1.0, 0.0], 5);
+        assert_eq!(linear.gradient_type, 0, "Linear gradient type should be 0");
+        assert_eq!(linear.start, [0.0, 0.0]);
+        assert_eq!(linear.end, [1.0, 0.0]);
+
+        // Test radial gradient
+        let radial = GradientParams::radial([0.5, 0.5], 0.5, 10);
+        assert_eq!(radial.gradient_type, 1, "Radial gradient type should be 1");
+        assert_eq!(radial.start, [0.5, 0.5]);
+
+        // Test angular gradient
+        let angular = GradientParams::angular([0.5, 0.5], 15);
+        assert_eq!(angular.gradient_type, 2, "Angular gradient type should be 2");
+
+        // Test diamond gradient
+        let diamond = GradientParams::diamond([0.5, 0.5], [0.3, 0.3], 20);
+        assert_eq!(
+            diamond.gradient_type, 3,
+            "Diamond gradient type should be 3"
+        );
+    }
+
+    #[test]
     fn test_gradient_atlas_creation() {
-        // let atlas = GradientAtlas::new();
-        // assert_eq!(atlas.data().len(), 1024 * 1024 * 4);
+        let atlas = GradientAtlas::default();
+        assert_eq!(
+            atlas.data().len(),
+            1024 * 1024 * 4,
+            "Atlas should have 1024x1024x4 f16 values"
+        );
+        assert_eq!(atlas.next_row, 0, "New atlas should start at row 0");
     }
 
     #[test]
-    #[ignore = "Phase 2+ - GradientAtlas not yet implemented"]
     fn test_gradient_atlas_black_to_white() {
-        // use style_engine::ColorStop;
-        // let mut atlas = GradientAtlas::new();
-        //
-        // let stops = vec![
-        //     ColorStop::new(0.0, Vec4::new(0.0, 0.0, 0.0, 1.0)), // Black
-        //     ColorStop::new(1.0, Vec4::new(1.0, 1.0, 1.0, 1.0)), // White
-        // ];
-        //
-        // let row = atlas.add_gradient(&stops);
-        // assert_eq!(row, 0, "First gradient should use row 0");
-        //
-        // // Check texel 0 ≈ black
-        // let texel_0 = atlas.get_texel(row, 0);
-        // assert!(
-        //     (texel_0.x - 0.0).abs() < 0.01,
-        //     "Texel 0 R should be ~0, got {}",
-        //     texel_0.x
-        // );
-        // assert!(
-        //     (texel_0.y - 0.0).abs() < 0.01,
-        //     "Texel 0 G should be ~0, got {}",
-        //     texel_0.y
-        // );
-        // assert!(
-        //     (texel_0.z - 0.0).abs() < 0.01,
-        //     "Texel 0 B should be ~0, got {}",
-        //     texel_0.z
-        // );
-        //
-        // // Check texel 1023 ≈ white
-        // let texel_1023 = atlas.get_texel(row, 1023);
-        // assert!(
-        //     (texel_1023.x - 1.0).abs() < 0.01,
-        //     "Texel 1023 R should be ~1, got {}",
-        //     texel_1023.x
-        // );
-        // assert!(
-        //     (texel_1023.y - 1.0).abs() < 0.01,
-        //     "Texel 1023 G should be ~1, got {}",
-        //     texel_1023.y
-        // );
-        // assert!(
-        //     (texel_1023.z - 1.0).abs() < 0.01,
-        //     "Texel 1023 B should be ~1, got {}",
-        //     texel_1023.z
-        // );
-        //
-        // // Check texel 512 ≈ gray (0.5, 0.5, 0.5)
-        // let texel_512 = atlas.get_texel(row, 512);
-        // assert!(
-        //     (texel_512.x - 0.5).abs() < 0.02,
-        //     "Texel 512 R should be ~0.5, got {}",
-        //     texel_512.x
-        // );
-        // assert!(
-        //     (texel_512.y - 0.5).abs() < 0.02,
-        //     "Texel 512 G should be ~0.5, got {}",
-        //     texel_512.y
-        // );
-        // assert!(
-        //     (texel_512.z - 0.5).abs() < 0.02,
-        //     "Texel 512 B should be ~0.5, got {}",
-        //     texel_512.z
-        // );
+        use style_engine::ColorStop;
+        let mut atlas = GradientAtlas::default();
+
+        let stops = vec![
+            ColorStop::new(0.0, Vec4::new(0.0, 0.0, 0.0, 1.0)), // Black
+            ColorStop::new(1.0, Vec4::new(1.0, 1.0, 1.0, 1.0)), // White
+        ];
+
+        let row = atlas.add_gradient(&stops);
+        assert_eq!(row, 0, "First gradient should use row 0");
+
+        // Check texel 0 ≈ black
+        let texel_0 = atlas.get_texel(row, 0);
+        assert!(
+            (texel_0.x - 0.0).abs() < 0.01,
+            "Texel 0 R should be ~0, got {}",
+            texel_0.x
+        );
+        assert!(
+            (texel_0.y - 0.0).abs() < 0.01,
+            "Texel 0 G should be ~0, got {}",
+            texel_0.y
+        );
+        assert!(
+            (texel_0.z - 0.0).abs() < 0.01,
+            "Texel 0 B should be ~0, got {}",
+            texel_0.z
+        );
+
+        // Check texel 1023 ≈ white
+        let texel_1023 = atlas.get_texel(row, 1023);
+        assert!(
+            (texel_1023.x - 1.0).abs() < 0.01,
+            "Texel 1023 R should be ~1, got {}",
+            texel_1023.x
+        );
+        assert!(
+            (texel_1023.y - 1.0).abs() < 0.01,
+            "Texel 1023 G should be ~1, got {}",
+            texel_1023.y
+        );
+        assert!(
+            (texel_1023.z - 1.0).abs() < 0.01,
+            "Texel 1023 B should be ~1, got {}",
+            texel_1023.z
+        );
+
+        // Check texel 512 ≈ perceptual midpoint gray (Oklab default interpolation)
+        let texel_512 = atlas.get_texel(row, 512);
+        assert!(
+            (texel_512.x - 0.39).abs() < 0.03,
+            "Texel 512 R should be ~0.39, got {}",
+            texel_512.x
+        );
+        assert!(
+            (texel_512.y - 0.39).abs() < 0.03,
+            "Texel 512 G should be ~0.39, got {}",
+            texel_512.y
+        );
+        assert!(
+            (texel_512.z - 0.39).abs() < 0.03,
+            "Texel 512 B should be ~0.39, got {}",
+            texel_512.z
+        );
     }
 
     #[test]
-    #[ignore = "Phase 2+ - GradientAtlas not yet implemented"]
     fn test_gradient_atlas_hard_stop() {
-        // use style_engine::ColorStop;
-        // let mut atlas = GradientAtlas::new();
-        //
-        // // Hard stop at 0.5: black before, white after
-        // let stops = vec![
-        //     ColorStop::new(0.0, Vec4::new(0.0, 0.0, 0.0, 1.0)),
-        //     ColorStop::new(0.5, Vec4::new(0.0, 0.0, 0.0, 1.0)),
-        //     ColorStop::new(0.5, Vec4::new(1.0, 1.0, 1.0, 1.0)),
-        //     ColorStop::new(1.0, Vec4::new(1.0, 1.0, 1.0, 1.0)),
-        // ];
-        //
-        // let row = atlas.add_gradient(&stops);
-        //
-        // // Texel at ~0.49 should be black
-        // let texel_before = atlas.get_texel(row, 500);
-        // assert!(
-        //     texel_before.x < 0.1,
-        //     "Before hard stop should be dark, got {}",
-        //     texel_before.x
-        // );
-        //
-        // // Texel at ~0.51 should be white
-        // let texel_after = atlas.get_texel(row, 524);
-        // assert!(
-        //     texel_after.x > 0.9,
-        //     "After hard stop should be bright, got {}",
-        //     texel_after.x
-        // );
+        use style_engine::ColorStop;
+        let mut atlas = GradientAtlas::default();
+
+        // Hard stop at 0.5: black before, white after
+        let stops = vec![
+            ColorStop::new(0.0, Vec4::new(0.0, 0.0, 0.0, 1.0)),
+            ColorStop::new(0.5, Vec4::new(0.0, 0.0, 0.0, 1.0)),
+            ColorStop::new(0.5, Vec4::new(1.0, 1.0, 1.0, 1.0)),
+            ColorStop::new(1.0, Vec4::new(1.0, 1.0, 1.0, 1.0)),
+        ];
+
+        let row = atlas.add_gradient(&stops);
+
+        // Texel at ~0.49 should be black
+        let texel_before = atlas.get_texel(row, 500);
+        assert!(
+            texel_before.x < 0.1,
+            "Before hard stop should be dark, got {}",
+            texel_before.x
+        );
+
+        // Texel at ~0.51 should be white
+        let texel_after = atlas.get_texel(row, 524);
+        assert!(
+            texel_after.x > 0.9,
+            "After hard stop should be bright, got {}",
+            texel_after.x
+        );
     }
 
     #[test]
-    #[ignore = "Phase 2+ - GradientAtlas not yet implemented"]
     fn test_gradient_atlas_cache_dedup() {
-        // use style_engine::ColorStop;
-        // let mut atlas = GradientAtlas::new();
-        //
-        // let stops = vec![
-        //     ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
-        //     ColorStop::new(1.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
-        // ];
-        //
-        // // Add same gradient twice
-        // let row1 = atlas.add_gradient(&stops);
-        // let row2 = atlas.add_gradient(&stops);
-        //
-        // assert_eq!(row1, row2, "Same gradient should return same row (cached)");
-        // assert_eq!(atlas.next_row, 1, "Should only allocate one row");
+        use style_engine::ColorStop;
+        let mut atlas = GradientAtlas::default();
+
+        let stops = vec![
+            ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+            ColorStop::new(1.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
+        ];
+
+        // Add same gradient twice
+        let row1 = atlas.add_gradient(&stops);
+        let row2 = atlas.add_gradient(&stops);
+
+        assert_eq!(row1, row2, "Same gradient should return same row (cached)");
+        assert_eq!(atlas.next_row, 1, "Should only allocate one row");
     }
 
     #[test]
-    #[ignore = "Phase 2+ - GradientAtlas not yet implemented"]
     fn test_gradient_atlas_multiple_gradients() {
-        // use style_engine::ColorStop;
-        // let mut atlas = GradientAtlas::new();
-        //
-        // let stops1 = vec![
-        //     ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
-        //     ColorStop::new(1.0, Vec4::new(0.0, 1.0, 0.0, 1.0)),
-        // ];
-        //
-        // let stops2 = vec![
-        //     ColorStop::new(0.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
-        //     ColorStop::new(1.0, Vec4::new(1.0, 1.0, 0.0, 1.0)),
-        // ];
-        //
-        // let row1 = atlas.add_gradient(&stops1);
-        // let row2 = atlas.add_gradient(&stops2);
-        //
-        // assert_eq!(row1, 0);
-        // assert_eq!(row2, 1);
-        // assert_ne!(row1, row2, "Different gradients should use different rows");
+        use style_engine::ColorStop;
+        let mut atlas = GradientAtlas::default();
+
+        let stops1 = vec![
+            ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+            ColorStop::new(1.0, Vec4::new(0.0, 1.0, 0.0, 1.0)),
+        ];
+
+        let stops2 = vec![
+            ColorStop::new(0.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
+            ColorStop::new(1.0, Vec4::new(1.0, 1.0, 0.0, 1.0)),
+        ];
+
+        let row1 = atlas.add_gradient(&stops1);
+        let row2 = atlas.add_gradient(&stops2);
+
+        assert_eq!(row1, 0);
+        assert_eq!(row2, 1);
+        assert_ne!(row1, row2, "Different gradients should use different rows");
     }
 
     // ========================================================================

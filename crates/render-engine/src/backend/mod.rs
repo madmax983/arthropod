@@ -5,8 +5,8 @@ pub mod composition_swap_chain;
 pub mod text;
 pub mod wgpu;
 
-pub use text::{GlyphAtlas, GlyphInstance, TexCoords, TextRenderer};
-pub use wgpu::{PrimitiveInstance, WgpuBackend};
+pub use text::{GlyphAtlas, TexCoords, TextRenderer};
+pub use wgpu::{PathCacheWarmupReport, PrimitiveInstance, TessellationCacheStats, WgpuBackend};
 
 use crate::Scene;
 

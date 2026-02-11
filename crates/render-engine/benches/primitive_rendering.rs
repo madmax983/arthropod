@@ -1,13 +1,20 @@
-//! Benchmarks for Phase 1 Primitive Rendering Pipeline
+//! Benchmarks for Phase 1+2 Primitive Rendering Pipeline
 //!
 //! Performance requirements:
+//! Phase 1:
 //! - 1000 solid primitives: < 200μs
 //! - Scene node operations: < 10μs
-//! - Instance creation: < 100μs for 1000 nodes
+//! Phase 2:
+//! - 1000 gradient primitives: < 400μs
+//! - 1000 stroked primitives: < 300μs
+//! - 1000 shadowed primitives: < 500μs
+//! - 1000 gradient text nodes: < 350μs
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use glam::{Vec2, Vec4};
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Paint, Scene, SceneNode, VisualStyle};
+use render_engine::{Color, ColorStop, NodeContent, Paint, Scene, SceneNode, StrokeStyle, VisualStyle};
+use style_engine::{LinearGradient, StrokeAlign, TextContent};
 
 /// Benchmark creating 1000 scene nodes with solid fills
 fn bench_create_nodes(c: &mut Criterion) {
@@ -207,6 +214,192 @@ fn bench_visual_iterator(c: &mut Criterion) {
     }
 }
 
+/// Benchmark creating nodes with linear gradients (Phase 2)
+fn bench_create_gradient_nodes(c: &mut Criterion) {
+    c.bench_function("create_1000_gradient_nodes", |b| {
+        b.iter(|| {
+            let mut scene = Scene::new();
+            let root = scene.root();
+
+            for i in 0..1000 {
+                let x = (i % 40) as f32 * 25.0;
+                let y = (i / 40) as f32 * 25.0;
+
+                // Real gradient rendering
+                let node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(
+                        VisualStyle::new()
+                            .fill(Paint::Linear(LinearGradient {
+                                start: Vec2::new(0.0, 0.5),
+                                end: Vec2::new(1.0, 0.5),
+                                stops: vec![
+                                    ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                                    ColorStop::new(1.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
+                                ],
+                            }))
+                            .corner_radius(8.0),
+                    ),
+                });
+
+                let node_id = scene.add_node(root, node);
+
+                if let Some(node) = scene.get_node_mut(node_id) {
+                    node.bounds = Rect::new(x, y, 20.0, 20.0);
+                }
+            }
+
+            black_box(scene);
+        });
+    });
+}
+
+/// Benchmark creating nodes with strokes (Phase 2)
+fn bench_create_stroked_nodes(c: &mut Criterion) {
+    c.bench_function("create_1000_stroked_nodes", |b| {
+        b.iter(|| {
+            let mut scene = Scene::new();
+            let root = scene.root();
+
+            for i in 0..1000 {
+                let x = (i % 40) as f32 * 25.0;
+                let y = (i / 40) as f32 * 25.0;
+
+                // Real stroke rendering
+                let node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(
+                        VisualStyle::new()
+                            .solid_fill(Vec4::new(0.95, 0.95, 0.95, 1.0))
+                            .stroke(StrokeStyle::solid(
+                                Paint::Solid(Vec4::new(0.2, 0.4, 0.8, 1.0)),
+                                3.0,
+                                StrokeAlign::Center,
+                            ))
+                            .corner_radius(4.0),
+                    ),
+                });
+
+                let node_id = scene.add_node(root, node);
+
+                if let Some(node) = scene.get_node_mut(node_id) {
+                    node.bounds = Rect::new(x, y, 20.0, 20.0);
+                }
+            }
+
+            black_box(scene);
+        });
+    });
+}
+
+/// Benchmark creating nodes with drop shadows (Phase 2)
+fn bench_create_shadowed_nodes(c: &mut Criterion) {
+    c.bench_function("create_1000_shadowed_nodes", |b| {
+        b.iter(|| {
+            let mut scene = Scene::new();
+            let root = scene.root();
+
+            for i in 0..1000 {
+                let x = (i % 40) as f32 * 25.0;
+                let y = (i / 40) as f32 * 25.0;
+
+                // Real drop shadow rendering
+                let node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(
+                        VisualStyle::new()
+                            .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
+                            .drop_shadow(
+                                Vec2::new(4.0, 4.0),
+                                8.0,
+                                Vec4::new(0.0, 0.0, 0.0, 0.4),
+                            )
+                            .corner_radius(8.0),
+                    ),
+                });
+
+                let node_id = scene.add_node(root, node);
+
+                if let Some(node) = scene.get_node_mut(node_id) {
+                    node.bounds = Rect::new(x, y, 20.0, 20.0);
+                }
+            }
+
+            black_box(scene);
+        });
+    });
+}
+
+/// Benchmark complex VisualStyle creation (gradient + stroke + shadow)
+fn bench_complex_visual_style(c: &mut Criterion) {
+    c.bench_function("create_1000_complex_styles", |b| {
+        b.iter(|| {
+            for _ in 0..1000 {
+                // Real complex style with all Phase 2 features
+                let style = VisualStyle::new()
+                    .fill(Paint::Linear(LinearGradient {
+                        start: Vec2::new(0.0, 0.0),
+                        end: Vec2::new(1.0, 1.0),
+                        stops: vec![
+                            ColorStop::new(0.0, Vec4::new(0.3, 0.5, 1.0, 1.0)),
+                            ColorStop::new(1.0, Vec4::new(0.6, 0.2, 0.9, 1.0)),
+                        ],
+                    }))
+                    .stroke(StrokeStyle::solid(
+                        Paint::Solid(Vec4::new(1.0, 1.0, 1.0, 0.8)),
+                        2.0,
+                        StrokeAlign::Inside,
+                    ))
+                    .drop_shadow(
+                        Vec2::new(4.0, 4.0),
+                        12.0,
+                        Vec4::new(0.0, 0.0, 0.0, 0.4),
+                    )
+                    .corner_radius(12.0)
+                    .opacity(0.95);
+
+                black_box(style);
+            }
+        });
+    });
+}
+
+/// Benchmark creating nodes with gradient text (Phase 2)
+fn bench_create_gradient_text_nodes(c: &mut Criterion) {
+    c.bench_function("create_1000_gradient_text_nodes", |b| {
+        b.iter(|| {
+            let mut scene = Scene::new();
+            let root = scene.root();
+
+            for i in 0..1000 {
+                let x = (i % 40) as f32 * 25.0;
+                let y = (i / 40) as f32 * 25.0;
+
+                // Gradient text with linear gradient (the Phase 2 showstopper!)
+                let node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(
+                        VisualStyle::new()
+                            .fill(Paint::Linear(LinearGradient {
+                                start: Vec2::new(0.0, 0.5),
+                                end: Vec2::new(1.0, 0.5),
+                                stops: vec![
+                                    ColorStop::new(0.0, Vec4::new(1.0, 0.2, 0.2, 1.0)), // Red
+                                    ColorStop::new(1.0, Vec4::new(0.2, 0.4, 1.0, 1.0)), // Blue
+                                ],
+                            }))
+                            .text(TextContent::new("TEXT", 16.0)),
+                    ),
+                });
+
+                let node_id = scene.add_node(root, node);
+
+                if let Some(node) = scene.get_node_mut(node_id) {
+                    node.bounds = Rect::new(x, y, 50.0, 20.0);
+                }
+            }
+
+            black_box(scene);
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_create_nodes,
@@ -216,6 +409,12 @@ criterion_group!(
     bench_visual_style_creation,
     bench_scene_iteration,
     bench_visual_iterator,
+    // Phase 2 benchmarks
+    bench_create_gradient_nodes,
+    bench_create_stroked_nodes,
+    bench_create_shadowed_nodes,
+    bench_complex_visual_style,
+    bench_create_gradient_text_nodes,
 );
 
 criterion_main!(benches);

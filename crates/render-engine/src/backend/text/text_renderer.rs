@@ -1,17 +1,8 @@
 //! Text renderer for generating GPU instances from shaped text
 
 use super::glyph_atlas::GlyphAtlas;
+use crate::backend::wgpu::PrimitiveInstance;
 use text_engine::{ShapedText, TextEngine};
-
-/// GPU glyph instance data
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GlyphInstance {
-    pub pos: [f32; 2],        // Position (x, y)
-    pub size: [f32; 2],       // Size (width, height)
-    pub color: [f32; 4],      // Color (r, g, b, a)
-    pub tex_coords: [f32; 4], // Texture coords (u0, v0, u1, v1)
-}
 
 /// Text renderer manages glyph atlas and instance generation
 pub struct TextRenderer {
@@ -34,7 +25,7 @@ impl TextRenderer {
         shaped: &ShapedText,
         position: glam::Vec2,
         color: glam::Vec4,
-    ) -> Vec<GlyphInstance> {
+    ) -> Vec<PrimitiveInstance> {
         let mut instances = Vec::with_capacity(shaped.glyphs.len());
 
         for glyph in &shaped.glyphs {
@@ -59,12 +50,12 @@ impl TextRenderer {
             let glyph_x = position.x + glyph.x_offset + coords.placement_left as f32;
             let glyph_y = position.y + glyph.y_offset - coords.placement_top as f32;
 
-            instances.push(GlyphInstance {
-                pos: [glyph_x, glyph_y],
-                size: [glyph_width, glyph_height],
-                color: color.to_array(),
-                tex_coords: [coords.u0, coords.v0, coords.u1, coords.v1],
-            });
+            instances.push(PrimitiveInstance::glyph(
+                [glyph_x, glyph_y],
+                [glyph_width, glyph_height],
+                color.to_array(),
+                [coords.u0, coords.v0, coords.u1, coords.v1],
+            ));
         }
 
         instances

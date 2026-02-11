@@ -16,10 +16,10 @@ pub use blend::BlendMode;
 pub use corner::CornerRadii;
 pub use effect::{BackgroundBlur, DropShadow, Effect, InnerShadow, LayerBlur};
 pub use paint::{
-    AngularGradient, Color, ColorStop, DiamondGradient, ImageFill, ImageId, ImageScaleMode,
-    LinearGradient, Paint, RadialGradient,
+    AngularGradient, Color, ColorStop, DiamondGradient, GradientInterpolationMode, ImageFill,
+    ImageId, ImageScaleMode, LinearGradient, Paint, RadialGradient,
 };
-pub use path::{PathCommand, VectorPath, WindingRule};
+pub use path::{BooleanOp, PathCommand, SvgParseOptions, VectorPath, VectorPathError, WindingRule};
 pub use stroke::{SideWeights, StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle};
 pub use text::{FontStyle, LineHeight, TextAlign, TextContent, TextDecoration};
 pub use visual::VisualStyle;

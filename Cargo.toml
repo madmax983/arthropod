@@ -129,6 +129,10 @@ path = "examples/directcomposition_demo.rs"
 name = "hello_world"
 path = "examples/hello_world.rs"
 
+[[example]]
+name = "phase3_path_smoke"
+path = "examples/phase3_path_smoke.rs"
+
 [features]
 nova = ["arthropod/nova"]
 
@@ -140,6 +144,7 @@ anim-graph = { path = "crates/anim-graph" }
 widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
 text-engine = { path = "crates/text-engine" }
+style-engine = { path = "crates/style-engine" }
 glam = "0.29"
 arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }

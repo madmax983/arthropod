@@ -19,14 +19,20 @@ pub struct VisualStyle {
     pub effects: Vec<Effect>,
     /// Corner radii (for rectangles)
     pub corner_radii: CornerRadii,
+    /// Corner smoothing (0.0 = circular corners, 1.0 = superellipse-like)
+    pub corner_smoothing: f32,
     /// Opacity (0.0 to 1.0)
     pub opacity: f32,
     /// Blend mode
     pub blend_mode: BlendMode,
+    /// Whether children should be clipped to this node's bounds
+    pub clips_content: bool,
     /// Text content (for text nodes)
     pub text: Option<TextContent>,
-    /// Vector path (for custom shapes)
-    pub path: Option<VectorPath>,
+    /// Fill geometry for custom vector shapes (None = rectangle)
+    pub fill_geometry: Option<Vec<VectorPath>>,
+    /// Stroke geometry for custom vector shapes (None = use fill geometry)
+    pub stroke_geometry: Option<Vec<VectorPath>>,
 }
 
 impl Default for VisualStyle {
@@ -36,10 +42,13 @@ impl Default for VisualStyle {
             stroke: None,
             effects: Vec::new(),
             corner_radii: CornerRadii::ZERO,
+            corner_smoothing: 0.0,
             opacity: 1.0,
             blend_mode: BlendMode::default(),
+            clips_content: false,
             text: None,
-            path: None,
+            fill_geometry: None,
+            stroke_geometry: None,
         }
     }
 }
@@ -71,6 +80,12 @@ impl VisualStyle {
     /// Set corner radii (per-corner)
     pub fn corner_radii(mut self, radii: CornerRadii) -> Self {
         self.corner_radii = radii;
+        self
+    }
+
+    /// Set corner smoothing amount
+    pub fn corner_smoothing(mut self, amount: f32) -> Self {
+        self.corner_smoothing = amount.clamp(0.0, 1.0);
         self
     }
 
@@ -110,9 +125,27 @@ impl VisualStyle {
         self
     }
 
+    /// Set whether this node clips child content to its bounds
+    pub fn clips_content(mut self, clips: bool) -> Self {
+        self.clips_content = clips;
+        self
+    }
+
+    /// Set fill geometry paths
+    pub fn fill_geometry(mut self, geometry: Vec<VectorPath>) -> Self {
+        self.fill_geometry = Some(geometry);
+        self
+    }
+
+    /// Set stroke geometry paths
+    pub fn stroke_geometry(mut self, geometry: Vec<VectorPath>) -> Self {
+        self.stroke_geometry = Some(geometry);
+        self
+    }
+
     /// Set vector path
     pub fn path(mut self, path: VectorPath) -> Self {
-        self.path = Some(path);
+        self.fill_geometry = Some(vec![path]);
         self
     }
 }
@@ -154,9 +187,13 @@ mod tests {
             "should have no effects by default"
         );
         assert_eq!(style.corner_radii, CornerRadii::ZERO);
+        assert_eq!(style.corner_smoothing, 0.0);
         assert_eq!(style.opacity, 1.0);
         assert_eq!(style.blend_mode, BlendMode::Normal);
+        assert!(!style.clips_content);
         assert!(style.text.is_none());
+        assert!(style.fill_geometry.is_none());
+        assert!(style.stroke_geometry.is_none());
     }
 
     #[test]
@@ -177,6 +214,12 @@ mod tests {
 
         assert_eq!(style.corner_radii, CornerRadii::uniform(12.0));
         assert!(style.corner_radii.is_uniform());
+    }
+
+    #[test]
+    fn test_builder_corner_smoothing_clamps() {
+        let style = VisualStyle::new().corner_smoothing(1.5);
+        assert_eq!(style.corner_smoothing, 1.0);
     }
 
     #[test]
@@ -209,6 +252,12 @@ mod tests {
 
         assert!(style.text.is_some());
         assert_eq!(style.text.unwrap(), text_content);
+    }
+
+    #[test]
+    fn test_builder_clips_content() {
+        let style = VisualStyle::new().clips_content(true);
+        assert!(style.clips_content);
     }
 
     #[test]

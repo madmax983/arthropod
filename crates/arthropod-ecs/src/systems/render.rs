@@ -16,7 +16,7 @@ pub struct RenderCommands(pub Vec<PrimitiveInstance>);
 /// Collect all visible renderables into GPU instances
 ///
 /// This system queries all entities marked as Renderable, fetches their
-/// corresponding scene nodes, and generates RectInstances for the GPU backend.
+/// corresponding scene nodes, and generates PrimitiveInstances for the GPU backend.
 /// Invisible nodes and nodes with zero opacity are filtered out.
 ///
 /// Uses adaptive thresholds to decide between parallel and sequential collection.

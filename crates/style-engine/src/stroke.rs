@@ -76,8 +76,8 @@ impl SideWeights {
 /// Stroke style
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StrokeStyle {
-    /// Stroke paint
-    pub paint: Paint,
+    /// Stroke paints (applied bottom-to-top)
+    pub paints: Vec<Paint>,
     /// Stroke weight (width)
     pub weight: f32,
     /// Stroke alignment
@@ -99,7 +99,7 @@ pub struct StrokeStyle {
 impl Default for StrokeStyle {
     fn default() -> Self {
         Self {
-            paint: Paint::solid(glam::Vec4::ZERO),
+            paints: Vec::new(),
             weight: 0.0,
             align: StrokeAlign::default(),
             cap: StrokeCap::default(),
@@ -116,11 +116,16 @@ impl StrokeStyle {
     /// Create a solid stroke with specified color, weight, and alignment
     pub fn solid(paint: Paint, weight: f32, align: StrokeAlign) -> Self {
         Self {
-            paint,
+            paints: vec![paint],
             weight,
             align,
             ..Default::default()
         }
+    }
+
+    /// Return the top-most stroke paint, if any.
+    pub fn top_paint(&self) -> Option<&Paint> {
+        self.paints.last()
     }
 }
 
@@ -143,7 +148,8 @@ mod tests {
         let black = Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0));
         let stroke = StrokeStyle::solid(black.clone(), 2.0, StrokeAlign::Inside);
 
-        assert_eq!(stroke.paint, black);
+        assert_eq!(stroke.paints, vec![black.clone()]);
+        assert_eq!(stroke.top_paint(), Some(&black));
         assert_eq!(stroke.weight, 2.0);
         assert_eq!(stroke.align, StrokeAlign::Inside);
     }

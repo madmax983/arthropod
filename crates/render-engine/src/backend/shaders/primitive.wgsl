@@ -19,9 +19,24 @@ struct Globals {
 @group(0) @binding(0)
 var<uniform> globals: Globals;
 
-// Group 1: Gradient atlas (TODO: Step 11)
-// @group(1) @binding(0) var gradient_texture: texture_2d<f32>;
-// @group(1) @binding(1) var gradient_sampler: sampler;
+// Group 1: Gradient atlas
+@group(1) @binding(0)
+var gradient_texture: texture_2d<f32>;
+
+@group(1) @binding(1)
+var gradient_sampler: sampler;
+
+// Per-gradient parameters (indexed via instance gradient_params)
+struct GradientParams {
+    start: vec2<f32>,           // Gradient start point (normalized 0-1 within rect)
+    end: vec2<f32>,             // Gradient end point (normalized 0-1 within rect)
+    atlas_row: f32,             // Row in gradient atlas (normalized v coord)
+    gradient_type: u32,         // 0=linear, 1=radial, 2=angular, 3=diamond
+    _padding: vec2<f32>,
+}
+
+@group(1) @binding(2)
+var<storage, read> gradient_params_buffer: array<GradientParams>;
 
 // Group 2: Glyph atlas (moved from old glyph shader)
 @group(2) @binding(0)
@@ -55,9 +70,11 @@ struct VertexOutput {
     @location(1) local_pos: vec2<f32>,     // Position within primitive (0..size)
     @location(2) prim_size: vec2<f32>,     // Primitive dimensions
     @location(3) corner_radii: vec4<f32>,  // Per-corner radii
-    @location(4) tex_coord: vec2<f32>,     // Glyph texture coordinates
-    @location(5) stroke_params: vec2<f32>, // Stroke parameters
-    @location(6) flags: u32,               // Bitflags
+    @location(4) gradient_params: vec4<f32>, // Gradient parameters
+    @location(5) tex_coord: vec2<f32>,     // Glyph texture coordinates
+    @location(6) stroke_params: vec2<f32>, // Stroke parameters
+    @location(7) flags: u32,               // Bitflags
+    @location(8) world_pos: vec2<f32>,     // Fragment position in scene space
 }
 
 // ============================================================================
@@ -118,6 +135,100 @@ fn has_stroke(flags: u32) -> bool {
     return (flags & (1u << 4u)) != 0u;
 }
 
+fn is_shadow(flags: u32) -> bool {
+    return (flags & (1u << 31u)) != 0u;
+}
+
+fn get_fill_type(flags: u32) -> u32 {
+    return flags & 0xFu;  // bits 0-3
+}
+
+fn get_gradient_index(gradient_params: vec4<f32>) -> u32 {
+    return u32(gradient_params.x);
+}
+
+// ============================================================================
+// Shadow Rendering
+// ============================================================================
+
+/// Render drop shadow with SDF-based blur approximation.
+/// This is the fast path for small blur radii (< 20px).
+/// For larger blurs, Phase 4's multi-pass Gaussian blur is used.
+///
+/// # Parameters
+/// - dist: Signed distance from the SDF boundary
+/// - blur_radius: Shadow blur radius in pixels
+///
+/// # Returns
+/// Alpha value for the shadow at this distance
+fn shadow_alpha(dist: f32, blur_radius: f32) -> f32 {
+    // Approximate gaussian blur with smoothstep
+    // Shadow is visible where dist < blur_radius
+    // Smooth falloff from -blur_radius to +blur_radius
+    return 1.0 - smoothstep(-blur_radius, blur_radius, dist);
+}
+
+// ============================================================================
+// Gradient Sampling
+// ============================================================================
+
+/// Sample a gradient color from the gradient atlas LUT.
+/// uv: Position within primitive (0-1 range)
+/// params: Gradient parameters from storage buffer
+fn sample_gradient(uv: vec2<f32>, params: GradientParams) -> vec4<f32> {
+    // Compute gradient position t (0.0 to 1.0) based on gradient type
+    var t: f32;
+
+    switch params.gradient_type {
+        case 0u: {
+            // Linear gradient: dot product along axis
+            let dir = params.end - params.start;
+            let dir_len_sq = dot(dir, dir);
+            if dir_len_sq < 0.0001 {
+                // Degenerate gradient (start == end): use start color
+                t = 0.0;
+            } else {
+                t = clamp(dot(uv - params.start, dir) / dir_len_sq, 0.0, 1.0);
+            }
+        }
+        case 1u: {
+            // Radial gradient: distance from center
+            let radius = length(params.end - params.start);
+            if radius < 0.0001 {
+                // Degenerate gradient (zero radius): use start color
+                t = 0.0;
+            } else {
+                t = clamp(length(uv - params.start) / radius, 0.0, 1.0);
+            }
+        }
+        case 2u: {
+            // Angular gradient: sweep around center (0-360 degrees)
+            let d = uv - params.start;
+            // atan2 returns [-π, π], normalize to [0, 1]
+            t = (atan2(d.y, d.x) + 3.14159265) / (2.0 * 3.14159265);
+        }
+        case 3u, default: {
+            // Diamond gradient: Manhattan distance (Figma-specific)
+            let d = abs(uv - params.start);
+            let scale = abs(params.end - params.start);
+            if all(scale < vec2<f32>(0.0001)) {
+                // Degenerate gradient: use start color
+                t = 0.0;
+            } else {
+                // Manhattan distance normalized by scale
+                let dist_x = select(0.0, d.x / scale.x, scale.x > 0.0001);
+                let dist_y = select(0.0, d.y / scale.y, scale.y > 0.0001);
+                t = clamp(dist_x + dist_y, 0.0, 1.0);
+            }
+        }
+    }
+
+    // Sample from gradient atlas LUT
+    // x: gradient position (0-1), y: atlas row (normalized v coordinate)
+    let atlas_uv = vec2<f32>(t, params.atlas_row);
+    return textureSample(gradient_texture, gradient_sampler, atlas_uv);
+}
+
 // ============================================================================
 // Vertex Shader
 // ============================================================================
@@ -138,8 +249,10 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     out.local_pos = unit_pos * input.size;
     out.prim_size = input.size;
     out.corner_radii = input.corner_radii;
+    out.gradient_params = input.gradient_params;
     out.stroke_params = input.stroke_params;
     out.flags = input.flags;
+    out.world_pos = input.pos + unit_pos * input.size;
 
     // Interpolate texture coordinates for glyphs
     let u = mix(input.tex_coords.x, input.tex_coords.z, unit_pos.x);
@@ -155,13 +268,68 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    var final_color = input.color;
+    // Determine fill color: solid or gradient
+    let fill_type = get_fill_type(input.flags);
+    var base_color: vec4<f32>;
+
+    if fill_type == 0u {
+        // Solid fill
+        base_color = input.color;
+    } else {
+        // Gradient fill (linear=1, radial=2, angular=3, diamond=4)
+        // Get gradient parameters from storage buffer
+        let gradient_index = get_gradient_index(input.gradient_params);
+        let params = gradient_params_buffer[gradient_index];
+
+        // Compute UV in normalized rect space (0-1).
+        // For glyphs, map against the parent text node bounds:
+        // - gradient_params.yz = text x/y
+        // - gradient_params.w = text width
+        // - stroke_params.x = text height
+        // For shapes, map against primitive local size.
+        var uv: vec2<f32>;
+        if is_glyph(input.flags) {
+            let text_pos = input.gradient_params.yz;
+            let text_size = max(vec2<f32>(input.gradient_params.w, input.stroke_params.x), vec2<f32>(1.0, 1.0));
+            uv = clamp((input.world_pos - text_pos) / text_size, vec2<f32>(0.0), vec2<f32>(1.0));
+        } else {
+            uv = input.local_pos / input.prim_size;
+        }
+        base_color = sample_gradient(uv, params);
+
+        // Apply instance color alpha (for opacity control)
+        base_color = vec4<f32>(base_color.rgb, base_color.a * input.color.a);
+    }
+
+    var final_color = base_color;
 
     // Branch: Glyph rendering (text)
     if is_glyph(input.flags) {
         // Sample glyph atlas texture
         let alpha = textureSample(glyph_texture, glyph_sampler, input.tex_coord).r;
+        // Gradient text: multiply glyph alpha with gradient color
         return vec4<f32>(final_color.rgb, final_color.a * alpha);
+    }
+
+    // Branch: Shadow rendering
+    if is_shadow(input.flags) {
+        // Compute SDF from center of rectangle
+        let half_size = input.prim_size * 0.5;
+        let centered_pos = input.local_pos - half_size;
+
+        // Clamp radii so they don't exceed half the smallest dimension
+        let max_radius = min(input.prim_size.x, input.prim_size.y) * 0.5;
+        let clamped_radii = min(input.corner_radii, vec4<f32>(max_radius));
+
+        let dist = rounded_rect_sdf_4(centered_pos, half_size, clamped_radii);
+
+        // Get blur radius from stroke_params[0] (shadows don't use stroke)
+        let blur_radius = input.stroke_params.x;
+
+        // Apply shadow blur
+        let shadow_alpha_value = shadow_alpha(dist, blur_radius);
+
+        return vec4<f32>(final_color.rgb, final_color.a * shadow_alpha_value);
     }
 
     // Branch: Shape rendering (rectangles, gradients, strokes)
