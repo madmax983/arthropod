@@ -1179,3 +1179,14 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo check --example phase4_visual_web --target wasm32-unknown-unknown --features web` -> PASS
   - `npm run visual:test:chromium` -> PASS (3 skipped due WebGPU unavailable in this runtime)
   - `npm run visual:test:firefox` -> PASS (3 skipped due WebGPU unavailable in this runtime)
+
+### 2026-02-12 (continuation verification on current head)
+
+- Goal:
+  - Re-verify the key desktop + web Phase 4/5 gates after latest commits.
+- Verification:
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS (2/2)
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (1/1)
+  - `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture` -> PASS (5/5)
+  - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `npm run visual:test` -> PASS (6 skipped due WebGPU unavailable in this runtime)
