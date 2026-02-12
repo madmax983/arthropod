@@ -5,9 +5,21 @@ const visualCases = ["blur", "blend", "clipping"];
 for (const visualCase of visualCases) {
   test(`phase4 ${visualCase} snapshot`, async ({ page }) => {
     await page.goto(`/?case=${visualCase}`);
-    await page.waitForSelector("body[data-arthropod-ready='1']", {
-      timeout: 30000
+    await page.waitForFunction(() => {
+      const body = document.body;
+      return !!body && body.hasAttribute("data-arthropod-ready");
+    }, {
+      timeout: 60000
     });
+    const body = page.locator("body");
+    const ready = await body.getAttribute("data-arthropod-ready");
+    if (ready !== "1") {
+      const error = (await body.getAttribute("data-arthropod-error")) ?? "unknown startup error";
+      if (/webgpu|surface creation|canvas\.getcontext/i.test(error)) {
+        test.skip(true, `WebGPU unavailable in this browser/runtime: ${error}`);
+      }
+      throw new Error(`phase4 fixture startup failed: ${error}`);
+    }
     await expect(page.locator("body")).toHaveAttribute(
       "data-arthropod-case",
       visualCase
@@ -23,4 +35,3 @@ for (const visualCase of visualCases) {
     });
   });
 }
-

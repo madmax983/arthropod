@@ -96,9 +96,9 @@ mod wasm_app {
     }
 
     fn log_startup_failure(stage: &str, error: &str) {
-        console::error_1(
-            &format!("phase4_visual_web startup failed during {stage}: {error}").into(),
-        );
+        let message = format!("phase4_visual_web startup failed during {stage}: {error}");
+        console::error_1(&message.clone().into());
+        set_error_marker(&message);
     }
 
     fn set_ready_marker(case: VisualCase) {
@@ -114,6 +114,20 @@ mod wasm_app {
 
         let _ = body.set_attribute("data-arthropod-ready", "1");
         let _ = body.set_attribute("data-arthropod-case", case.as_str());
+    }
+
+    fn set_error_marker(message: &str) {
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let Some(document) = window.document() else {
+            return;
+        };
+        let Some(body) = document.body() else {
+            return;
+        };
+        let _ = body.set_attribute("data-arthropod-ready", "0");
+        let _ = body.set_attribute("data-arthropod-error", message);
     }
 
     impl Phase4VisualApp {

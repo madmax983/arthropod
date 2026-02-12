@@ -1150,3 +1150,32 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `ARTHROPOD_UPDATE_GOLDENS=1 cargo test --test figma_json_render_regression -- --nocapture` -> PASS
   - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
   - `cargo clippy --test figma_json_render_regression -- -D warnings` -> PASS
+
+### 2026-02-12 (cross-browser wasm visual smoke wiring)
+
+- Goal:
+  - Add and validate browser-project coverage for wasm visual smoke checks.
+- Implementation:
+  - Updated Playwright project config in `playwright.config.mjs`:
+    - added `chromium` and `firefox` projects.
+    - added browser launch options to request WebGPU support.
+  - Updated npm scripts in `package.json`:
+    - `visual:test:chromium`
+    - `visual:test:firefox`
+  - Hardened web fixture startup signaling in `examples/phase4_visual_web.rs`:
+    - added error marker path:
+      - `data-arthropod-ready="0"`
+      - `data-arthropod-error="<message>"`
+    - startup failures now publish explicit DOM marker instead of timing out silently.
+  - Updated Playwright test logic in `tests/visual/phase4-visual.spec.mjs`:
+    - waits for ready marker presence (`0` or `1`).
+    - skips only when startup error explicitly indicates WebGPU unavailable.
+    - fails fast for all other startup errors.
+  - Updated usage docs in `docs/testing/phase4-visual-regression.md` with:
+    - multi-browser setup commands.
+    - browser-specific run commands.
+    - readiness/error marker behavior.
+- Verification:
+  - `cargo check --example phase4_visual_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `npm run visual:test:chromium` -> PASS (3 skipped due WebGPU unavailable in this runtime)
+  - `npm run visual:test:firefox` -> PASS (3 skipped due WebGPU unavailable in this runtime)

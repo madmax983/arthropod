@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "visual:test": "playwright test tests/visual/phase4-visual.spec.mjs",
-    "visual:update": "playwright test tests/visual/phase4-visual.spec.mjs --update-snapshots"
+    "visual:update": "playwright test tests/visual/phase4-visual.spec.mjs --update-snapshots",
+    "visual:test:chromium": "playwright test tests/visual/phase4-visual.spec.mjs --project=chromium",
+    "visual:test:firefox": "playwright test tests/visual/phase4-visual.spec.mjs --project=firefox"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1"
   }
 }
-

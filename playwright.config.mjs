@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "tests/visual",
@@ -18,6 +18,28 @@ export default defineConfig({
     url: "http://127.0.0.1:8090",
     timeout: 180000,
     reuseExistingServer: true
-  }
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: ["--enable-unsafe-webgpu"]
+        }
+      }
+    },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        launchOptions: {
+          firefoxUserPrefs: {
+            "dom.webgpu.enabled": true,
+            "gfx.webrender.all": true
+          }
+        }
+      }
+    }
+  ]
 });
-

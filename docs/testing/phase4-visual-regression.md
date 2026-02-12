@@ -8,11 +8,16 @@ This harness captures deterministic browser screenshots for the Phase 4 effect f
 
 It runs against the wasm example `phase4_visual_web` and compares `#arthropod-canvas` output against committed baselines.
 
+Configured browser projects:
+
+- Chromium (`Desktop Chrome`)
+- Firefox (`Desktop Firefox`)
+
 ## Setup
 
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install chromium firefox
 ```
 
 ## Update Baselines
@@ -29,6 +34,13 @@ This writes snapshots under:
 
 ```bash
 npm run visual:test
+```
+
+Run browser-specific checks:
+
+```bash
+npm run visual:test:chromium
+npm run visual:test:firefox
 ```
 
 ## Fixture App
@@ -50,3 +62,9 @@ On first successful frame, the app sets:
 
 Playwright waits for these markers before snapshot capture.
 
+If WebGPU is unavailable for a browser/runtime, the fixture sets:
+
+- `body[data-arthropod-ready="0"]`
+- `body[data-arthropod-error="<message>"]`
+
+The Playwright test skips that browser project only for explicit WebGPU-unavailable startup errors, and fails for all other startup errors.
