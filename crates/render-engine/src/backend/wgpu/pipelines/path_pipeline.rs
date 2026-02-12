@@ -285,21 +285,23 @@ fn push_batch_vertex(
     idx
 }
 
+struct ImageSampleTriangle {
+    positions: [glam::Vec2; 3],
+    normals: [glam::Vec2; 3],
+}
+
 fn append_subdivided_image_triangle(
     batch: &PathBatch,
     vertices: &mut Vec<PathGpuVertex>,
     indices: &mut Vec<u32>,
     size: glam::Vec2,
     subdivision_steps: u32,
-    p0: glam::Vec2,
-    p1: glam::Vec2,
-    p2: glam::Vec2,
-    n0: glam::Vec2,
-    n1: glam::Vec2,
-    n2: glam::Vec2,
+    triangle: &ImageSampleTriangle,
 ) {
     let steps = subdivision_steps.max(1);
     let mut row_indices: Vec<Vec<u32>> = Vec::with_capacity((steps + 1) as usize);
+    let [p0, p1, p2] = triangle.positions;
+    let [n0, n1, n2] = triangle.normals;
 
     for row in 0..=steps {
         let row_t = row as f32 / steps as f32;
@@ -359,18 +361,25 @@ fn append_batch_geometry(
             let va = batch.mesh.vertices[ia];
             let vb = batch.mesh.vertices[ib];
             let vc = batch.mesh.vertices[ic];
+            let triangle = ImageSampleTriangle {
+                positions: [
+                    glam::Vec2::from(va.position),
+                    glam::Vec2::from(vb.position),
+                    glam::Vec2::from(vc.position),
+                ],
+                normals: [
+                    glam::Vec2::from(va.normal),
+                    glam::Vec2::from(vb.normal),
+                    glam::Vec2::from(vc.normal),
+                ],
+            };
             append_subdivided_image_triangle(
                 batch,
                 vertices,
                 indices,
                 size,
                 subdivision_steps,
-                glam::Vec2::from(va.position),
-                glam::Vec2::from(vb.position),
-                glam::Vec2::from(vc.position),
-                glam::Vec2::from(va.normal),
-                glam::Vec2::from(vb.normal),
-                glam::Vec2::from(vc.normal),
+                &triangle,
             );
         }
         return;

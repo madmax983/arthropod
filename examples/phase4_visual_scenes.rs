@@ -371,3 +371,6 @@ pub fn build_phase4_image_scene() -> Scene {
 
     scene
 }
+
+#[allow(dead_code)]
+fn main() {}
