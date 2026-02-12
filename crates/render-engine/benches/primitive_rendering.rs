@@ -13,7 +13,9 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use glam::{Vec2, Vec4};
 use plat_core::Rect;
-use render_engine::{Color, ColorStop, NodeContent, Paint, Scene, SceneNode, StrokeStyle, VisualStyle};
+use render_engine::{
+    Color, ColorStop, NodeContent, Paint, Scene, SceneNode, StrokeStyle, VisualStyle,
+};
 use style_engine::{LinearGradient, StrokeAlign, TextContent};
 
 /// Benchmark creating 1000 scene nodes with solid fills
@@ -306,11 +308,7 @@ fn bench_create_shadowed_nodes(c: &mut Criterion) {
                     style: Box::new(
                         VisualStyle::new()
                             .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
-                            .drop_shadow(
-                                Vec2::new(4.0, 4.0),
-                                8.0,
-                                Vec4::new(0.0, 0.0, 0.0, 0.4),
-                            )
+                            .drop_shadow(Vec2::new(4.0, 4.0), 8.0, Vec4::new(0.0, 0.0, 0.0, 0.4))
                             .corner_radius(8.0),
                     ),
                 });
@@ -347,11 +345,7 @@ fn bench_complex_visual_style(c: &mut Criterion) {
                         2.0,
                         StrokeAlign::Inside,
                     ))
-                    .drop_shadow(
-                        Vec2::new(4.0, 4.0),
-                        12.0,
-                        Vec4::new(0.0, 0.0, 0.0, 0.4),
-                    )
+                    .drop_shadow(Vec2::new(4.0, 4.0), 12.0, Vec4::new(0.0, 0.0, 0.0, 0.4))
                     .corner_radius(12.0)
                     .opacity(0.95);
 

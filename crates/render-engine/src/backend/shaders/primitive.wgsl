@@ -73,7 +73,7 @@ struct VertexOutput {
     @location(4) gradient_params: vec4<f32>, // Gradient parameters
     @location(5) tex_coord: vec2<f32>,     // Glyph texture coordinates
     @location(6) stroke_params: vec2<f32>, // Stroke parameters
-    @location(7) flags: u32,               // Bitflags
+    @location(7) @interpolate(flat) flags: u32, // Bitflags (must be flat for integral varyings)
     @location(8) world_pos: vec2<f32>,     // Fragment position in scene space
 }
 
@@ -226,7 +226,8 @@ fn sample_gradient(uv: vec2<f32>, params: GradientParams) -> vec4<f32> {
     // Sample from gradient atlas LUT
     // x: gradient position (0-1), y: atlas row (normalized v coordinate)
     let atlas_uv = vec2<f32>(t, params.atlas_row);
-    return textureSample(gradient_texture, gradient_sampler, atlas_uv);
+    // Use explicit LOD to avoid derivative/uniform-control-flow constraints on WebGPU.
+    return textureSampleLevel(gradient_texture, gradient_sampler, atlas_uv, 0.0);
 }
 
 // ============================================================================
@@ -306,7 +307,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Branch: Glyph rendering (text)
     if is_glyph(input.flags) {
         // Sample glyph atlas texture
-        let alpha = textureSample(glyph_texture, glyph_sampler, input.tex_coord).r;
+        // Use explicit LOD because glyph path is selected via non-uniform instance flags.
+        let alpha = textureSampleLevel(glyph_texture, glyph_sampler, input.tex_coord, 0.0).r;
         // Gradient text: multiply glyph alpha with gradient color
         return vec4<f32>(final_color.rgb, final_color.a * alpha);
     }

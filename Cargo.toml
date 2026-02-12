@@ -114,6 +114,18 @@ name = "widget_gallery"
 path = "examples/widget_gallery.rs"
 
 [[example]]
+name = "widget_gallery_web"
+path = "examples/widget_gallery_web.rs"
+
+[[example]]
+name = "phase4_visual_web"
+path = "examples/phase4_visual_web.rs"
+
+[[example]]
+name = "capture_phase4_visuals"
+path = "examples/capture_phase4_visuals.rs"
+
+[[example]]
 name = "macro_demo"
 path = "examples/macro_demo.rs"
 
@@ -133,22 +145,34 @@ path = "examples/hello_world.rs"
 name = "phase3_path_smoke"
 path = "examples/phase3_path_smoke.rs"
 
+[[example]]
+name = "visual_test_phase4_blur"
+path = "examples/visual_test_phase4_blur.rs"
+
+[[example]]
+name = "visual_test_phase4_blend"
+path = "examples/visual_test_phase4_blend.rs"
+
+[[example]]
+name = "visual_test_phase4_clipping"
+path = "examples/visual_test_phase4_clipping.rs"
+
 [features]
+default = ["native"]
+native = ["plat-core/native", "render-engine/native"]
+web = ["plat-core/web", "render-engine/web"]
 nova = ["arthropod/nova"]
 
 [dependencies]
-arthropod = { path = "crates/arthropod" }
 plat-core = { path = "crates/plat-core" }
-render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
+render-engine = { path = "crates/render-engine" }
 anim-graph = { path = "crates/anim-graph" }
 widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
 text-engine = { path = "crates/text-engine" }
 style-engine = { path = "crates/style-engine" }
 glam = "0.29"
-arthropod-test = { path = "crates/arthropod-test" }
 arthropod-ecs = { path = "crates/arthropod-ecs" }
-arthropod-mcp = { path = "crates/arthropod-mcp" }
 a11y-engine = { path = "crates/a11y-engine" }
 theme-engine = { path = "crates/theme-engine" }
 env_logger.workspace = true
@@ -156,6 +180,18 @@ tracing.workspace = true
 serde_json = "1.0"
 tracing-subscriber.workspace = true
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+arthropod = { path = "crates/arthropod" }
+render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
+arthropod-mcp = { path = "crates/arthropod-mcp" }
+arthropod-test = { path = "crates/arthropod-test" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["console", "Window", "Document", "Location", "HtmlElement"] }
+console_error_panic_hook = "0.1"
+wasm-bindgen-futures = "0.4"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 ratatui = "0.30"
 crossterm = "0.28"

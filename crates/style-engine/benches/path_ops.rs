@@ -23,7 +23,12 @@ fn regular_polygon_path(sides: usize, radius: f32) -> VectorPath {
     path
 }
 
-fn concentric_donut_path(outer_sides: usize, inner_sides: usize, outer_r: f32, inner_r: f32) -> VectorPath {
+fn concentric_donut_path(
+    outer_sides: usize,
+    inner_sides: usize,
+    outer_r: f32,
+    inner_r: f32,
+) -> VectorPath {
     let mut path = regular_polygon_path(outer_sides, outer_r);
 
     let two_pi = std::f32::consts::TAU;
@@ -66,9 +71,8 @@ fn bench_boolean_ops(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("subtract", sides), &sides, |bench, _| {
             bench.iter(|| {
-                let out =
-                    VectorPath::boolean_op(black_box(&a), black_box(&b), BooleanOp::Subtract)
-                        .expect("subtract should succeed");
+                let out = VectorPath::boolean_op(black_box(&a), black_box(&b), BooleanOp::Subtract)
+                    .expect("subtract should succeed");
                 black_box(out.commands.len());
             });
         });
@@ -100,11 +104,17 @@ fn bench_svg_parse(c: &mut Criterion) {
     let d = "M 20 20 C 20 10 45 10 45 20 S 70 30 70 20 A 20 20 0 0 1 110 20 L 130 40 Q 150 60 130 80 T 90 110 Z";
     c.bench_function("svg_parse_complex_path_d", |bench| {
         bench.iter(|| {
-            let path = VectorPath::from_svg_path_data(black_box(d)).expect("svg parse should succeed");
+            let path =
+                VectorPath::from_svg_path_data(black_box(d)).expect("svg parse should succeed");
             black_box(path.commands.len());
         });
     });
 }
 
-criterion_group!(benches, bench_boolean_ops, bench_contains_point, bench_svg_parse);
+criterion_group!(
+    benches,
+    bench_boolean_ops,
+    bench_contains_point,
+    bench_svg_parse
+);
 criterion_main!(benches);

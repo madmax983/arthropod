@@ -18,9 +18,9 @@ use plat_core::{
     WindowId,
 };
 use render_engine::{
-    backend::{RenderBackend, WgpuBackend},
     Color, ColorStop, CornerRadii, NodeContent, NodeId, Paint, Scene, SceneNode, StrokeStyle,
     VisualStyle,
+    backend::{RenderBackend, WgpuBackend},
 };
 
 // Import gradient types, StrokeAlign, and TextContent from style_engine
@@ -181,8 +181,7 @@ fn create_gradient_row(scene: &mut Scene, root: NodeId, y: f32) {
         ),
     });
     let vgrad_id = scene.add_node(root, vertical_grad);
-    scene.get_node_mut(vgrad_id).unwrap().bounds =
-        Rect::new(x_start + spacing, y, width, height);
+    scene.get_node_mut(vgrad_id).unwrap().bounds = Rect::new(x_start + spacing, y, width, height);
 
     // 3. Diagonal gradient (purple → orange)
     let diagonal_grad = SceneNode::new(NodeContent::Styled {
@@ -211,10 +210,10 @@ fn create_gradient_row(scene: &mut Scene, root: NodeId, y: f32) {
                     start: Vec2::new(0.0, 0.5),
                     end: Vec2::new(1.0, 0.5),
                     stops: vec![
-                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),   // Red
-                        ColorStop::new(0.33, Vec4::new(0.0, 1.0, 0.0, 1.0)),  // Green
-                        ColorStop::new(0.66, Vec4::new(0.0, 0.0, 1.0, 1.0)),  // Blue
-                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 1.0, 1.0)),   // Magenta
+                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)), // Red
+                        ColorStop::new(0.33, Vec4::new(0.0, 1.0, 0.0, 1.0)), // Green
+                        ColorStop::new(0.66, Vec4::new(0.0, 0.0, 1.0, 1.0)), // Blue
+                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 1.0, 1.0)), // Magenta
                     ],
                 }))
                 .corner_radius(8.0),
@@ -277,10 +276,10 @@ fn create_radial_angular_row(scene: &mut Scene, root: NodeId, y: f32) {
                     center: Vec2::new(0.5, 0.5),
                     angle: 0.0,
                     stops: vec![
-                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),   // Red
-                        ColorStop::new(0.33, Vec4::new(0.0, 1.0, 0.0, 1.0)),  // Green
-                        ColorStop::new(0.66, Vec4::new(0.0, 0.0, 1.0, 1.0)),  // Blue
-                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),   // Red (wrap)
+                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)), // Red
+                        ColorStop::new(0.33, Vec4::new(0.0, 1.0, 0.0, 1.0)), // Green
+                        ColorStop::new(0.66, Vec4::new(0.0, 0.0, 1.0, 1.0)), // Blue
+                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 0.0, 1.0)), // Red (wrap)
                     ],
                 }))
                 .corner_radius(8.0),
@@ -404,11 +403,7 @@ fn create_shadow_row(scene: &mut Scene, root: NodeId, y: f32) {
         style: Box::new(
             VisualStyle::new()
                 .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
-                .drop_shadow(
-                    Vec2::new(4.0, 4.0),
-                    8.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.4),
-                )
+                .drop_shadow(Vec2::new(4.0, 4.0), 8.0, Vec4::new(0.0, 0.0, 0.0, 0.4))
                 .corner_radius(12.0),
         ),
     });
@@ -420,16 +415,8 @@ fn create_shadow_row(scene: &mut Scene, root: NodeId, y: f32) {
         style: Box::new(
             VisualStyle::new()
                 .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
-                .drop_shadow(
-                    Vec2::new(2.0, 2.0),
-                    4.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.3),
-                )
-                .drop_shadow(
-                    Vec2::new(8.0, 8.0),
-                    12.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.2),
-                )
+                .drop_shadow(Vec2::new(2.0, 2.0), 4.0, Vec4::new(0.0, 0.0, 0.0, 0.3))
+                .drop_shadow(Vec2::new(8.0, 8.0), 12.0, Vec4::new(0.0, 0.0, 0.0, 0.2))
                 .corner_radius(12.0),
         ),
     });
@@ -459,11 +446,7 @@ fn create_shadow_row(scene: &mut Scene, root: NodeId, y: f32) {
         style: Box::new(
             VisualStyle::new()
                 .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
-                .drop_shadow(
-                    Vec2::new(6.0, 6.0),
-                    20.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.3),
-                )
+                .drop_shadow(Vec2::new(6.0, 6.0), 20.0, Vec4::new(0.0, 0.0, 0.0, 0.3))
                 .corner_radius(12.0),
         ),
     });
@@ -496,11 +479,7 @@ fn create_combined_effects_row(scene: &mut Scene, root: NodeId, y: f32) {
                     3.0,
                     StrokeAlign::Inside,
                 ))
-                .drop_shadow(
-                    Vec2::new(4.0, 4.0),
-                    12.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.4),
-                )
+                .drop_shadow(Vec2::new(4.0, 4.0), 12.0, Vec4::new(0.0, 0.0, 0.0, 0.4))
                 .corner_radius(16.0),
         ),
     });
@@ -535,8 +514,7 @@ fn create_combined_effects_row(scene: &mut Scene, root: NodeId, y: f32) {
         ),
     });
     let combo2_id = scene.add_node(root, combo2);
-    scene.get_node_mut(combo2_id).unwrap().bounds =
-        Rect::new(x_start + spacing, y, width, height);
+    scene.get_node_mut(combo2_id).unwrap().bounds = Rect::new(x_start + spacing, y, width, height);
 
     // 3. Angular gradient + thick stroke + large shadow
     let combo3 = SceneNode::new(NodeContent::Styled {
@@ -556,11 +534,7 @@ fn create_combined_effects_row(scene: &mut Scene, root: NodeId, y: f32) {
                     5.0,
                     StrokeAlign::Outside,
                 ))
-                .drop_shadow(
-                    Vec2::new(6.0, 6.0),
-                    16.0,
-                    Vec4::new(0.0, 0.5, 0.2, 0.5),
-                )
+                .drop_shadow(Vec2::new(6.0, 6.0), 16.0, Vec4::new(0.0, 0.5, 0.2, 0.5))
                 .corner_radius(12.0),
         ),
     });
@@ -578,11 +552,7 @@ fn create_combined_effects_row(scene: &mut Scene, root: NodeId, y: f32) {
                     2.0,
                     StrokeAlign::Inside,
                 ))
-                .drop_shadow(
-                    Vec2::new(0.0, 8.0),
-                    24.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.15),
-                )
+                .drop_shadow(Vec2::new(0.0, 8.0), 24.0, Vec4::new(0.0, 0.0, 0.0, 0.15))
                 .corner_radius(20.0),
         ),
     });
@@ -624,11 +594,11 @@ fn create_gradient_text_row(scene: &mut Scene, root: NodeId, y: f32) {
                     start: Vec2::new(0.0, 0.5),
                     end: Vec2::new(1.0, 0.5),
                     stops: vec![
-                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),   // Red
-                        ColorStop::new(0.25, Vec4::new(1.0, 1.0, 0.0, 1.0)),  // Yellow
-                        ColorStop::new(0.5, Vec4::new(0.0, 1.0, 0.0, 1.0)),   // Green
-                        ColorStop::new(0.75, Vec4::new(0.0, 0.5, 1.0, 1.0)),  // Blue
-                        ColorStop::new(1.0, Vec4::new(0.8, 0.0, 1.0, 1.0)),   // Purple
+                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)), // Red
+                        ColorStop::new(0.25, Vec4::new(1.0, 1.0, 0.0, 1.0)), // Yellow
+                        ColorStop::new(0.5, Vec4::new(0.0, 1.0, 0.0, 1.0)), // Green
+                        ColorStop::new(0.75, Vec4::new(0.0, 0.5, 1.0, 1.0)), // Blue
+                        ColorStop::new(1.0, Vec4::new(0.8, 0.0, 1.0, 1.0)), // Purple
                     ],
                 }))
                 .text(TextContent::new("RAINBOW", 48.0)),
@@ -665,10 +635,10 @@ fn create_gradient_text_row(scene: &mut Scene, root: NodeId, y: f32) {
                     center: Vec2::new(0.5, 0.5),
                     angle: 0.0,
                     stops: vec![
-                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.5, 1.0)),   // Pink
-                        ColorStop::new(0.33, Vec4::new(0.5, 0.0, 1.0, 1.0)),  // Purple
-                        ColorStop::new(0.66, Vec4::new(0.0, 0.8, 1.0, 1.0)),  // Cyan
-                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 0.5, 1.0)),   // Pink (wrap)
+                        ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.5, 1.0)), // Pink
+                        ColorStop::new(0.33, Vec4::new(0.5, 0.0, 1.0, 1.0)), // Purple
+                        ColorStop::new(0.66, Vec4::new(0.0, 0.8, 1.0, 1.0)), // Cyan
+                        ColorStop::new(1.0, Vec4::new(1.0, 0.0, 0.5, 1.0)), // Pink (wrap)
                     ],
                 }))
                 .stroke(StrokeStyle::solid(
@@ -676,11 +646,7 @@ fn create_gradient_text_row(scene: &mut Scene, root: NodeId, y: f32) {
                     2.0,
                     StrokeAlign::Center,
                 ))
-                .drop_shadow(
-                    Vec2::new(3.0, 3.0),
-                    8.0,
-                    Vec4::new(0.0, 0.0, 0.0, 0.5),
-                )
+                .drop_shadow(Vec2::new(3.0, 3.0), 8.0, Vec4::new(0.0, 0.0, 0.0, 0.5))
                 .text(TextContent::new("PHASE 2!", 48.0)),
         ),
     });

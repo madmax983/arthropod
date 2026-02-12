@@ -22,6 +22,40 @@ pub fn compare_images(image1: &[u8], image2: &[u8], width: u32, height: u32) -> 
     Ok(diff_pixels as f32 / total_pixels as f32)
 }
 
+/// Compare two images with per-channel tolerance and return ratio of differing pixels.
+pub fn compare_images_with_tolerance(
+    image1: &[u8],
+    image2: &[u8],
+    width: u32,
+    height: u32,
+    tolerance: u8,
+) -> Result<f32> {
+    if image1.len() != image2.len() {
+        anyhow::bail!("Image sizes don't match");
+    }
+
+    let total_pixels = (width * height) as usize;
+    let mut diff_pixels = 0usize;
+
+    for i in 0..total_pixels {
+        let idx = i * 4; // RGBA
+        let mut pixel_differs = false;
+        for c in 0..4 {
+            let a = image1[idx + c] as i16;
+            let b = image2[idx + c] as i16;
+            if (a - b).abs() > tolerance as i16 {
+                pixel_differs = true;
+                break;
+            }
+        }
+        if pixel_differs {
+            diff_pixels += 1;
+        }
+    }
+
+    Ok(diff_pixels as f32 / total_pixels as f32)
+}
+
 /// Load an image from a file
 pub fn load_image(path: impl AsRef<Path>) -> Result<(Vec<u8>, u32, u32)> {
     let img = image::open(path)?.to_rgba8();
@@ -76,4 +110,37 @@ pub fn count_color_pixels(
         }
     }
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{compare_images, compare_images_with_tolerance};
+
+    #[test]
+    fn test_compare_images_with_tolerance_ignores_small_channel_delta() {
+        let width = 1;
+        let height = 1;
+        let a = [10u8, 20u8, 30u8, 255u8];
+        let b = [11u8, 20u8, 31u8, 255u8];
+
+        let strict = compare_images(&a, &b, width, height).expect("strict compare should work");
+        let tolerant = compare_images_with_tolerance(&a, &b, width, height, 2)
+            .expect("tolerant compare should work");
+
+        assert_eq!(strict, 1.0);
+        assert_eq!(tolerant, 0.0);
+    }
+
+    #[test]
+    fn test_compare_images_with_tolerance_counts_large_delta_as_difference() {
+        let width = 1;
+        let height = 1;
+        let a = [10u8, 20u8, 30u8, 255u8];
+        let b = [20u8, 20u8, 30u8, 255u8];
+
+        let tolerant = compare_images_with_tolerance(&a, &b, width, height, 2)
+            .expect("tolerant compare should work");
+
+        assert_eq!(tolerant, 1.0);
+    }
 }

@@ -1,5 +1,5 @@
-use glam::Vec2;
 use geo::{BooleanOps, Coord, LineString, MultiPolygon, Polygon};
+use glam::Vec2;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -272,11 +272,11 @@ impl VectorPath {
         for i in 0..rings.len() {
             let sample = first_distinct_point(&rings[i].contour).unwrap_or(Vec2::ZERO);
             let mut containing: Vec<usize> = Vec::new();
-            for j in 0..rings.len() {
+            for (j, ring_j) in rings.iter().enumerate() {
                 if i == j {
                     continue;
                 }
-                if point_in_ring(sample, &rings[j].contour) {
+                if point_in_ring(sample, &ring_j.contour) {
                     containing.push(j);
                 }
             }
@@ -420,10 +420,10 @@ impl VectorPath {
         }
 
         if current.len() >= 2 {
-            if let (Some(first), Some(last)) = (current.first().copied(), current.last().copied()) {
-                if first != last {
-                    current.push(first);
-                }
+            if let (Some(first), Some(last)) = (current.first().copied(), current.last().copied())
+                && first != last
+            {
+                current.push(first);
             }
             contours.push(current);
         }
@@ -531,6 +531,7 @@ fn angle_between(u: Vec2, v: Vec2) -> f32 {
     cross.atan2(dot)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn arc_to_polyline(
     from: Vec2,
     to: Vec2,
@@ -644,11 +645,9 @@ impl<'a> SvgPathParser<'a> {
                     self.idx += 1;
                     c
                 }
-                Some(SvgToken::Number(_)) => {
-                    last_cmd.ok_or_else(|| {
-                        VectorPathError::InvalidSvgPathData("number without command".to_string())
-                    })?
-                }
+                Some(SvgToken::Number(_)) => last_cmd.ok_or_else(|| {
+                    VectorPathError::InvalidSvgPathData("number without command".to_string())
+                })?,
                 None => break,
             };
 
@@ -985,8 +984,14 @@ mod tests {
 
         assert!(path.contains_point(50.0, 25.0));
         assert!(!path.contains_point(90.0, 90.0));
-        assert!(path.contains_point(50.0, 0.0), "edge point should be inside");
-        assert!(path.contains_point(0.0, 0.0), "vertex point should be inside");
+        assert!(
+            path.contains_point(50.0, 0.0),
+            "edge point should be inside"
+        );
+        assert!(
+            path.contains_point(0.0, 0.0),
+            "vertex point should be inside"
+        );
     }
 
     #[test]
@@ -1013,10 +1018,8 @@ mod tests {
 
     #[test]
     fn test_boolean_union_rectangles() {
-        let a = VectorPath::from_svg_path_data("M 0 0 L 10 0 L 10 10 L 0 10 Z")
-            .expect("parse a");
-        let b = VectorPath::from_svg_path_data("M 5 0 L 15 0 L 15 10 L 5 10 Z")
-            .expect("parse b");
+        let a = VectorPath::from_svg_path_data("M 0 0 L 10 0 L 10 10 L 0 10 Z").expect("parse a");
+        let b = VectorPath::from_svg_path_data("M 5 0 L 15 0 L 15 10 L 5 10 Z").expect("parse b");
         let out = VectorPath::boolean_op(&a, &b, BooleanOp::Union).expect("union should work");
 
         assert!(!out.commands.is_empty());
@@ -1068,9 +1071,10 @@ mod tests {
 
     #[test]
     fn test_boolean_intersect_respects_hole_from_single_path() {
-        let mut donut =
-            VectorPath::from_svg_path_data("M 0 0 L 20 0 L 20 20 L 0 20 Z M 5 5 L 15 5 L 15 15 L 5 15 Z")
-                .expect("donut path should parse");
+        let mut donut = VectorPath::from_svg_path_data(
+            "M 0 0 L 20 0 L 20 20 L 0 20 Z M 5 5 L 15 5 L 15 15 L 5 15 Z",
+        )
+        .expect("donut path should parse");
         donut.winding_rule = WindingRule::EvenOdd;
         let clip = VectorPath::from_svg_path_data("M 10 0 L 20 0 L 20 20 L 10 20 Z").expect("clip");
 
@@ -1101,7 +1105,10 @@ mod tests {
             "arc should expand to multiple line segments"
         );
         assert!(matches!(path.commands[0], PathCommand::MoveTo(_)));
-        assert!(matches!(path.commands[path.commands.len() - 1], PathCommand::Close));
+        assert!(matches!(
+            path.commands[path.commands.len() - 1],
+            PathCommand::Close
+        ));
     }
 
     #[test]

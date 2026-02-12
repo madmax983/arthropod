@@ -7,7 +7,6 @@
 /// 3. Changes to shader logic can be validated against reference implementation
 ///
 /// Each test includes the WGSL equivalent as a comment for cross-reference.
-
 use glam::Vec2;
 
 // ============================================================================
@@ -24,12 +23,7 @@ enum GradientType {
 
 /// Compute gradient position t (0.0 to 1.0) for a UV coordinate.
 /// This mirrors the WGSL sample_gradient() function.
-fn compute_gradient_t(
-    uv: Vec2,
-    start: Vec2,
-    end: Vec2,
-    gradient_type: GradientType,
-) -> f32 {
+fn compute_gradient_t(uv: Vec2, start: Vec2, end: Vec2, gradient_type: GradientType) -> f32 {
     match gradient_type {
         GradientType::Linear => {
             // Linear gradient: dot product along axis
@@ -89,11 +83,19 @@ fn test_linear_gradient_horizontal() {
 
     // Left edge (start)
     let t = compute_gradient_t(Vec2::new(0.0, 0.5), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 at start, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 at start, got {}",
+        t
+    );
 
     // Center
     let t = compute_gradient_t(Vec2::new(0.5, 0.5), start, end, GradientType::Linear);
-    assert!((t - 0.5).abs() < 0.001, "Expected t=0.5 at center, got {}", t);
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected t=0.5 at center, got {}",
+        t
+    );
 
     // Right edge (end)
     let t = compute_gradient_t(Vec2::new(1.0, 0.5), start, end, GradientType::Linear);
@@ -101,10 +103,18 @@ fn test_linear_gradient_horizontal() {
 
     // Beyond bounds (should clamp)
     let t = compute_gradient_t(Vec2::new(1.5, 0.5), start, end, GradientType::Linear);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 beyond end, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 beyond end, got {}",
+        t
+    );
 
     let t = compute_gradient_t(Vec2::new(-0.5, 0.5), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 before start, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 before start, got {}",
+        t
+    );
 }
 
 #[test]
@@ -114,11 +124,19 @@ fn test_linear_gradient_vertical() {
 
     // Top edge (start)
     let t = compute_gradient_t(Vec2::new(0.5, 0.0), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 at start, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 at start, got {}",
+        t
+    );
 
     // Center
     let t = compute_gradient_t(Vec2::new(0.5, 0.5), start, end, GradientType::Linear);
-    assert!((t - 0.5).abs() < 0.001, "Expected t=0.5 at center, got {}", t);
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected t=0.5 at center, got {}",
+        t
+    );
 
     // Bottom edge (end)
     let t = compute_gradient_t(Vec2::new(0.5, 1.0), start, end, GradientType::Linear);
@@ -132,11 +150,19 @@ fn test_linear_gradient_diagonal() {
 
     // Start corner
     let t = compute_gradient_t(Vec2::new(0.0, 0.0), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 at start, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 at start, got {}",
+        t
+    );
 
     // Center
     let t = compute_gradient_t(Vec2::new(0.5, 0.5), start, end, GradientType::Linear);
-    assert!((t - 0.5).abs() < 0.001, "Expected t=0.5 at center, got {}", t);
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected t=0.5 at center, got {}",
+        t
+    );
 
     // End corner
     let t = compute_gradient_t(Vec2::new(1.0, 1.0), start, end, GradientType::Linear);
@@ -144,7 +170,10 @@ fn test_linear_gradient_diagonal() {
 
     // Perpendicular offset (should remain at same t)
     let t = compute_gradient_t(Vec2::new(0.3, 0.7), start, end, GradientType::Linear);
-    assert!((t - 0.5).abs() < 0.001, "Expected perpendicular points to have same t");
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected perpendicular points to have same t"
+    );
 }
 
 #[test]
@@ -154,10 +183,16 @@ fn test_linear_gradient_degenerate() {
     let end = Vec2::new(0.5, 0.5);
 
     let t = compute_gradient_t(Vec2::new(0.0, 0.0), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Degenerate gradient should return t=0.0");
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Degenerate gradient should return t=0.0"
+    );
 
     let t = compute_gradient_t(Vec2::new(1.0, 1.0), start, end, GradientType::Linear);
-    assert!((t - 0.0).abs() < 0.001, "Degenerate gradient should return t=0.0");
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Degenerate gradient should return t=0.0"
+    );
 }
 
 // ============================================================================
@@ -171,21 +206,37 @@ fn test_radial_gradient_center() {
 
     // At center
     let t = compute_gradient_t(center, center, edge, GradientType::Radial);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 at center, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 at center, got {}",
+        t
+    );
 
     // At radius (right edge)
     let t = compute_gradient_t(edge, center, edge, GradientType::Radial);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at radius, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at radius, got {}",
+        t
+    );
 
     // Halfway to radius
     let halfway = Vec2::new(0.75, 0.5);
     let t = compute_gradient_t(halfway, center, edge, GradientType::Radial);
-    assert!((t - 0.5).abs() < 0.001, "Expected t=0.5 at half radius, got {}", t);
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected t=0.5 at half radius, got {}",
+        t
+    );
 
     // Beyond radius (should clamp to 1.0)
     let beyond = Vec2::new(1.5, 0.5);
     let t = compute_gradient_t(beyond, center, edge, GradientType::Radial);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 beyond radius, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 beyond radius, got {}",
+        t
+    );
 }
 
 #[test]
@@ -195,10 +246,10 @@ fn test_radial_gradient_circular_symmetry() {
 
     // Points at same distance should have same t
     let points = vec![
-        Vec2::new(0.75, 0.5),  // Right
-        Vec2::new(0.5, 0.75),  // Top
-        Vec2::new(0.25, 0.5),  // Left
-        Vec2::new(0.5, 0.25),  // Bottom
+        Vec2::new(0.75, 0.5), // Right
+        Vec2::new(0.5, 0.75), // Top
+        Vec2::new(0.25, 0.5), // Left
+        Vec2::new(0.5, 0.25), // Bottom
     ];
 
     let t_values: Vec<f32> = points
@@ -223,7 +274,10 @@ fn test_radial_gradient_degenerate() {
     let same = Vec2::new(0.5, 0.5); // Zero radius
 
     let t = compute_gradient_t(Vec2::new(1.0, 1.0), center, same, GradientType::Radial);
-    assert!((t - 0.0).abs() < 0.001, "Degenerate radial should return t=0.0");
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Degenerate radial should return t=0.0"
+    );
 }
 
 // ============================================================================
@@ -251,11 +305,19 @@ fn test_angular_gradient_quadrants() {
 
     // Left (180 degrees): atan2(0, -1) = π
     let t = compute_gradient_t(Vec2::new(0.0, 0.5), center, _end, GradientType::Angular);
-    assert!(t < 0.01 || t > 0.99, "Left should be t≈0.0 or t≈1.0 (wrap), got {}", t);
+    assert!(
+        t < 0.01 || t > 0.99,
+        "Left should be t≈0.0 or t≈1.0 (wrap), got {}",
+        t
+    );
 
     // Bottom (90 degrees): atan2(1, 0) = π/2
     let t = compute_gradient_t(Vec2::new(0.5, 1.0), center, _end, GradientType::Angular);
-    assert!((t - 0.75).abs() < 0.01, "Bottom should be t=0.75, got {}", t);
+    assert!(
+        (t - 0.75).abs() < 0.01,
+        "Bottom should be t=0.75, got {}",
+        t
+    );
 }
 
 #[test]
@@ -301,20 +363,36 @@ fn test_diamond_gradient_axes() {
 
     // At start (center)
     let t = compute_gradient_t(start, start, end, GradientType::Diamond);
-    assert!((t - 0.0).abs() < 0.001, "Expected t=0.0 at center, got {}", t);
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Expected t=0.0 at center, got {}",
+        t
+    );
 
     // Right edge (only X changes)
     let t = compute_gradient_t(Vec2::new(1.0, 0.5), start, end, GradientType::Diamond);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at right edge, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at right edge, got {}",
+        t
+    );
 
     // Top edge (only Y changes)
     let t = compute_gradient_t(Vec2::new(0.5, 0.0), start, end, GradientType::Diamond);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at top edge, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at top edge, got {}",
+        t
+    );
 
     // Diagonal corner (both X and Y change maximally)
     // Manhattan distance: |0.5|/0.5 + |0.5|/0.5 = 1.0 + 1.0 = 2.0 → clamped to 1.0
     let t = compute_gradient_t(Vec2::new(1.0, 0.0), start, end, GradientType::Diamond);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at diagonal corner (clamped), got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at diagonal corner (clamped), got {}",
+        t
+    );
 }
 
 #[test]
@@ -325,7 +403,11 @@ fn test_diamond_gradient_manhattan_distance() {
     // Point at Manhattan distance 0.5 (quarter way on both axes)
     let point = Vec2::new(0.625, 0.625); // d = |0.125|/0.5 + |0.125|/0.5 = 0.25 + 0.25 = 0.5
     let t = compute_gradient_t(point, start, end, GradientType::Diamond);
-    assert!((t - 0.5).abs() < 0.001, "Expected t=0.5 for Manhattan distance 0.5, got {}", t);
+    assert!(
+        (t - 0.5).abs() < 0.001,
+        "Expected t=0.5 for Manhattan distance 0.5, got {}",
+        t
+    );
 }
 
 #[test]
@@ -334,7 +416,10 @@ fn test_diamond_gradient_degenerate() {
     let same = Vec2::new(0.5, 0.5); // Zero scale
 
     let t = compute_gradient_t(Vec2::new(1.0, 1.0), start, same, GradientType::Diamond);
-    assert!((t - 0.0).abs() < 0.001, "Degenerate diamond should return t=0.0");
+    assert!(
+        (t - 0.0).abs() < 0.001,
+        "Degenerate diamond should return t=0.0"
+    );
 }
 
 #[test]
@@ -344,11 +429,19 @@ fn test_diamond_gradient_asymmetric_scale() {
 
     // Right edge (only X at max): d = 0.5/0.5 + 0/0.25 = 1.0
     let t = compute_gradient_t(Vec2::new(1.0, 0.5), start, end, GradientType::Diamond);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at X edge, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at X edge, got {}",
+        t
+    );
 
     // Top edge (only Y at max): d = 0/0.5 + 0.25/0.25 = 1.0
     let t = compute_gradient_t(Vec2::new(0.5, 0.25), start, end, GradientType::Diamond);
-    assert!((t - 1.0).abs() < 0.001, "Expected t=1.0 at Y edge, got {}", t);
+    assert!(
+        (t - 1.0).abs() < 0.001,
+        "Expected t=1.0 at Y edge, got {}",
+        t
+    );
 }
 
 // ============================================================================

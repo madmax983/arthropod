@@ -75,6 +75,13 @@ impl TextRenderer {
     pub fn text_engine_mut(&mut self) -> &mut TextEngine {
         &mut self.text_engine
     }
+
+    /// Register font bytes for this renderer's text engine.
+    ///
+    /// Returns number of newly visible faces in the backing font database.
+    pub fn register_font_bytes(&mut self, bytes: Vec<u8>) -> usize {
+        self.text_engine.register_font_bytes(bytes)
+    }
 }
 
 impl Default for TextRenderer {

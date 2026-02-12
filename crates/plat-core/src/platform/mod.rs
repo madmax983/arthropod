@@ -1,17 +1,32 @@
 //! Platform-specific implementations.
 
-#[cfg(target_os = "windows")]
+pub(crate) mod web_runtime;
+
+#[cfg(all(target_arch = "wasm32", feature = "web"))]
+mod web;
+#[cfg(all(target_arch = "wasm32", feature = "web"))]
+pub use self::web::*;
+
+#[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
 pub mod windows;
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", not(target_arch = "wasm32")))]
 pub use self::windows::*;
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 mod macos;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(target_arch = "wasm32")))]
 pub use self::macos::*;
 
 // Fallback for unsupported platforms (allows compilation for testing)
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(
+    all(target_arch = "wasm32", feature = "web"),
+    target_os = "windows",
+    target_os = "macos"
+)))]
 mod stub;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(
+    all(target_arch = "wasm32", feature = "web"),
+    target_os = "windows",
+    target_os = "macos"
+)))]
 pub use self::stub::*;

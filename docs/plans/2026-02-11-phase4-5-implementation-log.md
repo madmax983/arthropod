@@ -1,0 +1,1121 @@
+# Phase 4 + 5 Implementation Log
+
+Date: 2026-02-11
+Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`.
+
+## Work Items
+
+- [x] P4.1 Add render-target infrastructure and pooling with tests
+- [x] P4.2 Add blur, blend, stencil, and effect-planning modules with tests
+- [x] P4.3 Integrate effect planning into `WgpuBackend` render flow
+- [x] P4.4 Add Phase 4 shader assets and wire pipeline registry
+- [x] P5.1 Add web platform backend in `plat-core` with wasm cfg routing
+- [x] P5.2 Add workspace/crate feature gates for `native` and `web`
+- [x] P5.3 Add web entrypoint example for widget gallery
+- [x] P5.4 Run verification (tests/checks, including wasm target checks)
+
+## Execution Notes
+
+### 2026-02-11
+
+- Started implementation pass.
+- Audited existing code:
+  - `render-engine` already has Phase 1-3 primitives/path pipeline.
+  - `style-engine` already exposes effects and blend modes.
+  - `plat-core` currently supports Windows/macOS + stub fallback; no wasm web backend yet.
+- Decided on incremental TDD approach:
+  - Write failing tests per subsystem.
+  - Implement minimum viable production code to satisfy tests.
+  - Integrate modules and then run full verification commands.
+- Added failing Phase 4 test suite: `crates/render-engine/tests/phase4_effects_tests.rs`
+  - Covers: render-target pool reuse, blur kernel normalization, blend multiply reference math, effect pass classification, clip/stencil classification.
+- RED verification run:
+  - Command: `cargo test -p render-engine phase4_effects_tests -- --nocapture`
+  - Result: FAIL (expected)
+  - Failure: unresolved import `render_engine::backend::wgpu::effects` (module not implemented yet).
+- Implemented Phase 4 effect infrastructure module:
+  - Added `crates/render-engine/src/backend/wgpu/effects.rs`
+  - Added exports in `crates/render-engine/src/backend/wgpu/mod.rs`
+  - Implemented:
+    - `EffectPassKind`
+    - `RenderTargetKey`
+    - `RenderTargetPool` (acquire/release/end_frame)
+    - `gaussian_kernel_1d`
+    - `blend_multiply`
+    - `classify_effect_passes`
+- GREEN verification run:
+  - Command: `cargo test -p render-engine --test phase4_effects_tests -- --nocapture`
+  - Result: PASS (5/5)
+- Added Phase 4 pipeline modules and assets:
+  - `crates/render-engine/src/backend/wgpu/pipelines/blur_pipeline.rs`
+  - `crates/render-engine/src/backend/wgpu/pipelines/blend_pipeline.rs`
+  - `crates/render-engine/src/backend/wgpu/pipelines/stencil_pipeline.rs`
+  - `crates/render-engine/src/backend/shaders/blur.wgsl`
+  - `crates/render-engine/src/backend/shaders/blend.wgsl`
+  - Wired into `crates/render-engine/src/backend/wgpu/pipelines/mod.rs`
+- Added Phase 4 context/backend integration:
+  - Offscreen target allocation API in `crates/render-engine/src/backend/wgpu/context.rs`
+  - Effect planning + pool reservation path in `crates/render-engine/src/backend/wgpu/mod.rs`
+  - Added unit coverage for scene effect classification.
+- Verification run:
+  - Command: `cargo test -p render-engine --lib -- --nocapture`
+  - Result: PASS (88/88)
+- Started Phase 5 RED step:
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: FAIL (expected)
+  - Failure: package `plat-core` does not contain feature `web`.
+- Implemented Phase 5 web feature gating and wasm dependencies:
+  - Updated workspace/root features (`native`, `web`) in `Cargo.toml`.
+  - Added `web` feature in `crates/plat-core/Cargo.toml`.
+  - Added `web` feature in `crates/render-engine/Cargo.toml`.
+  - Added wasm-specific dependencies for `plat-core` (`wasm-bindgen`, `web-sys`) and `render-engine` (`getrandom` wasm backend).
+- Added wasm target config:
+  - Created `.cargo/config.toml` with wasm rustflags for `getrandom_backend="wasm_js"`.
+- Implemented web platform backend:
+  - Added `crates/plat-core/src/platform/web.rs`.
+  - Wired cfg routing in `crates/plat-core/src/platform/mod.rs`.
+- Added web gallery entrypoint:
+  - Created `examples/widget_gallery_web.rs` with `#[wasm_bindgen(start)]` startup path.
+- Continued wasm verification:
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+- Encountered root wasm example check failures:
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: FAIL.
+  - Cause: non-wasm-safe dependencies still compiled for wasm target (`arthropod`, `renderdoc` path, terminal-only dev deps).
+- Fixed root wasm dependency gating:
+  - Updated root `Cargo.toml`:
+    - moved `arthropod` to non-wasm target dependency block.
+    - kept `renderdoc` only on non-wasm target dependency block.
+    - moved `ratatui` and `crossterm` to non-wasm target dev-dependency block.
+    - added wasm-only root deps needed by example (`wasm-bindgen`, `web-sys` with `console`).
+- Encountered wasm example binary entrypoint issue:
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: FAIL.
+  - Cause: wasm example binary still requires a `main` symbol.
+- Fixed wasm entrypoint:
+  - Added `#[cfg(target_arch = "wasm32")] fn main() {}` shim to `examples/widget_gallery_web.rs`.
+- Final verification pass:
+  - Command: `cargo test -p render-engine --test phase4_effects_tests -- --nocapture`
+  - Result: PASS (5/5).
+  - Command: `cargo test -p render-engine --lib -- --nocapture`
+  - Result: PASS (88/88).
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery`
+  - Result: PASS (native sanity check after target-specific gating).
+- Formatting and post-format recheck:
+  - Command: `cargo fmt --all`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+- Final diff cleanup and safety revalidation:
+  - Reverted unrelated formatting-only files touched by `cargo fmt --all` so the change set stays scoped to Phase 4/5 work.
+  - Command: `cargo test -p render-engine --test phase4_effects_tests -- --nocapture`
+  - Result: PASS (5/5).
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+- Browser runtime follow-up (`.wasm` direct execution on Windows):
+  - Reproduced the user-facing issue context: running `target\\wasm32-unknown-unknown\\debug\\examples\\widget_gallery_web.wasm` directly is not a valid Win32 process.
+  - Added Trunk browser harness files:
+    - `index.html` (root web target with `#arthropod-canvas` + Trunk rust asset)
+    - `Trunk.toml` (target + dist defaults for web build)
+  - Updated `examples/widget_gallery_web.rs` docs with browser run command.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 1: tasks 1-3)
+
+- Task 1 RED:
+  - Added `crates/render-engine/tests/phase4_effect_plan_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_effect_plan_tests -- --nocapture`
+  - Result: FAIL (expected): missing `EffectPlanNode` and `plan_effect_passes`.
+- Task 1 implementation:
+  - Added deterministic planning API in `crates/render-engine/src/backend/wgpu/effects.rs`:
+    - `EffectPass`
+    - `EffectPlanNode` + `EffectPlanNode::from_scene`
+    - `plan_effect_passes(...)`
+    - frame-clamped bounds helper
+  - Ensured offscreen effect chains append `BlendComposite` for layer/background/inner-shadow compositing.
+- Task 1 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_effect_plan_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Task 2 RED:
+  - Added `crates/render-engine/tests/phase4_render_target_pool_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_render_target_pool_tests -- --nocapture`
+  - Result: FAIL (expected): missing `end_frame_with` and `free_bytes`.
+- Task 2 implementation:
+  - Created `crates/render-engine/src/backend/wgpu/render_target_pool.rs`.
+  - Moved/expanded pool internals:
+    - explicit `free_order` tracking for FIFO eviction
+    - `free_bytes()`
+    - `end_frame_with(...)` with budget-based eviction callback
+  - Re-exported pool types from `effects.rs` for compatibility.
+  - Wired module in `crates/render-engine/src/backend/wgpu/mod.rs`.
+  - Integrated real reclamation callback:
+    - `WgpuBackend::render` now calls `end_frame_with` and evicts context targets via `context.remove_render_target(...)`.
+- Task 2 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_render_target_pool_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Task 3 RED:
+  - Added `crates/render-engine/tests/phase4_blur_execution_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_blur_execution_tests -- --nocapture`
+  - Result: FAIL (expected): missing `BlurTier` and `select_blur_tier`.
+- Task 3 implementation:
+  - Added `BlurTier` + `select_blur_tier(radius)` in `crates/render-engine/src/backend/wgpu/pipelines/blur_pipeline.rs`.
+  - Added render-path hook in `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - computes `max_scene_blur_radius(scene)`
+    - selects tier via `select_blur_tier(...)` during effect planning.
+- Task 3 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_blur_execution_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Batch sanity re-run:
+  - Command: `cargo test -p render-engine --test phase4_effect_plan_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --test phase4_render_target_pool_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --lib -- --nocapture`
+  - Result: PASS (90/90).
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 2: tasks 4-6)
+
+- Task 4 RED:
+  - Added `crates/render-engine/tests/phase4_background_blur_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_background_blur_tests -- --nocapture`
+  - Result: FAIL (expected): missing `backdrop_capture_bounds`.
+- Task 4 implementation:
+  - Added `backdrop_capture_bounds(node_bounds, radius, frame_bounds)` in `crates/render-engine/src/backend/wgpu/effects.rs`.
+  - Added internal unit coverage for bounds inflate+clamp behavior.
+  - Added render-path hook in `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - `collect_background_capture_bounds(scene, frame_width, frame_height)`
+    - called during render effect-planning path.
+- Task 4 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_background_blur_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Task 5 RED:
+  - Added `crates/render-engine/tests/phase4_inner_shadow_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_inner_shadow_tests -- --nocapture`
+  - Result: FAIL (expected): missing `inner_shadow_alpha`.
+- Task 5 implementation:
+  - Added CPU helper `inner_shadow_alpha(mask, blurred_offset_mask)` in `crates/render-engine/src/backend/wgpu/effects.rs`.
+  - Added WGSL helper of the same formula in `crates/render-engine/src/backend/shaders/blur.wgsl`.
+  - Added internal unit coverage for mask behavior.
+- Task 5 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_inner_shadow_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Task 6 RED:
+  - Added `crates/render-engine/tests/phase4_stencil_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_stencil_tests -- --nocapture`
+  - Result: FAIL (expected): missing `plan_clip_sequence_for_nested_clips`.
+- Task 6 implementation:
+  - Added `plan_clip_sequence_for_nested_clips()` in `crates/render-engine/src/backend/wgpu/pipelines/stencil_pipeline.rs`.
+  - Added render hook in `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - when stencil effects are present, computes planned clip sequence.
+- Task 6 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_stencil_tests -- --nocapture`
+  - Result: PASS (1/1).
+
+- Batch sanity re-run:
+  - Command: `cargo test -p render-engine --test phase4_background_blur_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --test phase4_inner_shadow_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --test phase4_stencil_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --lib -- --nocapture`
+  - Result: PASS (92/92).
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 3: tasks 7-9)
+
+- Task 7 RED:
+  - Added `crates/render-engine/tests/phase4_blend_modes_tests.rs`.
+  - Command: `cargo test -p render-engine --test phase4_blend_modes_tests -- --nocapture`
+  - Result: FAIL (expected): missing blend helpers (`blend_screen`, `blend_overlay`, `blend_darken`, `blend_lighten`, `blend_difference`, `blend_exclusion`).
+- Task 7 implementation:
+  - Added CPU blend references in `crates/render-engine/src/backend/wgpu/effects.rs`:
+    - `blend_screen`
+    - `blend_overlay`
+    - `blend_darken`
+    - `blend_lighten`
+    - `blend_difference`
+    - `blend_exclusion`
+  - Expanded shader mode coverage in `crates/render-engine/src/backend/shaders/blend.wgsl`:
+    - explicit branches for darken/lighten/difference/exclusion/color burn/color dodge/linear burn/linear dodge
+    - hard-light and soft-light fallbacks
+    - explicit handling comments for HSL non-separable modes + passthrough fallback.
+  - Added pipeline-side helper + unit test in `crates/render-engine/src/backend/wgpu/pipelines/blend_pipeline.rs`:
+    - `has_explicit_shader_branch(mode)`
+- Task 7 GREEN:
+  - Command: `cargo test -p render-engine --test phase4_blend_modes_tests -- --nocapture`
+  - Result: PASS (6/6).
+
+- Task 8 RED:
+  - Command: `cargo bench -p render-engine phase4_effects -- --noplot`
+  - Result: FAIL (expected in current state): no dedicated benchmark target was wired yet (`--noplot` passed to default lib bench harness).
+- Task 8 implementation:
+  - Added visual smoke examples:
+    - `examples/visual_test_phase4_blur.rs`
+    - `examples/visual_test_phase4_blend.rs`
+    - `examples/visual_test_phase4_clipping.rs`
+  - Added criterion benchmark target:
+    - `crates/render-engine/benches/phase4_effects.rs`
+    - benchmarks: `blur_pass_1080p`, `background_blur_500_nodes`, `blend_composite_layers/1000`
+  - Registered bench in `crates/render-engine/Cargo.toml` (`[[bench]] name = "phase4_effects"`).
+  - Registered examples in root `Cargo.toml`:
+    - `visual_test_phase4_blur`
+    - `visual_test_phase4_blend`
+    - `visual_test_phase4_clipping`
+- Task 8 GREEN:
+  - Command: `cargo bench -p render-engine --bench phase4_effects -- --noplot`
+  - Result: PASS.
+  - Command: `cargo check --example visual_test_phase4_blur`
+  - Result: PASS.
+  - Command: `cargo check --example visual_test_phase4_blend`
+  - Result: PASS.
+  - Command: `cargo check --example visual_test_phase4_clipping`
+  - Result: PASS.
+
+- Task 9 RED:
+  - Added `crates/plat-core/src/platform/web_runtime.rs` with failing scheduler test references.
+  - Command: `cargo test -p plat-core redraw_scheduler -- --nocapture`
+  - Result: FAIL (expected): missing `RedrawScheduler`.
+- Task 9 implementation:
+  - Added `RedrawScheduler` with coalescing behavior in `crates/plat-core/src/platform/web_runtime.rs`.
+  - Added scheduler tests:
+    - `test_redraw_scheduler_requests_next_frame_once`
+    - `test_redraw_scheduler_consume_resets_pending_state`
+  - Exposed runtime helper module in `crates/plat-core/src/platform/mod.rs`.
+  - Replaced one-shot web `run()` path with RAF loop in `crates/plat-core/src/platform/web.rs`:
+    - lifecycle resume dispatch
+    - coalesced redraw scheduling via `RedrawScheduler`
+    - per-frame `RedrawRequested` event + `on_redraw` callback
+    - control-flow exit handling
+- Task 9 GREEN:
+  - Command: `cargo test -p plat-core redraw_scheduler -- --nocapture`
+  - Result: PASS (2 scheduler tests).
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+- Batch sanity re-run:
+  - Command: `cargo test -p render-engine --test phase4_blend_modes_tests -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo bench -p render-engine --bench phase4_effects -- --noplot`
+  - Result: PASS.
+  - Command: `cargo test -p plat-core redraw_scheduler -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 4: task 10)
+
+- Task 10 RED:
+  - Added `crates/plat-core/tests/web_event_mapping_tests.rs`.
+  - Command: `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture`
+  - Result: FAIL (expected): unresolved imports for missing mapping helpers (`map_pointer_*`, `map_key_input`, `normalize_wheel`, `map_resize_events`, `wheel_event_from_input`).
+- Task 10 implementation:
+  - Expanded pure web mapping helpers in `crates/plat-core/src/platform/web_runtime.rs`:
+    - wheel normalization + wheel event mapping
+    - pointer down/up/move mapping (with and without modifiers)
+    - keyboard code/key mapping (with and without modifiers)
+    - resize + DPR mapping to `Resized` and `ScaleFactorChanged`
+  - Re-exported web mapping helpers from `crates/plat-core/src/lib.rs` for integration test access.
+  - Updated `crates/plat-core/src/platform/web.rs` to attach DOM listeners using shared mapping helpers:
+    - pointer: `mousedown`, `mouseup`, `mousemove`, `mouseenter`, `mouseleave`
+    - wheel: `wheel` (with prevent_default + normalization)
+    - keyboard: `keydown`, `keyup`
+    - resize: `resize` (canvas physical size update + resize events)
+  - Added required `web-sys` features in `crates/plat-core/Cargo.toml`:
+    - `KeyboardEvent`, `MouseEvent`, `WheelEvent`, `Event`, `EventTarget`
+- Task 10 GREEN:
+  - Command: `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture`
+  - Result: PASS (5/5).
+  - Command: `cargo check -p plat-core`
+  - Result: PASS.
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 4: task 11)
+
+- Task 11 RED:
+  - Added `crates/text-engine/tests/web_font_loader_tests.rs`.
+  - Command: `cargo test -p text-engine --test web_font_loader_tests -- --nocapture`
+  - Result: FAIL (expected): unresolved imports for missing web font loader API (`FontCache`, `FontSource`, `load_font_source`, `load_font_url`) and missing test runtime crate (`pollster`).
+- Task 11 implementation:
+  - Added `crates/text-engine/src/web_loader.rs`:
+    - `FontSource` (`Bytes`, `Url`)
+    - `FontCache` with URL and URL+version key support
+    - `versioned_cache_key`
+    - `load_font_source` and `load_font_url`
+    - wasm fetch path + native unsupported fallback
+    - `WebFontLoadError`
+  - Exported web loader API from `crates/text-engine/src/lib.rs`.
+  - Updated `crates/text-engine/Cargo.toml`:
+    - Added `thiserror`
+    - Added wasm target deps: `js-sys`, `wasm-bindgen`, `wasm-bindgen-futures`, `web-sys` (`Window`, `Response`)
+    - Added dev-dependency `pollster` for async tests.
+- Task 11 GREEN:
+  - Command: `cargo test -p text-engine --test web_font_loader_tests -- --nocapture`
+  - Result: PASS (4/4).
+  - Command: `cargo check -p text-engine --target wasm32-unknown-unknown`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 4: task 12)
+
+- Task 12 RED:
+  - Added `crates/render-engine/tests/web_backend_probe_tests.rs`.
+  - Command: `cargo test -p render-engine --test web_backend_probe_tests -- --nocapture`
+  - Result: FAIL (expected): missing backend probe API (`ProbeCaps`, `WebBackend`, `select_web_backend`).
+- Task 12 implementation:
+  - Added backend probe types/functions in `crates/render-engine/src/backend/wgpu/context.rs`:
+    - `WebBackend`
+    - `ProbeCaps`
+    - `select_web_backend(...)`
+    - wasm runtime probe helper for WebGPU/WebGL2 availability
+  - Wired selected backend into wasm instance creation:
+    - `WebGpu` -> `wgpu::Backends::BROWSER_WEBGPU`
+    - `WebGl2` -> `wgpu::Backends::GL`
+  - Added backend-specific wasm limits:
+    - WebGPU path uses `downlevel_defaults`
+    - WebGL2 path uses `downlevel_webgl2_defaults`
+  - Updated wasm dependencies in `crates/render-engine/Cargo.toml`:
+    - `js-sys`, `wasm-bindgen`, `web-sys` (`Window`, `Document`, `HtmlCanvasElement`, `Navigator`)
+- Task 12 GREEN:
+  - Command: `cargo test -p render-engine --test web_backend_probe_tests -- --nocapture`
+  - Result: PASS (1/1).
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 5: task 13)
+
+- Task 13 RED:
+  - Added smoke script `scripts/smoke/web_gallery_smoke.ps1`.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: FAIL (expected): built HTML title did not match live gallery requirement.
+- Task 13 implementation:
+  - Implemented real browser-rendered app in `examples/widget_gallery_web.rs`:
+    - `plat_core::run::<WebGalleryApp>()` startup path
+    - creates `Window` via `EventLoop`
+    - initializes `WgpuBackend`
+    - builds a visible scene (panel, title/subtitle text, color swatches)
+    - handles resize/scale events and redraw renders
+  - Updated `plat-core` web window handle support in `crates/plat-core/src/platform/web.rs`:
+    - `HasWindowHandle` now returns `WebCanvasWindowHandle`
+    - `HasDisplayHandle` now returns `DisplayHandle::web()`
+  - Relaxed backend constructor bounds for web compatibility:
+    - `crates/render-engine/src/backend/wgpu/context.rs`
+    - `crates/render-engine/src/backend/wgpu/mod.rs`
+    - removed unconditional `Sync` bound on window handle type
+  - Updated browser shell assets:
+    - `index.html` title now `Arthropod Widget Gallery Live`
+    - `Trunk.toml` set `filehash = false` for stable smoke artifact checks
+- Task 13 GREEN:
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+
+### 2026-02-11 (finish-plan execution, batch 5: task 14)
+
+- Task 14 implementation:
+  - Updated `.github/workflows/ci.yml` with `phase45-gates` job:
+    - wasm target checks for `plat-core`, `render-engine`, and `widget_gallery_web`
+    - explicit Phase 4 test suite execution
+    - Phase 4 benchmark smoke (`phase4_effects`)
+    - Trunk build smoke for web gallery output
+  - Addressed strict clippy gate blockers discovered during full verification:
+    - `crates/style-engine/src/path.rs`
+      - collapsed nested conditionals
+      - replaced needless range loop with iterator+enumerate
+      - explicitly allowed `too_many_arguments` for arc polyline helper
+    - `crates/render-engine/src/backend/wgpu/effects.rs`
+      - replaced `% 2 == 0` with `.is_multiple_of(2)`
+    - `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`
+      - collapsed nested conditional in path interning lookup
+    - `crates/render-engine/src/backend/wgpu/pipelines/primitive_pipeline.rs`
+      - collapsed nested conditional in drop-shadow emission
+      - simplified optional pipeline access pattern
+    - `crates/render-engine/src/backend/wgpu/render_target_pool.rs`
+      - collapsed nested conditional in target reuse path
+    - `crates/render-engine/src/backend/wgpu/mod.rs`
+      - collapsed nested conditionals in path interning and stroke routing
+      - collapsed nested mesh-result/emptiness checks
+- Task 14 local gate check (step 2):
+  - Command: `cargo test -p render-engine --test phase4_effects_tests -- --nocapture`
+  - Result: PASS (5/5).
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+- Task 14 full verification (step 4):
+  - Command: `cargo fmt --all --check`
+  - Result: FAIL initially (format drift) then PASS after `cargo fmt --all`.
+  - Command: `cargo clippy --all-targets --all-features -- -D warnings`
+  - Result: FAIL initially (strict lint violations) then PASS after fixes.
+  - Command: `cargo test --all`
+  - Result: PASS.
+  - Command: `cargo bench -p render-engine phase4_effects -- --noplot`
+  - Result: FAIL (lib bench harness receives unsupported `--noplot`).
+  - Command: `cargo bench -p render-engine --bench phase4_effects -- --noplot`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+
+### 2026-02-11 (post-plan follow-up: wasm panic diagnostics hardening)
+
+- Issue:
+  - Browser reported `RuntimeError: unreachable` with stack ending in `Result::expect` during `widget_gallery_web` startup.
+- Fix:
+  - Updated `examples/widget_gallery_web.rs`:
+    - replaced direct `expect(...)` startup path with explicit error logging before panic for:
+      - window creation
+      - WGPU backend initialization
+    - enabled `console_error_panic_hook::set_once()` in wasm start function.
+    - added console logging for `plat_core::run` errors.
+  - Updated root `Cargo.toml` wasm deps:
+    - added `console_error_panic_hook = "0.1"`.
+- Verification:
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+
+### 2026-02-11 (post-plan follow-up: wasm no-thread condvar panic fix)
+
+- Issue:
+  - Browser panic:
+    - `condvar wait not supported`
+    - `cannot recursively acquire mutex`
+  - Root cause: wasm path still used `pollster::block_on` during backend init (`request_adapter`/`request_device`), which relies on thread/condvar primitives not supported in wasm no-threads runtime.
+- Fix:
+  - `crates/render-engine/src/backend/wgpu/context.rs`
+    - introduced shared async initializer (`new_impl`)
+    - kept native `new(...)` wrapper (driven by `pollster` on native)
+    - added wasm `new_async(...)` entrypoint
+    - removed direct `pollster::block_on` usage from core initialization flow
+  - `crates/render-engine/src/backend/wgpu/mod.rs`
+    - split backend construction into:
+      - native `new(...)`
+      - wasm `new_async(...)`
+      - shared `from_context(...)` pipeline setup
+  - `examples/widget_gallery_web.rs`
+    - switched to non-blocking async backend initialization via `wasm_bindgen_futures::spawn_local`
+    - app now waits until backend init completes, then renders
+    - no startup `expect` panic path for backend init
+  - `Cargo.toml`
+    - added wasm dependency: `wasm-bindgen-futures`
+- Verification:
+  - Command: `cargo check -p render-engine --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example single_rect_test`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+
+### 2026-02-11 (post-plan follow-up: web event queue re-entrancy borrow fix)
+
+- Issue:
+  - Browser panic:
+    - `RefCell already borrowed` in `crates/plat-core/src/platform/web.rs`
+  - Root cause: event dispatch could re-enter queue drain paths during callbacks and hit nested mutable `RefCell` borrows in the pending event queue path.
+- Fix:
+  - Updated `crates/plat-core/src/platform/web.rs`:
+    - added `is_draining_events` guard (`Rc<Cell<bool>>`) to prevent nested drain re-entry
+    - changed queue push/pop operations to scoped borrows so mutable queue borrows are released before callback dispatch
+    - threaded drain guard through all event listener dispatch paths and RAF drain points
+    - preserved deferred event behavior when `app.try_borrow_mut()` is unavailable by pushing event back to queue front
+- Verification:
+  - Command: `cargo check -p plat-core --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+  - Command: `cargo fmt --all --check`
+  - Result: FAIL initially (format drift), then PASS after `cargo fmt --all`.
+  - Command: `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture`
+  - Result: PASS (5/5).
+
+### 2026-02-11 (post-plan follow-up: wasm font/shader/pipeline validation fixes)
+
+- Issues:
+  - Browser panic:
+    - `cosmic-text ... no default font found` while shaping text in wasm.
+  - WebGPU shader validation:
+    - integral vertex output `flags: u32` missing `@interpolate(flat)` in primitive shader.
+  - WebGPU pipeline validation:
+    - blur uniform struct consumed 128 bytes in WGSL but bind-group `minBindingSize` was 124.
+- Fix:
+  - Updated `crates/text-engine/src/lib.rs`:
+    - added `font_system_has_faces(...)` guard
+    - `shape_text(...)` and `shape_text_parallel(...)` now return empty shaped output when no fonts are available (prevents wasm panic)
+    - added regression test `test_shape_text_without_available_fonts_returns_empty`
+  - Updated `crates/render-engine/src/backend/shaders/primitive.wgsl`:
+    - annotated `flags` varying with `@interpolate(flat)`.
+  - Updated `crates/render-engine/src/backend/wgpu/pipelines/blur_pipeline.rs`:
+    - added `_tail_pad` so `BlurParams` ABI matches WGSL uniform size (128 bytes)
+    - added regression test `test_blur_params_uniform_size_matches_wgsl`.
+- Verification:
+  - Command: `cargo test -p text-engine --lib -- --nocapture`
+  - Result: PASS (7/7).
+  - Command: `cargo test -p render-engine blur_params_uniform_size_matches_wgsl -- --nocapture`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+  - Command: `cargo fmt --all --check`
+  - Result: PASS.
+
+### 2026-02-11 (post-plan follow-up: primitive WGSL non-uniform texture sampling fix)
+
+- Issue:
+  - WebGPU shader validation failed:
+    - `'textureSample' must only be called from uniform control flow`
+    - triggered by glyph-texture sample in branch guarded by per-fragment `flags`.
+  - Downstream warnings (`Invalid ShaderModule`, `Invalid RenderPipeline`, invalid command buffer submit) were secondary failures caused by primitive shader compilation failure.
+- Fix:
+  - Updated `crates/render-engine/src/backend/shaders/primitive.wgsl`:
+    - replaced gradient atlas sample with `textureSampleLevel(..., 0.0)`
+    - replaced glyph atlas sample with `textureSampleLevel(..., 0.0)`
+  - This removes implicit-derivative requirements that enforce uniform control flow for `textureSample`.
+- Verification:
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+
+### 2026-02-11 (post-plan follow-up: wasm text rendering via bundled runtime font)
+
+- Goal:
+  - Restore visible text in `widget_gallery_web` on wasm after no-system-font safety guard.
+- RED:
+  - Added tests in `crates/text-engine/src/lib.rs` expecting runtime font registration to unblock shaping:
+    - `test_register_font_bytes_unblocks_shaping_on_empty_db`
+    - `test_shape_text_parallel_uses_runtime_registered_font`
+  - Command: `cargo test -p text-engine --lib -- --nocapture`
+  - Result: FAIL (expected): missing `TextEngine::register_font_bytes`.
+- Implementation:
+  - Bundled a local fallback font from already-vendored dependency assets:
+    - added `assets/fonts/Inter-Regular.ttf`
+    - added `assets/fonts/Inter-LICENSE`
+  - Updated `crates/text-engine/src/lib.rs`:
+    - added global runtime font registry (`OnceLock<Mutex<Vec<Vec<u8>>>>`)
+    - added font propagation helpers:
+      - `register_global_font_bytes`
+      - `apply_global_fonts`
+    - thread-local shaping pool now tracks applied global font count
+    - `TextEngine` now tracks `applied_global_fonts`
+    - added public `TextEngine::register_font_bytes(bytes) -> usize`
+    - `shape_text` and `shape_text_parallel` now sync global runtime fonts before shaping
+  - Updated `crates/render-engine/src/backend/text/text_renderer.rs`:
+    - added `TextRenderer::register_font_bytes(bytes) -> usize`
+  - Updated `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - added `WgpuBackend::register_font_bytes(bytes) -> usize` (in inherent impl)
+  - Updated `examples/widget_gallery_web.rs`:
+    - embedded bundled font bytes with `include_bytes!("../assets/fonts/Inter-Regular.ttf")`
+    - registers font immediately after backend init
+    - logs loaded face count.
+- GREEN + verification:
+  - Command: `cargo test -p text-engine --lib -- --nocapture`
+  - Result: PASS (9/9).
+  - Command: `cargo check -p render-engine`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `trunk build --example widget_gallery_web --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+  - Command: `cargo fmt --all --check`
+  - Result: FAIL initially (format drift), then PASS after `cargo fmt --all`.
+
+### 2026-02-11 (post-plan follow-up: Playwright-style visual regression harness for Phase 4)
+
+- Goal:
+  - Add real screenshot-based visual regression tests for Phase 4 blur/blend/clipping.
+- Implementation:
+  - Added wasm visual fixture app:
+    - `examples/phase4_visual_web.rs`
+    - renders deterministic scenes for `blur`, `blend`, and `clipping` selected by query param (`?case=`).
+    - emits readiness markers in DOM:
+      - `body[data-arthropod-ready="1"]`
+      - `body[data-arthropod-case="<case>"]`
+  - Added root example registration and wasm web-sys features in `Cargo.toml`:
+    - `[[example]] phase4_visual_web`
+    - wasm `web-sys` features expanded for location/document access.
+  - Added Playwright harness files:
+    - `package.json` (scripts `visual:test` / `visual:update`)
+    - `playwright.config.mjs` (webServer uses `trunk serve --example phase4_visual_web --features web`)
+    - `tests/visual/phase4-visual.spec.mjs` (canvas snapshots for blur/blend/clipping)
+  - Added docs:
+    - `docs/testing/phase4-visual-regression.md`
+  - Updated `.gitignore` for Node/Playwright outputs.
+- Rust-side verification:
+  - Command: `cargo check --example phase4_visual_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `cargo check --example phase4_visual_web`
+  - Result: PASS.
+  - Command: `trunk build --example phase4_visual_web --features web`
+  - Result: PASS.
+  - Command: `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web`
+  - Result: PASS.
+  - Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke/web_gallery_smoke.ps1`
+  - Result: PASS.
+  - Command: `cargo fmt --all --check`
+  - Result: PASS.
+- Playwright execution status in this environment:
+  - Command: `npm install`
+  - Result: FAIL (`EACCES` fetching `@playwright/test` from npm registry in sandboxed environment).
+  - Command: `npm run visual:test`
+  - Result: FAIL (`playwright` command unavailable because dependencies were not installable in this sandbox).
+
+### 2026-02-11 (desktop pivot: Phase 4 visual examples render native windows, not console-only)
+
+- Goal:
+  - Ensure `visual_test_phase4_blur`, `visual_test_phase4_blend`, and `visual_test_phase4_clipping` are real desktop rendering examples using the normal native pipeline.
+- Implementation:
+  - Added shared scene builders in `examples/phase4_visual_scenes.rs`:
+    - `build_phase4_blur_scene()`
+    - `build_phase4_blend_scene()`
+    - `build_phase4_clipping_scene()`
+  - Reworked desktop examples into full `plat_core::Application` implementations:
+    - `examples/visual_test_phase4_blur.rs`
+    - `examples/visual_test_phase4_blend.rs`
+    - `examples/visual_test_phase4_clipping.rs`
+  - Each example now:
+    - creates a real native window
+    - initializes `WgpuBackend`
+    - handles resize/close events
+    - renders the Phase 4 scene on redraw via `backend.render(&scene)`
+- Verification:
+  - Command: `cargo check --example visual_test_phase4_blur --example visual_test_phase4_blend --example visual_test_phase4_clipping`
+  - Result: PASS.
+  - Command: `cargo test -p render-engine --test phase4_effect_plan_tests --test phase4_render_target_pool_tests --test phase4_blur_execution_tests --test phase4_background_blur_tests --test phase4_inner_shadow_tests --test phase4_stencil_tests --test phase4_blend_modes_tests --test phase4_effects_tests -- --nocapture`
+  - Result: PASS (all listed Phase 4 effect/planner tests).
+  - Command: `cargo fmt --all` then `cargo fmt --all --check`
+  - Result: PASS (`examples/phase4_visual_scenes.rs` auto-formatted to satisfy rustfmt).
+  - Command: `cargo run --example visual_test_phase4_blur` (20s timeout)
+  - Result: STARTED successfully (windowed app banner + backend init log observed; command timed out intentionally because event loop keeps running).
+  - Command: `cargo run --example visual_test_phase4_blend` (12s timeout)
+  - Result: STARTED successfully (windowed app banner + backend init log observed; command timed out intentionally because event loop keeps running).
+  - Command: `cargo run --example visual_test_phase4_clipping` (12s timeout)
+  - Result: STARTED successfully (windowed app banner + backend init log observed; command timed out intentionally because event loop keeps running).
+
+### 2026-02-11 (desktop visual regression harness: native screenshot + golden diff)
+
+- Goal:
+  - Add deterministic native desktop visual regression tests for Phase 4 blur/blend/clipping (no web dependency).
+- TDD checkpoints:
+  - RED:
+    - Added new `WgpuContext` tests expecting missing helpers:
+      - `test_aligned_bytes_per_row_rounds_up_to_256_bytes`
+      - `test_unpack_readback_pixels_removes_padding`
+      - `test_unpack_readback_pixels_swizzles_bgra_to_rgba`
+    - Command: `cargo test -p render-engine context::tests::test_aligned_bytes_per_row_rounds_up_to_256_bytes -- --nocapture`
+    - Result: FAIL (expected, missing `aligned_bytes_per_row` / `unpack_readback_pixels`).
+  - GREEN:
+    - Implemented:
+      - `aligned_bytes_per_row(...)`
+      - `unpack_readback_pixels(...)` (padding strip + BGRA->RGBA swizzle)
+      - `WgpuContext::with_offscreen_render_pass(...)` for native RGBA capture.
+    - Added `WgpuBackend` capture path:
+      - `render_scene_to_rgba(...)`
+      - extracted shared frame prep into `prepare_phase4_effect_state(...)` and `collect_frame_batches(...)`.
+  - RED (golden test):
+    - Added `tests/phase4_desktop_visual_regression.rs`.
+    - Command: `cargo test --test phase4_desktop_visual_regression -- --nocapture`
+    - Result: FAIL (expected, missing `tests/visual/golden/phase4/*.png`).
+  - GREEN:
+    - Added native capture example:
+      - `examples/capture_phase4_visuals.rs` (writes blur/blend/clipping PNGs)
+    - Generated and committed goldens:
+      - `tests/visual/golden/phase4/blur.png`
+      - `tests/visual/golden/phase4/blend.png`
+      - `tests/visual/golden/phase4/clipping.png`
+    - Re-ran regression test: PASS.
+
+- Additional changes:
+  - Added tolerant image diff utility:
+    - `compare_images_with_tolerance(...)` in `crates/arthropod-test/src/visual_test.rs`
+    - with unit tests for tolerance behavior.
+  - Added docs:
+    - `docs/testing/phase4-desktop-visual-regression.md`
+  - Added CI gate:
+    - `.github/workflows/ci.yml` job `phase4-desktop-visual-regression` on Windows.
+  - Added ignore for generated artifacts:
+    - `.gitignore`: `tests/visual/artifacts/`
+  - Added example registration:
+    - `Cargo.toml`: `[[example]] capture_phase4_visuals`
+
+- Verification evidence:
+  - `cargo fmt --all --check` -> PASS
+  - `cargo check -p render-engine` -> PASS
+  - `cargo check --example capture_phase4_visuals` -> PASS
+  - `cargo test -p arthropod-test visual_test -- --nocapture` -> PASS
+  - `cargo run --example capture_phase4_visuals` -> PASS (writes all three goldens)
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-11 (desktop visual regression CI hardening: failure artifacts + threshold overrides)
+
+- Goal:
+  - Make CI fail only on substantial visual changes and attach failed render outputs for fast PR review.
+- Changes:
+  - `tests/phase4_desktop_visual_regression.rs`
+    - added env-configurable thresholds:
+      - `ARTHROPOD_VISUAL_CHANNEL_TOLERANCE` (default `2`)
+      - `ARTHROPOD_VISUAL_MAX_DIFF_RATIO` (default `0.02`)
+  - `.github/workflows/ci.yml`
+    - `phase4-desktop-visual-regression` job now runs with:
+      - `ARTHROPOD_VISUAL_CHANNEL_TOLERANCE=2`
+      - `ARTHROPOD_VISUAL_MAX_DIFF_RATIO=0.04`
+    - added `actions/upload-artifact@v4` step on `failure()`:
+      - artifact name: `phase4-desktop-visual-artifacts`
+      - path: `tests/visual/artifacts/phase4`
+  - `docs/testing/phase4-desktop-visual-regression.md`
+    - documented env overrides and CI artifact behavior.
+- Verification evidence:
+  - `cargo fmt --all --check` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+  - `ARTHROPOD_VISUAL_MAX_DIFF_RATIO=0.04 cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-11 (parity gap close: `VisualStyle.opacity` now participates in rendering)
+
+- Goal:
+  - Align runtime rendering with model semantics so node alpha is `node.opacity * style.opacity`.
+- TDD:
+  - RED tests added in `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - `test_style_opacity_multiplies_node_opacity_for_primitive_instances`
+    - `test_style_opacity_multiplies_node_opacity_for_path_batches`
+  - RED verification:
+    - `cargo test -p render-engine style_opacity_multiplies_node_opacity -- --nocapture`
+    - Result: FAIL (expected; got 0.5 and 0.8 instead of 0.2 and 0.4).
+  - GREEN implementation:
+    - `create_node_instances(...)` now passes combined opacity.
+    - `collect_instances_impl(...)` computes `effective_opacity = node.opacity * style.opacity`.
+    - Applies `effective_opacity` to:
+      - primitive instance creation
+      - path batch opacity
+      - text fill opacity path
+  - GREEN verification:
+    - `cargo test -p render-engine style_opacity_multiplies_node_opacity -- --nocapture` -> PASS
+    - `cargo check -p render-engine` -> PASS
+    - `cargo fmt --all` applied after rustfmt diffs.
+
+### 2026-02-11 (parity gap close: `clips_content` now clips child primitive bounds in collection path)
+
+- Goal:
+  - Apply parent `clips_content` to child primitive bounds during instance collection.
+- TDD:
+  - RED tests added in `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - `test_clips_content_partially_clips_child_primitive_bounds`
+    - `test_clips_content_skips_child_fully_outside_clip_bounds`
+  - RED verification:
+    - `cargo test -p render-engine clips_content_ -- --nocapture`
+    - Result: FAIL (expected; child width un-clipped and outside child still emitted).
+  - GREEN implementation:
+    - Added ancestor clip intersection helpers:
+      - `rect_intersection(...)`
+      - `ancestor_clip_bounds(...)`
+      - `clipped_bounds_for_node(...)`
+    - `collect_instances_impl(...)` now:
+      - computes per-node clipped bounds from ancestor clip containers
+      - skips nodes fully outside clip
+      - uses clipped bounds for primitive instance size/position and path batch offsets/sizes
+  - GREEN verification:
+    - `cargo test -p render-engine clips_content_ -- --nocapture` -> PASS
+    - `cargo run --example capture_phase4_visuals` -> PASS (regenerated goldens after clipping change)
+    - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-11 (model parity: Figma `individualStrokeWeights` alias)
+
+- Goal:
+  - Improve import parity for Figma stroke weight naming.
+- Implementation:
+  - Added serde aliases on `StrokeStyle.side_weights`:
+    - `individualStrokeWeights`
+    - `individual_weights`
+  - Added unit test:
+    - `test_deserialize_figma_individual_stroke_weights_alias`
+- Verification:
+  - `cargo test -p style-engine deserialize_figma_individual_stroke_weights_alias -- --nocapture` -> PASS
+  - `cargo fmt --all --check` -> PASS
+
+### 2026-02-11 (desktop multipass blur fix: WGSL uniform layout + visual parity)
+
+- Issue:
+  - Desktop/native Phase 4 blur path produced invalid pipeline at runtime and blank/transparent output.
+  - Uncaptured wgpu validation error from `Blur Shader`:
+    - uniform `array<f32, 25>` in WGSL had invalid stride in uniform address space.
+- Root cause:
+  - WGSL uniform layout rules require 16-byte-aligned array stride; scalar float arrays are not valid for this block shape.
+- Implementation:
+  - Updated `crates/render-engine/src/backend/wgpu/pipelines/blur_pipeline.rs`:
+    - `BlurParams` now uses packed weight storage: `packed_weights: [[f32; 4]; 7]`.
+    - Added explicit padding field `_pad2: [u32; 2]` so Rust ABI offsets match WGSL uniform layout.
+    - Updated `from_radius(...)` packing logic.
+    - Added/updated tests:
+      - `test_blur_params_uniform_size_matches_wgsl`
+      - `test_blur_params_pack_weights`
+  - Updated `crates/render-engine/src/backend/shaders/blur.wgsl`:
+    - replaced `weights: array<f32, 25>` with `packed_weights: array<vec4<f32>, 7>`.
+    - added `blur_weight(index)` helper for packed lookup.
+  - Removed temporary debug print from `render_scene_to_rgba(...)` in `crates/render-engine/src/backend/wgpu/mod.rs`.
+  - Gated native-only readback helpers in `crates/render-engine/src/backend/wgpu/context.rs` with `#[cfg(not(target_arch = "wasm32"))]` to keep wasm checks warning-free.
+  - Regenerated desktop golden images with fixed blur output:
+    - `tests/visual/golden/phase4/blur.png`
+    - `tests/visual/golden/phase4/blend.png`
+    - `tests/visual/golden/phase4/clipping.png`
+- Verification:
+  - `cargo test -p render-engine test_blur_params_uniform_size_matches_wgsl -- --nocapture` -> PASS
+  - `cargo run --example capture_phase4_visuals -- --out .tmp/phase4-debug` -> PASS (no blur pipeline validation errors)
+  - `cargo run --example capture_phase4_visuals` -> PASS (goldens updated)
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+  - `cargo test -p render-engine --test phase4_effect_plan_tests --test phase4_render_target_pool_tests --test phase4_blur_execution_tests --test phase4_background_blur_tests --test phase4_inner_shadow_tests --test phase4_stencil_tests --test phase4_blend_modes_tests --test phase4_effects_tests -- --nocapture` -> PASS
+  - `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture` -> PASS
+  - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `cargo fmt --all --check` -> PASS
+
+### 2026-02-11 (parity continuation: `isMask`/`maskType` + non-placeholder `Paint::Image`)
+
+- Goal:
+  - Close remaining mapping gaps from the Phase 4/5 parity table:
+    - `isMask` / `maskType`
+    - `fills[].type: IMAGE`
+- Implementation:
+  - `style-engine` mask model:
+    - Added `MaskType` enum in `crates/style-engine/src/visual.rs`:
+      - `Alpha`, `Vector`, `Luminance`
+    - Extended `VisualStyle` with:
+      - `is_mask: bool` (`serde` alias `isMask`)
+      - `mask_type: MaskType` (`serde` alias `maskType`)
+    - Added builder methods:
+      - `VisualStyle::is_mask(...)`
+      - `VisualStyle::mask_type(...)`
+    - Exported `MaskType` in `crates/style-engine/src/lib.rs`.
+  - `render-engine` mask clipping behavior:
+    - Added ancestor sibling-mask resolution in `crates/render-engine/src/backend/wgpu/mod.rs`:
+      - `ancestor_mask_bounds(...)`
+      - integrated into `clipped_bounds_for_node(...)`
+    - Behavior:
+      - last preceding mask sibling per ancestor level clips subsequent sibling bounds.
+      - combined with existing `clips_content` clipping.
+  - `render-engine` image fill behavior:
+    - Added CPU image registry + sampling module:
+      - `crates/render-engine/src/backend/wgpu/image_store.rs`
+      - APIs:
+        - `register_image_rgba8(...)`
+        - `unregister_image(...)`
+        - `sample_image_fill(...)`
+      - scale modes handled: `Fill`, `Fit`, `Crop`, `Tile`
+      - optional 3x3 UV transform support.
+    - Exposed backend registration API in `WgpuBackend`:
+      - `register_image_rgba8(...)`
+      - `unregister_image(...)`
+    - Updated path sampling in `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`:
+      - `Paint::Image` now samples registered image data instead of magenta fallback.
+    - Updated instance collection in `crates/render-engine/src/backend/wgpu/mod.rs`:
+      - image-filled rectangle nodes are routed through path batches (no primitive magenta fallback).
+- Tests added:
+  - `crates/style-engine/src/visual.rs`:
+    - `test_builder_mask_fields`
+    - `test_deserialize_figma_mask_aliases`
+  - `crates/render-engine/src/backend/wgpu/mod.rs`:
+    - `test_image_fill_rect_is_routed_to_path_batches`
+    - `test_mask_node_clips_subsequent_sibling_bounds`
+    - `test_mask_node_does_not_clip_preceding_sibling`
+  - `crates/render-engine/src/backend/wgpu/image_store.rs`:
+    - `test_register_rejects_invalid_byte_len`
+    - `test_sample_image_fill_reads_registered_pixel`
+    - `test_sample_image_fill_tile_wraps_uv`
+  - `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`:
+    - `test_sample_paint_at_uv_image_fill_reads_registered_image`
+- Verification:
+  - `cargo test -p style-engine --lib -- --nocapture` -> PASS
+  - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+  - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `cargo fmt --all --check` -> PASS
+
+### 2026-02-11 (visual parity extension: desktop regression now covers `mask` and `image`)
+
+- Goal:
+  - Add screenshot-level regression coverage for newly added mask/image rendering behavior.
+- Implementation:
+  - Extended shared scene fixtures in `examples/phase4_visual_scenes.rs`:
+    - `build_phase4_mask_scene()`
+    - `build_phase4_image_scene()`
+    - added `PHASE4_IMAGE_TEST_ID` fixture ID.
+  - Updated desktop capture harness `examples/capture_phase4_visuals.rs`:
+    - registers deterministic test image bytes via `WgpuBackend::register_image_rgba8(...)`.
+    - captures additional cases:
+      - `mask`
+      - `image`
+  - Updated desktop regression test `tests/phase4_desktop_visual_regression.rs`:
+    - registers same deterministic image asset.
+    - compares `mask` and `image` outputs against committed goldens.
+  - Updated docs `docs/testing/phase4-desktop-visual-regression.md` with new coverage/golden list.
+  - Generated new goldens:
+    - `tests/visual/golden/phase4/mask.png`
+    - `tests/visual/golden/phase4/image.png`
+- Verification:
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+  - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+  - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `cargo fmt --all --check` -> PASS
+
+### 2026-02-11 (visual tuning follow-up: blur compositing write mode + clipping palette)
+
+- User feedback:
+  - blend/blur output looked off and clipping sample had a distracting yellow rectangle.
+- Implementation:
+  - Updated `crates/render-engine/src/backend/wgpu/pipelines/blur_pipeline.rs`:
+    - extracted `blur_color_target_state(...)`.
+    - switched blur pass color target to replace writes (`blend: None`) to avoid double alpha blending in fullscreen blur compositing.
+    - added unit test `test_blur_pipeline_uses_replace_target_state`.
+  - Updated `examples/phase4_visual_scenes.rs`:
+    - changed clipping scene accent (`escape_rect`) fill from saturated yellow to cyan-blue to remove random yellow outlier.
+  - Regenerated desktop phase4 goldens after scene/pipeline updates:
+    - `tests/visual/golden/phase4/blur.png`
+    - `tests/visual/golden/phase4/blend.png`
+    - `tests/visual/golden/phase4/clipping.png`
+    - `tests/visual/golden/phase4/mask.png`
+    - `tests/visual/golden/phase4/image.png`
+- Verification:
+  - `cargo fmt --all` -> PASS
+  - `cargo test -p render-engine test_blur_pipeline_uses_replace_target_state --lib -- --nocapture` -> PASS
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-11 (root-cause fix: multipass UV orientation + blend alpha compositing + regression hardening)
+
+- User feedback:
+  - blend and blur visuals were still incorrect after initial tuning.
+- Root cause investigation (systematic):
+  - Added failing regression guard in `tests/phase4_desktop_visual_regression.rs`:
+    - `phase4_blend_modes_render_distinct_outputs`
+    - verified first two blend columns were pixel-identical before fix (RED).
+  - Traced multipass execution path in `crates/render-engine/src/backend/wgpu/mod.rs` and confirmed per-node blend modes were being passed correctly.
+  - Identified shader-space mismatch:
+    - fullscreen triangle UVs in `blur.wgsl` and `blend.wgsl` sampled with incorrect Y orientation relative to render-target reads/writes.
+    - this caused multipass source/destination sampling to come from wrong rows, making blend columns collapse and blur composition look wrong.
+- Implementation:
+  - `crates/render-engine/src/backend/shaders/blur.wgsl`
+    - corrected fullscreen UV mapping in `vs_main`:
+      - `out.uv = vec2<f32>(p.x * 0.5 + 0.5, 1.0 - (p.y * 0.5 + 0.5));`
+  - `crates/render-engine/src/backend/shaders/blend.wgsl`
+    - corrected fullscreen UV mapping with same Y flip.
+    - retained alpha-correct source-over blend compositing:
+      - unpremultiply sampled RGBA
+      - apply blend function in straight-color space
+      - recomposite with Porter-Duff source-over into premultiplied output.
+  - `crates/render-engine/src/backend/wgpu/effects.rs`
+    - added CPU reference compositing helper:
+      - `composite_blend_over(mode, src, dst)`
+    - added internal `apply_blend_mode(...)` helper.
+  - `crates/render-engine/tests/phase4_blend_modes_tests.rs`
+    - added RED/GREEN coverage:
+      - `test_composite_blend_over_preserves_destination_when_source_alpha_zero`
+      - `test_composite_blend_over_uses_source_alpha_for_blend_mix`
+  - `tests/phase4_desktop_visual_regression.rs`
+    - added blend distinctness visual test:
+      - `phase4_blend_modes_render_distinct_outputs`
+      - asserts blend columns differ and Screen is brighter than Multiply at overlap sample.
+  - `examples/phase4_visual_scenes.rs`
+    - clipping accent kept as cyan-blue (removed yellow outlier from previous follow-up).
+- Regenerated goldens after final fix:
+  - `tests/visual/golden/phase4/blur.png`
+  - `tests/visual/golden/phase4/blend.png`
+  - `tests/visual/golden/phase4/clipping.png`
+  - `tests/visual/golden/phase4/mask.png`
+  - `tests/visual/golden/phase4/image.png`
+- Verification:
+  - `cargo test -p render-engine --test phase4_blend_modes_tests -- --nocapture` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression phase4_blend_modes_render_distinct_outputs -- --nocapture` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+  - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo fmt --all --check` -> PASS
+
+### 2026-02-11 (mask visual clarity improvement + regression stability)
+
+- User feedback:
+  - mask golden did not clearly demonstrate clipping behavior.
+- Implementation:
+  - Updated `examples/phase4_visual_scenes.rs` `build_phase4_mask_scene()` to make mask behavior visually explicit:
+    - added backdrop panel behind mask demo area.
+    - changed mask node to a large rounded shape (`corner_radius(140.0)`) centered in panel.
+    - enlarged post-mask gradient layer so clipping boundary is obvious.
+    - added additional oversized post-mask siblings (`masked_bar`, `masked_chip`) so all are clipped by the same mask.
+    - retained pre-mask blue sibling as unmasked control element.
+  - Regenerated goldens with updated mask fixture:
+    - `tests/visual/golden/phase4/mask.png` (plus full phase4 set via capture example).
+  - Improved regression determinism in `tests/phase4_desktop_visual_regression.rs`:
+    - added process-local mutex (`OnceLock<Mutex<()>>`) and lock guard in both tests.
+    - prevents parallel test execution races when both tests initialize/render through native WGPU paths concurrently.
+- Verification:
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression phase4_desktop_visual_regression_matches_golden -- --nocapture` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS (both tests together)
+
+### 2026-02-11 (image visual fidelity fix: path image sampling density)
+
+- User feedback:
+  - image golden did not look like an image (looked like flat/gradient regions instead of sampled content).
+- Root cause:
+  - `Paint::Image` in `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs` was sampled only at tessellated mesh vertices.
+  - rectangle/path fill meshes have sparse vertices (often corners), so GPU interpolation blurred/collapsed image detail.
+- Implementation:
+  - Added adaptive image-batch subdivision in `path_pipeline.rs` during `PathPipeline::prepare(...)`:
+    - `image_subdivision_steps(...)`
+    - `append_subdivided_image_triangle(...)`
+    - `append_batch_geometry(...)`
+    - `push_batch_vertex(...)`
+    - `sample_batch_color(...)`
+  - Behavior:
+    - non-image paints keep existing geometry path (no behavior change).
+    - image paints subdivide triangles before upload so interior texels are sampled across the surface.
+    - subdivision is capped by:
+      - `IMAGE_SUBDIVISION_TARGET_PIXELS`
+      - `IMAGE_SUBDIVISION_MAX`
+      - `IMAGE_SUBDIVISION_TRIANGLE_BUDGET`
+  - Added regression tests in `path_pipeline.rs`:
+    - `test_append_batch_geometry_subdivides_image_batches_and_samples_interior`
+    - updated `test_sample_paint_at_uv_image_fill_reads_registered_image` to cleanup image registration after test.
+  - Regenerated desktop phase4 goldens:
+    - `tests/visual/golden/phase4/image.png` now shows clear marker sprite across fill/fit/tile cases.
+- Verification:
+  - `cargo test -p render-engine path_pipeline -- --nocapture` -> PASS (9/9)
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS (2/2)

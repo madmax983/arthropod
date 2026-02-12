@@ -1,0 +1,5 @@
+[build]
+target = "index.html"
+dist = "target/trunk/widget_gallery_web"
+public_url = "/"
+filehash = false

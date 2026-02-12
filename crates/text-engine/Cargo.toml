@@ -12,9 +12,17 @@ unicode-bidi = "0.3"
 unicode-segmentation = "1.12"
 glam = "0.29"
 rayon = "1.11"
+thiserror = "2.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Response"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+pollster = "0.4"
 
 [[bench]]
 name = "shaping_bench"

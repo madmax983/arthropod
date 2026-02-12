@@ -1,15 +1,19 @@
 //! Tessellated path utilities and Phase 3 path pipeline foundation.
 
+use crate::backend::wgpu::image_store;
 use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillRule, FillTessellator, FillVertex, LineCap, LineJoin,
     StrokeOptions, StrokeTessellator, StrokeVertex, VertexBuffers,
 };
-use style_engine::{Paint, PathCommand, StrokeCap, StrokeJoin, StrokeStyle, VectorPath, WindingRule};
 use std::collections::HashMap;
 use std::sync::Arc;
+use style_engine::{
+    Paint, PathCommand, StrokeCap, StrokeJoin, StrokeStyle, VectorPath, WindingRule,
+};
 use thiserror::Error;
+use wgpu::util::DeviceExt;
 
 /// Vertex payload for tessellated path rendering.
 #[repr(C)]
@@ -104,6 +108,9 @@ pub struct PathPipeline {
 
 const INITIAL_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_INDEX_CAPACITY: usize = 8192;
+const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 12.0;
+const IMAGE_SUBDIVISION_MAX: u32 = 32;
+const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 4096;
 
 #[inline]
 fn mix_u64(mut state: u64, value: u64) -> u64 {
@@ -200,7 +207,7 @@ fn hash_paint_fast(mut state: u64, paint: &Paint) -> u64 {
     }
 }
 
-fn sample_paint_at_uv(paint: &Paint, uv: glam::Vec2) -> glam::Vec4 {
+fn sample_paint_at_uv(paint: &Paint, uv: glam::Vec2, target_size: glam::Vec2) -> glam::Vec4 {
     match paint {
         Paint::Solid(color) => *color,
         Paint::Linear(gradient) => {
@@ -237,8 +244,151 @@ fn sample_paint_at_uv(paint: &Paint, uv: glam::Vec2) -> glam::Vec4 {
             let t = ((d.x / scale) + (d.y / scale)).clamp(0.0, 1.0);
             Paint::interpolate_stops(t, &gradient.stops)
         }
-        Paint::Image(_) => glam::Vec4::new(1.0, 0.0, 1.0, 1.0),
+        Paint::Image(image) => image_store::sample_image_fill(image, uv, target_size)
+            .unwrap_or_else(|| glam::Vec4::new(1.0, 0.0, 1.0, 1.0)),
     }
+}
+
+fn image_subdivision_steps(size: glam::Vec2, base_triangle_count: usize) -> u32 {
+    let desired = ((size.x.max(size.y).max(1.0) / IMAGE_SUBDIVISION_TARGET_PIXELS).ceil() as u32)
+        .clamp(2, IMAGE_SUBDIVISION_MAX);
+    let max_by_budget =
+        ((IMAGE_SUBDIVISION_TRIANGLE_BUDGET as f32 / base_triangle_count.max(1) as f32).sqrt()
+            .floor() as u32)
+            .max(1);
+    desired.min(max_by_budget).max(1)
+}
+
+fn sample_batch_color(batch: &PathBatch, local_pos: glam::Vec2, size: glam::Vec2) -> [f32; 4] {
+    let mut color = sample_paint_at_uv(
+        &batch.paint,
+        (local_pos / size).clamp(glam::Vec2::ZERO, glam::Vec2::ONE),
+        size,
+    );
+    color.w *= batch.opacity;
+    color.to_array()
+}
+
+fn push_batch_vertex(
+    batch: &PathBatch,
+    vertices: &mut Vec<PathGpuVertex>,
+    local_pos: glam::Vec2,
+    normal: glam::Vec2,
+    size: glam::Vec2,
+) -> u32 {
+    let idx = vertices.len() as u32;
+    vertices.push(PathGpuVertex {
+        position: [local_pos.x + batch.offset[0], local_pos.y + batch.offset[1]],
+        normal: normal.to_array(),
+        color: sample_batch_color(batch, local_pos, size),
+    });
+    idx
+}
+
+fn append_subdivided_image_triangle(
+    batch: &PathBatch,
+    vertices: &mut Vec<PathGpuVertex>,
+    indices: &mut Vec<u32>,
+    size: glam::Vec2,
+    subdivision_steps: u32,
+    p0: glam::Vec2,
+    p1: glam::Vec2,
+    p2: glam::Vec2,
+    n0: glam::Vec2,
+    n1: glam::Vec2,
+    n2: glam::Vec2,
+) {
+    let steps = subdivision_steps.max(1);
+    let mut row_indices: Vec<Vec<u32>> = Vec::with_capacity((steps + 1) as usize);
+
+    for row in 0..=steps {
+        let row_t = row as f32 / steps as f32;
+        let start_pos = p0.lerp(p2, row_t);
+        let end_pos = p1.lerp(p2, row_t);
+        let start_normal = n0.lerp(n2, row_t);
+        let end_normal = n1.lerp(n2, row_t);
+
+        let cols = steps - row;
+        let mut row_ids = Vec::with_capacity((cols + 1) as usize);
+        for col in 0..=cols {
+            let col_t = if cols == 0 {
+                0.0
+            } else {
+                col as f32 / cols as f32
+            };
+            let local_pos = start_pos.lerp(end_pos, col_t);
+            let normal = start_normal.lerp(end_normal, col_t);
+            row_ids.push(push_batch_vertex(batch, vertices, local_pos, normal, size));
+        }
+        row_indices.push(row_ids);
+    }
+
+    for row in 0..steps as usize {
+        let top = &row_indices[row];
+        let bottom = &row_indices[row + 1];
+        let cols = bottom.len();
+        for col in 0..cols {
+            indices.push(top[col]);
+            indices.push(top[col + 1]);
+            indices.push(bottom[col]);
+            if col + 1 < cols {
+                indices.push(top[col + 1]);
+                indices.push(bottom[col + 1]);
+                indices.push(bottom[col]);
+            }
+        }
+    }
+}
+
+fn append_batch_geometry(
+    batch: &PathBatch,
+    vertices: &mut Vec<PathGpuVertex>,
+    indices: &mut Vec<u32>,
+) {
+    if batch.mesh.vertices.is_empty() || batch.mesh.indices.is_empty() {
+        return;
+    }
+
+    let size = glam::Vec2::new(batch.size[0].max(1.0), batch.size[1].max(1.0));
+    if matches!(batch.paint, Paint::Image(_)) {
+        let subdivision_steps = image_subdivision_steps(size, batch.mesh.indices.len() / 3);
+        for tri in batch.mesh.indices.chunks_exact(3) {
+            let ia = tri[0] as usize;
+            let ib = tri[1] as usize;
+            let ic = tri[2] as usize;
+            let va = batch.mesh.vertices[ia];
+            let vb = batch.mesh.vertices[ib];
+            let vc = batch.mesh.vertices[ic];
+            append_subdivided_image_triangle(
+                batch,
+                vertices,
+                indices,
+                size,
+                subdivision_steps,
+                glam::Vec2::from(va.position),
+                glam::Vec2::from(vb.position),
+                glam::Vec2::from(vc.position),
+                glam::Vec2::from(va.normal),
+                glam::Vec2::from(vb.normal),
+                glam::Vec2::from(vc.normal),
+            );
+        }
+        return;
+    }
+
+    let base_vertex = vertices.len() as u32;
+    vertices.extend(batch.mesh.vertices.iter().map(|v| {
+        let local_pos = glam::Vec2::new(v.position[0], v.position[1]);
+        PathGpuVertex {
+            position: [
+                local_pos.x + batch.offset[0],
+                local_pos.y + batch.offset[1],
+            ],
+            normal: v.normal,
+            color: sample_batch_color(batch, local_pos, size),
+        }
+    }));
+    indices.extend(batch.mesh.indices.iter().map(|i| i + base_vertex));
 }
 
 fn hash_vector_path(path: &VectorPath) -> u64 {
@@ -388,10 +538,10 @@ impl TessellationCache {
     fn fill_key_interned(&mut self, path: &VectorPath) -> u64 {
         let ptr = path as *const VectorPath as usize;
         let fingerprint = Self::path_fingerprint(path);
-        if let Some(entry) = self.interned_path_keys.get(&ptr) {
-            if entry.fingerprint == fingerprint {
-                return entry.path_hash;
-            }
+        if let Some(entry) = self.interned_path_keys.get(&ptr)
+            && entry.fingerprint == fingerprint
+        {
+            return entry.path_hash;
         }
 
         let path_hash = hash_vector_path(path);
@@ -424,7 +574,9 @@ impl TessellationCache {
 
     fn evict_if_needed(&mut self) {
         while self.cache.len() > self.max_entries {
-            if let Some((&oldest_key, _)) = self.access_epoch.iter().min_by_key(|(_, epoch)| **epoch) {
+            if let Some((&oldest_key, _)) =
+                self.access_epoch.iter().min_by_key(|(_, epoch)| **epoch)
+            {
                 self.cache.remove(&oldest_key);
                 self.lyon_paths.remove(&oldest_key);
                 self.access_epoch.remove(&oldest_key);
@@ -486,7 +638,10 @@ impl TessellationCache {
         }
         self.record_miss();
         let lyon_path = self.get_or_build_lyon_path(key, path);
-        let mesh = Arc::new(tessellate_fill_from_lyon_path(&lyon_path, path.winding_rule)?);
+        let mesh = Arc::new(tessellate_fill_from_lyon_path(
+            &lyon_path,
+            path.winding_rule,
+        )?);
         Ok(self.insert_mesh(key, mesh))
     }
 
@@ -642,7 +797,10 @@ fn tessellate_fill_from_lyon_path(
 }
 
 /// Tessellate path stroke geometry using lyon.
-pub fn tessellate_stroke(path: &VectorPath, stroke: &StrokeStyle) -> Result<PathMesh, TessellationError> {
+pub fn tessellate_stroke(
+    path: &VectorPath,
+    stroke: &StrokeStyle,
+) -> Result<PathMesh, TessellationError> {
     if path.commands.is_empty() || stroke.weight <= 0.0 {
         return Ok(PathMesh::default());
     }
@@ -764,54 +922,12 @@ impl PathPipeline {
         }
     }
 
-    fn ensure_vertex_capacity(&mut self, device: &wgpu::Device, needed: usize) {
-        if needed <= self.vertex_capacity {
-            return;
-        }
-        self.vertex_capacity = needed.next_power_of_two();
-        self.vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Path Vertex Buffer"),
-            size: (self.vertex_capacity * std::mem::size_of::<PathGpuVertex>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-    }
-
-    fn ensure_index_capacity(&mut self, device: &wgpu::Device, needed: usize) {
-        if needed <= self.index_capacity {
-            return;
-        }
-        self.index_capacity = needed.next_power_of_two();
-        self.index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Path Index Buffer"),
-            size: (self.index_capacity * std::mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-    }
-
-    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, batches: &[PathBatch]) {
+    pub fn prepare(&mut self, device: &wgpu::Device, _queue: &wgpu::Queue, batches: &[PathBatch]) {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
 
         for batch in batches {
-            if batch.mesh.vertices.is_empty() || batch.mesh.indices.is_empty() {
-                continue;
-            }
-
-            let base_vertex = vertices.len() as u32;
-            vertices.extend(batch.mesh.vertices.iter().map(|v| PathGpuVertex {
-                position: [v.position[0] + batch.offset[0], v.position[1] + batch.offset[1]],
-                normal: v.normal,
-                color: {
-                    let size = glam::Vec2::new(batch.size[0].max(1.0), batch.size[1].max(1.0));
-                    let uv = glam::Vec2::new(v.position[0], v.position[1]) / size;
-                    let mut color = sample_paint_at_uv(&batch.paint, uv.clamp(glam::Vec2::ZERO, glam::Vec2::ONE));
-                    color.w *= batch.opacity;
-                    color.to_array()
-                },
-            }));
-            indices.extend(batch.mesh.indices.iter().map(|i| i + base_vertex));
+            append_batch_geometry(batch, &mut vertices, &mut indices);
         }
 
         self.index_count = indices.len() as u32;
@@ -819,14 +935,25 @@ impl PathPipeline {
             return;
         }
 
-        self.ensure_vertex_capacity(device, vertices.len());
-        self.ensure_index_capacity(device, indices.len());
-
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+        self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Path Vertex Buffer"),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        self.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Path Index Buffer"),
+            contents: bytemuck::cast_slice(&indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        self.vertex_capacity = vertices.len();
+        self.index_capacity = indices.len();
     }
 
-    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, globals_bind_group: &wgpu::BindGroup) {
+    pub fn render(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        globals_bind_group: &wgpu::BindGroup,
+    ) {
         if self.index_count == 0 {
             return;
         }
@@ -911,7 +1038,10 @@ mod tests {
             .expect("cached tessellation should succeed");
 
         assert_eq!(cache.len(), 1, "same path should produce one cache entry");
-        assert!(Arc::ptr_eq(&first, &second), "cache hit should return same mesh allocation");
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "cache hit should return same mesh allocation"
+        );
         assert_eq!(first.indices.len(), second.indices.len());
         let stats = cache.stats();
         assert_eq!(stats.misses, 1, "first lookup should be a miss");
@@ -943,10 +1073,126 @@ mod tests {
             ],
         });
 
-        let left = sample_paint_at_uv(&paint, glam::Vec2::new(0.0, 0.5));
-        let right = sample_paint_at_uv(&paint, glam::Vec2::new(1.0, 0.5));
+        let left = sample_paint_at_uv(&paint, glam::Vec2::new(0.0, 0.5), glam::Vec2::ONE);
+        let right = sample_paint_at_uv(&paint, glam::Vec2::new(1.0, 0.5), glam::Vec2::ONE);
 
         assert!(left.x > right.x, "left should be redder than right");
         assert!(right.z > left.z, "right should be bluer than left");
+    }
+
+    #[test]
+    fn test_sample_paint_at_uv_image_fill_reads_registered_image() {
+        use style_engine::{ImageFill, ImageId, ImageScaleMode};
+
+        crate::backend::wgpu::image_store::register_image_rgba8(
+            ImageId(99_001),
+            2,
+            2,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, // row 0
+                0, 0, 255, 255, 255, 255, 255, 255, // row 1
+            ],
+        )
+        .expect("register image");
+
+        let paint = Paint::Image(ImageFill {
+            image_id: ImageId(99_001),
+            scale_mode: ImageScaleMode::Fill,
+            transform: None,
+        });
+
+        let top_left = sample_paint_at_uv(&paint, glam::Vec2::new(0.0, 0.0), glam::Vec2::ONE);
+        assert!(top_left.x > 0.9);
+        assert!(top_left.y < 0.1);
+        assert!(top_left.z < 0.1);
+
+        crate::backend::wgpu::image_store::unregister_image(ImageId(99_001));
+    }
+
+    #[test]
+    fn test_append_batch_geometry_subdivides_image_batches_and_samples_interior() {
+        use style_engine::{ImageFill, ImageId, ImageScaleMode};
+
+        let image_id = ImageId(99_002);
+        let width = 8u32;
+        let height = 8u32;
+        let mut rgba = vec![0u8; (width * height * 4) as usize];
+        for y in 0..height {
+            for x in 0..width {
+                let idx = ((y * width + x) * 4) as usize;
+                let mut c = [0u8, 0u8, 0u8, 255u8];
+                if x == 0 || y == 0 || x + 1 == width || y + 1 == height {
+                    c = [255, 255, 255, 255];
+                }
+                if (3..=4).contains(&x) && (3..=4).contains(&y) {
+                    c = [255, 0, 0, 255];
+                }
+                rgba[idx] = c[0];
+                rgba[idx + 1] = c[1];
+                rgba[idx + 2] = c[2];
+                rgba[idx + 3] = c[3];
+            }
+        }
+
+        crate::backend::wgpu::image_store::register_image_rgba8(image_id, width, height, rgba)
+            .expect("register image");
+
+        let mesh = Arc::new(PathMesh {
+            vertices: vec![
+                PathVertex {
+                    position: [0.0, 0.0],
+                    normal: [0.0, 0.0],
+                },
+                PathVertex {
+                    position: [120.0, 0.0],
+                    normal: [0.0, 0.0],
+                },
+                PathVertex {
+                    position: [120.0, 120.0],
+                    normal: [0.0, 0.0],
+                },
+                PathVertex {
+                    position: [0.0, 120.0],
+                    normal: [0.0, 0.0],
+                },
+            ],
+            indices: vec![0, 1, 2, 0, 2, 3],
+        });
+
+        let batch = PathBatch {
+            mesh,
+            paint: Paint::Image(ImageFill {
+                image_id,
+                scale_mode: ImageScaleMode::Fill,
+                transform: None,
+            }),
+            opacity: 1.0,
+            size: [120.0, 120.0],
+            offset: [0.0, 0.0],
+        };
+
+        let mut gpu_vertices = Vec::new();
+        let mut gpu_indices = Vec::new();
+        append_batch_geometry(&batch, &mut gpu_vertices, &mut gpu_indices);
+
+        assert!(
+            gpu_vertices.len() > batch.mesh.vertices.len(),
+            "image batches should be subdivided to increase sampling density"
+        );
+        assert!(
+            gpu_indices.len() > batch.mesh.indices.len(),
+            "image batches should emit denser triangle geometry"
+        );
+
+        let has_black = gpu_vertices
+            .iter()
+            .any(|v| v.color[0] < 0.15 && v.color[1] < 0.15 && v.color[2] < 0.15);
+        let has_red = gpu_vertices
+            .iter()
+            .any(|v| v.color[0] > 0.85 && v.color[1] < 0.2 && v.color[2] < 0.2);
+        assert!(has_black, "expected interior black texels to be sampled");
+        assert!(has_red, "expected center red texels to be sampled");
+
+        crate::backend::wgpu::image_store::unregister_image(image_id);
     }
 }

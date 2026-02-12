@@ -5,3 +5,7 @@
 nul
 mutants.out/
 mutants.out.old/
+node_modules/
+playwright-report/
+test-results/
+tests/visual/artifacts/

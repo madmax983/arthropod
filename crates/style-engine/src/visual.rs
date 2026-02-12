@@ -5,6 +5,19 @@ use crate::{
 use glam::Vec2;
 use serde::{Deserialize, Serialize};
 
+/// Mask behavior mode for nodes marked as masks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MaskType {
+    /// Use source alpha as mask coverage.
+    #[default]
+    Alpha,
+    /// Use filled vector area as binary mask.
+    Vector,
+    /// Use luminance as mask coverage.
+    Luminance,
+}
+
 /// VisualStyle - unified styling for all visual primitives
 ///
 /// This is the central type that maps 1:1 to Figma's visual properties.
@@ -27,6 +40,12 @@ pub struct VisualStyle {
     pub blend_mode: BlendMode,
     /// Whether children should be clipped to this node's bounds
     pub clips_content: bool,
+    /// Whether this node acts as a sibling mask (`isMask` in Figma).
+    #[serde(default, alias = "isMask")]
+    pub is_mask: bool,
+    /// Mask mode (`maskType` in Figma).
+    #[serde(default, alias = "maskType")]
+    pub mask_type: MaskType,
     /// Text content (for text nodes)
     pub text: Option<TextContent>,
     /// Fill geometry for custom vector shapes (None = rectangle)
@@ -46,6 +65,8 @@ impl Default for VisualStyle {
             opacity: 1.0,
             blend_mode: BlendMode::default(),
             clips_content: false,
+            is_mask: false,
+            mask_type: MaskType::default(),
             text: None,
             fill_geometry: None,
             stroke_geometry: None,
@@ -131,6 +152,18 @@ impl VisualStyle {
         self
     }
 
+    /// Mark this node as a sibling mask.
+    pub fn is_mask(mut self, is_mask: bool) -> Self {
+        self.is_mask = is_mask;
+        self
+    }
+
+    /// Set mask type for this node.
+    pub fn mask_type(mut self, mask_type: MaskType) -> Self {
+        self.mask_type = mask_type;
+        self
+    }
+
     /// Set fill geometry paths
     pub fn fill_geometry(mut self, geometry: Vec<VectorPath>) -> Self {
         self.fill_geometry = Some(geometry);
@@ -191,6 +224,8 @@ mod tests {
         assert_eq!(style.opacity, 1.0);
         assert_eq!(style.blend_mode, BlendMode::Normal);
         assert!(!style.clips_content);
+        assert!(!style.is_mask);
+        assert_eq!(style.mask_type, MaskType::Alpha);
         assert!(style.text.is_none());
         assert!(style.fill_geometry.is_none());
         assert!(style.stroke_geometry.is_none());
@@ -261,6 +296,15 @@ mod tests {
     }
 
     #[test]
+    fn test_builder_mask_fields() {
+        let style = VisualStyle::new()
+            .is_mask(true)
+            .mask_type(MaskType::Luminance);
+        assert!(style.is_mask);
+        assert_eq!(style.mask_type, MaskType::Luminance);
+    }
+
+    #[test]
     fn test_gradient_text() {
         use crate::paint::{ColorStop, LinearGradient};
 
@@ -320,11 +364,35 @@ mod tests {
         let style = VisualStyle::new()
             .solid_fill(Vec4::new(1.0, 0.0, 0.0, 1.0))
             .corner_radius(12.0)
-            .opacity(0.8);
+            .opacity(0.8)
+            .is_mask(true)
+            .mask_type(MaskType::Vector);
 
         let json = serde_json::to_string(&style).expect("serialize failed");
         let deserialized: VisualStyle = serde_json::from_str(&json).expect("deserialize failed");
 
         assert_eq!(style, deserialized);
+    }
+
+    #[test]
+    fn test_deserialize_figma_mask_aliases() {
+        let json = r#"{
+            "fills": [],
+            "stroke": null,
+            "effects": [],
+            "corner_radii": {"top_left":0.0,"top_right":0.0,"bottom_right":0.0,"bottom_left":0.0},
+            "corner_smoothing": 0.0,
+            "opacity": 1.0,
+            "blend_mode": "Normal",
+            "clips_content": false,
+            "isMask": true,
+            "maskType": "LUMINANCE",
+            "text": null,
+            "fill_geometry": null,
+            "stroke_geometry": null
+        }"#;
+        let style: VisualStyle = serde_json::from_str(json).expect("deserialize failed");
+        assert!(style.is_mask);
+        assert_eq!(style.mask_type, MaskType::Luminance);
     }
 }

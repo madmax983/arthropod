@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 description = "Platform abstraction layer for Arthropod GUI framework"
 
+[features]
+default = ["native"]
+native = []
+web = []
+
 [dependencies]
 raw-window-handle.workspace = true
 log.workspace = true
@@ -19,6 +24,20 @@ window-vibrancy = "0.5"
 objc2.workspace = true
 objc2-foundation.workspace = true
 objc2-app-kit.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    "KeyboardEvent",
+    "MouseEvent",
+    "WheelEvent",
+    "Event",
+    "EventTarget",
+    "Element",
+] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -171,3 +171,64 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 9: Phase 4/5 completion gates (effects + web)
+  phase45-gates:
+    name: Phase 4/5 Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Trunk
+        run: cargo install trunk --locked
+      - name: Phase 4 effects tests
+        run: |
+          cargo test -p render-engine --test phase4_effects_tests -- --nocapture
+          cargo test -p render-engine --test phase4_effect_plan_tests -- --nocapture
+          cargo test -p render-engine --test phase4_render_target_pool_tests -- --nocapture
+          cargo test -p render-engine --test phase4_blur_execution_tests -- --nocapture
+          cargo test -p render-engine --test phase4_background_blur_tests -- --nocapture
+          cargo test -p render-engine --test phase4_inner_shadow_tests -- --nocapture
+          cargo test -p render-engine --test phase4_stencil_tests -- --nocapture
+          cargo test -p render-engine --test phase4_blend_modes_tests -- --nocapture
+      - name: Web target checks
+        run: |
+          cargo check -p plat-core --target wasm32-unknown-unknown --features web
+          cargo check -p render-engine --target wasm32-unknown-unknown --features web
+          cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web
+      - name: Phase 4 benchmark smoke
+        run: cargo bench -p render-engine --bench phase4_effects -- --noplot
+      - name: Trunk build smoke
+        run: |
+          trunk build --example widget_gallery_web --features web
+          test -f target/trunk/widget_gallery_web/index.html
+          grep -q "Arthropod Widget Gallery Live" target/trunk/widget_gallery_web/index.html
+          grep -q 'id="arthropod-canvas"' target/trunk/widget_gallery_web/index.html
+
+  # Job 10: Native desktop visual regression (golden image diff)
+  phase4-desktop-visual-regression:
+    name: Phase 4 Desktop Visual Regression
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run desktop golden regression test
+        env:
+          ARTHROPOD_VISUAL_CHANNEL_TOLERANCE: "2"
+          ARTHROPOD_VISUAL_MAX_DIFF_RATIO: "0.04"
+        run: cargo test --test phase4_desktop_visual_regression -- --nocapture
+      - name: Upload desktop visual artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4-desktop-visual-artifacts
+          path: tests/visual/artifacts/phase4
+          if-no-files-found: ignore

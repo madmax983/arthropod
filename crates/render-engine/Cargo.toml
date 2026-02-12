@@ -42,10 +42,22 @@ harness = false
 name = "path_pipeline"
 harness = false
 
+[[bench]]
+name = "phase4_effects"
+harness = false
+
 [features]
-default = []
+default = ["native"]
+native = []
+web = []
 renderdoc = ["dep:renderdoc"]
 
 [dependencies.renderdoc]
 version = "0.11"
 optional = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Document", "HtmlCanvasElement", "Navigator"] }

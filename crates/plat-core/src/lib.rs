@@ -18,6 +18,11 @@ mod window;
 pub use compositor::{Compositor, Layer};
 pub use input::*;
 pub use materials::*;
+pub use platform::web_runtime::{
+    map_key_input, map_key_input_with_modifiers, map_modifiers, map_pointer_down,
+    map_pointer_down_with_modifiers, map_pointer_move, map_pointer_up,
+    map_pointer_up_with_modifiers, map_resize_events, normalize_wheel, wheel_event_from_input,
+};
 pub use window::*;
 
 use thiserror::Error;

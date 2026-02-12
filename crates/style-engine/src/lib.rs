@@ -22,4 +22,4 @@ pub use paint::{
 pub use path::{BooleanOp, PathCommand, SvgParseOptions, VectorPath, VectorPathError, WindingRule};
 pub use stroke::{SideWeights, StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle};
 pub use text::{FontStyle, LineHeight, TextAlign, TextContent, TextDecoration};
-pub use visual::VisualStyle;
+pub use visual::{MaskType, VisualStyle};

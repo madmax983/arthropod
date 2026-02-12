@@ -3,23 +3,70 @@
 //! Uses cosmic-text for integrated text shaping and rasterization.
 //! Provides glyph runs for rendering.
 
+mod web_loader;
+
 use cosmic_text::{Attrs, Buffer, CacheKeyFlags, FontSystem, Metrics, Shaping};
 use std::cell::RefCell;
+use std::sync::{Mutex, OnceLock};
+pub use web_loader::{
+    load_font_source, load_font_url, versioned_cache_key, FontCache, FontSource, WebFontLoadError,
+};
+
+fn global_font_registry() -> &'static Mutex<Vec<Vec<u8>>> {
+    static REGISTRY: OnceLock<Mutex<Vec<Vec<u8>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn register_global_font_bytes(bytes: Vec<u8>) -> bool {
+    let mut registry = global_font_registry()
+        .lock()
+        .expect("font registry lock poisoned");
+    if registry.iter().any(|existing| existing == &bytes) {
+        return false;
+    }
+    registry.push(bytes);
+    true
+}
+
+fn apply_global_fonts(font_system: &mut FontSystem, applied_count: &mut usize) -> usize {
+    let registry = global_font_registry()
+        .lock()
+        .expect("font registry lock poisoned");
+    let start = *applied_count;
+    if start >= registry.len() {
+        return 0;
+    }
+
+    for bytes in registry.iter().skip(start) {
+        font_system.db_mut().load_font_data(bytes.clone());
+    }
+
+    let added = registry.len().saturating_sub(start);
+    *applied_count = registry.len();
+    added
+}
 
 // Thread-local storage for parallel text shaping
 thread_local! {
-    static FONT_SYSTEM_POOL: RefCell<(FontSystem, Buffer)> = RefCell::new({
+    static FONT_SYSTEM_POOL: RefCell<(FontSystem, Buffer, usize)> = RefCell::new({
         let mut font_system = FontSystem::new();
+        let mut applied_global_fonts = 0usize;
+        let _ = apply_global_fonts(&mut font_system, &mut applied_global_fonts);
         let metrics = Metrics::new(16.0, 20.0);
         let buffer = Buffer::new(&mut font_system, metrics);
-        (font_system, buffer)
+        (font_system, buffer, applied_global_fonts)
     });
+}
+
+fn font_system_has_faces(font_system: &FontSystem) -> bool {
+    font_system.db().faces().next().is_some()
 }
 
 /// Text engine using cosmic-text
 pub struct TextEngine {
     font_system: FontSystem,
     buffer: Buffer,
+    applied_global_fonts: usize,
 }
 
 /// A shaped glyph with position and metrics
@@ -57,6 +104,8 @@ impl TextEngine {
     /// Create a new text engine with system fonts
     pub fn new() -> Self {
         let mut font_system = FontSystem::new();
+        let mut applied_global_fonts = 0usize;
+        let _ = apply_global_fonts(&mut font_system, &mut applied_global_fonts);
 
         // Create a buffer for shaping text
         let metrics = Metrics::new(16.0, 20.0);
@@ -66,7 +115,37 @@ impl TextEngine {
         Self {
             font_system,
             buffer,
+            applied_global_fonts,
         }
+    }
+
+    #[cfg(test)]
+    fn new_with_font_system(mut font_system: FontSystem) -> Self {
+        let mut applied_global_fonts = 0usize;
+        let _ = apply_global_fonts(&mut font_system, &mut applied_global_fonts);
+        let metrics = Metrics::new(16.0, 20.0);
+        let mut buffer = Buffer::new(&mut font_system, metrics);
+        buffer.set_size(&mut font_system, None, None);
+        Self {
+            font_system,
+            buffer,
+            applied_global_fonts,
+        }
+    }
+
+    fn sync_global_fonts(&mut self) {
+        let _ = apply_global_fonts(&mut self.font_system, &mut self.applied_global_fonts);
+    }
+
+    /// Register font bytes for shaping in this engine and all thread-local shaping pools.
+    ///
+    /// Returns the number of newly visible font faces in this engine's font database.
+    pub fn register_font_bytes(&mut self, bytes: Vec<u8>) -> usize {
+        let before = self.font_system.db().faces().count();
+        let _ = register_global_font_bytes(bytes);
+        self.sync_global_fonts();
+        let after = self.font_system.db().faces().count();
+        after.saturating_sub(before)
     }
 
     /// Shape text with the specified font size
@@ -82,7 +161,18 @@ impl TextEngine {
     /// println!("Glyphs: {}", shaped.glyphs.len());
     /// ```
     pub fn shape_text(&mut self, text: &str, font_size: f32) -> ShapedText {
+        self.sync_global_fonts();
+
         if text.is_empty() {
+            return ShapedText {
+                glyphs: Vec::new(),
+                bounds: TextBounds::default(),
+            };
+        }
+
+        // Web targets may run without discoverable system fonts.
+        // Avoid panics in cosmic-text fallback resolution by returning an empty shape result.
+        if !font_system_has_faces(&self.font_system) {
             return ShapedText {
                 glyphs: Vec::new(),
                 bounds: TextBounds::default(),
@@ -198,7 +288,16 @@ pub fn shape_text_parallel(text: &str, font_size: f32) -> ShapedText {
 
     FONT_SYSTEM_POOL.with(|pool| {
         let mut pool = pool.borrow_mut();
-        let (font_system, buffer) = &mut *pool;
+        let (font_system, buffer, applied_global_fonts) = &mut *pool;
+
+        let _ = apply_global_fonts(font_system, applied_global_fonts);
+
+        if !font_system_has_faces(font_system) {
+            return ShapedText {
+                glyphs: Vec::new(),
+                bounds: TextBounds::default(),
+            };
+        }
 
         // Update metrics for this font size
         let metrics = Metrics::new(font_size, font_size * 1.2);
@@ -257,6 +356,7 @@ pub fn shape_text_parallel(text: &str, font_size: f32) -> ShapedText {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const INTER_REGULAR_TTF: &[u8] = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
 
     #[test]
     fn test_create_engine() {
@@ -328,5 +428,45 @@ mod tests {
         let shaped = shape_text_parallel("", 16.0);
         assert!(shaped.glyphs.is_empty());
         assert_eq!(shaped.bounds.width, 0.0);
+    }
+
+    #[test]
+    fn test_shape_text_without_available_fonts_returns_empty() {
+        let db = cosmic_text::fontdb::Database::new();
+        let font_system = FontSystem::new_with_locale_and_db("en-US".to_string(), db);
+        let mut engine = TextEngine::new_with_font_system(font_system);
+        let shaped = engine.shape_text("Hello", 16.0);
+        assert!(shaped.glyphs.is_empty());
+        assert_eq!(shaped.bounds.width, 0.0);
+        assert_eq!(shaped.bounds.height, 0.0);
+    }
+
+    #[test]
+    fn test_register_font_bytes_unblocks_shaping_on_empty_db() {
+        let db = cosmic_text::fontdb::Database::new();
+        let font_system = FontSystem::new_with_locale_and_db("en-US".to_string(), db);
+        let mut engine = TextEngine::new_with_font_system(font_system);
+
+        let before = engine.shape_text("Hello", 16.0);
+        assert!(before.glyphs.is_empty());
+
+        let added_faces = engine.register_font_bytes(INTER_REGULAR_TTF.to_vec());
+        assert!(added_faces > 0);
+
+        let after = engine.shape_text("Hello", 16.0);
+        assert!(!after.glyphs.is_empty());
+        assert!(after.bounds.width > 0.0);
+    }
+
+    #[test]
+    fn test_shape_text_parallel_uses_runtime_registered_font() {
+        let db = cosmic_text::fontdb::Database::new();
+        let font_system = FontSystem::new_with_locale_and_db("en-US".to_string(), db);
+        let mut engine = TextEngine::new_with_font_system(font_system);
+        let _ = engine.register_font_bytes(INTER_REGULAR_TTF.to_vec());
+
+        let shaped = shape_text_parallel("Parallel Hello", 16.0);
+        assert!(!shaped.glyphs.is_empty());
+        assert!(shaped.bounds.width > 0.0);
     }
 }

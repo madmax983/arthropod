@@ -5,6 +5,7 @@ use glam::Vec2;
 use glam::Vec4;
 use hashbrown::HashMap;
 use style_engine::{BlendMode, ColorStop, CornerRadii, Paint, StrokeCap, StrokeJoin, VisualStyle};
+use wgpu::util::DeviceExt;
 
 pub const FLAG_FILL_TYPE_MASK: u32 = 0xF;
 pub const FLAG_HAS_STROKE: u32 = 1 << 4;
@@ -125,11 +126,11 @@ impl PrimitiveInstance {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GradientParams {
-    pub start: [f32; 2],        // 8 bytes: Gradient start point (normalized 0-1)
-    pub end: [f32; 2],          // 8 bytes: Gradient end point (normalized 0-1)
-    pub atlas_row: f32,         // 4 bytes: Row in atlas (normalized v coord)
-    pub gradient_type: u32,     // 4 bytes: 0=linear, 1=radial, 2=angular, 3=diamond
-    pub _padding: [f32; 2],     // 8 bytes: Padding to 32 bytes
+    pub start: [f32; 2],    // 8 bytes: Gradient start point (normalized 0-1)
+    pub end: [f32; 2],      // 8 bytes: Gradient end point (normalized 0-1)
+    pub atlas_row: f32,     // 4 bytes: Row in atlas (normalized v coord)
+    pub gradient_type: u32, // 4 bytes: 0=linear, 1=radial, 2=angular, 3=diamond
+    pub _padding: [f32; 2], // 8 bytes: Padding to 32 bytes
 }
 
 impl GradientParams {
@@ -399,36 +400,41 @@ fn create_primitive_instances_impl(
 
     // 1. Render shadows FIRST (behind everything)
     for effect in &style.effects {
-        if let style_engine::Effect::DropShadow(shadow) = effect {
-            if shadow.visible {
-                // Create shadow instance with offset position
-                let shadow_pos = pos + shadow.offset;
+        if let style_engine::Effect::DropShadow(shadow) = effect
+            && shadow.visible
+        {
+            // Create shadow instance with offset position
+            let shadow_pos = pos + shadow.offset;
 
-                let mut shadow_color = shadow.color;
-                shadow_color.w *= opacity;
+            let mut shadow_color = shadow.color;
+            shadow_color.w *= opacity;
 
-                let mut shadow_instance = PrimitiveInstance::rounded(
-                    [shadow_pos.x, shadow_pos.y],
-                    [size.x, size.y],
-                    [shadow_color.x, shadow_color.y, shadow_color.z, shadow_color.w],
-                    style.corner_radii,
-                );
+            let mut shadow_instance = PrimitiveInstance::rounded(
+                [shadow_pos.x, shadow_pos.y],
+                [size.x, size.y],
+                [
+                    shadow_color.x,
+                    shadow_color.y,
+                    shadow_color.z,
+                    shadow_color.w,
+                ],
+                style.corner_radii,
+            );
 
-                // Store blur radius in stroke_params[0] (shadows don't use stroke)
-                shadow_instance.stroke_params[0] = shadow.blur;
+            // Store blur radius in stroke_params[0] (shadows don't use stroke)
+            shadow_instance.stroke_params[0] = shadow.blur;
 
-                // Set blend mode and internal shadow flag
-                shadow_instance.flags = with_blend_mode(shadow_instance.flags, style.blend_mode);
-                shadow_instance.flags |= FLAG_IS_SHADOW;
+            // Set blend mode and internal shadow flag
+            shadow_instance.flags = with_blend_mode(shadow_instance.flags, style.blend_mode);
+            shadow_instance.flags |= FLAG_IS_SHADOW;
 
-                instances.push(shadow_instance);
-            }
+            instances.push(shadow_instance);
         }
     }
 
     // 2. Render fills (solid or gradient backgrounds)
     for fill in &style.fills {
-        let fill_instance = if let Some(pipeline) = pipeline.as_deref_mut() {
+        let fill_instance = if let Some(pipeline) = pipeline.as_mut() {
             create_fill_instance(
                 pipeline,
                 fill,
@@ -453,7 +459,7 @@ fn create_primitive_instances_impl(
 
     // 3. Render stroke (on top of fill)
     if let Some(stroke) = &style.stroke {
-        let stroke_instance = if let Some(pipeline) = pipeline.as_deref_mut() {
+        let stroke_instance = if let Some(pipeline) = pipeline.as_mut() {
             create_stroke_instance(
                 pipeline,
                 stroke,
@@ -626,8 +632,12 @@ fn create_stroke_instance_without_pipeline(
         Some(Paint::Image(_)) | None => [1.0, 0.0, 1.0, opacity],
     };
 
-    let mut instance =
-        PrimitiveInstance::rounded([pos.x, pos.y], [size.x, size.y], stroke_color, *corner_radii);
+    let mut instance = PrimitiveInstance::rounded(
+        [pos.x, pos.y],
+        [size.x, size.y],
+        stroke_color,
+        *corner_radii,
+    );
     instance.stroke_params = [stroke_width, stroke_align];
     instance.flags |= FLAG_HAS_STROKE;
     instance.flags = with_blend_mode(instance.flags, blend_mode);
@@ -1113,9 +1123,10 @@ impl PrimitivePipeline {
                 self.gradient_params_capacity = new_capacity;
 
                 // Recreate bind group with new buffer
-                if let (Some(view), Some(sampler)) =
-                    (self.gradient_atlas.texture_view(), self.gradient_atlas.sampler())
-                {
+                if let (Some(view), Some(sampler)) = (
+                    self.gradient_atlas.texture_view(),
+                    self.gradient_atlas.sampler(),
+                ) {
                     self.gradient_bind_group =
                         Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
                             label: Some("Gradient Atlas Bind Group"),
@@ -1147,21 +1158,13 @@ impl PrimitivePipeline {
             return;
         }
 
-        // Resize vertex buffer if needed
-        if instances.len() > self.vertex_buffer_capacity {
-            let new_capacity = instances.len().next_power_of_two();
-            self.vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Primitive Instance Buffer"),
-                size: (new_capacity * std::mem::size_of::<PrimitiveInstance>()) as u64,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            self.vertex_buffer_capacity = new_capacity;
-        }
-
-        // Upload instance data
         let instance_bytes = bytemuck::cast_slice(instances);
-        queue.write_buffer(&self.vertex_buffer, 0, instance_bytes);
+        self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Primitive Instance Buffer"),
+            contents: instance_bytes,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        self.vertex_buffer_capacity = instances.len();
     }
 
     pub fn render(
@@ -1558,7 +1561,10 @@ mod tests {
 
         // Test angular gradient
         let angular = GradientParams::angular([0.5, 0.5], 15);
-        assert_eq!(angular.gradient_type, 2, "Angular gradient type should be 2");
+        assert_eq!(
+            angular.gradient_type, 2,
+            "Angular gradient type should be 2"
+        );
 
         // Test diamond gradient
         let diamond = GradientParams::diamond([0.5, 0.5], [0.3, 0.3], 20);

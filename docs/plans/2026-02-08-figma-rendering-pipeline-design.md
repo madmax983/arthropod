@@ -1383,171 +1383,173 @@ impl VectorPath {
 
 ## Phase 4: Multi-Pass Effects (~3 weeks)
 
-**Goal**: Implement effects that require render-to-texture: Gaussian blur, background blur, inner shadows, clipping/masking, and advanced blend modes.
+**Goal**: Implement render-to-texture effects (layer blur, background blur, inner shadows, clipping/masking, advanced blend modes) without compute shaders so the same design runs on native wgpu and WASM WebGL2 fallback.
 
-### 4.1 Render Target Infrastructure
+### 4.1 Effect Classification and Render Plan
 
-Add offscreen render target support to `WgpuContext`:
+Phase 4 introduces a per-frame **effect plan** generated from scene nodes after z-sort. This avoids ad hoc branching in draw code and gives deterministic ordering.
 
 ```rust
-pub struct RenderTarget {
-    pub texture: wgpu::Texture,
-    pub view: wgpu::TextureView,
+pub enum EffectPassKind {
+    DirectPrimitive,       // no offscreen pass needed
+    OffscreenLayer,        // render node subtree into target
+    BackgroundCapture,     // copy backdrop region for background blur
+    BlurHorizontal,
+    BlurVertical,
+    InnerShadow,
+    BlendComposite,
+    StencilPush,
+    StencilPop,
+}
+
+pub struct EffectPass {
+    pub node_id: NodeId,
+    pub kind: EffectPassKind,
+    pub target: Option<RenderTargetHandle>,
+    pub bounds_px: UVec4, // [x, y, width, height]
+    pub blend_mode: BlendMode,
+}
+```
+
+**Planning rules**:
+- `BlendMode::Normal` + no heavy effects -> `DirectPrimitive`
+- `LayerBlur` -> `OffscreenLayer` + `BlurHorizontal` + `BlurVertical` + composite
+- `BackgroundBlur` -> `BackgroundCapture` + blur passes + masked composite
+- `InnerShadow` -> offscreen mask + `InnerShadow` pass
+- `clips_content` and masks -> `StencilPush` / `StencilPop` around children
+
+### 4.2 Render Target Infrastructure and Pooling
+
+Offscreen rendering must be pooled to avoid per-frame texture churn.
+
+```rust
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+pub struct RenderTargetKey {
     pub width: u32,
     pub height: u32,
+    pub format: wgpu::TextureFormat,
+    pub has_stencil: bool,
 }
 
-impl WgpuContext {
-    pub fn create_render_target(&self, width: u32, height: u32) -> RenderTarget {
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Render Target"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: self.config.format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                 | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        let view = texture.create_view(&Default::default());
-        RenderTarget { texture, view, width, height }
-    }
+pub struct RenderTargetPool {
+    free: HashMap<RenderTargetKey, Vec<RenderTarget>>,
+    in_use: Vec<RenderTarget>,
+    bytes_in_use: u64,
+    soft_budget_bytes: u64, // desktop default: 256 MB, web default: 96 MB
+}
+
+impl RenderTargetPool {
+    pub fn acquire(&mut self, ctx: &WgpuContext, key: RenderTargetKey) -> RenderTarget;
+    pub fn release(&mut self, target: RenderTarget);
+    pub fn end_frame(&mut self);
 }
 ```
 
-### 4.2 Gaussian Blur (Two-Pass Separable)
+**File changes**:
+- `crates/render-engine/src/backend/wgpu/context.rs` (render target creation helpers)
+- `crates/render-engine/src/backend/wgpu/mod.rs` (pool owned by backend)
+- `crates/render-engine/src/backend/wgpu/render_target_pool.rs` (new)
 
-Gaussian blur is separable: apply horizontal blur, then vertical blur. This reduces complexity from O(n^2) to O(2n) per pixel.
+### 4.3 Gaussian Blur Pipeline (Separable + Radius Tiers)
 
-**Shader** (`blur.wgsl`):
+Blur stays two-pass separable, but uses two quality tiers:
+- **Tier A** (`radius <= 24`): full-resolution two-pass blur
+- **Tier B** (`radius > 24`): downsample to half-res, blur, then upsample (large perf win)
+
 ```wgsl
-@group(1) @binding(0)
-var source_texture: texture_2d<f32>;
-@group(1) @binding(1)
-var source_sampler: sampler;
+const MAX_TAPS: u32 = 25u;
 
 struct BlurParams {
-    direction: vec2<f32>,  // (1,0) for horizontal, (0,1) for vertical
-    radius: f32,
-    texel_size: vec2<f32>, // 1.0 / texture_size
+    direction: vec2<f32>,     // (1,0) horizontal, (0,1) vertical
+    texel_size: vec2<f32>,    // 1.0 / target_size
+    tap_count: u32,
+    _pad: u32,
+    weights: array<f32, 25>,  // symmetric kernel precomputed on CPU
 }
 
-@group(1) @binding(2)
-var<uniform> blur_params: BlurParams;
-
-@fragment
-fn fs_blur(input: VertexOutput) -> @location(0) vec4<f32> {
-    var color = vec4<f32>(0.0);
-    var total_weight = 0.0;
-
-    let sigma = blur_params.radius / 3.0;
-    let kernel_size = i32(ceil(blur_params.radius));
-
-    for (var i = -kernel_size; i <= kernel_size; i++) {
-        let offset = vec2<f32>(f32(i)) * blur_params.direction * blur_params.texel_size;
-        let weight = gaussian(f32(i), sigma);
-        color += textureSample(source_texture, source_sampler, input.uv + offset) * weight;
-        total_weight += weight;
-    }
-
-    return color / total_weight;
-}
-
-fn gaussian(x: f32, sigma: f32) -> f32 {
-    return exp(-(x * x) / (2.0 * sigma * sigma));
-}
+@group(1) @binding(0) var source_texture: texture_2d<f32>;
+@group(1) @binding(1) var source_sampler: sampler;
+@group(1) @binding(2) var<uniform> blur: BlurParams;
 ```
 
-**Blur execution flow**:
-```
-1. Render node content to RenderTarget A
-2. Blur pass 1: A → B (horizontal)
-3. Blur pass 2: B → A (vertical)
-4. Composite A onto main surface
-```
+**Execution**:
+1. Render source into `A`.
+2. Pass 1 (`BlurHorizontal`): `A -> B`.
+3. Pass 2 (`BlurVertical`): `B -> A`.
+4. Composite `A` into destination using node opacity/blend.
 
-### 4.3 Background Blur
+### 4.4 Layer Blur
 
-Background blur renders content behind the node, blurs it, then composites:
+`Effect::LayerBlur` blurs the node's own pixels (and children), not the backdrop.
 
 ```
-1. Render everything below this node to main surface
-2. Copy the region behind this node to RenderTarget A
-3. Blur A (two-pass)
-4. Render blurred A as the node's background
-5. Render node content on top
+1. Render node subtree into offscreen A
+2. Blur A -> B -> A
+3. Composite A back into parent target
 ```
 
-This is how frosted glass / glassmorphism effects work.
+Important details:
+- Blur bounds are inflated by `ceil(radius * 2.0)` to prevent edge clipping.
+- Clear color is transparent black to avoid halo artifacts.
+- Layer blur participates in clip stack before compositing.
 
-### 4.4 Inner Shadows
+### 4.5 Background Blur (Backdrop Filter)
 
-Inner shadows use the inverted SDF: the shadow is visible only inside the shape.
+`Effect::BackgroundBlur` samples pixels *already rendered behind* the node:
+
+```
+1. Resolve/copy current destination into backdrop texture
+2. Crop node bounds (inflated by blur radius) into A
+3. Blur A -> B -> A
+4. Composite blurred result through node shape mask
+5. Render node fills/strokes/text on top
+```
+
+This requires an intermediate color target for the frame; swapchain textures cannot be sampled directly in all backends.
+
+### 4.6 Inner Shadows
+
+Inner shadows are implemented as masked blur:
+
+```
+1. Render node alpha mask (shape coverage) into A
+2. Offset mask by shadow offset into B
+3. Blur B -> C -> B
+4. Subtract original mask from blurred mask
+5. Multiply by shadow color and composite inside shape only
+```
 
 ```wgsl
-fn inner_shadow_alpha(dist: f32, offset: vec2<f32>, blur_radius: f32) -> f32 {
-    // Inner shadow: visible where SDF < 0 (inside shape)
-    // Shadow source is the shape boundary, offset and blurred inward
-    let shadow_dist = dist + length(offset);
-    let alpha = smoothstep(-blur_radius, 0.0, shadow_dist);
-    // Only visible inside the shape
-    let inside = step(dist, 0.0);
-    return alpha * inside;
+fn inner_shadow_alpha(mask: f32, blurred_offset_mask: f32) -> f32 {
+    // Only keep blur that falls inside the original shape.
+    return clamp(blurred_offset_mask - (1.0 - mask), 0.0, 1.0) * mask;
 }
 ```
 
-### 4.5 Stencil-Based Clipping
+### 4.7 Stencil Clipping and Mask Stack
 
-For `clips_content: true` (Figma's frame clipping):
+`clips_content: true` and mask nodes use an explicit stencil stack:
 
 ```rust
-pub struct StencilPipeline {
-    // Writes to stencil buffer, doesn't write color
-    stencil_write_pipeline: wgpu::RenderPipeline,
-    // Tests against stencil buffer during rendering
-    stencil_test_pipeline: wgpu::RenderPipeline,
+pub struct ClipStack {
+    depth: u8, // 0..255 stencil levels
 }
 ```
 
-**Execution flow**:
-```
-1. Render clip shape to stencil buffer (stencil = 1 inside shape)
-2. Render children with stencil test (only where stencil = 1)
-3. Clear stencil
-```
+**Protocol**:
+1. `StencilPush`: draw clip geometry writing `depth + 1`.
+2. Render child passes with stencil compare `Equal(depth + 1)`.
+3. Nested clips increment depth.
+4. `StencilPop`: decrement depth after children.
 
-This requires adding a depth/stencil attachment to the render pass:
-```rust
-depth_stencil: Some(wgpu::DepthStencilState {
-    format: wgpu::TextureFormat::Stencil8,
-    depth_write_enabled: false,
-    depth_compare: wgpu::CompareFunction::Always,
-    stencil: wgpu::StencilState {
-        front: wgpu::StencilFaceState {
-            compare: wgpu::CompareFunction::Equal,
-            fail_op: wgpu::StencilOperation::Keep,
-            depth_fail_op: wgpu::StencilOperation::Keep,
-            pass_op: wgpu::StencilOperation::Keep,
-        },
-        ..Default::default()
-    },
-    ..Default::default()
-}),
-```
+This supports nested frame clipping and mask groups with deterministic behavior.
 
-### 4.6 Blend Mode Compositing
+### 4.8 Blend Mode Compositing
 
-Non-trivial blend modes (Multiply, Screen, Overlay, etc.) require render-to-texture:
+Blend modes are implemented in `blend.wgsl` with two categories:
+- **Separable modes**: multiply, screen, overlay, darken, lighten, dodge, burn, hard/soft light, difference, exclusion
+- **Non-separable modes**: hue, saturation, color, luminosity (HSL conversion path)
 
-```
-1. Render node to offscreen RenderTarget A
-2. Sample both A (source) and main surface (destination) in blend shader
-3. Apply blend mode formula
-4. Write result to main surface
-```
-
-**Shader** (`blend.wgsl`):
 ```wgsl
 fn blend_multiply(src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
     return src * dst;
@@ -1556,121 +1558,252 @@ fn blend_multiply(src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
 fn blend_screen(src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
     return src + dst - src * dst;
 }
-
-fn blend_overlay(src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
-    return select(
-        2.0 * src * dst,
-        1.0 - 2.0 * (1.0 - src) * (1.0 - dst),
-        dst > vec3<f32>(0.5)
-    );
-}
-
-// ... remaining blend modes
 ```
 
-For `BlendMode::Normal`, no render-to-texture is needed (standard alpha blending).
+Compositing rule:
+- `BlendMode::Normal` -> regular alpha pipeline (no offscreen)
+- all other modes -> source rendered to offscreen, then blended against destination sample
 
-### 4.7 Phase 4 Deliverables
+### 4.9 Phase 4 Verification (Tests + Benchmarks)
+
+**Unit/integration tests**:
+- `test_render_target_pool_reuses_same_key`
+- `test_blur_kernel_weights_sum_to_one`
+- `test_background_blur_respects_clip_bounds`
+- `test_inner_shadow_only_inside_shape`
+- `test_nested_clip_stack_depth`
+- `test_blend_mode_multiply_matches_reference`
+
+**Visual tests**:
+```bash
+cargo run --example visual_test_phase4_blur
+cargo run --example visual_test_phase4_blend
+cargo run --example visual_test_phase4_clipping
+```
+
+**Benchmarks**:
+```bash
+cargo bench -p render-engine blur_pass_1080p
+cargo bench -p render-engine background_blur_500_nodes
+cargo bench -p render-engine blend_composite_1000_layers
+```
+
+Exit gates:
+- 1080p 2-pass blur <= 2.0 ms
+- blend composite <= 1.0 ms for 1,000 layers
+- no >10% regression in existing primitive/path throughput benches
+
+### 4.10 Phase 4 Deliverables
 
 | Deliverable | Description |
 |-------------|-------------|
-| `RenderTarget` infrastructure | Offscreen texture creation/management |
-| `BlurPipeline` | Two-pass separable Gaussian blur |
-| Background blur | Frosted glass / glassmorphism |
-| Inner shadow rendering | Inverted SDF shadow |
-| `StencilPipeline` | Stencil-based frame clipping |
-| `BlendPipeline` | All 19 blend modes |
-| Render target pool | Reuse offscreen textures across frames |
-| Performance tests | Measure multi-pass overhead |
+| Effect planner | Deterministic per-frame `EffectPass` plan |
+| Render target pool | Reuse offscreen textures with memory budget |
+| `BlurPipeline` | Separable blur with large-radius tiering |
+| Layer blur | Node-local blur compositing |
+| Background blur | Backdrop capture + masked blur |
+| Inner shadow pass | Offset+blur+mask implementation |
+| Stencil clip stack | Nested clip/mask behavior |
+| `BlendPipeline` | All 19 Figma blend modes |
+| Visual tests | Blur/blend/clip regression examples |
+| Performance suite | Phase 4 criterion benchmarks + gates |
 
 ---
 
 ## Phase 5: WASM Target (~3 weeks)
 
-**Goal**: Arthropod runs in the browser via WebAssembly + WebGPU.
+**Goal**: Ship Arthropod in browsers with WebAssembly + WebGPU, with automatic fallback to WebGL2 where required.
 
-### 5.1 What Already Works in WASM
+### 5.1 Target Constraints and Compatibility
+
+Phase 5 must preserve one renderer architecture:
+- same `VisualStyle` data model
+- same `PrimitivePipeline`, `PathPipeline`, and Phase 4 effect passes
+- no compute-only features
+- predictable behavior across native + web
+
+Current readiness snapshot:
 
 | Component | WASM Ready? | Notes |
 |-----------|-------------|-------|
 | `style-engine` | Yes | Pure Rust, no platform deps |
 | `flux-state` | Yes | Pure Rust signals |
-| `layout-engine` (taffy) | Yes | Taffy has WASM support |
-| `widget-core` | Yes | Pure Rust widgets |
-| `render-engine` (wgpu) | Yes* | wgpu compiles to WebGPU |
-| `text-engine` (cosmic-text) | Yes* | Needs font loading adaptation |
-| `plat-core` | No | Platform-specific, needs web backend |
-| Lyon | Yes | Pure Rust tessellation |
+| `render-engine` | Mostly | Requires web surface init and runtime capability checks |
+| `plat-core` | No | Needs `web` platform backend |
+| `text` stack | Mostly | Font loading and caching path must be web-safe |
+| tessellation (`lyon`) | Yes | Pure Rust |
 
-### 5.2 Web Platform Layer
+### 5.2 Cargo Features and Target-Specific Dependencies
 
-```rust
-// crates/plat-core/src/platform/web.rs (NEW)
-
-#[cfg(target_arch = "wasm32")]
-pub struct WebPlatform {
-    canvas: web_sys::HtmlCanvasElement,
-    event_loop: winit::event_loop::EventLoop<()>,
-    window: winit::window::Window,
-}
-```
-
-**winit** already supports web targets. The main work is:
-
-1. **Canvas integration**: Create/find HTML canvas element
-2. **Event mapping**: Browser events → Arthropod events
-3. **Font loading**: Fetch fonts via HTTP instead of filesystem
-4. **Resize handling**: Browser window resize → surface resize
-5. **High DPI**: `window.devicePixelRatio` → scale factor
-
-### 5.3 Build Configuration
+Use explicit feature gates for native and web backends:
 
 ```toml
-# Cargo.toml feature flags
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]
 web = ["plat-core/web", "render-engine/web"]
 ```
 
-```bash
-# Build for web
-wasm-pack build --target web --features web
+`plat-core` adds web-only dependencies:
 
-# Or with trunk
-trunk serve examples/widget_gallery.rs --features web
+```toml
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+  "Window",
+  "Document",
+  "HtmlCanvasElement",
+  "Performance",
+  "MouseEvent",
+  "PointerEvent",
+  "WheelEvent",
+  "KeyboardEvent",
+] }
 ```
 
-### 5.4 WebGL2 Fallback
+### 5.3 Web Platform Backend (`plat-core`)
 
-For browsers without WebGPU, wgpu can fall back to WebGL2. Our pipeline is designed for this:
+Add `crates/plat-core/src/platform/web.rs` and register it in `platform/mod.rs`.
+
+```rust
+#[cfg(target_arch = "wasm32")]
+pub struct WebPlatform {
+    canvas: web_sys::HtmlCanvasElement,
+    window: web_sys::Window,
+    scale_factor: f64,
+    event_queue: Vec<PlatformEvent>,
+}
+```
+
+Responsibilities:
+- attach to existing `<canvas>` or create one
+- map DOM events to `PlatformEvent`
+- forward resize + DPR updates
+- request animation frames for redraw
+- expose surface handle for wgpu/winit initialization
+
+### 5.4 Bootstrapping and Canvas Integration
+
+Create a web entrypoint for the gallery:
+- `examples/widget_gallery_web.rs` (new, `wasm_bindgen(start)`)
+- optional `examples/web/index.html` and `examples/web/trunk.toml`
+
+```rust
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub async fn start() -> Result<(), JsValue> {
+    let app = WidgetGalleryApp::new_web("arthropod-canvas").await?;
+    app.run();
+    Ok(())
+}
+```
+
+### 5.5 Event and Input Mapping
+
+Browser events map into existing framework input types:
+
+| Browser Event | Arthropod Event |
+|---------------|-----------------|
+| `pointerdown/move/up` | `PointerDown/Move/Up` |
+| `wheel` | `MouseWheel` (pixel/line normalized) |
+| `keydown/keyup` | `KeyDown/KeyUp` |
+| `resize` | `WindowResized` |
+| `blur/focus` | `WindowBlur/Focus` |
+
+Requirements:
+- preserve pointer capture semantics
+- normalize wheel delta modes
+- keep text input IME-safe (composition events staged for later phase if needed)
+
+### 5.6 Font and Asset Loading on Web
+
+Filesystem-based loading is replaced with async HTTP fetch:
+
+```rust
+pub enum FontSource {
+    Bytes(Vec<u8>),       // native/tests
+    Url(String),          // web runtime
+}
+```
+
+Plan:
+1. `fetch()` font bytes via `web_sys`.
+2. Cache bytes in-memory (hash by URL + etag/version).
+3. Hand bytes to text shaping/atlas as today.
+4. Preload default UI font before first frame to avoid layout jumps.
+
+### 5.7 WebGPU + WebGL2 Runtime Path
+
+Renderer startup probes backend capabilities:
+
+```text
+try WebGPU adapter -> if unavailable, initialize wgpu WebGL2 backend
+```
+
+Compatibility rules:
+- no storage textures required
+- no compute passes
+- conservative uniform/storage buffer sizes
+- shader code validated on both backends in CI
 
 | Feature | WebGPU | WebGL2 |
 |---------|--------|--------|
-| Primitive pipeline (SDF + glyphs unified) | Yes | Yes |
-| Gradient pipeline (LUT) | Yes | Yes |
-| Path pipeline (tessellation) | Yes | Yes |
-| Blur (render-to-texture) | Yes | Yes |
-| Stencil clipping | Yes | Yes |
-| Blend modes | Yes | Yes (fragment shader) |
-| Compute shaders | Yes | No (not needed) |
+| Primitive pipeline | Yes | Yes |
+| Gradient LUT sampling | Yes | Yes |
+| Path rendering | Yes | Yes |
+| Blur / blend / stencil effects | Yes | Yes |
+| Compute shaders | Yes | No (unused) |
 
-Everything we build works on WebGL2 because we avoid compute shaders entirely.
+### 5.8 Build, Tooling, and CI
 
-### 5.5 Phase 5 Deliverables
+Local workflows:
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo check --target wasm32-unknown-unknown --features web
+wasm-pack build --target web --features web
+trunk serve --features web
+```
+
+CI additions:
+- `cargo check --target wasm32-unknown-unknown --features web`
+- `cargo test -p style-engine --target wasm32-unknown-unknown` (where supported)
+- browser smoke test for `widget_gallery` load + first frame render
+
+### 5.9 Phase 5 Verification (Tests + Performance)
+
+**Tests**:
+- `test_web_canvas_bootstrap`
+- `test_web_pointer_event_mapping`
+- `test_font_fetch_and_cache`
+- `test_web_resize_updates_surface`
+- `test_webgl2_fallback_initializes`
+
+**Smoke benchmarks**:
+- time-to-first-frame (TTFF) for widget gallery
+- steady-state frame time with 1,000 styled nodes
+- wasm bundle size tracking per commit
+
+Exit gates:
+- gallery loads and renders on Chrome, Firefox, Safari
+- fallback path works on browsers without WebGPU
+- no correctness differences in visual regression set vs native
+
+### 5.10 Phase 5 Deliverables
 
 | Deliverable | Description |
 |-------------|-------------|
-| Web platform backend | winit + web_sys integration |
-| Font loading | HTTP-based font fetching |
-| WASM build config | Feature flags, wasm-pack/trunk setup |
-| Canvas integration | HTML canvas element management |
-| WebGL2 compatibility | Verified fallback path |
-| Web example | Widget gallery running in browser |
+| `plat-core` web backend | Canvas lifecycle + event bridge |
+| Web entrypoint | `wasm_bindgen(start)` example app |
+| Font/asset loader | Async HTTP fetch + caching |
+| WASM feature gating | Native/web split in workspace features |
+| Runtime backend probe | WebGPU primary, WebGL2 fallback |
+| Web CI checks | wasm check + browser smoke test |
+| Web visual regression suite | Compare output vs native references |
+| Browser-ready widget gallery | Public demo target for ongoing work |
 
 ---
-
-## Figma Property → Arthropod Mapping Reference
+## Figma Property -> Arthropod Mapping Reference
 
 | Figma Property | Arthropod Type | Phase |
 |---------------|----------------|-------|

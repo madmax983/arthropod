@@ -168,13 +168,25 @@ mod tests {
         let end = Vec2::new(1.0, 0.5);
 
         // Left edge
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.0, 0.5), start, end), 0.0, "left edge");
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.0, 0.5), start, end),
+            0.0,
+            "left edge",
+        );
 
         // Middle
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end), 0.5, "middle");
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end),
+            0.5,
+            "middle",
+        );
 
         // Right edge
-        assert_near(linear_gradient_coord_cpu(Vec2::new(1.0, 0.5), start, end), 1.0, "right edge");
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(1.0, 0.5), start, end),
+            1.0,
+            "right edge",
+        );
 
         // Off-axis (should project onto axis)
         let t = linear_gradient_coord_cpu(Vec2::new(0.25, 0.8), start, end);
@@ -187,9 +199,21 @@ mod tests {
         let start = Vec2::new(0.5, 0.0);
         let end = Vec2::new(0.5, 1.0);
 
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.5, 0.0), start, end), 0.0, "top");
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end), 0.5, "middle");
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.5, 1.0), start, end), 1.0, "bottom");
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.5, 0.0), start, end),
+            0.0,
+            "top",
+        );
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end),
+            0.5,
+            "middle",
+        );
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.5, 1.0), start, end),
+            1.0,
+            "bottom",
+        );
     }
 
     #[test]
@@ -198,9 +222,21 @@ mod tests {
         let start = Vec2::ZERO;
         let end = Vec2::ONE;
 
-        assert_near(linear_gradient_coord_cpu(Vec2::ZERO, start, end), 0.0, "origin");
-        assert_near(linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end), 0.5, "center");
-        assert_near(linear_gradient_coord_cpu(Vec2::ONE, start, end), 1.0, "opposite corner");
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::ZERO, start, end),
+            0.0,
+            "origin",
+        );
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::new(0.5, 0.5), start, end),
+            0.5,
+            "center",
+        );
+        assert_near(
+            linear_gradient_coord_cpu(Vec2::ONE, start, end),
+            1.0,
+            "opposite corner",
+        );
     }
 
     #[test]
@@ -223,12 +259,28 @@ mod tests {
         let radius = 0.5;
 
         // At center
-        assert_near(radial_gradient_coord_cpu(center, center, radius), 0.0, "at center");
+        assert_near(
+            radial_gradient_coord_cpu(center, center, radius),
+            0.0,
+            "at center",
+        );
 
         // At radius distance
-        assert_near(radial_gradient_coord_cpu(Vec2::new(1.0, 0.5), center, radius), 1.0, "at radius (right)");
-        assert_near(radial_gradient_coord_cpu(Vec2::new(0.0, 0.5), center, radius), 1.0, "at radius (left)");
-        assert_near(radial_gradient_coord_cpu(Vec2::new(0.5, 0.0), center, radius), 1.0, "at radius (top)");
+        assert_near(
+            radial_gradient_coord_cpu(Vec2::new(1.0, 0.5), center, radius),
+            1.0,
+            "at radius (right)",
+        );
+        assert_near(
+            radial_gradient_coord_cpu(Vec2::new(0.0, 0.5), center, radius),
+            1.0,
+            "at radius (left)",
+        );
+        assert_near(
+            radial_gradient_coord_cpu(Vec2::new(0.5, 0.0), center, radius),
+            1.0,
+            "at radius (top)",
+        );
 
         // Halfway
         let t = radial_gradient_coord_cpu(Vec2::new(0.75, 0.5), center, radius);
@@ -273,7 +325,11 @@ mod tests {
         let scale = Vec2::new(0.5, 0.5);
 
         // Center
-        assert_near(diamond_gradient_coord_cpu(center, center, scale), 0.0, "at center");
+        assert_near(
+            diamond_gradient_coord_cpu(center, center, scale),
+            0.0,
+            "at center",
+        );
 
         // Along X axis
         let t = diamond_gradient_coord_cpu(Vec2::new(1.0, 0.5), center, scale);

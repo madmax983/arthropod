@@ -93,6 +93,7 @@ pub struct StrokeStyle {
     /// Dash offset
     pub dash_offset: f32,
     /// Individual side weights (overrides weight if present)
+    #[serde(alias = "individualStrokeWeights", alias = "individual_weights")]
     pub side_weights: Option<SideWeights>,
 }
 
@@ -194,5 +195,27 @@ mod tests {
         let deserialized: StrokeStyle = serde_json::from_str(&json).expect("deserialize failed");
 
         assert_eq!(stroke, deserialized);
+    }
+
+    #[test]
+    fn test_deserialize_figma_individual_stroke_weights_alias() {
+        let json = r#"{
+            "paints":[{"Solid":[1.0,1.0,1.0,1.0]}],
+            "weight":2.0,
+            "align":"Center",
+            "cap":"Butt",
+            "join":"Miter",
+            "miter_limit":4.0,
+            "dash_pattern":[],
+            "dash_offset":0.0,
+            "individualStrokeWeights":{"top":1.0,"right":2.0,"bottom":3.0,"left":4.0}
+        }"#;
+
+        let stroke: StrokeStyle = serde_json::from_str(json).expect("deserialize failed");
+        let side = stroke.side_weights.expect("expected side weights");
+        assert_eq!(side.top, 1.0);
+        assert_eq!(side.right, 2.0);
+        assert_eq!(side.bottom, 3.0);
+        assert_eq!(side.left, 4.0);
     }
 }

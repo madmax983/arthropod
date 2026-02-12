@@ -284,7 +284,9 @@ impl Paint {
             GradientInterpolationMode::LinearRgb => {
                 lerp_color_linear_rgb(before.color, after.color, local_t)
             }
-            GradientInterpolationMode::Oklab => lerp_color_oklab(before.color, after.color, local_t),
+            GradientInterpolationMode::Oklab => {
+                lerp_color_oklab(before.color, after.color, local_t)
+            }
         }
     }
 }

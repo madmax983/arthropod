@@ -7,8 +7,8 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use glam::Vec2;
 use render_engine::backend::wgpu::pipelines::path_pipeline::{TessellationCache, tessellate_fill};
-use style_engine::{PathCommand, StrokeAlign, StrokeStyle, VectorPath};
 use std::collections::HashMap;
+use style_engine::{PathCommand, StrokeAlign, StrokeStyle, VectorPath};
 
 fn circle_like_path(segments: usize, radius: f32) -> VectorPath {
     let mut path = VectorPath::new();
@@ -98,11 +98,14 @@ struct BenchPathInterner {
 impl BenchPathInterner {
     fn command_fp(command: PathCommand) -> u64 {
         match command {
-            PathCommand::MoveTo(p) => 0x01 ^ ((p.x.to_bits() as u64) << 1) ^ (p.y.to_bits() as u64).rotate_left(11),
-            PathCommand::LineTo(p) => 0x02 ^ ((p.x.to_bits() as u64) << 1) ^ (p.y.to_bits() as u64).rotate_left(11),
+            PathCommand::MoveTo(p) => {
+                0x01 ^ ((p.x.to_bits() as u64) << 1) ^ (p.y.to_bits() as u64).rotate_left(11)
+            }
+            PathCommand::LineTo(p) => {
+                0x02 ^ ((p.x.to_bits() as u64) << 1) ^ (p.y.to_bits() as u64).rotate_left(11)
+            }
             PathCommand::QuadraticTo { control, to } => {
-                0x03
-                    ^ ((control.x.to_bits() as u64) << 1)
+                0x03 ^ ((control.x.to_bits() as u64) << 1)
                     ^ (control.y.to_bits() as u64).rotate_left(7)
                     ^ (to.x.to_bits() as u64).rotate_left(17)
                     ^ (to.y.to_bits() as u64).rotate_left(29)
@@ -112,8 +115,7 @@ impl BenchPathInterner {
                 control2,
                 to,
             } => {
-                0x04
-                    ^ ((control1.x.to_bits() as u64) << 1)
+                0x04 ^ ((control1.x.to_bits() as u64) << 1)
                     ^ (control1.y.to_bits() as u64).rotate_left(5)
                     ^ (control2.x.to_bits() as u64).rotate_left(13)
                     ^ (control2.y.to_bits() as u64).rotate_left(19)
@@ -125,8 +127,18 @@ impl BenchPathInterner {
     }
 
     fn fingerprint(path: &VectorPath) -> BenchFingerprint {
-        let first = path.commands.first().copied().map(Self::command_fp).unwrap_or(0);
-        let last = path.commands.last().copied().map(Self::command_fp).unwrap_or(0);
+        let first = path
+            .commands
+            .first()
+            .copied()
+            .map(Self::command_fp)
+            .unwrap_or(0);
+        let last = path
+            .commands
+            .last()
+            .copied()
+            .map(Self::command_fp)
+            .unwrap_or(0);
         BenchFingerprint {
             len: path.commands.len(),
             first,
