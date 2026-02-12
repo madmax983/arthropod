@@ -1119,3 +1119,34 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo test -p render-engine path_pipeline -- --nocapture` -> PASS (9/9)
   - `cargo run --example capture_phase4_visuals` -> PASS
   - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS (2/2)
+
+### 2026-02-12 (success-criteria closeout: Figma JSON -> render regression test)
+
+- Goal:
+  - Close success criterion #2 from `docs/plans/2026-02-08-figma-rendering-pipeline-design.md` with an automated end-to-end test:
+    - Figma-style JSON fixture -> Arthropod scene/style mapping -> desktop render -> golden comparison.
+- Implementation:
+  - Added Figma-style fixture:
+    - `tests/fixtures/figma/figma_import_scene.json`
+    - includes scene metadata, nodes, style properties, and image asset metadata.
+  - Added desktop integration regression:
+    - `tests/figma_json_render_regression.rs`
+    - parses fixture JSON into local DTOs.
+    - maps Figma-style properties to engine types:
+      - paints: solid / linear gradient / image
+      - stroke: `strokeWeight`, `strokeAlign`, `individualStrokeWeights`
+      - effects: drop/inner shadow, layer/background blur
+      - corner radius, opacity, blend mode, clips content, mask fields
+    - builds `Scene` with `NodeContent::Styled`.
+    - registers deterministic fixture images via `WgpuBackend::register_image_rgba8(...)`.
+    - renders offscreen with `render_scene_to_rgba(...)`.
+    - compares against golden with tolerance.
+    - supports golden refresh via `ARTHROPOD_UPDATE_GOLDENS=1`.
+  - Added committed golden:
+    - `tests/visual/golden/figma/figma_import_scene.png`
+  - Added root test-only serde derive dependency in `Cargo.toml`:
+    - `[dev-dependencies] serde = { version = "1.0", features = ["derive"] }`
+- Verification:
+  - `ARTHROPOD_UPDATE_GOLDENS=1 cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - `cargo clippy --test figma_json_render_regression -- -D warnings` -> PASS

@@ -276,6 +276,7 @@ dependencies = [
  "plat-core",
  "ratatui",
  "render-engine",
+ "serde",
  "serde_json",
  "style-engine",
  "text-engine",

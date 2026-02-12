@@ -192,6 +192,9 @@ web-sys = { version = "0.3", features = ["console", "Window", "Document", "Locat
 console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 ratatui = "0.30"
 crossterm = "0.28"
