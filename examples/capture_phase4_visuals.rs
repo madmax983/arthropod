@@ -12,6 +12,8 @@ mod phase4_visual_scenes;
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 720;
+const IMAGE_FIXTURE_WIDTH: u32 = 192;
+const IMAGE_FIXTURE_HEIGHT: u32 = 144;
 
 fn phase4_image_bytes(width: u32, height: u32) -> Vec<u8> {
     let mut rgba = vec![0u8; (width * height * 4) as usize];
@@ -113,9 +115,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     backend.set_clear_color(Color::rgba(0.02, 0.05, 0.09, 1.0));
     backend.register_image_rgba8(
         phase4_visual_scenes::PHASE4_IMAGE_TEST_ID,
-        64,
-        48,
-        phase4_image_bytes(64, 48),
+        IMAGE_FIXTURE_WIDTH,
+        IMAGE_FIXTURE_HEIGHT,
+        phase4_image_bytes(IMAGE_FIXTURE_WIDTH, IMAGE_FIXTURE_HEIGHT),
     )?;
 
     let captures = [

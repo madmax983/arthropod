@@ -108,9 +108,9 @@ pub struct PathPipeline {
 
 const INITIAL_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_INDEX_CAPACITY: usize = 8192;
-const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 12.0;
-const IMAGE_SUBDIVISION_MAX: u32 = 32;
-const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 4096;
+const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 4.0;
+const IMAGE_SUBDIVISION_MAX: u32 = 128;
+const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 16_384;
 
 #[inline]
 fn mix_u64(mut state: u64, value: u64) -> u64 {
@@ -252,10 +252,11 @@ fn sample_paint_at_uv(paint: &Paint, uv: glam::Vec2, target_size: glam::Vec2) ->
 fn image_subdivision_steps(size: glam::Vec2, base_triangle_count: usize) -> u32 {
     let desired = ((size.x.max(size.y).max(1.0) / IMAGE_SUBDIVISION_TARGET_PIXELS).ceil() as u32)
         .clamp(2, IMAGE_SUBDIVISION_MAX);
-    let max_by_budget =
-        ((IMAGE_SUBDIVISION_TRIANGLE_BUDGET as f32 / base_triangle_count.max(1) as f32).sqrt()
-            .floor() as u32)
-            .max(1);
+    let max_by_budget = ((IMAGE_SUBDIVISION_TRIANGLE_BUDGET as f32
+        / base_triangle_count.max(1) as f32)
+        .sqrt()
+        .floor() as u32)
+        .max(1);
     desired.min(max_by_budget).max(1)
 }
 
@@ -389,10 +390,7 @@ fn append_batch_geometry(
     vertices.extend(batch.mesh.vertices.iter().map(|v| {
         let local_pos = glam::Vec2::new(v.position[0], v.position[1]);
         PathGpuVertex {
-            position: [
-                local_pos.x + batch.offset[0],
-                local_pos.y + batch.offset[1],
-            ],
+            position: [local_pos.x + batch.offset[0], local_pos.y + batch.offset[1]],
             normal: v.normal,
             color: sample_batch_color(batch, local_pos, size),
         }
@@ -1203,5 +1201,14 @@ mod tests {
         assert!(has_red, "expected center red texels to be sampled");
 
         crate::backend::wgpu::image_store::unregister_image(image_id);
+    }
+
+    #[test]
+    fn test_image_subdivision_steps_dense_for_scaled_images() {
+        let steps = image_subdivision_steps(glam::Vec2::new(300.0, 170.0), 2);
+        assert!(
+            steps >= 64,
+            "image batches should use dense subdivision for large scaled content, got {steps}"
+        );
     }
 }

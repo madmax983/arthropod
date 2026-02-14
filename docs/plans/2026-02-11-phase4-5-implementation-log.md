@@ -1190,3 +1190,29 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo test -p plat-core --test web_event_mapping_tests -- --nocapture` -> PASS (5/5)
   - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
   - `npm run visual:test` -> PASS (6 skipped due WebGPU unavailable in this runtime)
+
+### 2026-02-13 (phase4 image golden sharpness improvement)
+
+- User feedback:
+  - `tests/visual/golden/phase4/image.png` looked noticeably blurry.
+- Root cause:
+  - `Paint::Image` path rendering still shades by interpolating vertex colors.
+  - Existing image subdivision density (target 12px, max 32, budget 4096) was too coarse for scaled image fills, producing soft edges.
+- Implementation:
+  - Updated image subdivision tuning in `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`:
+    - `IMAGE_SUBDIVISION_TARGET_PIXELS`: `12.0` -> `4.0`
+    - `IMAGE_SUBDIVISION_MAX`: `32` -> `128`
+    - `IMAGE_SUBDIVISION_TRIANGLE_BUDGET`: `4096` -> `16_384`
+  - Added regression unit test:
+    - `test_image_subdivision_steps_dense_for_scaled_images` (expects dense tessellation for 300x170 image fills).
+  - Increased deterministic phase4 image fixture resolution in both harnesses:
+    - `examples/capture_phase4_visuals.rs`
+    - `tests/phase4_desktop_visual_regression.rs`
+    - fixture size: `64x48` -> `192x144`
+  - Regenerated desktop phase4 goldens:
+    - `tests/visual/golden/phase4/image.png`
+- Verification:
+  - `cargo test -p render-engine path_pipeline -- --nocapture` -> PASS
+  - `cargo fmt --all` -> PASS
+  - `cargo run --example capture_phase4_visuals` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS

@@ -15,6 +15,8 @@ mod phase4_visual_scenes;
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 720;
+const IMAGE_FIXTURE_WIDTH: u32 = 192;
+const IMAGE_FIXTURE_HEIGHT: u32 = 144;
 const DEFAULT_CHANNEL_TOLERANCE: u8 = 2;
 const DEFAULT_MAX_DIFFERENCE_RATIO: f32 = 0.02;
 static VISUAL_TEST_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
@@ -110,9 +112,9 @@ fn phase4_desktop_visual_regression_matches_golden() {
     backend
         .register_image_rgba8(
             phase4_visual_scenes::PHASE4_IMAGE_TEST_ID,
-            64,
-            48,
-            phase4_image_bytes(64, 48),
+            IMAGE_FIXTURE_WIDTH,
+            IMAGE_FIXTURE_HEIGHT,
+            phase4_image_bytes(IMAGE_FIXTURE_WIDTH, IMAGE_FIXTURE_HEIGHT),
         )
         .expect("failed to register phase4 image asset");
 
