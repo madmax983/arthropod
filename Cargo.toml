@@ -110,6 +110,10 @@ name = "form_demo"
 path = "examples/form_demo.rs"
 
 [[example]]
+name = "glassmorphic_form"
+path = "examples/glassmorphic_form.rs"
+
+[[example]]
 name = "widget_gallery"
 path = "examples/widget_gallery.rs"
 
