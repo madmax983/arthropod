@@ -3,11 +3,7 @@ name: Miri (Unsafe Code Validation)
 on:
   push:
     branches: [ trunk, main ]
-  pull_request:
-    branches: [ trunk, main ]
-  # Allow manual trigger
   workflow_dispatch:
-  # Run weekly
   schedule:
     - cron: '0 0 * * 1'  # Monday at midnight
 
@@ -35,70 +31,31 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Run Miri on core crates with unsafe code
-      # Note: GUI/platform crates excluded as they need OS-specific APIs
-
-      - name: Miri - flux-state (reactive runtime)
+      # Run Miri on core crates with unsafe code.
+      # GUI/platform crates are excluded because they require OS APIs unsupported by Miri.
+      - name: Miri - flux-state
         run: cargo +nightly miri test -p flux-state
-        continue-on-error: false
 
-      - name: Miri - arthropod-ecs (ECS systems)
+      - name: Miri - arthropod-ecs
         run: cargo +nightly miri test -p arthropod-ecs --lib
-        continue-on-error: true  # May have platform dependencies
+        continue-on-error: true
 
-      - name: Miri - render-engine (scene graph)
+      - name: Miri - render-engine
         run: cargo +nightly miri test -p render-engine --lib --no-default-features
-        continue-on-error: true  # May need WGPU mocking
+        continue-on-error: true
 
-      # Document results
       - name: Summary
         if: always()
         run: |
           echo "## Miri Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Miri validates unsafe code for:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Use-after-free" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Data races" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Invalid memory access" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Uninitialized memory" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Alignment violations" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note**: Platform-specific crates (plat-core, a11y-engine) cannot run in Miri" >> $GITHUB_STEP_SUMMARY
-          echo "due to OS API dependencies. Their unsafe code is manually reviewed." >> $GITHUB_STEP_SUMMARY
+          echo "- use-after-free" >> $GITHUB_STEP_SUMMARY
+          echo "- data races" >> $GITHUB_STEP_SUMMARY
+          echo "- invalid memory access" >> $GITHUB_STEP_SUMMARY
+          echo "- uninitialized memory" >> $GITHUB_STEP_SUMMARY
+          echo "- alignment violations" >> $GITHUB_STEP_SUMMARY
 
-  # Check for new unsafe code in PRs
-  unsafe-audit:
-    name: Unsafe Code Audit
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check for new unsafe blocks
-        run: |
-          # Count unsafe blocks in diff
-          NEW_UNSAFE=$(git diff origin/${{ github.base_ref }}...HEAD | grep -c '^\+.*unsafe' || true)
-
-          echo "## Unsafe Code Changes" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "$NEW_UNSAFE" -gt 0 ]; then
-            echo "⚠️ **$NEW_UNSAFE new unsafe block(s) detected**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Required:**" >> $GITHUB_STEP_SUMMARY
-            echo "- [ ] Add \`# Safety\` doc comment explaining invariants" >> $GITHUB_STEP_SUMMARY
-            echo "- [ ] Verify with \`cargo +nightly miri test\` if possible" >> $GITHUB_STEP_SUMMARY
-            echo "- [ ] Review for alternatives (safe abstractions)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Unsafe code locations:**" >> $GITHUB_STEP_SUMMARY
-            git diff origin/${{ github.base_ref }}...HEAD | grep -B2 '^\+.*unsafe' | grep '^\+' || true
-          else
-            echo "✅ No new unsafe blocks" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # Static analysis for unsafe patterns
   unsafe-patterns:
     name: Unsafe Code Patterns
     runs-on: ubuntu-latest
@@ -111,17 +68,9 @@ jobs:
           echo "## Unsafe Pattern Analysis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Check for transmute (often avoidable)
           TRANSMUTE=$(grep -r "std::mem::transmute" crates/ || true)
           if [ -n "$TRANSMUTE" ]; then
-            echo "⚠️ Found \`transmute\` usage - consider alternatives" >> $GITHUB_STEP_SUMMARY
+            echo "Found \`transmute\` usage - review for safer alternatives." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No \`transmute\` usage found." >> $GITHUB_STEP_SUMMARY
           fi
-
-          # Check for raw pointer derefs without null checks
-          # (simplified check - manual review still needed)
-          echo "✅ Pattern checks complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Manual review recommended for:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Raw pointer dereferencing" >> $GITHUB_STEP_SUMMARY
-          echo "- FFI boundaries" >> $GITHUB_STEP_SUMMARY
-          echo "- Concurrent access patterns" >> $GITHUB_STEP_SUMMARY

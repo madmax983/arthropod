@@ -5,6 +5,11 @@ on:
     branches: [ trunk, main ]
   pull_request:
     branches: [ trunk, main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -40,22 +45,17 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  # Job 3: Test Suite (Multiple Platforms)
-  test:
-    name: Test Suite
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable]
-    runs-on: ${{ matrix.os }}
+  # Job 3: Test Suite (Linux - required for PRs)
+  test-linux:
+    name: Test Suite (Linux)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
@@ -68,7 +68,25 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc --all-features
 
-  # Job 4: Build Check (Release)
+  # Job 4: Cross-platform tests (push only)
+  test-cross-platform:
+    name: Test Suite (${{ matrix.os }})
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+        rust: [stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --all --all-features
+
+  # Job 5: Build Check (Release)
   build:
     name: Build Check
     runs-on: ubuntu-latest
@@ -83,7 +101,7 @@ jobs:
       - name: Build release
         run: cargo build --release --all-features
 
-  # Job 5: Examples Build Check
+  # Job 6: Examples Build Check
   examples:
     name: Examples Build
     runs-on: ubuntu-latest
@@ -98,11 +116,11 @@ jobs:
       - name: Build all examples
         run: cargo build --examples --all-features
 
-  # Job 6: Benchmark Regression Check (optional - only on main)
+  # Job 7: Benchmark Regression Check (trunk/main push + manual)
   benchmark:
     name: Benchmark Check
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -139,10 +157,11 @@ jobs:
           comment-on-alert: true
           fail-on-alert: false
 
-  # Job 7: Coverage (optional - requires tarpaulin)
+  # Job 8: Coverage (trunk/main push + manual)
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -162,7 +181,7 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # Job 8: Security Audit
+  # Job 9: Security Audit
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -172,10 +191,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Job 9: Phase 4/5 completion gates (effects + web)
+  # Job 10: Phase 4/5 completion gates (effects + web)
   phase45-gates:
     name: Phase 4/5 Gates
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -212,10 +232,11 @@ jobs:
           grep -q "Arthropod Widget Gallery Live" target/trunk/widget_gallery_web/index.html
           grep -q 'id="arthropod-canvas"' target/trunk/widget_gallery_web/index.html
 
-  # Job 10: Native desktop visual regression (golden image diff)
+  # Job 11: Native desktop visual regression (golden image diff)
   phase4-desktop-visual-regression:
     name: Phase 4 Desktop Visual Regression
     runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

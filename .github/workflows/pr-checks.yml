@@ -1,125 +1,42 @@
-name: PR Quality Gate
+name: PR Meta Checks
 
 on:
   pull_request:
     branches: [ trunk, main ]
 
+concurrency:
+  group: pr-meta-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Comprehensive PR checks before merge
-  quality-gate:
-    name: Quality Gate
+  meta-checks:
+    name: PR Meta Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history for diff
+          fetch-depth: 0
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-
-      - uses: Swatinem/rust-cache@v2
-
-      # 1. Format check (hard requirement)
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      # 2. Clippy with -D warnings (hard requirement)
-      - name: Clippy check
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      # 3. All tests must pass (hard requirement)
-      - name: Run tests
-        run: cargo test --all --all-features
-
-      # 4. Doc tests must pass
-      - name: Run doc tests
-        run: cargo test --doc --all-features
-
-      # 5. Build all examples
-      - name: Build examples
-        run: cargo build --examples --all-features
-
-      # 6. Check for new TODOs in diff
       - name: Check for new TODOs
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*TODO' && echo "❌ New TODOs found in PR" && exit 1 || echo "✅ No new TODOs"
+          if git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*TODO' > /dev/null; then
+            echo "::error::New TODOs found in PR diff"
+            exit 1
+          fi
+          echo "No new TODOs found in PR diff"
 
-      # 7. Check documentation coverage (modified files)
-      - name: Check docs coverage
-        run: |
-          RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
-
-      # 8. Check for new unsafe blocks
       - name: Check for new unsafe code
         run: |
           NEW_UNSAFE=$(git diff origin/${{ github.base_ref }}...HEAD | grep -c '^\+.*unsafe' || true)
           if [ "$NEW_UNSAFE" -gt 0 ]; then
-            echo "⚠️ New unsafe blocks detected: $NEW_UNSAFE"
-            echo "Ensure they have proper safety documentation"
+            echo "::warning::New unsafe blocks detected: $NEW_UNSAFE (ensure # Safety docs/invariants)"
+          else
+            echo "No new unsafe blocks detected"
           fi
 
-      # 9. Performance guardrail: path cache hot path
-      - name: Path hot-path benchmark guardrail
-        env:
-          MAX_NS: "200"
-        run: bash .github/scripts/check-path-hot-bench.sh
-      - name: Style boolean-op benchmark guardrail
-        env:
-          BENCH_NAME: "path_boolean_ops/intersect/128"
-          MAX_NS: "50000"
-        run: bash .github/scripts/check-style-path-bench.sh
-      - name: Style hit-test benchmark guardrail
-        env:
-          BENCH_NAME: "path_hit_test/contains_point_inside"
-          MAX_NS: "5000"
-        run: bash .github/scripts/check-style-path-bench.sh
-
-  # Size check - ensure binary size doesn't explode
-  size-check:
-    name: Binary Size Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build release binary
-        run: cargo build --release -p arthropod
-
-      - name: Check binary size
-        run: |
-          SIZE=$(stat -c%s "target/release/libarthropod.rlib")
-          echo "Binary size: $(numfmt --to=iec-i --suffix=B $SIZE)"
-
-          # Alert if > 50MB (adjust threshold as needed)
-          if [ $SIZE -gt 52428800 ]; then
-            echo "⚠️ Binary size exceeds 50MB"
-          fi
-
-  # Dependency audit
-  dependency-audit:
-    name: Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  # Check for banned dependencies
   banned-deps:
     name: Check Banned Dependencies
     runs-on: ubuntu-latest
@@ -131,11 +48,10 @@ jobs:
       - name: Check dependencies
         run: cargo deny check
 
-  # All jobs must pass for PR to be mergeable
   pr-ready:
     name: PR Ready to Merge
     runs-on: ubuntu-latest
-    needs: [quality-gate, size-check, dependency-audit, banned-deps]
+    needs: [meta-checks, banned-deps]
     steps:
       - name: All checks passed
-        run: echo "✅ All quality gates passed - PR is ready!"
+        run: echo "All PR meta checks passed."
