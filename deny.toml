@@ -5,15 +5,11 @@
 # Deny crates with security vulnerabilities
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "warn"
 yanked = "deny"
-notice = "warn"
 ignore = []
 
 [licenses]
 # Allow permissive licenses
-unlicensed = "deny"
 allow = [
     "MIT",
     "Apache-2.0",
@@ -31,9 +27,6 @@ deny = [
     "GPL-3.0",
     "AGPL-3.0",
 ]
-copyleft = "deny"
-allow-osi-fsf-free = "both"
-default = "deny"
 confidence-threshold = 0.8
 
 [[licenses.clarify]]

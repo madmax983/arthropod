@@ -250,6 +250,8 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
+    use super::Layer;
+    use crate::Rect;
 
     #[test]
     fn test_layer_bounds() {

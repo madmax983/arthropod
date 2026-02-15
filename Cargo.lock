@@ -2085,6 +2085,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "input-fusion"
+version = "0.1.0"
+dependencies = [
+ "flux-state",
+ "log",
+ "plat-core",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "instability"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

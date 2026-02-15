@@ -524,8 +524,7 @@ fn generate_style_setup(style: &StyleConfig) -> TokenStream {
 
     let mut style_setters = Vec::new();
 
-    if style.opacity.is_some() {
-        let opacity = style.opacity.unwrap();
+    if let Some(opacity) = style.opacity {
         style_setters.push(quote! {
             if let Some(node) = ctx.scene_mut().get_node_mut(__node_id) {
                 node.opacity = #opacity;

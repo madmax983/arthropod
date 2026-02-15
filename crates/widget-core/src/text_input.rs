@@ -165,8 +165,12 @@ impl Widget for TextInput {
             self.read_signal.with_untracked(|value| {
                 let is_empty = value.is_empty();
 
-                let display = if is_empty && self.placeholder.is_some() {
-                    self.placeholder.as_ref().unwrap().clone()
+                let display = if is_empty {
+                    if let Some(placeholder) = &self.placeholder {
+                        placeholder.clone()
+                    } else {
+                        value.clone()
+                    }
                 } else {
                     value.clone()
                 };

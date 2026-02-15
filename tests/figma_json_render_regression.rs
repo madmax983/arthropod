@@ -264,9 +264,9 @@ impl FigmaEffect {
             Self::LayerBlur { radius, visible } => {
                 visible.then_some(Effect::LayerBlur(LayerBlur { radius, visible }))
             }
-            Self::BackgroundBlur { radius, visible } => visible.then_some(
-                Effect::BackgroundBlur(BackgroundBlur { radius, visible }),
-            ),
+            Self::BackgroundBlur { radius, visible } => {
+                visible.then_some(Effect::BackgroundBlur(BackgroundBlur { radius, visible }))
+            }
         }
     }
 }
@@ -512,7 +512,12 @@ fn phase4_marker_bytes(width: u32, height: u32) -> Vec<u8> {
 
 fn should_update_goldens() -> bool {
     std::env::var("ARTHROPOD_UPDATE_GOLDENS")
-        .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
