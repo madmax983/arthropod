@@ -1,201 +1,38 @@
 //! WGPU backend implementation.
 
+pub mod clipping;
 pub mod context;
 pub mod effects;
 pub mod image_store;
+pub mod instance_collector;
+pub mod multipass_executor;
+pub mod path_interner;
 pub mod pipelines;
 pub mod render_target_pool;
 
 use crate::backend::text::TextRenderer;
-use crate::{Color, RendererError, Scene, SceneNode};
+use crate::{Color, RendererError, Scene};
 #[cfg(not(target_arch = "wasm32"))]
 use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use rayon::prelude::*;
-use std::collections::HashMap;
-use std::sync::Arc;
-use text_engine::{ShapedText, shape_text_parallel};
 use tracing::{Level, instrument, span};
 
 use context::WgpuContext;
-use effects::{
-    EffectPassKind, RenderTargetHandle, RenderTargetKey, RenderTargetPool, backdrop_capture_bounds,
-    classify_effect_passes,
-};
-use pipelines::blend_pipeline::{BlendParams, BlendPipeline};
-use pipelines::blur_pipeline::{BlurDirection, BlurParams, BlurPipeline, select_blur_tier};
+use effects::{RenderTargetKey, RenderTargetPool};
+use pipelines::blend_pipeline::BlendPipeline;
+use pipelines::blur_pipeline::BlurPipeline;
 pub use pipelines::path_pipeline::TessellationCacheStats;
-use pipelines::path_pipeline::{
-    PathBatch, PathPipeline, TessellationCache, tessellate_fill, tessellate_stroke,
-};
+use pipelines::path_pipeline::{PathPipeline, TessellationCache};
 pub use pipelines::primitive_pipeline::PrimitiveInstance;
-use pipelines::primitive_pipeline::{
-    FLAG_FILL_TYPE_MASK, GradientParams, PrimitivePipeline, create_primitive_instances,
-    create_primitive_instances_with_pipeline,
-};
-use pipelines::stencil_pipeline::{ClipStack, plan_clip_sequence_for_nested_clips};
+use pipelines::primitive_pipeline::PrimitivePipeline;
+use pipelines::stencil_pipeline::ClipStack;
 
-/// Threshold for parallelizing text shaping
-/// Below this count, sequential shaping is faster due to thread overhead
-const TEXT_PARALLEL_THRESHOLD: usize = 8;
+pub(crate) const GLYPH_ATLAS_SIZE: u32 = 1024;
+pub(crate) const GRADIENT_ATLAS_SIZE: f32 = 1024.0;
 
-/// Text node data for shaping: (node, text, font_size, style)
-type TextNodeData<'a> = (&'a SceneNode, &'a str, f32, &'a style_engine::VisualStyle);
-
-const GLYPH_ATLAS_SIZE: u32 = 1024;
-const GRADIENT_ATLAS_SIZE: f32 = 1024.0;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PathFingerprint {
-    command_len: usize,
-    winding: style_engine::WindingRule,
-    first: u64,
-    last: u64,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct InternedPathEntry {
-    path_hash: u64,
-    fingerprint: PathFingerprint,
-}
-
-#[derive(Debug, Default)]
-struct PathInterner {
-    by_ptr: HashMap<usize, InternedPathEntry>,
-}
-
-impl PathInterner {
-    fn fingerprint(path: &style_engine::VectorPath) -> PathFingerprint {
-        fn command_fp(command: style_engine::PathCommand) -> u64 {
-            match command {
-                style_engine::PathCommand::MoveTo(p) => {
-                    0x01u64
-                        ^ ((p.x.to_bits() as u64) << 1)
-                        ^ ((p.y.to_bits() as u64).rotate_left(17))
-                }
-                style_engine::PathCommand::LineTo(p) => {
-                    0x02u64
-                        ^ ((p.x.to_bits() as u64) << 1)
-                        ^ ((p.y.to_bits() as u64).rotate_left(17))
-                }
-                style_engine::PathCommand::QuadraticTo { control, to } => {
-                    0x03u64
-                        ^ ((control.x.to_bits() as u64) << 1)
-                        ^ ((control.y.to_bits() as u64).rotate_left(9))
-                        ^ ((to.x.to_bits() as u64).rotate_left(17))
-                        ^ ((to.y.to_bits() as u64).rotate_left(29))
-                }
-                style_engine::PathCommand::CubicTo {
-                    control1,
-                    control2,
-                    to,
-                } => {
-                    0x04u64
-                        ^ ((control1.x.to_bits() as u64) << 1)
-                        ^ ((control1.y.to_bits() as u64).rotate_left(7))
-                        ^ ((control2.x.to_bits() as u64).rotate_left(13))
-                        ^ ((control2.y.to_bits() as u64).rotate_left(19))
-                        ^ ((to.x.to_bits() as u64).rotate_left(23))
-                        ^ ((to.y.to_bits() as u64).rotate_left(31))
-                }
-                style_engine::PathCommand::Close => 0x05u64,
-            }
-        }
-
-        let first = path.commands.first().copied().map(command_fp).unwrap_or(0);
-        let last = path.commands.last().copied().map(command_fp).unwrap_or(0);
-        PathFingerprint {
-            command_len: path.commands.len(),
-            winding: path.winding_rule,
-            first,
-            last,
-        }
-    }
-
-    fn hash_for(&mut self, path: &style_engine::VectorPath) -> u64 {
-        let ptr = path as *const style_engine::VectorPath as usize;
-        let fingerprint = Self::fingerprint(path);
-        if let Some(entry) = self.by_ptr.get(&ptr)
-            && entry.fingerprint == fingerprint
-        {
-            return entry.path_hash;
-        }
-
-        let path_hash = TessellationCache::fill_key(path);
-        self.by_ptr.insert(
-            ptr,
-            InternedPathEntry {
-                path_hash,
-                fingerprint,
-            },
-        );
-        path_hash
-    }
-}
-
-#[derive(Clone, Copy)]
-enum TextFill {
-    Solid(glam::Vec4),
-    Gradient {
-        param_index: u32,
-        fill_type: u32,
-        opacity: f32,
-        text_bounds: [f32; 4], // x, y, width, height in scene space
-    },
-}
-
-fn apply_text_fill_to_glyph(instance: &mut PrimitiveInstance, fill: TextFill) {
-    match fill {
-        TextFill::Solid(color) => {
-            instance.color = color.to_array();
-            instance.flags &= !0xF;
-        }
-        TextFill::Gradient {
-            param_index,
-            fill_type,
-            opacity,
-            text_bounds,
-        } => {
-            instance.color = [1.0, 1.0, 1.0, opacity];
-            instance.gradient_params = [
-                param_index as f32,
-                text_bounds[0],
-                text_bounds[1],
-                text_bounds[2],
-            ];
-            instance.stroke_params = [text_bounds[3], 0.0];
-            instance.flags =
-                (instance.flags & !FLAG_FILL_TYPE_MASK) | (fill_type & FLAG_FILL_TYPE_MASK);
-        }
-    }
-}
-
-/// Helper to create PrimitiveInstances from a SceneNode (ECS compatibility).
-///
-/// Uses the no-pipeline fallback path:
-/// - solid fills are emitted directly
-/// - gradients are approximated to a representative color
-/// - strokes and drop shadows are emitted
-/// - text is skipped (text shaping requires backend-owned text/glyph resources)
-///
-/// Returns empty vec if the node is invisible or has no styled content.
-pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
-    use crate::NodeContent;
-    use pipelines::primitive_pipeline::create_primitive_instances;
-
-    if !node.visible || node.opacity <= 0.0 {
-        return Vec::new();
-    }
-
-    match &node.content {
-        NodeContent::Styled { style } => {
-            let pos = glam::Vec2::new(node.bounds.x, node.bounds.y);
-            let size = glam::Vec2::new(node.bounds.width, node.bounds.height);
-            create_primitive_instances(style, pos, size, node.opacity * style.opacity)
-        }
-        NodeContent::Empty => Vec::new(),
-    }
-}
+pub use instance_collector::create_node_instances;
+use multipass_executor::{MultipassRenderer, collect_multipass_node_ids};
+use path_interner::PathInterner;
 
 /// wgpu-based rendering backend.
 #[cfg_attr(not(target_arch = "wasm32"), derive(Resource))]
@@ -463,599 +300,6 @@ impl WgpuBackend {
             path_pipeline.render(render_pass, globals_bind_group);
         })
     }
-
-    /// Collect instances from the scene.
-    ///
-    /// Returns a tuple of (primitive_instances, text_nodes_for_shaping, path_batches).
-    /// Text nodes are extracted from VisualStyle and returned for shaping.
-    fn collect_instances<'a>(
-        pipeline: &mut PrimitivePipeline,
-        tessellation_cache: &mut TessellationCache,
-        path_interner: &mut PathInterner,
-        scene: &'a Scene,
-    ) -> (
-        Vec<PrimitiveInstance>,
-        Vec<TextNodeData<'a>>,
-        Vec<PathBatch>,
-    ) {
-        Self::collect_instances_impl(
-            Some(pipeline),
-            Some(tessellation_cache),
-            Some(path_interner),
-            scene,
-            false,
-        )
-    }
-
-    fn collect_instances_excluding_multipass<'a>(
-        pipeline: &mut PrimitivePipeline,
-        tessellation_cache: &mut TessellationCache,
-        path_interner: &mut PathInterner,
-        scene: &'a Scene,
-    ) -> (
-        Vec<PrimitiveInstance>,
-        Vec<TextNodeData<'a>>,
-        Vec<PathBatch>,
-    ) {
-        Self::collect_instances_impl(
-            Some(pipeline),
-            Some(tessellation_cache),
-            Some(path_interner),
-            scene,
-            true,
-        )
-    }
-
-    #[cfg(test)]
-    fn collect_instances_for_tests<'a>(
-        scene: &'a Scene,
-    ) -> (
-        Vec<PrimitiveInstance>,
-        Vec<TextNodeData<'a>>,
-        Vec<PathBatch>,
-    ) {
-        Self::collect_instances_impl(None, None, None, scene, false)
-    }
-
-    #[cfg(test)]
-    fn collect_instances_without_multipass_for_tests<'a>(
-        scene: &'a Scene,
-    ) -> (
-        Vec<PrimitiveInstance>,
-        Vec<TextNodeData<'a>>,
-        Vec<PathBatch>,
-    ) {
-        Self::collect_instances_impl(None, None, None, scene, true)
-    }
-
-    fn collect_instances_impl<'a>(
-        mut pipeline: Option<&mut PrimitivePipeline>,
-        mut tessellation_cache: Option<&mut TessellationCache>,
-        mut path_interner: Option<&mut PathInterner>,
-        scene: &'a Scene,
-        skip_multipass: bool,
-    ) -> (
-        Vec<PrimitiveInstance>,
-        Vec<TextNodeData<'a>>,
-        Vec<PathBatch>,
-    ) {
-        use crate::NodeContent;
-        let mut instances = Vec::new();
-        let mut text_nodes_for_shaping = Vec::new();
-        let mut path_batches = Vec::new();
-
-        for (node_id, node) in scene.iter_visuals() {
-            if !node.visible || node.opacity <= 0.0 {
-                continue;
-            }
-
-            if let NodeContent::Styled { style } = &node.content {
-                if skip_multipass && style_requires_multipass(style) {
-                    continue;
-                }
-                let effective_opacity = node.opacity * style.opacity;
-                let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds)
-                else {
-                    continue;
-                };
-
-                if let Some(paths) = &style.fill_geometry {
-                    let fill_paint = resolve_path_fill_paint(style);
-
-                    for path in paths {
-                        let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
-                            interner.hash_for(path)
-                        } else {
-                            TessellationCache::fill_key(path)
-                        };
-                        let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-                            cache.get_or_tessellate_fill_with_key(path_hash, path)
-                        } else {
-                            tessellate_fill(path).map(Arc::new)
-                        };
-
-                        if let Ok(mesh) = mesh_result
-                            && !mesh.indices.is_empty()
-                        {
-                            path_batches.push(PathBatch {
-                                mesh,
-                                paint: fill_paint.clone(),
-                                opacity: effective_opacity,
-                                size: [render_bounds.width, render_bounds.height],
-                                offset: [render_bounds.x, render_bounds.y],
-                            });
-                        }
-                    }
-
-                    if let Some(stroke) = &style.stroke {
-                        let stroke_paint = resolve_path_stroke_paint(stroke);
-                        if let Some(stroke_paths) = style
-                            .stroke_geometry
-                            .as_ref()
-                            .or(style.fill_geometry.as_ref())
-                        {
-                            for path in stroke_paths {
-                                let path_hash = if let Some(interner) = path_interner.as_deref_mut()
-                                {
-                                    interner.hash_for(path)
-                                } else {
-                                    TessellationCache::fill_key(path)
-                                };
-                                let stroke_key =
-                                    TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
-                                let mesh_result = if let Some(cache) =
-                                    tessellation_cache.as_deref_mut()
-                                {
-                                    cache
-                                        .get_or_tessellate_stroke_with_key(stroke_key, path, stroke)
-                                } else {
-                                    tessellate_stroke(path, stroke).map(Arc::new)
-                                };
-                                if let Ok(mesh) = mesh_result
-                                    && !mesh.indices.is_empty()
-                                {
-                                    path_batches.push(PathBatch {
-                                        mesh,
-                                        paint: stroke_paint.clone(),
-                                        opacity: effective_opacity,
-                                        size: [render_bounds.width, render_bounds.height],
-                                        offset: [render_bounds.x, render_bounds.y],
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    continue;
-                }
-
-                // Route image-filled rectangles through path batches so Paint::Image
-                // samples are resolved by the path pipeline instead of magenta fallback.
-                if matches!(style.fills.first(), Some(style_engine::Paint::Image(_))) {
-                    let fill_paint = resolve_path_fill_paint(style);
-                    let rect_path = rect_path_for_size(render_bounds.width, render_bounds.height);
-                    let path_hash = TessellationCache::fill_key(&rect_path);
-                    let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-                        cache.get_or_tessellate_fill_with_key(path_hash, &rect_path)
-                    } else {
-                        tessellate_fill(&rect_path).map(Arc::new)
-                    };
-                    if let Ok(mesh) = mesh_result
-                        && !mesh.indices.is_empty()
-                    {
-                        path_batches.push(PathBatch {
-                            mesh,
-                            paint: fill_paint.clone(),
-                            opacity: effective_opacity,
-                            size: [render_bounds.width, render_bounds.height],
-                            offset: [render_bounds.x, render_bounds.y],
-                        });
-                    }
-
-                    if let Some(stroke) = &style.stroke {
-                        let stroke_paint = resolve_path_stroke_paint(stroke);
-                        let stroke_key =
-                            TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
-                        let stroke_mesh_result = if let Some(cache) =
-                            tessellation_cache.as_deref_mut()
-                        {
-                            cache.get_or_tessellate_stroke_with_key(stroke_key, &rect_path, stroke)
-                        } else {
-                            tessellate_stroke(&rect_path, stroke).map(Arc::new)
-                        };
-                        if let Ok(mesh) = stroke_mesh_result
-                            && !mesh.indices.is_empty()
-                        {
-                            path_batches.push(PathBatch {
-                                mesh,
-                                paint: stroke_paint,
-                                opacity: effective_opacity,
-                                size: [render_bounds.width, render_bounds.height],
-                                offset: [render_bounds.x, render_bounds.y],
-                            });
-                        }
-                    }
-
-                    continue;
-                }
-
-                // Check if this style has text that needs shaping
-                if let Some(text_content) = &style.text {
-                    text_nodes_for_shaping.push((
-                        node,
-                        text_content.text.as_str(),
-                        text_content.font_size,
-                        style.as_ref(),
-                    ));
-                }
-
-                // Create primitive instances for this style
-                let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
-                let size = glam::Vec2::new(render_bounds.width, render_bounds.height);
-                let node_instances = if let Some(pipeline) = pipeline.as_deref_mut() {
-                    create_primitive_instances_with_pipeline(
-                        pipeline,
-                        style,
-                        pos,
-                        size,
-                        effective_opacity,
-                    )
-                } else {
-                    create_primitive_instances(style, pos, size, effective_opacity)
-                };
-                instances.extend(node_instances);
-            }
-        }
-        (instances, text_nodes_for_shaping, path_batches)
-    }
-
-    fn resolve_text_fill(
-        pipeline: &mut PrimitivePipeline,
-        style: &style_engine::VisualStyle,
-        opacity: f32,
-        text_bounds: [f32; 4],
-    ) -> TextFill {
-        let Some(fill) = style.fills.first() else {
-            return TextFill::Solid(glam::Vec4::new(0.0, 0.0, 0.0, opacity));
-        };
-
-        match fill {
-            style_engine::Paint::Solid(color) => {
-                let mut final_color = *color;
-                final_color.w *= opacity;
-                TextFill::Solid(final_color)
-            }
-            style_engine::Paint::Linear(gradient) => {
-                let atlas_row = pipeline.add_gradient(&gradient.stops);
-                let param_index = pipeline.add_gradient_params(GradientParams {
-                    start: gradient.start.to_array(),
-                    end: gradient.end.to_array(),
-                    atlas_row: (atlas_row as f32 + 0.5) / GRADIENT_ATLAS_SIZE,
-                    gradient_type: 0,
-                    _padding: [0.0; 2],
-                });
-                TextFill::Gradient {
-                    param_index,
-                    fill_type: 1,
-                    opacity,
-                    text_bounds,
-                }
-            }
-            style_engine::Paint::Radial(gradient) => {
-                let atlas_row = pipeline.add_gradient(&gradient.stops);
-                let param_index = pipeline.add_gradient_params(GradientParams {
-                    start: gradient.center.to_array(),
-                    end: (gradient.center + glam::Vec2::new(gradient.radius, 0.0)).to_array(),
-                    atlas_row: (atlas_row as f32 + 0.5) / GRADIENT_ATLAS_SIZE,
-                    gradient_type: 1,
-                    _padding: [0.0; 2],
-                });
-                TextFill::Gradient {
-                    param_index,
-                    fill_type: 2,
-                    opacity,
-                    text_bounds,
-                }
-            }
-            style_engine::Paint::Angular(gradient) => {
-                let atlas_row = pipeline.add_gradient(&gradient.stops);
-                let param_index = pipeline.add_gradient_params(GradientParams {
-                    start: gradient.center.to_array(),
-                    end: gradient.center.to_array(),
-                    atlas_row: (atlas_row as f32 + 0.5) / GRADIENT_ATLAS_SIZE,
-                    gradient_type: 2,
-                    _padding: [0.0; 2],
-                });
-                TextFill::Gradient {
-                    param_index,
-                    fill_type: 3,
-                    opacity,
-                    text_bounds,
-                }
-            }
-            style_engine::Paint::Diamond(gradient) => {
-                let atlas_row = pipeline.add_gradient(&gradient.stops);
-                let param_index = pipeline.add_gradient_params(GradientParams {
-                    start: gradient.center.to_array(),
-                    end: (gradient.center + glam::Vec2::new(gradient.scale, gradient.scale))
-                        .to_array(),
-                    atlas_row: (atlas_row as f32 + 0.5) / GRADIENT_ATLAS_SIZE,
-                    gradient_type: 3,
-                    _padding: [0.0; 2],
-                });
-                TextFill::Gradient {
-                    param_index,
-                    fill_type: 4,
-                    opacity,
-                    text_bounds,
-                }
-            }
-            style_engine::Paint::Image(_) => {
-                TextFill::Solid(glam::Vec4::new(0.0, 0.0, 0.0, opacity))
-            }
-        }
-    }
-}
-
-fn resolve_path_fill_paint(style: &style_engine::VisualStyle) -> style_engine::Paint {
-    style
-        .fills
-        .first()
-        .cloned()
-        .unwrap_or_else(|| style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 1.0, 1.0)))
-}
-
-fn resolve_path_stroke_paint(stroke: &style_engine::StrokeStyle) -> style_engine::Paint {
-    stroke
-        .top_paint()
-        .cloned()
-        .unwrap_or_else(|| style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 1.0, 1.0)))
-}
-
-fn rect_intersection(a: plat_core::Rect, b: plat_core::Rect) -> Option<plat_core::Rect> {
-    let x0 = a.x.max(b.x);
-    let y0 = a.y.max(b.y);
-    let x1 = (a.x + a.width).min(b.x + b.width);
-    let y1 = (a.y + a.height).min(b.y + b.height);
-
-    if x1 <= x0 || y1 <= y0 {
-        return None;
-    }
-
-    Some(plat_core::Rect::new(x0, y0, x1 - x0, y1 - y0))
-}
-
-fn ancestor_clip_bounds(scene: &Scene, node_id: crate::NodeId) -> Option<plat_core::Rect> {
-    use crate::NodeContent;
-
-    let mut current = scene.parent(node_id);
-    let mut clip: Option<plat_core::Rect> = None;
-
-    while let Some(parent_id) = current {
-        let Some(parent_node) = scene.get_node(parent_id) else {
-            break;
-        };
-
-        if let NodeContent::Styled { style } = &parent_node.content
-            && style.clips_content
-        {
-            clip = Some(match clip {
-                Some(existing) => rect_intersection(existing, parent_node.bounds)?,
-                None => parent_node.bounds,
-            });
-        }
-
-        current = parent_node.parent;
-    }
-
-    clip
-}
-
-/// Compute active sibling-mask bounds for `node_id` across ancestor levels.
-///
-/// Figma-style behavior is approximated by selecting the last preceding mask sibling
-/// in each ancestor level and intersecting those bounds.
-fn ancestor_mask_bounds(scene: &Scene, node_id: crate::NodeId) -> Option<plat_core::Rect> {
-    use crate::NodeContent;
-
-    let mut current = node_id;
-    let mut mask_clip: Option<plat_core::Rect> = None;
-
-    while let Some(parent_id) = scene.parent(current) {
-        let Some(parent_node) = scene.get_node(parent_id) else {
-            break;
-        };
-
-        let mut level_mask: Option<plat_core::Rect> = None;
-        for &sibling_id in &parent_node.children {
-            if sibling_id == current {
-                break;
-            }
-            let Some(sibling) = scene.get_node(sibling_id) else {
-                continue;
-            };
-            if !sibling.visible || sibling.opacity <= 0.0 {
-                continue;
-            }
-            if let NodeContent::Styled { style } = &sibling.content
-                && style.is_mask
-            {
-                level_mask = Some(sibling.bounds);
-            }
-        }
-
-        if let Some(level_mask) = level_mask {
-            mask_clip = Some(match mask_clip {
-                Some(existing) => rect_intersection(existing, level_mask)?,
-                None => level_mask,
-            });
-        }
-
-        current = parent_id;
-    }
-
-    mask_clip
-}
-
-fn clipped_bounds_for_node(
-    scene: &Scene,
-    node_id: crate::NodeId,
-    node_bounds: plat_core::Rect,
-) -> Option<plat_core::Rect> {
-    let mut clipped = node_bounds;
-    if let Some(clip) = ancestor_clip_bounds(scene, node_id) {
-        clipped = rect_intersection(clipped, clip)?;
-    }
-    if let Some(mask) = ancestor_mask_bounds(scene, node_id) {
-        clipped = rect_intersection(clipped, mask)?;
-    }
-    Some(clipped)
-}
-
-fn rect_to_scissor_bounds(
-    bounds: plat_core::Rect,
-    frame_width: u32,
-    frame_height: u32,
-) -> Option<[u32; 4]> {
-    let x0 = bounds.x.max(0.0).min(frame_width as f32).floor() as u32;
-    let y0 = bounds.y.max(0.0).min(frame_height as f32).floor() as u32;
-    let x1 = (bounds.x + bounds.width)
-        .max(0.0)
-        .min(frame_width as f32)
-        .ceil() as u32;
-    let y1 = (bounds.y + bounds.height)
-        .max(0.0)
-        .min(frame_height as f32)
-        .ceil() as u32;
-
-    if x1 <= x0 || y1 <= y0 {
-        return None;
-    }
-
-    Some([x0, y0, x1 - x0, y1 - y0])
-}
-
-fn rect_path_for_size(width: f32, height: f32) -> style_engine::VectorPath {
-    let mut path = style_engine::VectorPath::new();
-    path.move_to(glam::Vec2::new(0.0, 0.0));
-    path.line_to(glam::Vec2::new(width, 0.0));
-    path.line_to(glam::Vec2::new(width, height));
-    path.line_to(glam::Vec2::new(0.0, height));
-    path.close();
-    path
-}
-
-fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
-    if !matches!(
-        style.blend_mode,
-        style_engine::BlendMode::Normal | style_engine::BlendMode::PassThrough
-    ) {
-        return true;
-    }
-
-    style.effects.iter().any(|effect| match effect {
-        style_engine::Effect::LayerBlur(blur) => blur.visible && blur.radius > 0.0,
-        style_engine::Effect::BackgroundBlur(blur) => blur.visible && blur.radius > 0.0,
-        style_engine::Effect::InnerShadow(shadow) => shadow.visible,
-        _ => false,
-    })
-}
-
-fn collect_multipass_node_ids(scene: &Scene) -> Vec<crate::NodeId> {
-    use crate::NodeContent;
-
-    scene
-        .iter_visuals()
-        .filter_map(|(node_id, node)| {
-            if !node.visible || node.opacity <= 0.0 {
-                return None;
-            }
-            match &node.content {
-                NodeContent::Styled { style } if style_requires_multipass(style) => Some(node_id),
-                _ => None,
-            }
-        })
-        .collect()
-}
-
-fn classify_scene_effect_kinds(scene: &Scene) -> Vec<EffectPassKind> {
-    use crate::NodeContent;
-
-    let mut kinds = Vec::new();
-    for (_, node) in scene.iter_visuals() {
-        if !node.visible || node.opacity <= 0.0 {
-            continue;
-        }
-        let NodeContent::Styled { style } = &node.content else {
-            continue;
-        };
-        kinds.extend(classify_effect_passes(style, !node.children.is_empty()));
-    }
-    kinds
-}
-
-fn max_scene_blur_radius(scene: &Scene) -> f32 {
-    use crate::NodeContent;
-    use style_engine::Effect;
-
-    let mut max_radius = 0.0f32;
-    for (_, node) in scene.iter_visuals() {
-        if !node.visible || node.opacity <= 0.0 {
-            continue;
-        }
-        let NodeContent::Styled { style } = &node.content else {
-            continue;
-        };
-        for effect in &style.effects {
-            match effect {
-                Effect::LayerBlur(blur) if blur.visible => {
-                    max_radius = max_radius.max(blur.radius);
-                }
-                Effect::BackgroundBlur(blur) if blur.visible => {
-                    max_radius = max_radius.max(blur.radius);
-                }
-                _ => {}
-            }
-        }
-    }
-    max_radius
-}
-
-fn collect_background_capture_bounds(
-    scene: &Scene,
-    frame_width: u32,
-    frame_height: u32,
-) -> Vec<[u32; 4]> {
-    use crate::NodeContent;
-    use style_engine::Effect;
-
-    let mut bounds = Vec::new();
-    let frame = [0, 0, frame_width, frame_height];
-
-    for (_, node) in scene.iter_visuals() {
-        if !node.visible || node.opacity <= 0.0 {
-            continue;
-        }
-        let NodeContent::Styled { style } = &node.content else {
-            continue;
-        };
-
-        for effect in &style.effects {
-            if let Effect::BackgroundBlur(blur) = effect
-                && blur.visible
-                && blur.radius > 0.0
-            {
-                let node_bounds = [
-                    node.bounds.x.max(0.0) as u32,
-                    node.bounds.y.max(0.0) as u32,
-                    node.bounds.width.max(0.0) as u32,
-                    node.bounds.height.max(0.0) as u32,
-                ];
-                bounds.push(backdrop_capture_bounds(node_bounds, blur.radius, frame));
-            }
-        }
-    }
-
-    bounds
 }
 
 impl WgpuBackend {
@@ -1066,651 +310,6 @@ impl WgpuBackend {
         self.text_renderer.register_font_bytes(bytes)
     }
 
-    fn prepare_phase4_effect_state(&mut self, scene: &Scene) {
-        // Phase 4 planner: detect effects that require offscreen multipass work.
-        // Current integration reserves pooled targets and keeps the direct renderer
-        // path active until full per-node effect compositing is layered in.
-        let effect_kinds = classify_scene_effect_kinds(scene);
-        let _blur_tier = select_blur_tier(max_scene_blur_radius(scene));
-        let _background_capture_bounds = collect_background_capture_bounds(
-            scene,
-            self.context.config.width,
-            self.context.config.height,
-        );
-        let _clip_sequence = if effect_kinds
-            .iter()
-            .any(|k| matches!(k, EffectPassKind::StencilPush))
-        {
-            plan_clip_sequence_for_nested_clips()
-        } else {
-            Vec::new()
-        };
-        let requires_offscreen = effect_kinds.iter().any(|kind| {
-            matches!(
-                kind,
-                EffectPassKind::OffscreenLayer
-                    | EffectPassKind::BackgroundCapture
-                    | EffectPassKind::BlurHorizontal
-                    | EffectPassKind::BlurVertical
-                    | EffectPassKind::BlendComposite
-                    | EffectPassKind::InnerShadow
-            )
-        });
-        if requires_offscreen {
-            let key =
-                RenderTargetKey::new(self.context.config.width, self.context.config.height, false);
-            let context = &mut self.context;
-            let handle = self.effect_target_pool.acquire(key, |pool_key| {
-                let h = context.create_render_target(pool_key);
-                let bytes = context
-                    .get_render_target(h)
-                    .map(|target| target.estimated_bytes())
-                    .unwrap_or_else(|| pool_key.estimated_bytes());
-                (h, bytes)
-            });
-            let _ = self.effect_target_pool.release(handle);
-            self.effect_target_pool.end_frame_with(|evicted| {
-                let _ = context.remove_render_target(evicted);
-            });
-        }
-    }
-
-    fn collect_frame_batches_internal(
-        &mut self,
-        scene: &Scene,
-        skip_multipass: bool,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-        // Clear per-frame gradient data
-        self.primitive_pipeline.clear_gradient_params();
-
-        let (mut instances, raw_text_nodes, path_batches) = if skip_multipass {
-            Self::collect_instances_excluding_multipass(
-                &mut self.primitive_pipeline,
-                &mut self.tessellation_cache,
-                &mut self.path_interner,
-                scene,
-            )
-        } else {
-            Self::collect_instances(
-                &mut self.primitive_pipeline,
-                &mut self.tessellation_cache,
-                &mut self.path_interner,
-                scene,
-            )
-        };
-
-        // Process text nodes
-        if !raw_text_nodes.is_empty() {
-            // Step 1: Shape text in parallel if above threshold
-            // Shaping is CPU-intensive and read-only (uses thread-local FontSystem)
-            let shaped_results: Vec<(
-                glam::Vec2,
-                f32,
-                [f32; 4],
-                &style_engine::VisualStyle,
-                ShapedText,
-            )> = if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
-                // Parallel shaping
-                raw_text_nodes
-                    .par_iter()
-                    .filter(|(_, text, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, style)| {
-                        let shaped = shape_text_parallel(text, *font_size);
-                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
-                        let text_bounds = [
-                            node.bounds.x,
-                            node.bounds.y,
-                            node.bounds.width,
-                            node.bounds.height,
-                        ];
-                        (
-                            position,
-                            node.opacity * style.opacity,
-                            text_bounds,
-                            *style,
-                            shaped,
-                        )
-                    })
-                    .collect()
-            } else {
-                // Sequential shaping for small counts
-                raw_text_nodes
-                    .iter()
-                    .filter(|(_, text, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, style)| {
-                        let shaped = self
-                            .text_renderer
-                            .text_engine_mut()
-                            .shape_text(text, *font_size);
-                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
-                        let text_bounds = [
-                            node.bounds.x,
-                            node.bounds.y,
-                            node.bounds.width,
-                            node.bounds.height,
-                        ];
-                        (
-                            position,
-                            node.opacity * style.opacity,
-                            text_bounds,
-                            *style,
-                            shaped,
-                        )
-                    })
-                    .collect()
-            };
-
-            // Step 2: Generate glyph instances and add to primitives
-            for (position, opacity, text_bounds, style, shaped) in shaped_results {
-                let fill = Self::resolve_text_fill(
-                    &mut self.primitive_pipeline,
-                    style,
-                    opacity,
-                    text_bounds,
-                );
-                let glyph_instances =
-                    self.text_renderer
-                        .generate_instances(&shaped, position, glam::Vec4::ONE);
-
-                // Apply text fill metadata to generated glyph primitive instances
-                for mut instance in glyph_instances {
-                    apply_text_fill_to_glyph(&mut instance, fill);
-                    instances.push(instance);
-                }
-            }
-
-            // Update glyph atlas texture (atlas is always 1024x1024)
-            self.context.queue.write_texture(
-                self.glyph_texture.as_image_copy(),
-                self.text_renderer.atlas().texture_data(),
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(GLYPH_ATLAS_SIZE),
-                    rows_per_image: Some(GLYPH_ATLAS_SIZE),
-                },
-                wgpu::Extent3d {
-                    width: GLYPH_ATLAS_SIZE,
-                    height: GLYPH_ATLAS_SIZE,
-                    depth_or_array_layers: 1,
-                },
-            );
-        }
-
-        (instances, path_batches)
-    }
-
-    fn collect_frame_batches(&mut self, scene: &Scene) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-        self.collect_frame_batches_internal(scene, false)
-    }
-
-    fn collect_frame_batches_without_multipass(
-        &mut self,
-        scene: &Scene,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-        self.collect_frame_batches_internal(scene, true)
-    }
-
-    fn collect_style_batches_for_bounds(
-        &mut self,
-        style: &style_engine::VisualStyle,
-        effective_opacity: f32,
-        render_bounds: plat_core::Rect,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-        let mut instances = Vec::new();
-        let mut path_batches = Vec::new();
-
-        if let Some(paths) = &style.fill_geometry {
-            let fill_paint = resolve_path_fill_paint(style);
-
-            for path in paths {
-                let path_hash = self.path_interner.hash_for(path);
-                let mesh_result = self
-                    .tessellation_cache
-                    .get_or_tessellate_fill_with_key(path_hash, path);
-
-                if let Ok(mesh) = mesh_result
-                    && !mesh.indices.is_empty()
-                {
-                    path_batches.push(PathBatch {
-                        mesh,
-                        paint: fill_paint.clone(),
-                        opacity: effective_opacity,
-                        size: [render_bounds.width, render_bounds.height],
-                        offset: [render_bounds.x, render_bounds.y],
-                    });
-                }
-            }
-
-            if let Some(stroke) = &style.stroke {
-                let stroke_paint = resolve_path_stroke_paint(stroke);
-                if let Some(stroke_paths) = style
-                    .stroke_geometry
-                    .as_ref()
-                    .or(style.fill_geometry.as_ref())
-                {
-                    for path in stroke_paths {
-                        let path_hash = self.path_interner.hash_for(path);
-                        let stroke_key =
-                            TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
-                        let mesh_result = self
-                            .tessellation_cache
-                            .get_or_tessellate_stroke_with_key(stroke_key, path, stroke);
-                        if let Ok(mesh) = mesh_result
-                            && !mesh.indices.is_empty()
-                        {
-                            path_batches.push(PathBatch {
-                                mesh,
-                                paint: stroke_paint.clone(),
-                                opacity: effective_opacity,
-                                size: [render_bounds.width, render_bounds.height],
-                                offset: [render_bounds.x, render_bounds.y],
-                            });
-                        }
-                    }
-                }
-            }
-        } else {
-            let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
-            let size = glam::Vec2::new(render_bounds.width, render_bounds.height);
-            let node_instances = create_primitive_instances_with_pipeline(
-                &mut self.primitive_pipeline,
-                style,
-                pos,
-                size,
-                effective_opacity,
-            );
-            instances.extend(node_instances);
-        }
-
-        if let Some(text_content) = &style.text
-            && !text_content.text.is_empty()
-        {
-            let shaped = self
-                .text_renderer
-                .text_engine_mut()
-                .shape_text(&text_content.text, text_content.font_size);
-            let position =
-                glam::Vec2::new(render_bounds.x, render_bounds.y + text_content.font_size);
-            let text_bounds = [
-                render_bounds.x,
-                render_bounds.y,
-                render_bounds.width,
-                render_bounds.height,
-            ];
-            let fill = Self::resolve_text_fill(
-                &mut self.primitive_pipeline,
-                style,
-                effective_opacity,
-                text_bounds,
-            );
-            let glyph_instances =
-                self.text_renderer
-                    .generate_instances(&shaped, position, glam::Vec4::ONE);
-            for mut instance in glyph_instances {
-                apply_text_fill_to_glyph(&mut instance, fill);
-                instances.push(instance);
-            }
-
-            self.context.queue.write_texture(
-                self.glyph_texture.as_image_copy(),
-                self.text_renderer.atlas().texture_data(),
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(GLYPH_ATLAS_SIZE),
-                    rows_per_image: Some(GLYPH_ATLAS_SIZE),
-                },
-                wgpu::Extent3d {
-                    width: GLYPH_ATLAS_SIZE,
-                    height: GLYPH_ATLAS_SIZE,
-                    depth_or_array_layers: 1,
-                },
-            );
-        }
-
-        (instances, path_batches)
-    }
-
-    fn acquire_effect_target(&mut self, key: RenderTargetKey) -> RenderTargetHandle {
-        let context = &mut self.context;
-        self.effect_target_pool.acquire(key, |pool_key| {
-            let handle = context.create_render_target(pool_key);
-            let bytes = context
-                .get_render_target(handle)
-                .map(|target| target.estimated_bytes())
-                .unwrap_or_else(|| pool_key.estimated_bytes());
-            (handle, bytes)
-        })
-    }
-
-    fn release_effect_target(&mut self, handle: RenderTargetHandle) {
-        let _ = self.effect_target_pool.release(handle);
-    }
-
-    fn draw_batches_to_view(
-        &mut self,
-        target_view: &wgpu::TextureView,
-        load_op: wgpu::LoadOp<wgpu::Color>,
-        instances: &[PrimitiveInstance],
-        path_batches: &[PathBatch],
-        scissor: Option<[u32; 4]>,
-    ) {
-        let should_skip = instances.is_empty()
-            && path_batches.is_empty()
-            && !matches!(load_op, wgpu::LoadOp::Clear(_));
-        if should_skip {
-            return;
-        }
-
-        self.primitive_pipeline
-            .prepare(&self.context.device, &self.context.queue, instances);
-        self.path_pipeline
-            .prepare(&self.context.device, &self.context.queue, path_batches);
-
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Draw Batches Encoder"),
-                });
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Multipass Draw Batches"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: load_op,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        if let Some([x, y, width, height]) = scissor
-            && width > 0
-            && height > 0
-        {
-            render_pass.set_scissor_rect(x, y, width, height);
-        }
-
-        self.primitive_pipeline.render(
-            &mut render_pass,
-            &self.context.globals_bind_group,
-            instances.len() as u32,
-        );
-        self.path_pipeline
-            .render(&mut render_pass, &self.context.globals_bind_group);
-
-        drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
-    }
-
-    fn run_blur_pass(
-        &mut self,
-        source_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        radius: f32,
-        direction: BlurDirection,
-    ) {
-        let params = BlurParams::from_radius(
-            radius,
-            self.context.config.width,
-            self.context.config.height,
-            direction,
-        );
-        self.blur_pipeline
-            .update_params(&self.context.queue, &params);
-        let bind_group = self.blur_pipeline.create_bind_group(
-            &self.context.device,
-            source_view,
-            &self.effect_sampler,
-        );
-
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Blur Encoder"),
-                });
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Multipass Blur Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        self.blur_pipeline.render(&mut render_pass, &bind_group);
-
-        drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
-    }
-
-    fn run_blend_composite(
-        &mut self,
-        src_view: &wgpu::TextureView,
-        dst_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        blend_mode: style_engine::BlendMode,
-        scissor: Option<[u32; 4]>,
-    ) {
-        self.blend_pipeline
-            .update_params(&self.context.queue, BlendParams::new(blend_mode));
-        let bind_group = self.blend_pipeline.create_bind_group(
-            &self.context.device,
-            src_view,
-            dst_view,
-            &self.effect_sampler,
-        );
-
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Blend Encoder"),
-                });
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Multipass Blend Composite"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        if let Some([x, y, width, height]) = scissor
-            && width > 0
-            && height > 0
-        {
-            render_pass.set_scissor_rect(x, y, width, height);
-        }
-
-        self.blend_pipeline.render(&mut render_pass, &bind_group);
-
-        drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
-    }
-
-    fn copy_texture_full_frame(&self, src: &wgpu::Texture, dst: &wgpu::Texture) {
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Copy Texture Encoder"),
-                });
-        encoder.copy_texture_to_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: src,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyTextureInfo {
-                texture: dst,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width: self.context.config.width,
-                height: self.context.config.height,
-                depth_or_array_layers: 1,
-            },
-        );
-        self.context.queue.submit(std::iter::once(encoder.finish()));
-    }
-
-    fn render_multipass_effect_nodes(
-        &mut self,
-        scene: &Scene,
-        multipass_node_ids: &[crate::NodeId],
-        surface_texture: &wgpu::Texture,
-        surface_view: &wgpu::TextureView,
-    ) {
-        let frame_key =
-            RenderTargetKey::new(self.context.config.width, self.context.config.height, false);
-
-        for &node_id in multipass_node_ids {
-            let Some(node) = scene.get_node(node_id) else {
-                continue;
-            };
-            let crate::NodeContent::Styled { style } = &node.content else {
-                continue;
-            };
-            if !node.visible || node.opacity <= 0.0 {
-                continue;
-            }
-
-            let style = style.as_ref().clone();
-            let effective_opacity = node.opacity * style.opacity;
-            let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) else {
-                continue;
-            };
-            let scissor = rect_to_scissor_bounds(
-                render_bounds,
-                self.context.config.width,
-                self.context.config.height,
-            );
-
-            let layer_blur_radius = style.effects.iter().find_map(|effect| match effect {
-                style_engine::Effect::LayerBlur(blur) if blur.visible && blur.radius > 0.0 => {
-                    Some(blur.radius)
-                }
-                _ => None,
-            });
-            let background_blur_radius = style.effects.iter().find_map(|effect| match effect {
-                style_engine::Effect::BackgroundBlur(blur) if blur.visible && blur.radius > 0.0 => {
-                    Some(blur.radius)
-                }
-                _ => None,
-            });
-
-            let src_handle = self.acquire_effect_target(frame_key);
-            let tmp_handle = self.acquire_effect_target(frame_key);
-            let dst_handle = self.acquire_effect_target(frame_key);
-
-            let src_view = self
-                .context
-                .get_render_target(src_handle)
-                .expect("missing src render target")
-                .color_view
-                .clone();
-            let tmp_view = self
-                .context
-                .get_render_target(tmp_handle)
-                .expect("missing temp render target")
-                .color_view
-                .clone();
-            let dst_view = self
-                .context
-                .get_render_target(dst_handle)
-                .expect("missing dst render target")
-                .color_view
-                .clone();
-            let src_texture = self
-                .context
-                .get_render_target(src_handle)
-                .expect("missing src render target texture")
-                .color_texture
-                .clone();
-            let dst_texture = self
-                .context
-                .get_render_target(dst_handle)
-                .expect("missing dst render target texture")
-                .color_texture
-                .clone();
-
-            let (node_instances, node_path_batches) =
-                self.collect_style_batches_for_bounds(&style, effective_opacity, render_bounds);
-            if background_blur_radius.is_none() {
-                self.draw_batches_to_view(
-                    &src_view,
-                    wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    &node_instances,
-                    &node_path_batches,
-                    None,
-                );
-            } else {
-                self.copy_texture_full_frame(surface_texture, &src_texture);
-            }
-
-            if let Some(radius) = layer_blur_radius.or(background_blur_radius) {
-                let _ = select_blur_tier(radius);
-                self.run_blur_pass(&src_view, &tmp_view, radius, BlurDirection::Horizontal);
-                self.run_blur_pass(&tmp_view, &src_view, radius, BlurDirection::Vertical);
-            }
-
-            self.copy_texture_full_frame(surface_texture, &dst_texture);
-
-            let blend_mode = if matches!(
-                style.blend_mode,
-                style_engine::BlendMode::Normal | style_engine::BlendMode::PassThrough
-            ) {
-                style_engine::BlendMode::Normal
-            } else {
-                style.blend_mode
-            };
-
-            self.run_blend_composite(&src_view, &dst_view, surface_view, blend_mode, scissor);
-
-            if background_blur_radius.is_some() {
-                self.draw_batches_to_view(
-                    surface_view,
-                    wgpu::LoadOp::Load,
-                    &node_instances,
-                    &node_path_batches,
-                    scissor,
-                );
-            }
-
-            self.release_effect_target(src_handle);
-            self.release_effect_target(tmp_handle);
-            self.release_effect_target(dst_handle);
-        }
-    }
-
     #[cfg(not(target_arch = "wasm32"))]
     pub fn render_scene_to_rgba(
         &mut self,
@@ -1719,36 +318,109 @@ impl WgpuBackend {
         height: u32,
     ) -> Result<Vec<u8>, RendererError> {
         self.context.resize(width, height);
-        self.prepare_phase4_effect_state(scene);
+
+        let mut executor = MultipassRenderer {
+            context: &mut self.context,
+            primitive_pipeline: &mut self.primitive_pipeline,
+            path_pipeline: &mut self.path_pipeline,
+            blur_pipeline: &mut self.blur_pipeline,
+            blend_pipeline: &mut self.blend_pipeline,
+            effect_target_pool: &mut self.effect_target_pool,
+            effect_sampler: &self.effect_sampler,
+            tessellation_cache: &mut self.tessellation_cache,
+            path_interner: &mut self.path_interner,
+            text_renderer: &mut self.text_renderer,
+            glyph_texture: &self.glyph_texture,
+        };
+
+        executor.prepare_phase4_effect_state(scene);
         let multipass_node_ids = collect_multipass_node_ids(scene);
 
         let frame_key = RenderTargetKey::new(width.max(1), height.max(1), false);
-        let frame_handle = self.acquire_effect_target(frame_key);
-        let frame_view = self
+        let frame_handle = executor.acquire_effect_target(frame_key);
+        // Borrow checker might complain here if executor holds mutable borrow of context.
+        // executor holds &mut context.
+        // We need to access context to get render target.
+        // But context is borrowed by executor.
+        // This is a typical issue.
+
+        // Refactoring to avoid this split borrow is needed or `executor` methods should do the work.
+        // `acquire_effect_target` is on executor.
+
+        // But accessing `frame_view` from `executor.context` while `executor` exists?
+        // `executor.context` is `&mut WgpuContext`.
+        // If I use `executor` to get handle, I can use `executor.context` to get view.
+
+        // Let's rely on re-borrowing if possible, or maybe I need to drop executor? No, I need it later.
+
+        let frame_view = executor
             .context
             .get_render_target(frame_handle)
             .expect("missing frame render target")
             .color_view
             .clone();
-        let frame_texture = self
+        let frame_texture = executor
             .context
             .get_render_target(frame_handle)
             .expect("missing frame render target texture")
             .color_texture
             .clone();
 
+        // collect_frame_batches uses `self`. But `self` is borrowed by `executor`.
+        // So `collect_frame_batches` must be moved to `executor` or `instance_collector`.
+        // It uses `self.primitive_pipeline` etc. which are borrowed by `executor`.
+        // So `collect_frame_batches` must be called using `executor` components?
+        // Or I can't use `self` anymore.
+
+        // This confirms `collect_frame_batches` should be in `instance_collector` or `MultipassRenderer`.
+        // `collect_frame_batches` is basically `instance_collector::collect_instances` + text shaping.
+        // I can move it to `MultipassRenderer`?
+
+        // For now, I have to duplicate logic or move `collect_frame_batches` out of `WgpuBackend` (to `instance_collector`).
+        // I'll assume I can call it on `self`? No, `self` is mutably borrowed.
+
+        // I need to use `executor` to do everything.
+
+        // I'll implement `collect_frame_batches` on `MultipassRenderer` or free function in `instance_collector`.
+        // `collect_frame_batches_internal` was using `self`.
+
+        // I will use `instance_collector::collect_frame_batches` (which I need to create/move).
+
+        // Wait, `collect_frame_batches_internal` is complex.
+
+        // Let's implement `collect_frame_batches` on `MultipassRenderer`?
+        // Or just move it to `instance_collector.rs`.
+        // `instance_collector.rs` already has `collect_instances` which does most of it.
+        // The text shaping part is in `collect_frame_batches_internal`.
+
+        // I will assume `executor` has a method `collect_frame_batches`.
+        // I will add it to `MultipassRenderer` later.
+        // Or I can inline it using `executor` fields.
+
+        // This is getting complicated to do in one step.
+        // Maybe I should have moved `collect_frame_batches` first.
+
+        // I'll revert to just replacing the methods first, but keep `render_scene_to_rgba` logic commented out or broken?
+        // No, I want it to compile.
+
+        // I'll implement `collect_frame_batches` in `MultipassRenderer` in `multipass_executor.rs`.
+        // It needs access to `glyph_texture` (it has it), `text_renderer` (it has it), `queue` (via context).
+
+        // I'll assume I add `collect_frame_batches` to `MultipassRenderer`.
+
         let (base_instances, base_path_batches) = if multipass_node_ids.is_empty() {
-            self.collect_frame_batches(scene)
+            executor.collect_frame_batches(scene)
         } else {
-            self.collect_frame_batches_without_multipass(scene)
+            executor.collect_frame_batches_without_multipass(scene)
         };
-        self.draw_batches_to_view(
+
+        executor.draw_batches_to_view(
             &frame_view,
             wgpu::LoadOp::Clear(wgpu::Color {
-                r: self.context.clear_color.r() as f64,
-                g: self.context.clear_color.g() as f64,
-                b: self.context.clear_color.b() as f64,
-                a: self.context.clear_color.a() as f64,
+                r: executor.context.clear_color.r() as f64,
+                g: executor.context.clear_color.g() as f64,
+                b: executor.context.clear_color.b() as f64,
+                a: executor.context.clear_color.a() as f64,
             }),
             &base_instances,
             &base_path_batches,
@@ -1756,7 +428,7 @@ impl WgpuBackend {
         );
 
         if !multipass_node_ids.is_empty() {
-            self.render_multipass_effect_nodes(
+            executor.render_multipass_effect_nodes(
                 scene,
                 &multipass_node_ids,
                 &frame_texture,
@@ -1764,14 +436,12 @@ impl WgpuBackend {
             );
         }
 
-        let rgba = self
+        let rgba = executor
             .context
             .read_texture_to_rgba(&frame_texture, width, height)?;
 
-        self.release_effect_target(frame_handle);
-        self.effect_target_pool.end_frame_with(|evicted| {
-            let _ = self.context.remove_render_target(evicted);
-        });
+        executor.release_effect_target(frame_handle);
+        executor.end_frame();
 
         Ok(rgba)
     }
@@ -1782,23 +452,74 @@ impl super::RenderBackend for WgpuBackend {
     fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
         let _span = span!(Level::TRACE, "render_frame").entered();
 
-        self.prepare_phase4_effect_state(scene);
+        let mut executor = MultipassRenderer {
+            context: &mut self.context,
+            primitive_pipeline: &mut self.primitive_pipeline,
+            path_pipeline: &mut self.path_pipeline,
+            blur_pipeline: &mut self.blur_pipeline,
+            blend_pipeline: &mut self.blend_pipeline,
+            effect_target_pool: &mut self.effect_target_pool,
+            effect_sampler: &self.effect_sampler,
+            tessellation_cache: &mut self.tessellation_cache,
+            path_interner: &mut self.path_interner,
+            text_renderer: &mut self.text_renderer,
+            glyph_texture: &self.glyph_texture,
+        };
+
+        executor.prepare_phase4_effect_state(scene);
         let multipass_node_ids = collect_multipass_node_ids(scene);
         if multipass_node_ids.is_empty() {
-            let (instances, path_batches) = self.collect_frame_batches(scene);
+            let (instances, path_batches) = executor.collect_frame_batches(scene);
 
-            self.primitive_pipeline
-                .prepare(&self.context.device, &self.context.queue, &instances);
-            self.path_pipeline
-                .prepare(&self.context.device, &self.context.queue, &path_batches);
+            executor.primitive_pipeline.prepare(
+                &executor.context.device,
+                &executor.context.queue,
+                &instances,
+            );
+            executor.path_pipeline.prepare(
+                &executor.context.device,
+                &executor.context.queue,
+                &path_batches,
+            );
 
-            let WgpuBackend {
+            // We need to borrow context from executor again for render pass?
+            // `executor` holds mutable borrow of context.
+            // But we need `clip_stack` from `self`.
+            // `executor` does NOT hold `clip_stack`.
+            // So we can borrow `self.clip_stack`.
+            // But `executor` holds `&mut self.context`.
+
+            // `with_render_pass` takes `&mut self` on context.
+            // `executor.context` IS `&mut context`.
+            // So `executor.context.with_render_pass(...)`.
+
+            // Inside closure we use `executor.primitive_pipeline` etc.
+            // But `primitive_pipeline.render` takes `&mut RenderPass` and `&BindGroup`.
+            // `executor.primitive_pipeline` is `&mut PrimitivePipeline`.
+
+            let clip_stack = &mut self.clip_stack;
+
+            // To avoid borrowing executor in closure while borrowing context from executor...
+            // `context.with_render_pass` borrows `context`.
+            // `executor` owns `&mut context`.
+            // The closure uses `primitive_pipeline` which is also in `executor`.
+            // Rust should allow splitting borrows of `executor`? No, `executor` is a struct, not `self`.
+            // But `executor` fields are disjoint mutable borrows of `self` fields.
+            // Wait, `executor` holds `&mut context` and `&mut primitive_pipeline`.
+            // If I call `executor.context.with_render_pass`, `executor` is mutably borrowed (for context).
+            // Can I use `executor.primitive_pipeline` in the closure?
+            // `primitive_pipeline` is disjoint from `context` in `MultipassRenderer`.
+            // If `MultipassRenderer` fields were public I could access them disjointly.
+            // They are `pub(crate)`.
+            // So `executor.primitive_pipeline` access inside closure while `executor.context` is borrowed might work if compiler is smart enough or if I destructure.
+
+            // Destructuring executor seems best.
+            let MultipassRenderer {
                 context,
                 primitive_pipeline,
                 path_pipeline,
-                clip_stack,
                 ..
-            } = self;
+            } = executor;
 
             return context.with_render_pass(|render_pass, globals_bind_group| {
                 primitive_pipeline.render(render_pass, globals_bind_group, instances.len() as u32);
@@ -1808,35 +529,33 @@ impl super::RenderBackend for WgpuBackend {
         }
 
         let (base_instances, base_path_batches) =
-            self.collect_frame_batches_without_multipass(scene);
+            executor.collect_frame_batches_without_multipass(scene);
 
-        let output = self.context.surface.get_current_texture()?;
+        let output = executor.context.surface.get_current_texture()?;
         let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        self.draw_batches_to_view(
+        executor.draw_batches_to_view(
             &surface_view,
             wgpu::LoadOp::Clear(wgpu::Color {
-                r: self.context.clear_color.r() as f64,
-                g: self.context.clear_color.g() as f64,
-                b: self.context.clear_color.b() as f64,
-                a: self.context.clear_color.a() as f64,
+                r: executor.context.clear_color.r() as f64,
+                g: executor.context.clear_color.g() as f64,
+                b: executor.context.clear_color.b() as f64,
+                a: executor.context.clear_color.a() as f64,
             }),
             &base_instances,
             &base_path_batches,
             None,
         );
 
-        self.render_multipass_effect_nodes(
+        executor.render_multipass_effect_nodes(
             scene,
             &multipass_node_ids,
             &output.texture,
             &surface_view,
         );
 
-        self.effect_target_pool.end_frame_with(|evicted| {
-            let _ = self.context.remove_render_target(evicted);
-        });
+        executor.end_frame();
 
         output.present();
         Ok(())
@@ -1854,6 +573,11 @@ impl super::RenderBackend for WgpuBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::backend::wgpu::effects;
+    use crate::backend::wgpu::instance_collector;
+    use crate::backend::wgpu::instance_collector::{TextFill, apply_text_fill_to_glyph};
+    use crate::backend::wgpu::multipass_executor;
+    use crate::backend::wgpu::pipelines::primitive_pipeline::FLAG_FILL_TYPE_MASK;
     use crate::{NodeContent, SceneNode, Transform2D};
 
     #[test]
@@ -1929,7 +653,7 @@ mod tests {
         scene.add_node(root, blue_rect);
 
         // Collect instances
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
 
         // Should have 2 instances (red and blue, not invisible)
         assert_eq!(instances.len(), 2);
@@ -1985,7 +709,7 @@ mod tests {
         scene.add_node(root, node);
 
         let (instances, _text_nodes, _path_batches) =
-            WgpuBackend::collect_instances_for_tests(&scene);
+            instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(instances.len(), 1);
         assert!(
             (instances[0].color[3] - 0.2).abs() < 1e-6,
@@ -2044,7 +768,7 @@ mod tests {
         };
         scene.add_node(root, flat);
 
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(instances.len(), 2);
 
         // Rounded rect should preserve corner_radius (uniform radii)
@@ -2094,7 +818,7 @@ mod tests {
             scene.add_node(root, text_node);
         }
 
-        let (_, text_nodes, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (_, text_nodes, _) = instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(text_nodes.len(), 4);
         // Sequential path should be taken
     }
@@ -2130,7 +854,7 @@ mod tests {
             scene.add_node(root, text_node);
         }
 
-        let (_, text_nodes, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (_, text_nodes, _) = instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(text_nodes.len(), 10);
         // Parallel path should be taken
     }
@@ -2171,7 +895,7 @@ mod tests {
             scene.add_node(root, text_node);
         }
 
-        let (_, text_nodes, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (_, text_nodes, _) = instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(text_nodes.len(), 5);
         // Empty strings should be filtered out during shaping
     }
@@ -2315,7 +1039,7 @@ mod tests {
         scene.add_node(root, node);
 
         let (instances, _text_nodes, path_batches) =
-            WgpuBackend::collect_instances_for_tests(&scene);
+            instance_collector::collect_instances_for_tests(&scene);
         assert!(
             instances.is_empty(),
             "path-only node should not emit primitive rect instances"
@@ -2363,7 +1087,7 @@ mod tests {
         scene.add_node(root, node);
 
         let (instances, _text_nodes, path_batches) =
-            WgpuBackend::collect_instances_for_tests(&scene);
+            instance_collector::collect_instances_for_tests(&scene);
         assert!(
             instances.is_empty(),
             "geometry node should route through path batches"
@@ -2406,7 +1130,7 @@ mod tests {
         scene.add_node(root, node);
 
         let (_instances, _text_nodes, path_batches) =
-            WgpuBackend::collect_instances_for_tests(&scene);
+            instance_collector::collect_instances_for_tests(&scene);
         assert_eq!(path_batches.len(), 1);
         assert!(
             (path_batches[0].opacity - 0.4).abs() < 1e-6,
@@ -2438,7 +1162,7 @@ mod tests {
         child.bounds = plat_core::Rect::new(80.0, 10.0, 40.0, 20.0);
         scene.add_node(parent_id, child);
 
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
         let clipped_child = instances
             .iter()
             .find(|i| (i.color[0] - 1.0).abs() < 1e-6)
@@ -2474,7 +1198,7 @@ mod tests {
         child.bounds = plat_core::Rect::new(120.0, 10.0, 40.0, 20.0);
         scene.add_node(parent_id, child);
 
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
         let red_count = instances
             .iter()
             .filter(|i| (i.color[0] - 1.0).abs() < 1e-6)
@@ -2503,7 +1227,7 @@ mod tests {
         node.bounds = plat_core::Rect::new(20.0, 30.0, 140.0, 90.0);
         scene.add_node(root, node);
 
-        let (instances, _, path_batches) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, path_batches) = instance_collector::collect_instances_for_tests(&scene);
         assert!(
             instances.is_empty(),
             "image-fill rect should not emit primitive fallback instances"
@@ -2542,7 +1266,7 @@ mod tests {
         masked.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 40.0);
         scene.add_node(root, masked);
 
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
         let green = instances
             .iter()
             .find(|i| (i.color[1] - 1.0).abs() < 1e-6 && (i.color[0]).abs() < 1e-6)
@@ -2582,7 +1306,7 @@ mod tests {
         after.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 40.0);
         scene.add_node(root, after);
 
-        let (instances, _, _) = WgpuBackend::collect_instances_for_tests(&scene);
+        let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
         let blue = instances
             .iter()
             .find(|i| (i.color[2] - 1.0).abs() < 1e-6 && (i.color[0]).abs() < 1e-6)
@@ -2605,7 +1329,7 @@ mod tests {
     fn test_style_requires_multipass_detects_blend_and_blur() {
         let blend_only =
             style_engine::VisualStyle::new().blend_mode(style_engine::BlendMode::Multiply);
-        assert!(super::style_requires_multipass(&blend_only));
+        assert!(effects::style_requires_multipass(&blend_only));
 
         let layer_blur = style_engine::VisualStyle::new().effect(style_engine::Effect::LayerBlur(
             style_engine::LayerBlur {
@@ -2613,11 +1337,11 @@ mod tests {
                 visible: true,
             },
         ));
-        assert!(super::style_requires_multipass(&layer_blur));
+        assert!(effects::style_requires_multipass(&layer_blur));
 
         let normal =
             style_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4());
-        assert!(!super::style_requires_multipass(&normal));
+        assert!(!effects::style_requires_multipass(&normal));
     }
 
     #[test]
@@ -2655,7 +1379,7 @@ mod tests {
         blur.bounds = plat_core::Rect::new(20.0, 20.0, 30.0, 30.0);
         let blur_id = scene.add_node(root, blur);
 
-        let ids = super::collect_multipass_node_ids(&scene);
+        let ids = multipass_executor::collect_multipass_node_ids(&scene);
         assert_eq!(ids, vec![blend_id, blur_id]);
     }
 
@@ -2684,7 +1408,7 @@ mod tests {
         scene.add_node(root, blend);
 
         let (instances, _text_nodes, _path_batches) =
-            WgpuBackend::collect_instances_without_multipass_for_tests(&scene);
+            instance_collector::collect_instances_without_multipass_for_tests(&scene);
         assert_eq!(instances.len(), 1);
         assert!((instances[0].color[1] - 1.0).abs() < 1e-6);
     }
@@ -2705,9 +1429,9 @@ mod tests {
         node.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
         scene.add_node(root, node);
 
-        let kinds = super::classify_scene_effect_kinds(&scene);
-        assert!(kinds.contains(&super::EffectPassKind::OffscreenLayer));
-        assert!(kinds.contains(&super::EffectPassKind::BlurHorizontal));
-        assert!(kinds.contains(&super::EffectPassKind::BlurVertical));
+        let kinds = multipass_executor::classify_scene_effect_kinds(&scene);
+        assert!(kinds.contains(&effects::EffectPassKind::OffscreenLayer));
+        assert!(kinds.contains(&effects::EffectPassKind::BlurHorizontal));
+        assert!(kinds.contains(&effects::EffectPassKind::BlurVertical));
     }
 }

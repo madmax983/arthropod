@@ -25,3 +25,7 @@
 ## 2026-02-06 - Centralize Render Logic
 **Tangle:** `arthropod-ecs` duplicated the logic for converting `SceneNode` to `RectInstance` from `WgpuBackend`, violating DRY and creating a "Shotgun" maintenance burden where adding new node types required updating multiple crates.
 **Blueprint:** Extracted the conversion logic into a public helper `create_rect_instance` in `render-engine`. Both `WgpuBackend` and `arthropod-ecs` now consume this helper, ensuring consistent behavior and encapsulation.
+
+## 2026-02-07 - Decompose WgpuBackend
+**Tangle:** `crates/render-engine/src/backend/wgpu/mod.rs` was a "Blob" (2700+ lines) mixing backend lifecycle, instance collection, path interning, clipping logic, and multipass effect rendering. This violated Single Responsibility Principle.
+**Blueprint:** Split `mod.rs` into `path_interner.rs`, `clipping.rs`, `instance_collector.rs`, and `multipass_executor.rs`. Introduced `MultipassRenderer` struct to encapsulate multipass state and borrow checker constraints. `WgpuBackend` now acts as a coordinator.
