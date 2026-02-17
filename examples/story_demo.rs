@@ -18,7 +18,7 @@ mod tui_app {
         layout::{Alignment, Constraint, Direction, Layout},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, Borders, Paragraph, Wrap},
+        widgets::{Block, BorderType, Borders, Padding, Paragraph, Wrap},
     };
     use render_engine::{NodeContent, Scene};
 
@@ -110,6 +110,80 @@ mod tui_app {
                 }
             }
         }
+    }
+
+    fn parse_markdown(text: &str) -> Vec<Line<'_>> {
+        let mut lines = Vec::new();
+
+        for line in text.lines() {
+            if line.trim().is_empty() {
+                lines.push(Line::from(""));
+                continue;
+            }
+
+            if let Some(rest) = line.strip_prefix("# ") {
+                // H1: Centered, Yellow, Bold, Underlined
+                lines.push(
+                    Line::from(vec![Span::styled(
+                        rest,
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                    )])
+                    .alignment(Alignment::Center),
+                );
+                lines.push(Line::from(""));
+            } else if let Some(rest) = line.strip_prefix("## ") {
+                // H2: Cyan, Bold
+                lines.push(Line::from(vec![Span::styled(
+                    rest,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )]));
+            } else {
+                // Body text with **bold** parsing
+                let mut spans = Vec::new();
+                let mut current_text = line;
+
+                while let Some(start_idx) = current_text.find("**") {
+                    if start_idx > 0 {
+                        spans.push(Span::styled(
+                            &current_text[..start_idx],
+                            Style::default().fg(Color::Gray),
+                        ));
+                    }
+
+                    let rest = &current_text[start_idx + 2..];
+                    if let Some(end_idx) = rest.find("**") {
+                        let bold_text = &rest[..end_idx];
+                        spans.push(Span::styled(
+                            bold_text,
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ));
+                        current_text = &rest[end_idx + 2..];
+                    } else {
+                        // Unclosed **, treat as raw
+                        spans.push(Span::styled(
+                            &current_text[start_idx..],
+                            Style::default().fg(Color::Gray),
+                        ));
+                        current_text = "";
+                        break;
+                    }
+                }
+
+                if !current_text.is_empty() {
+                    spans.push(Span::styled(current_text, Style::default().fg(Color::Gray)));
+                }
+
+                lines.push(Line::from(spans));
+            }
+        }
+
+        lines
     }
 
     #[allow(clippy::collapsible_if)]
@@ -233,16 +307,15 @@ mod tui_app {
                 f.render_widget(p, v_center[1]);
             }
             AppState::Display { story } => {
-                let text = vec![
-                    Line::from(""),
-                    Line::from(Span::styled(story, Style::default().fg(Color::White))),
-                    Line::from(""),
-                ];
+                let text = parse_markdown(story);
                 let p = Paragraph::new(text)
                     .block(
                         Block::default()
-                            .title(" Generated Narrative ")
-                            .borders(Borders::ALL),
+                            .title(" 📜 The Chronicle ")
+                            .borders(Borders::ALL)
+                            .border_type(BorderType::Double)
+                            .border_style(Style::default().fg(Color::Yellow))
+                            .padding(Padding::new(2, 2, 1, 1)),
                     )
                     .wrap(Wrap { trim: true });
                 f.render_widget(p, content_area);

@@ -22,7 +22,7 @@ pub fn generate_narrative(
                 render_engine::VisualStyle::new()
                     .solid_fill(Color::BLACK.as_vec4())
                     .text(render_engine::TextContent::new(
-                        "Once upon a time...".to_string(),
+                        "# The Crystal Spire\n\n## Chapter 1: The Descent\n\nThe wind howled around the **obsidian** peaks, carrying whispers of ancient magic. Below, the valley was shrouded in a **thick, purple mist**.\n\n## Chapter 2: The Guardian\n\nA lone figure stood at the gate, clad in shimmering armor that reflected the **dying light** of the twin suns. \"None shall pass,\" the Guardian intoned, voice resonating like thunder.\n\n## Chapter 3: The Choice\n\nWould you **fight** or would you **flee**? The destiny of the realm hung in the balance.",
                         32.0,
                     )),
             ),
