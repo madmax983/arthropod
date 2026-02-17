@@ -65,6 +65,10 @@ impl<T: 'static + Send> Signal<T> {
     /// let runtime = Runtime::new();
     /// let count = Signal::new(runtime, 100);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the runtime fails to allocate a new signal ID (unlikely).
     pub fn new(runtime: Arc<Runtime>, value: T) -> Self {
         let id = runtime.create_signal(Arc::new(Mutex::new(value)));
         Self {
@@ -89,7 +93,16 @@ impl<T: 'static + Send> Signal<T> {
     /// # let runtime = Runtime::new();
     /// let count = Signal::new(runtime, 0);
     ///
-    /// // Clone before splitting if you need to keep 'count'
+    /// // Standard usage: split and consume the original signal
+    /// let (read, write) = count.split();
+    /// ```
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime, 0);
+    ///
+    /// // Keep the original signal by cloning
     /// let (read, write) = count.clone().split();
     /// ```
     pub fn split(self) -> (ReadSignal<T>, WriteSignal<T>) {
@@ -126,7 +139,8 @@ impl<T: 'static + Send> Signal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let handle = self.runtime.get_signal_handle(self.id);
@@ -153,7 +167,8 @@ impl<T: 'static + Send> Signal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let handle = self.runtime.get_signal_handle(self.id);
         let guard = handle
@@ -181,8 +196,9 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// # Example
     ///
     /// ```
-    /// # use flux_state::{Runtime, Signal, Effect};
-    /// # let runtime = Runtime::new();
+    /// use flux_state::{Runtime, Signal, Effect};
+    ///
+    /// let runtime = Runtime::new();
     /// let count = Signal::new(runtime.clone(), 0);
     /// let (read, _) = count.split();
     ///
@@ -195,6 +211,11 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// // 2. Outside an effect (Just reads value)
     /// let value = read.get(); // No tracking
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn get(&self) -> T {
         self.with(|v| v.clone())
     }
@@ -207,8 +228,9 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// # Example
     ///
     /// ```
-    /// # use flux_state::{Runtime, Signal, Effect};
-    /// # let runtime = Runtime::new();
+    /// use flux_state::{Runtime, Signal, Effect};
+    ///
+    /// let runtime = Runtime::new();
     /// let count = Signal::new(runtime.clone(), 0);
     /// let (read, _) = count.split();
     ///
@@ -217,6 +239,11 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     ///     println!("Count is: {}", read.get_untracked());
     /// });
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn get_untracked(&self) -> T {
         self.with_untracked(|v| v.clone())
     }
@@ -243,7 +270,8 @@ impl<T: 'static + Send> ReadSignal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let handle = self.runtime.get_signal_handle(self.id);
@@ -271,7 +299,8 @@ impl<T: 'static + Send> ReadSignal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let handle = self.runtime.get_signal_handle(self.id);
         let guard = handle
@@ -304,7 +333,8 @@ impl<T: 'static + Send> WriteSignal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn set(&self, value: T) {
         let handle = self.runtime.get_signal_handle(self.id);
         {
@@ -336,7 +366,8 @@ impl<T: 'static + Send> WriteSignal<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         let handle = self.runtime.get_signal_handle(self.id);
         {

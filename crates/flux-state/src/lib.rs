@@ -8,6 +8,7 @@
 //!
 //! - **Signal**: The atomic unit of state. It holds a value and notifies dependents when it changes.
 //! - **Computed**: A derived value that automatically updates when its dependencies change.
+//!   It is initialized *eagerly* but updates *lazily*.
 //! - **Effect**: A side effect that runs automatically when its dependencies change.
 //! - **Runtime**: The coordinator that manages the dependency graph and propagates updates.
 //!
@@ -31,6 +32,7 @@
 //! let (read_count, write_count) = count.split();
 //!
 //! // 3. Create a computed value (derived state)
+//! // Note: Computed values run immediately upon creation to calculate their initial value.
 //! let read_count_computed = read_count.clone();
 //! let double_count = Computed::new(runtime.clone(), move || {
 //!     read_count_computed.get() * 2

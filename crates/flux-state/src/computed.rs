@@ -3,8 +3,17 @@
 //! Computed values are signals that are derived from other signals. They automatically
 //! update when their dependencies change.
 //!
-//! They are lazy: they only re-execute their computation when their dependencies change
-//! and their value is requested.
+//! # Lazy vs Eager Behavior
+//!
+//! - **Eager Initialization**: When you create a `Computed` value using [`Computed::new`],
+//!   the closure is executed *immediately* to calculate the initial value. This ensures
+//!   the value is always valid from the start.
+//! - **Lazy Updates**: After initialization, the value is only re-calculated when:
+//!   1. A dependency changes, AND
+//!   2. The value is read (e.g., via `.get()`, `.with()`, or inside another Effect/Computed).
+//!
+//! If a dependency changes but the computed value is never read, the computation closure
+//! will NOT run. This "pull-based" reactivity saves resources.
 
 use crate::runtime::{NodeId, Runtime};
 use std::sync::{Arc, Mutex};
@@ -24,6 +33,7 @@ use std::sync::{Arc, Mutex};
 /// let (read_count, _) = count.split();
 ///
 /// // Create a computed value that doubles the count
+/// // NOTE: This executes immediately to calculate the initial value (2)
 /// let read_count_clone = read_count.clone();
 /// let double_count = Computed::new(runtime, move || {
 ///     read_count_clone.get() * 2
@@ -80,8 +90,14 @@ pub struct Computed<T> {
 impl<T: 'static + Send> Computed<T> {
     /// Create a new computed value.
     ///
-    /// The `compute` closure will be called to calculate the initial value,
-    /// and then automatically called again whenever any signal it reads changes.
+    /// The `compute` closure will be called *immediately* to calculate the initial value,
+    /// and then automatically called again whenever any signal it reads changes and the
+    /// computed value is accessed.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the `compute` closure panics.
+    /// - Panics if the runtime recursion limit (100) is exceeded (e.g., infinite dependency loop).
     pub fn new<F>(runtime: Arc<Runtime>, compute: F) -> Self
     where
         F: Fn() -> T + 'static + Send + Sync,
@@ -108,9 +124,25 @@ impl<T: 'static + Send> Computed<T> {
     /// This method allows accessing the value without cloning it.
     /// It automatically tracks dependencies and recomputes if stale.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// # let count = Signal::new(runtime.clone(), vec![1, 2, 3]);
+    /// # let (read, _) = count.split();
+    /// let computed = Computed::new(runtime, move || read.get());
+    ///
+    /// // Access the internal Vec without cloning it
+    /// let len = computed.with(|v| v.len());
+    /// assert_eq!(len, 3);
+    /// ```
+    ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T` (should not happen in safe code).
+    /// - Panics if re-computation fails (e.g., dependency panic).
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
 
@@ -133,9 +165,24 @@ impl<T: 'static + Send> Computed<T> {
     /// Note: This will still trigger a recompute if the value is stale, but will not
     /// subscribe the current context to this computed value.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// # let count = Signal::new(runtime.clone(), 10);
+    /// # let (read, _) = count.split();
+    /// let computed = Computed::new(runtime, move || read.get() * 2);
+    ///
+    /// // Read value without subscribing the current effect/computed to updates
+    /// let val = computed.with_untracked(|v| *v);
+    /// assert_eq!(val, 20);
+    /// ```
+    ///
     /// # Panics
     ///
-    /// Panics if the internal mutex is poisoned or if the stored type does not match `T`.
+    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         // Check if value is stale and recompute if needed
         if self.runtime.is_stale(self.id) {
@@ -159,6 +206,22 @@ impl<T: Clone + 'static + Send> Computed<T> {
     /// 1. Tracks the dependency if called inside an Effect or another Computed.
     /// 2. Recomputes the value if any dependencies have changed (lazy evaluation).
     /// 3. Returns the memoized value otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// # let count = Signal::new(runtime.clone(), 5);
+    /// # let (read, _) = count.split();
+    /// let computed = Computed::new(runtime, move || read.get() + 1);
+    ///
+    /// assert_eq!(computed.get(), 6);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the re-computation fails or internal state is corrupted.
     pub fn get(&self) -> T {
         self.with(|v| v.clone())
     }
