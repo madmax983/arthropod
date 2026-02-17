@@ -2,6 +2,7 @@
 
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
+use crate::validation::{validate_finite, validate_range};
 use anyhow::{Result, anyhow};
 use render_engine::{NodeContent, NodeId};
 use serde::{Deserialize, Serialize};
@@ -410,6 +411,9 @@ impl Tool for FindNodesAtPositionTool {
     fn execute(&self, params: Value, ctx: &mut McpFrameworkContext) -> Result<Value> {
         let params: FindNodesAtPositionParams = serde_json::from_value(params)?;
 
+        let x = validate_finite(params.x, "x")?;
+        let y = validate_finite(params.y, "y")?;
+
         let scene = ctx.scene();
         let mut nodes_at_pos: Vec<NodeId> = Vec::new();
 
@@ -420,10 +424,10 @@ impl Tool for FindNodesAtPositionTool {
 
             // Check if point is inside bounds
             let bounds = &node.bounds;
-            if params.x >= bounds.x
-                && params.x <= bounds.x + bounds.width
-                && params.y >= bounds.y
-                && params.y <= bounds.y + bounds.height
+            if x >= bounds.x
+                && x <= bounds.x + bounds.width
+                && y >= bounds.y
+                && y <= bounds.y + bounds.height
             {
                 nodes_at_pos.push(node_id);
             }
@@ -523,28 +527,32 @@ impl Tool for UpdateNodeTool {
         }
 
         if let Some(opacity) = params.updates.opacity {
-            node.opacity = opacity.clamp(0.0, 1.0);
+            node.opacity = validate_range(opacity, 0.0, 1.0, "opacity")?;
             updated_fields.push("opacity");
         }
 
         if let Some(bounds_update) = params.updates.bounds {
             let mut new_bounds = node.bounds;
             if let Some(x) = bounds_update.x {
+                validate_finite(x, "bounds.x")?;
                 new_bounds =
                     plat_core::Rect::new(x, new_bounds.y, new_bounds.width, new_bounds.height);
                 updated_fields.push("bounds.x");
             }
             if let Some(y) = bounds_update.y {
+                validate_finite(y, "bounds.y")?;
                 new_bounds =
                     plat_core::Rect::new(new_bounds.x, y, new_bounds.width, new_bounds.height);
                 updated_fields.push("bounds.y");
             }
             if let Some(width) = bounds_update.width {
+                validate_finite(width, "bounds.width")?;
                 new_bounds =
                     plat_core::Rect::new(new_bounds.x, new_bounds.y, width, new_bounds.height);
                 updated_fields.push("bounds.width");
             }
             if let Some(height) = bounds_update.height {
+                validate_finite(height, "bounds.height")?;
                 new_bounds =
                     plat_core::Rect::new(new_bounds.x, new_bounds.y, new_bounds.width, height);
                 updated_fields.push("bounds.height");
@@ -553,6 +561,10 @@ impl Tool for UpdateNodeTool {
         }
 
         if let Some(color_array) = params.updates.color {
+            for (i, &c) in color_array.iter().enumerate() {
+                validate_finite(c, &format!("color[{}]", i))?;
+            }
+
             let color = render_engine::Color::rgba(
                 color_array[0],
                 color_array[1],

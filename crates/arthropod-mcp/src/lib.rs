@@ -36,6 +36,7 @@ pub mod protocol;
 pub mod registry;
 pub mod server;
 pub mod tools;
+pub mod validation;
 
 // Re-export main types
 pub use context::McpFrameworkContext;

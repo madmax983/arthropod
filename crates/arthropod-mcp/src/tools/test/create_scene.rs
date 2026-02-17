@@ -1,5 +1,6 @@
 use crate::context::McpFrameworkContext;
 use crate::tools::{Tool, ToolSchema};
+use crate::validation::{validate_finite, validate_range};
 use anyhow::{Result, anyhow};
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use serde::Deserialize;
@@ -132,6 +133,46 @@ impl Tool for CreateSceneTool {
 
     fn execute(&self, params: Value, ctx: &mut McpFrameworkContext) -> Result<Value> {
         let params: CreateSceneParams = serde_json::from_value(params)?;
+
+        // Validate inputs
+        for spec in &params.nodes {
+            validate_finite(spec.bounds.x, &format!("node[{}] bounds.x", spec.name))?;
+            validate_finite(spec.bounds.y, &format!("node[{}] bounds.y", spec.name))?;
+            validate_finite(
+                spec.bounds.width,
+                &format!("node[{}] bounds.width", spec.name),
+            )?;
+            validate_finite(
+                spec.bounds.height,
+                &format!("node[{}] bounds.height", spec.name),
+            )?;
+            validate_range(
+                spec.opacity,
+                0.0,
+                1.0,
+                &format!("node[{}] opacity", spec.name),
+            )?;
+
+            match &spec.content {
+                NodeContentSpec::Rect { color } => {
+                    for (i, c) in color.iter().enumerate() {
+                        validate_finite(*c, &format!("node[{}] color[{}]", spec.name, i))?;
+                    }
+                }
+                NodeContentSpec::RoundedRect {
+                    color,
+                    corner_radius,
+                } => {
+                    for (i, c) in color.iter().enumerate() {
+                        validate_finite(*c, &format!("node[{}] color[{}]", spec.name, i))?;
+                    }
+                    validate_finite(
+                        *corner_radius,
+                        &format!("node[{}] corner_radius", spec.name),
+                    )?;
+                }
+            }
+        }
 
         let mut name_to_id = HashMap::new();
         let scene = ctx.scene_mut();
