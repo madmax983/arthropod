@@ -77,8 +77,8 @@ pub use plat_core::{BackdropMaterial, HasBackdropMaterial};
 
 // Widget system - Core widgets
 pub use widget_core::{
-    Button, Card, Center, Checkbox, Column, Container, Divider, Form, Grid, List, Padding, Row,
-    Spacer, Stack, Text, TextInput, Widget, WidgetContext,
+    Button, Card, Center, Checkbox, Column, Container, Divider, FlexDirection, FlexStyle, Form,
+    Grid, List, Padding, Row, Spacer, Stack, Text, TextInput, Widget, WidgetContext, list_from,
 };
 
 // Widget system - Macros

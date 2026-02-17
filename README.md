@@ -27,11 +27,10 @@ Arthropod separates concerns into three distinct layers:
 
 ## Quick Start
 
-Add `arthropod` and `widget-core` to your `Cargo.toml`.
+Add `arthropod` to your `Cargo.toml`.
 
 ```rust
 use arthropod::prelude::*;
-use widget_core::{txt, btn, col};
 
 fn main() -> Result<(), AppError> {
     App::run("Hello Arthropod", 400, 300, |_ctx| {

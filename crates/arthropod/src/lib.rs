@@ -11,7 +11,6 @@
 //!
 //! ```no_run
 //! use arthropod::prelude::*;
-//! use widget_core::{txt, btn, col};
 //!
 //! fn main() -> Result<(), AppError> {
 //!     App::run("Hello Arthropod", 400, 300, |_ctx| {
