@@ -7,6 +7,7 @@ use std::thread;
 
 /// Unique identifier for reactive nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeId(pub u64);
 
 /// The reactive runtime - manages the dependency graph.
@@ -402,5 +403,94 @@ impl Runtime {
 
         // Clean up dependencies
         inner.cleanup_dependencies(id);
+    }
+}
+
+#[cfg(feature = "nova")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
+pub struct GraphSnapshot {
+    pub nodes: Vec<NodeInfo>,
+    pub dependencies: Vec<(NodeId, NodeId)>,
+    pub stale_nodes: Vec<NodeId>,
+}
+
+#[cfg(feature = "nova")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
+pub struct NodeInfo {
+    pub id: NodeId,
+    pub node_type: NodeType,
+    pub label: String,
+}
+
+#[cfg(feature = "nova")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
+pub enum NodeType {
+    Signal,
+    Computed,
+    Effect,
+}
+
+#[cfg(feature = "nova")]
+impl Runtime {
+    /// Snapshots the current dependency graph for debugging/devtools.
+    pub fn inspect_graph(&self) -> GraphSnapshot {
+        let inner = self.inner.lock().unwrap();
+        let mut nodes = Vec::new();
+        let mut dependencies = Vec::new();
+        let mut stale_nodes = Vec::new();
+
+        // Collect Signals
+        for id in inner.signals.keys() {
+            nodes.push(NodeInfo {
+                id: *id,
+                node_type: NodeType::Signal,
+                label: format!("Signal({:?})", id),
+            });
+        }
+
+        // Collect Computeds
+        for id in inner.computeds.keys() {
+            nodes.push(NodeInfo {
+                id: *id,
+                node_type: NodeType::Computed,
+                label: format!("Computed({:?})", id),
+            });
+        }
+
+        // Collect Effects
+        for id in inner.effects.keys() {
+            nodes.push(NodeInfo {
+                id: *id,
+                node_type: NodeType::Effect,
+                label: format!("Effect({:?})", id),
+            });
+        }
+
+        // Collect Dependencies
+        // dependencies: node -> its dependencies.
+        // We want to represent edges as (Subscriber, Source) or (Source, Subscriber)?
+        // Usually graph is (Source, Target).
+        // inner.dependencies maps Observer -> {Sources}.
+        // So Source -> Observer is the flow of data.
+        for (observer, sources) in &inner.dependencies {
+            for source in sources {
+                // Edge from Source to Observer
+                dependencies.push((*source, *observer));
+            }
+        }
+
+        // Collect Stale Nodes
+        for id in &inner.stale {
+            stale_nodes.push(*id);
+        }
+
+        GraphSnapshot {
+            nodes,
+            dependencies,
+            stale_nodes,
+        }
     }
 }

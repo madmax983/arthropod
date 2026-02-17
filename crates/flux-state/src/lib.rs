@@ -66,5 +66,7 @@ mod signal;
 
 pub use computed::Computed;
 pub use effect::Effect;
+#[cfg(feature = "nova")]
+pub use runtime::{GraphSnapshot, NodeInfo, NodeType};
 pub use runtime::{NodeId, Runtime};
 pub use signal::{ReadSignal, Signal, WriteSignal};

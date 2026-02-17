@@ -5,8 +5,12 @@ edition.workspace = true
 license.workspace = true
 description = "Reactive state management for Arthropod GUI framework"
 
+[features]
+nova = ["dep:serde"]
+
 [dependencies]
 log.workspace = true
+serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 proptest = "1.4"

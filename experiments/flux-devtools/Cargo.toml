@@ -1,0 +1,12 @@
+[package]
+name = "flux-devtools"
+version = "0.1.0"
+edition = "2024"
+description = "TUI-based inspector for flux-state reactive graphs"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+flux-state = { path = "../../crates/flux-state", features = ["nova"] }
+ratatui = "0.30"
+crossterm = "0.28"
+anyhow = "1.0"
