@@ -182,6 +182,12 @@ impl RuntimeInner {
             .get(&thread::current().id())
             .and_then(|stack| stack.last().copied())
     }
+
+    fn prepare_execution(&mut self, id: NodeId) -> Result<(), String> {
+        self.cleanup_dependencies(id);
+        self.stale.remove(&id);
+        self.push_context(id)
+    }
 }
 
 impl Runtime {
@@ -286,9 +292,7 @@ impl Runtime {
         // Clear old dependencies and set tracking context
         let (effect_fn, error) = {
             let mut inner = self.inner.lock().unwrap();
-            inner.cleanup_dependencies(id);
-            inner.stale.remove(&id);
-            match inner.push_context(id) {
+            match inner.prepare_execution(id) {
                 Ok(_) => (inner.effects.get(&id).cloned(), None),
                 Err(e) => (None, Some(e)),
             }
@@ -354,10 +358,7 @@ impl Runtime {
         // Clear old dependencies and set tracking context, then get compute function
         let (compute_fn, error) = {
             let mut inner = self.inner.lock().unwrap();
-            inner.cleanup_dependencies(id);
-            inner.stale.remove(&id);
-
-            match inner.push_context(id) {
+            match inner.prepare_execution(id) {
                 Ok(_) => {
                     let computed = inner
                         .computeds
