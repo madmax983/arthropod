@@ -213,18 +213,12 @@ impl Scene {
         }
     }
 
-    /// Remove a node from the scene.
+    /// Remove a node and its descendants from the scene.
     ///
-    /// Removes the node from its parent's children list and deletes the node.
+    /// This method recursively removes the node and all its children from the
+    /// internal map, preventing memory leaks.
     ///
-    /// # ⚠️ Memory Leak Warning
-    ///
-    /// This method does **not** recursively remove children. If the removed node
-    /// has children, they will become "orphaned" (they remain in the internal
-    /// map but are no longer reachable via traversal). This causes a memory leak.
-    ///
-    /// **Recommendation:** If you need to remove a subtree, you must manually
-    /// collect and remove all descendants first, or use a helper that does so.
+    /// It also removes the node from its parent's children list.
     ///
     /// # Example
     ///
@@ -239,13 +233,28 @@ impl Scene {
     /// ```
     #[allow(clippy::collapsible_if)]
     pub fn remove_node(&mut self, id: NodeId) {
-        if let Some(node) = self.nodes.remove(&id) {
-            // Remove from parent's children list
-            if let Some(parent_id) = node.parent {
-                if let Some(parent) = self.nodes.get_mut(&parent_id) {
-                    parent.children.retain(|&child_id| child_id != id);
-                    self.mark_dirty(parent_id);
-                }
+        // 1. Remove from parent's children list FIRST to detach the subtree
+        // We peek at the node to get its parent, but don't remove it yet.
+        // We separate the parent lookup from the mutation to satisfy the borrow checker.
+        let parent_id = self.nodes.get(&id).and_then(|n| n.parent);
+
+        if let Some(parent_id) = parent_id {
+            if let Some(parent) = self.nodes.get_mut(&parent_id) {
+                parent.children.retain(|&child_id| child_id != id);
+                self.mark_dirty(parent_id);
+            }
+        } else if !self.nodes.contains_key(&id) {
+            // Node doesn't exist, nothing to do
+            return;
+        }
+
+        // 2. Iteratively remove the subtree
+        // We use a stack to traverse all descendants.
+        let mut stack = vec![id];
+        while let Some(current_id) = stack.pop() {
+            // remove() returns the SceneNode, giving us ownership of its children vec
+            if let Some(node) = self.nodes.remove(&current_id) {
+                stack.extend(node.children);
             }
         }
     }
@@ -604,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_node_with_children_orphans_them() {
+    fn test_remove_node_recursively_removes_children() {
         let mut scene = Scene::new();
         let root = scene.root();
 
@@ -630,12 +639,8 @@ mod tests {
         // Parent is gone
         assert!(scene.get_node(parent_id).is_none());
 
-        // Child still exists (orphaned)
-        assert!(scene.get_node(child_id).is_some());
-
-        // Child still points to deleted parent (as per current simplistic implementation)
-        // This confirms the behavior described in doc comment
-        assert_eq!(scene.get_node(child_id).unwrap().parent, Some(parent_id));
+        // Child should also be gone (recursive removal)
+        assert!(scene.get_node(child_id).is_none());
     }
 
     #[test]
