@@ -34,6 +34,30 @@ use std::sync::Arc;
 /// write.set(1); // Prints "Count changed to: 1"
 /// ```
 ///
+/// # Common Patterns
+///
+/// ## Resource Cleanup
+///
+/// If your effect creates resources (like timers, network connections, or DOM nodes),
+/// you should rely on `Drop` implementations of the captured variables to clean them up.
+/// The effect closure itself is re-run from scratch on every update, so any
+/// local variables are dropped before the next run.
+///
+/// ```rust
+/// # use flux_state::{Runtime, Effect};
+/// # let runtime = Runtime::new();
+/// struct MyResource;
+/// impl Drop for MyResource {
+///     fn drop(&mut self) { println!("Cleaning up!"); }
+/// }
+///
+/// let _effect = Effect::new(runtime, || {
+///     let _res = MyResource;
+///     // ... do something with resource
+///     // _res is dropped when the closure ends or before next run
+/// });
+/// ```
+///
 /// # Pitfalls
 ///
 /// Effects are **dropped immediately** if they are not bound to a variable,

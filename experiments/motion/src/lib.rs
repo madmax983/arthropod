@@ -1,3 +1,60 @@
+//! # Reactive Motion
+//!
+//! Experimental motion system for Arthropod, providing physics-based springs and time-based tweens
+//! integrated with `flux-state` signals.
+//!
+//! This crate implements the "Impossible UI" vision by making fluid, organic motion a first-class
+//! citizen in the reactive graph. Instead of imperatively starting animations, you declare
+//! `MotionSignal`s that automatically interpolate towards a target value.
+//!
+//! ## Core Concepts
+//!
+//! - **MotionSignal**: A signal that smoothly animates to match a source signal's value.
+//! - **MotionConfig**: Configuration for the animation (Spring vs Tween).
+//! - **Spring**: Physics-based animation (stiffness, damping) that feels natural and organic.
+//! - **Tween**: Time-based animation (duration, easing) for precise timing control.
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use flux_state::{Runtime, Signal};
+//! use motion::{create_motion_signal, MotionConfig};
+//! use std::time::Duration;
+//!
+//! // 1. Setup runtime and clock
+//! let runtime = Runtime::new();
+//! let clock = Signal::new(runtime.clone(), Duration::ZERO);
+//! let (read_clock, write_clock) = clock.split();
+//!
+//! // 2. Create a source signal (the target value)
+//! let target = Signal::new(runtime.clone(), 0.0);
+//! let (read_target, write_target) = target.split();
+//!
+//! // 3. Create a motion signal that follows the target
+//! // Using a spring for organic movement
+//! let position = create_motion_signal(
+//!     runtime.clone(),
+//!     read_target,
+//!     read_clock,
+//!     MotionConfig::Spring {
+//!         stiffness: 100.0,
+//!         damping: 15.0,
+//!     },
+//! );
+//!
+//! // 4. Update the target - position will animate towards 100.0
+//! write_target.set(100.0);
+//!
+//! // In your app loop:
+//! // write_clock.set(app_time);
+//! // let current_pos = position.get();
+//! ```
+//!
+//! ## Experimental Status
+//!
+//! This crate is part of the `experiments/` directory and is subject to breaking changes.
+//! It is intended to explore reactive animation patterns before stabilization.
+
 use anim_graph::{Animatable, Animation, Easing};
 use flux_state::{Effect, ReadSignal, Runtime, Signal};
 use std::sync::{Arc, Mutex};
@@ -7,8 +64,14 @@ use std::time::Duration;
 #[derive(Clone, Copy, Debug)]
 pub enum MotionConfig {
     /// Physics-based spring animation.
+    ///
+    /// - `stiffness`: Controls the speed of the spring (higher is faster).
+    /// - `damping`: Controls the bounciness (lower is bouncier, higher is stiffer).
     Spring { stiffness: f32, damping: f32 },
     /// Time-based tween animation.
+    ///
+    /// - `duration`: Total time for the animation.
+    /// - `easing`: Easing curve (Linear, Quad, Cubic, etc.).
     Tween { duration: Duration, easing: Easing },
 }
 
@@ -24,6 +87,7 @@ impl Default for MotionConfig {
 /// A signal that animates its value over time.
 ///
 /// Keeps the animation effect alive as long as this struct exists.
+/// Dereferences to `ReadSignal<T>` for easy access to the current animated value.
 pub struct MotionSignal<T> {
     signal: ReadSignal<T>,
     _effect: Effect,
@@ -38,12 +102,34 @@ impl<T> std::ops::Deref for MotionSignal<T> {
 
 /// Create a signal that smoothly animates to the source signal's value.
 ///
+/// The returned `MotionSignal` will automatically update its value based on the
+/// `clock` signal, interpolating towards the current value of `source`.
+///
 /// # Arguments
 ///
 /// * `cx` - The runtime context.
 /// * `source` - The source signal (target value).
 /// * `clock` - A signal representing the current application time (e.g., elapsed duration).
 /// * `config` - Animation configuration.
+///
+/// # Example
+///
+/// ```rust
+/// # use flux_state::{Runtime, Signal};
+/// # use motion::{create_motion_signal, MotionConfig};
+/// # use std::time::Duration;
+/// # let runtime = Runtime::new();
+/// # let clock = Signal::new(runtime.clone(), Duration::ZERO);
+/// # let (read_clock, _) = clock.split();
+/// # let target = Signal::new(runtime.clone(), 0.0);
+/// # let (read_target, _) = target.split();
+/// let motion = create_motion_signal(
+///     runtime,
+///     read_target,
+///     read_clock,
+///     MotionConfig::default(),
+/// );
+/// ```
 pub fn create_motion_signal<T>(
     cx: Arc<Runtime>,
     source: ReadSignal<T>,

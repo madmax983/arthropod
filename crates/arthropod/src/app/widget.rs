@@ -38,8 +38,22 @@ pub(crate) struct WidgetAppConfig {
     pub builder: WidgetBuilder,
 }
 
-/// Extension trait for boxed widgets.
+/// Extension trait for type-erased widgets.
+///
+/// This trait allows `Widget` implementations to be stored in `Box<dyn WidgetExt>`
+/// and used dynamically. It provides a `build_boxed` method that delegates to
+/// the standard `Widget::build` method.
+///
+/// # Why is this needed?
+///
+/// The `Widget` trait is not object-safe because it may have generic methods or
+/// associated types in future versions. `WidgetExt` provides an object-safe
+/// interface for cases where you need a heterogeneous collection of widgets or
+/// dynamic dispatch (like in `App::run`).
 pub trait WidgetExt {
+    /// Build the widget into the context, returning the root node ID.
+    ///
+    /// This is identical to `Widget::build`, but callable on a trait object.
     fn build_boxed(&self, ctx: &mut WidgetContext) -> NodeId;
 }
 

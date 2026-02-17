@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 /// A reactive signal - the atomic unit of state.
 ///
 /// Signals hold a value and notify dependents when that value changes.
+/// They are the primary input to [`crate::Computed`] values and [`crate::Effect`]s.
 ///
 /// # Example
 ///
@@ -19,6 +20,11 @@ use std::sync::{Arc, Mutex};
 /// let runtime = Runtime::new();
 /// let count = Signal::new(runtime, 0);
 /// ```
+///
+/// # See Also
+///
+/// - [`crate::Computed`]: Derive state from signals automatically.
+/// - [`crate::Effect`]: Run side effects when signals change.
 #[derive(Clone)]
 pub struct Signal<T> {
     id: NodeId,
