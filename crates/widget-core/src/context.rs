@@ -2,7 +2,7 @@
 //!
 //! Provides API for widgets to build scene nodes and configure components.
 
-use crate::form_state::{FormData, FormState, SubmitCallback};
+use crate::form_state::{FormState, SubmitCallback};
 use crate::input_state::{
     ComputedTextState, ReactiveColorState, ReactiveTextState, TextInputState,
 };
@@ -361,47 +361,27 @@ impl WidgetContext {
 
     /// Send a character to focused input
     pub fn send_char(&mut self, c: char) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                state.insert_char(c);
-            }
-        }
+        crate::input_logic::send_char(&mut self.text_input_states, self.focused_node, c);
     }
 
     /// Send backspace to focused input
     pub fn send_backspace(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                state.backspace();
-            }
-        }
+        crate::input_logic::send_backspace(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send delete to focused input
     pub fn send_delete(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                state.delete();
-            }
-        }
+        crate::input_logic::send_delete(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send left arrow key to focused input
     pub fn send_key_left(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                state.move_cursor_left();
-            }
-        }
+        crate::input_logic::send_key_left(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send right arrow key to focused input
     pub fn send_key_right(&mut self) {
-        if let Some(focused_id) = self.focused_node {
-            if let Some(state) = self.text_input_states.get_mut(&focused_id) {
-                state.move_cursor_right();
-            }
-        }
+        crate::input_logic::send_key_right(&mut self.text_input_states, self.focused_node);
     }
 
     /// Set validator for a node
@@ -480,17 +460,7 @@ impl WidgetContext {
 
     /// Get all field errors for a form
     pub fn get_form_field_errors(&self, node_id: NodeId) -> HashMap<String, String> {
-        let mut errors = HashMap::new();
-
-        if let Some(form_state) = self.form_states.get(&node_id) {
-            for (field_name, field_node_id) in &form_state.field_mapping {
-                if let Some(error) = self.get_validation_error(*field_node_id) {
-                    errors.insert(field_name.clone(), error);
-                }
-            }
-        }
-
-        errors
+        crate::form_logic::get_form_field_errors(node_id, &self.form_states, &self.validators)
     }
 
     /// Get form state for a form node
@@ -500,72 +470,22 @@ impl WidgetContext {
 
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
-        // Re-run validators on all fields with current values
-        let field_node_ids: Vec<NodeId> = if let Some(form_state) = self.form_states.get(&node_id) {
-            form_state.field_mapping.values().copied().collect()
-        } else {
-            return;
-        };
-
-        // Collect current values first to avoid borrowing issues
-        let mut field_values = HashMap::new();
-        for field_node_id in &field_node_ids {
-            if let Some(state) = self.text_input_states.get(field_node_id) {
-                field_values.insert(*field_node_id, state.read_signal.get_untracked());
-            }
-        }
-
-        // Re-run validation for each field
-        for (field_node_id, current_value) in field_values {
-            if let Some(validator_state) = self.validators.get_mut(&field_node_id) {
-                // Run validator on current value
-                let result = (validator_state.validator)(&current_value);
-                validator_state.error = result.err();
-            }
-        }
-
-        // Get field errors after re-validation
-        let field_errors = self.get_form_field_errors(node_id);
-
-        // Update form is_valid state
-        if let Some(form_state) = self.form_states.get_mut(&node_id) {
-            form_state.is_valid = field_errors.is_empty();
-        }
+        crate::form_logic::revalidate_form(
+            node_id,
+            &mut self.form_states,
+            &self.text_input_states,
+            &mut self.validators,
+        );
     }
 
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
-        // Revalidate first
-        self.revalidate_form(node_id);
-
-        // Only submit if valid
-        if !self.is_form_valid(node_id) {
-            return;
-        }
-
-        // Collect form data and callback
-        let mut form_data = FormData::new();
-        let mut callback_opt = None;
-
-        if let Some(form_state) = self.form_states.get(&node_id) {
-            callback_opt = form_state.on_submit.clone();
-
-            for (field_name, field_node_id) in &form_state.field_mapping {
-                if let Some(state) = self.text_input_states.get(field_node_id) {
-                    form_data.insert(field_name.clone(), state.read_signal.get_untracked());
-                }
-            }
-        }
-
-        // Call submit callback
-        if let Some(callback) = callback_opt {
-            let result = callback(form_data);
-
-            // Store submit error if any
-            if let Some(form_state_mut) = self.form_states.get_mut(&node_id) {
-                form_state_mut.submit_error = result.err();
-            }
-        }
+        crate::form_logic::trigger_submit(
+            node_id,
+            &mut self.form_states,
+            &self.text_input_states,
+            &mut self.validators,
+        );
     }
 
     /// Check if form has submit error
@@ -608,23 +528,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_next(&mut self) -> Option<NodeId> {
-        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
-        if focusable.is_empty() {
-            return None;
-        }
-
-        let current_index = self
-            .focused_node
-            .and_then(|f| focusable.iter().position(|&id| id == f));
-
-        let next_index = match current_index {
-            Some(idx) => (idx + 1) % focusable.len(),
-            None => 0,
-        };
-
-        let next_node = focusable[next_index];
-        self.focused_node = Some(next_node);
-        Some(next_node)
+        crate::input_logic::focus_next(&self.text_input_states, &mut self.focused_node)
     }
 
     /// Focus the previous focusable node (Shift+Tab navigation).
@@ -637,24 +541,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_prev(&mut self) -> Option<NodeId> {
-        let focusable: Vec<NodeId> = self.text_input_states.keys().copied().collect();
-        if focusable.is_empty() {
-            return None;
-        }
-
-        let current_index = self
-            .focused_node
-            .and_then(|f| focusable.iter().position(|&id| id == f));
-
-        let prev_index = match current_index {
-            Some(0) => focusable.len() - 1,
-            Some(idx) => idx - 1,
-            None => focusable.len() - 1,
-        };
-
-        let prev_node = focusable[prev_index];
-        self.focused_node = Some(prev_node);
-        Some(prev_node)
+        crate::input_logic::focus_prev(&self.text_input_states, &mut self.focused_node)
     }
 
     // =========================================================================
