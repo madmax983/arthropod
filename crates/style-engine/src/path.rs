@@ -193,15 +193,20 @@ impl VectorPath {
 
     fn winding_number(&self, point: Vec2) -> i32 {
         let mut winding = 0;
-        for contour in self.flattened_contours(12) {
+        let mut on_edge = false;
+        self.for_each_flattened_contour(12, |contour| {
+            if on_edge {
+                return;
+            }
             if contour.len() < 3 {
-                continue;
+                return;
             }
             for edge in contour.windows(2) {
                 let p1 = edge[0];
                 let p2 = edge[1];
                 if point_on_segment(p1, p2, point, 1e-5) {
-                    return 1;
+                    on_edge = true;
+                    return;
                 }
                 if p1.y <= point.y {
                     if p2.y > point.y && is_left(p1, p2, point) > 0.0 {
@@ -211,21 +216,26 @@ impl VectorPath {
                     winding -= 1;
                 }
             }
-        }
-        winding
+        });
+        if on_edge { 1 } else { winding }
     }
 
     fn crossing_count(&self, point: Vec2) -> usize {
         let mut crossings = 0usize;
-        for contour in self.flattened_contours(12) {
+        let mut on_edge = false;
+        self.for_each_flattened_contour(12, |contour| {
+            if on_edge {
+                return;
+            }
             if contour.len() < 3 {
-                continue;
+                return;
             }
             for edge in contour.windows(2) {
                 let p1 = edge[0];
                 let p2 = edge[1];
                 if point_on_segment(p1, p2, point, 1e-5) {
-                    return 1;
+                    on_edge = true;
+                    return;
                 }
                 if (p1.y > point.y) != (p2.y > point.y) {
                     let t = (point.y - p1.y) / (p2.y - p1.y);
@@ -235,8 +245,8 @@ impl VectorPath {
                     }
                 }
             }
-        }
-        crossings
+        });
+        if on_edge { 1 } else { crossings }
     }
 
     fn to_multi_polygon(&self) -> MultiPolygon<f64> {
@@ -366,8 +376,23 @@ impl VectorPath {
     }
 
     fn flattened_contours(&self, curve_steps: usize) -> Vec<Vec<Vec2>> {
-        let mut contours: Vec<Vec<Vec2>> = Vec::new();
-        let mut current: Vec<Vec2> = Vec::new();
+        let mut contours = Vec::new();
+        self.for_each_flattened_contour(curve_steps, |c| {
+            contours.push(c.to_vec());
+        });
+        contours
+    }
+
+    /// Iterates over flattened contours without allocating a vector of vectors.
+    ///
+    /// This method is designed for performance-critical operations like hit testing,
+    /// where we only need to inspect each contour one by one. It reuses a single
+    /// buffer for the current contour to minimize heap allocations.
+    fn for_each_flattened_contour<F>(&self, curve_steps: usize, mut f: F)
+    where
+        F: FnMut(&[Vec2]),
+    {
+        let mut current: Vec<Vec2> = Vec::with_capacity(32);
         let mut cursor = Vec2::ZERO;
         let mut start = Vec2::ZERO;
         let mut has_cursor = false;
@@ -376,9 +401,10 @@ impl VectorPath {
             match *cmd {
                 PathCommand::MoveTo(p) => {
                     if current.len() >= 2 {
-                        contours.push(current);
+                        f(&current);
                     }
-                    current = vec![p];
+                    current.clear();
+                    current.push(p);
                     cursor = p;
                     start = p;
                     has_cursor = true;
@@ -410,9 +436,9 @@ impl VectorPath {
                         current.push(start);
                     }
                     if current.len() >= 2 {
-                        contours.push(current);
+                        f(&current);
                     }
-                    current = Vec::new();
+                    current.clear();
                     has_cursor = false;
                 }
                 _ => {}
@@ -425,10 +451,10 @@ impl VectorPath {
             {
                 current.push(first);
             }
-            contours.push(current);
+            if current.len() >= 2 {
+                f(&current);
+            }
         }
-
-        contours
     }
 }
 
