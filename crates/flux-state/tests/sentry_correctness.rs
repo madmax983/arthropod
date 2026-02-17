@@ -1,4 +1,5 @@
 use flux_state::{Computed, Effect, Runtime, Signal};
+use std::panic;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -178,7 +179,7 @@ fn test_dynamic_dependency_pruning() {
     assert_eq!(
         compute_count.load(Ordering::SeqCst),
         3,
-        "Updating unused dependency B should not trigger recompute"
+        "Updating unused dependency B should not run effect"
     );
 }
 
@@ -240,4 +241,55 @@ fn test_effect_dynamic_dependency_cleanup() {
         3,
         "Updating unused dependency B should not run effect"
     );
+}
+
+#[test]
+fn test_panic_state_consistency() {
+    let runtime = Runtime::new();
+
+    let x_sig = Signal::new(runtime.clone(), 1);
+    let (x, set_x) = x_sig.split();
+
+    let y_sig = Signal::new(runtime.clone(), 10);
+    let (y, set_y) = y_sig.split();
+
+    // c = if x == 0 { panic } else { y }
+    // We intentionally make x depend on y only in the non-panic path
+    // to simulate "lost dependency" if panic happens before y is tracked.
+    let x_clone = x.clone();
+    let y_clone = y.clone();
+    let c = Computed::new(runtime.clone(), move || {
+        let val_x = x_clone.get();
+        if val_x == 0 {
+            panic!("Boom");
+        }
+        y_clone.get()
+    });
+
+    // 1. Initial stable state
+    assert_eq!(c.get(), 10);
+
+    // 2. Put x in panic state
+    set_x.set(0);
+
+    // Verify it panics
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| c.get()));
+    assert!(result.is_err());
+
+    // 3. Update y. This should mark c as stale IF it was listening to y.
+    // But due to the panic in step 2 (before reaching y.get()), c lost dependency on y.
+    // If the bug exists, c is NOT marked stale.
+    set_y.set(20);
+
+    // 4. Query c again.
+    // EXPECTATION: It should still panic (because x is 0).
+    // REALITY (Hypothesis): It returns the old cached value (10) because it thinks it's not stale.
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| c.get()));
+
+    if let Ok(val) = result {
+        panic!(
+            "Computed value should panic because x is 0. Instead, it returned stale value: {}",
+            val
+        );
+    }
 }

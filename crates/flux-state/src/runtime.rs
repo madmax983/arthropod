@@ -78,6 +78,7 @@ struct ComputedNode {
 
 struct ContextGuard<'a> {
     runtime: &'a Runtime,
+    id: NodeId,
 }
 
 impl<'a> Drop for ContextGuard<'a> {
@@ -88,6 +89,13 @@ impl<'a> Drop for ContextGuard<'a> {
             Err(poisoned) => poisoned.into_inner(),
         };
         inner.pop_context();
+
+        // If we are unwinding due to a panic, restore the stale status of the node.
+        // This ensures that the node is recomputed on the next access, rather than
+        // being left in a zombie state with no dependencies.
+        if std::thread::panicking() {
+            inner.stale.insert(self.id);
+        }
     }
 }
 
@@ -288,7 +296,7 @@ impl Runtime {
 
         // SAFETY: The context guard ensures that `pop_context` is called
         // even if the effect closure panics.
-        let _guard = ContextGuard { runtime: self };
+        let _guard = ContextGuard { runtime: self, id };
 
         // Run effect (will re-establish dependencies)
         if let Some(f) = effect_fn {
@@ -365,7 +373,7 @@ impl Runtime {
 
         // SAFETY: The context guard ensures that `pop_context` is called
         // even if the compute closure panics.
-        let _guard = ContextGuard { runtime: self };
+        let _guard = ContextGuard { runtime: self, id };
 
         // Call without holding borrow
         let new_value = compute_fn();

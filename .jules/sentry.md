@@ -19,3 +19,7 @@
 ## 2024-10-24 - [Reactive State Desynchronization]
 **Learning:** `TextInputState` duplicated state (cursor position) without subscribing to the underlying signal. When the signal was updated externally (e.g., text shortened), the cursor position remained invalid, causing silent failures in subsequent edits.
 **Action:** Implemented "lazy clamping" in all state mutation methods. Always check bounds against the *current* signal value before performing operations. Do not assume cached state is valid in a reactive system.
+
+## 2024-05-24 - [Silent Stale Value Bug]
+**Learning:** If a `Computed` value panics during recomputation, it is prematurely unmarked as `stale` before the new value is stored. This causes subsequent reads to return the old (stale) value without re-attempting the computation, even if dependencies have changed.
+**Action:** Modified `ContextGuard` to restore the node's `stale` status if the computation panics. This ensures correct panic recovery while preserving "optimistic staleness removal" needed for cycle handling.
