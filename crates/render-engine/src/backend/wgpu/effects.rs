@@ -381,6 +381,22 @@ pub fn inner_shadow_alpha(mask: f32, blurred_offset_mask: f32) -> f32 {
     (blurred_offset_mask - (1.0 - mask)).clamp(0.0, 1.0) * mask
 }
 
+pub fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
+    if !matches!(
+        style.blend_mode,
+        style_engine::BlendMode::Normal | style_engine::BlendMode::PassThrough
+    ) {
+        return true;
+    }
+
+    style.effects.iter().any(|effect| match effect {
+        style_engine::Effect::LayerBlur(blur) => blur.visible && blur.radius > 0.0,
+        style_engine::Effect::BackgroundBlur(blur) => blur.visible && blur.radius > 0.0,
+        style_engine::Effect::InnerShadow(shadow) => shadow.visible,
+        _ => false,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,20 +444,4 @@ mod tests {
         assert_eq!(inner_shadow_alpha(0.0, 1.0), 0.0);
         assert!(inner_shadow_alpha(1.0, 0.8) > 0.0);
     }
-}
-
-pub fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
-    if !matches!(
-        style.blend_mode,
-        style_engine::BlendMode::Normal | style_engine::BlendMode::PassThrough
-    ) {
-        return true;
-    }
-
-    style.effects.iter().any(|effect| match effect {
-        style_engine::Effect::LayerBlur(blur) => blur.visible && blur.radius > 0.0,
-        style_engine::Effect::BackgroundBlur(blur) => blur.visible && blur.radius > 0.0,
-        style_engine::Effect::InnerShadow(shadow) => shadow.visible,
-        _ => false,
-    })
 }

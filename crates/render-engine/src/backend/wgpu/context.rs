@@ -641,7 +641,7 @@ impl WgpuContext {
             height,
             padded_bytes_per_row,
             self.config.format,
-        );
+        )?;
         drop(mapped);
         output_buffer.unmap();
 
@@ -719,7 +719,7 @@ impl WgpuContext {
             height,
             padded_bytes_per_row,
             self.config.format,
-        );
+        )?;
         drop(mapped);
         output_buffer.unmap();
         Ok(rgba)
@@ -771,16 +771,40 @@ fn unpack_readback_pixels(
     height: u32,
     padded_bytes_per_row: u32,
     format: wgpu::TextureFormat,
-) -> Vec<u8> {
-    let row_len = (width * 4) as usize;
+) -> Result<Vec<u8>, RendererError> {
+    let row_len = (width as usize).checked_mul(4).ok_or_else(|| {
+        RendererError::InitializationFailed("Overflow calculating row length".to_string())
+    })?;
+
+    let total_size = row_len.checked_mul(height as usize).ok_or_else(|| {
+        RendererError::InitializationFailed("Overflow calculating output buffer size".to_string())
+    })?;
+
     let padded = padded_bytes_per_row as usize;
-    let mut out = vec![0u8; row_len * height as usize];
+    // Note: vec! allocation may still panic on OOM if total_size is huge but valid.
+    let mut out = vec![0u8; total_size];
 
     for row in 0..height as usize {
-        let src_start = row * padded;
-        let src_end = src_start + row_len;
-        let dst_start = row * row_len;
-        let dst_end = dst_start + row_len;
+        let src_start = row.checked_mul(padded).ok_or_else(|| {
+            RendererError::InitializationFailed("Overflow calculating source offset".to_string())
+        })?;
+        let src_end = src_start.checked_add(row_len).ok_or_else(|| {
+            RendererError::InitializationFailed("Overflow calculating source end".to_string())
+        })?;
+
+        let dst_start = row.checked_mul(row_len).ok_or_else(|| {
+            RendererError::InitializationFailed("Overflow calculating dest offset".to_string())
+        })?;
+        let dst_end = dst_start.checked_add(row_len).ok_or_else(|| {
+            RendererError::InitializationFailed("Overflow calculating dest end".to_string())
+        })?;
+
+        if src_end > readback.len() {
+            return Err(RendererError::InitializationFailed(
+                "Readback buffer too small for requested dimensions".to_string(),
+            ));
+        }
+
         out[dst_start..dst_end].copy_from_slice(&readback[src_start..src_end]);
     }
 
@@ -793,7 +817,7 @@ fn unpack_readback_pixels(
         _ => {}
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -905,7 +929,8 @@ mod tests {
             height,
             padded_bpr,
             wgpu::TextureFormat::Rgba8Unorm,
-        );
+        )
+        .unwrap();
         assert_eq!(
             out,
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
@@ -927,7 +952,28 @@ mod tests {
             height,
             padded_bpr,
             wgpu::TextureFormat::Bgra8Unorm,
-        );
+        )
+        .unwrap();
         assert_eq!(out, vec![1, 2, 3, 255]);
+    }
+
+    #[test]
+    fn test_unpack_readback_pixels_overflow_repro() {
+        // width * 4 overflows u32 (approx 4GB width)
+        // 1_073_741_824 * 4 = 4_294_967_296 (just over u32::MAX)
+        let width = 1_073_741_824 + 10;
+        let height = 1;
+        let padded_bpr = 256;
+        let readback = vec![0u8; 1000];
+
+        // This should return an Error now, instead of panicking or returning garbage
+        let result = unpack_readback_pixels(
+            &readback,
+            width,
+            height,
+            padded_bpr,
+            wgpu::TextureFormat::Rgba8Unorm,
+        );
+        assert!(result.is_err());
     }
 }

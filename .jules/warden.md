@@ -38,3 +38,7 @@
 1. Updated `bytes` to v1.11.1 via `cargo update`.
 2. Updated `ratatui` (in `arthropod-mcp`) from v0.29 to v0.30, which pulls in `lru` v0.16.3 (safe version).
 3. Fixed compilation error in `bench-viewer` caused by stricter `Send`/`Sync` bounds in updated `ratatui`/`anyhow`.
+
+## 2026-02-05 - [Unsafe Integer Overflow in Texture Readback]
+**Threat:** `unpack_readback_pixels` in `render-engine` used unchecked arithmetic `(width * 4)` to calculate buffer sizes. For very large widths, this calculation could wrap around (overflow), causing the allocation of a small buffer for a large image. This would lead to incorrect memory access (logic error) or a panic when accessing the buffer.
+**Defense:** Implemented checked arithmetic using `checked_mul` and `checked_add`. The function now returns `Result<Vec<u8>, RendererError>` and fails gracefully with a descriptive error if dimensions are invalid or if an overflow occurs.
