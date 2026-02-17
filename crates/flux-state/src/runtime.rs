@@ -69,6 +69,9 @@ struct RuntimeInner {
 
     // Pending effects to run
     pending_effects: Vec<NodeId>,
+
+    // Reusable buffer for graph traversal to avoid allocations
+    traversal_buffer: Vec<NodeId>,
 }
 
 struct ComputedNode {
@@ -129,20 +132,20 @@ impl RuntimeInner {
 
     fn mark_subscribers_stale(&mut self, source: NodeId) {
         // Optimization: Avoid allocating intermediate Vecs by iterating HashSet refs directly.
-        // We use a stack for DFS traversal.
-        let mut stack = Vec::new();
+        // We use a reusable buffer for DFS traversal to avoid repeated allocations.
+        self.traversal_buffer.clear();
 
         if let Some(subs) = self.subscribers.get(&source) {
-            stack.extend(subs);
+            self.traversal_buffer.extend(subs);
         }
 
-        while let Some(node) = stack.pop() {
+        while let Some(node) = self.traversal_buffer.pop() {
             // mark_stale borrows &mut self, but returns bool.
             // The borrow ends after the if condition check.
             #[allow(clippy::collapsible_if)]
             if self.mark_stale(node) {
                 if let Some(subs) = self.subscribers.get(&node) {
-                    stack.extend(subs);
+                    self.traversal_buffer.extend(subs);
                 }
             }
         }
@@ -198,6 +201,7 @@ impl Runtime {
                 tracking_context: HashMap::new(),
                 stale: HashSet::new(),
                 pending_effects: Vec::new(),
+                traversal_buffer: Vec::new(),
             }),
         })
     }

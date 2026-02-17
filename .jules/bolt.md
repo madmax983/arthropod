@@ -13,3 +13,7 @@
 ## Iterative Traversal vs Recursion Performance
 **Learning:** Converting a recursive tree traversal to an iterative one using a `Vec` stack (even with `thread_local` reuse) resulted in a ~2x performance regression (68µs -> 175µs for 10k nodes) in micro-benchmarks. The overhead of manual stack management and bounds checks exceeds the compiler-optimized recursive calls.
 **Action:** Only replace recursion with iteration when stack depth is a proven crash risk (like here), and accept the minor CPU cost for stability.
+
+**[Heap Reuse in Reactive Graphs]**
+**Learning:** Reusing a traversal buffer in `RuntimeInner` eliminates one heap allocation per signal update without fighting the borrow checker, provided the buffer is cleared before use and field access is disjoint.
+**Action:** Always look for transient `Vec::new()` in hot loops or recursive structures and hoist them into the parent struct if single-threaded access is guaranteed (e.g., via Mutex).
