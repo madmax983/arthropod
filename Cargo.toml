@@ -22,6 +22,7 @@ members = [
     "experiments/input-fusion", 
     "experiments/flux-devtools", 
     "experiments/tui-renderer",
+    "experiments/fluid-layout",
 ]
 
 [package]

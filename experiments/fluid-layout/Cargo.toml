@@ -1,0 +1,13 @@
+[package]
+name = "fluid-layout"
+version = "0.1.0"
+edition = "2021"
+description = "Physics-based layout interpolation for Arthropod"
+
+[dependencies]
+flux-state = { path = "../../crates/flux-state" }
+layout-engine = { path = "../../crates/layout-engine" }
+anim-graph = { path = "../../crates/anim-graph" }
+glam = "0.29"
+
+[dev-dependencies]

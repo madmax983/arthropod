@@ -17,3 +17,8 @@
 **Concept:** A reactive gesture recognition system (Sequences, Chords) that bridges `plat-core` input events with `flux-state`.
 **Fate:** Merged
 **Lesson:** Reactive signals are perfect for state machines like gesture detection. `Effect` ownership is critical; dropping it kills the listener.
+
+## [Fluid Layout]
+**Concept:** Physics-based layout interpolation that transforms discrete `layout-engine` updates into smooth, organic animations using `flux-state` and `anim-graph`.
+**Fate:** Merged
+**Lesson:** Layouts shouldn't snap. By treating layout rects as animatable signals, we can make the entire UI feel "fluid" without changing the core layout logic.
