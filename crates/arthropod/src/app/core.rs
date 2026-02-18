@@ -166,8 +166,6 @@ impl App {
     ///
     /// ```
     /// # use arthropod::prelude::*;
-    /// # use render_engine::Scene;
-    /// # use arthropod_ecs::components::Renderable;
     /// let mut app = App::new_headless().unwrap();
     /// let root = app.world().resource::<Scene>().root();
     ///
@@ -189,8 +187,6 @@ impl App {
     ///
     /// ```
     /// # use arthropod::prelude::*;
-    /// # use render_engine::Scene;
-    /// # use arthropod_ecs::components::Renderable;
     /// let mut app = App::new_headless().unwrap();
     /// let root = app.world().resource::<Scene>().root();
     /// app.spawn(root); // Create the entity first
@@ -381,7 +377,6 @@ impl App {
     ///
     /// ```
     /// use arthropod::prelude::*;
-    /// use widget_core::WidgetContext;
     /// use std::collections::HashMap;
     ///
     /// // 1. Build a widget in a test context

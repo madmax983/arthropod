@@ -13,11 +13,24 @@
 //! use arthropod::prelude::*;
 //!
 //! fn main() -> Result<(), AppError> {
-//!     App::run("Hello Arthropod", 400, 300, |_ctx| {
+//!     App::run("Hello Arthropod", 400, 300, |ctx| {
+//!         // Create reactive state
+//!         let count = ctx.signal(0);
+//!         let (read_count, write_count) = count.split();
+//!
+//!         // Create derived state (auto-updates when count changes)
+//!         let count_text = Computed::new(ctx.runtime().clone(), move || {
+//!             format!("Count: {}", read_count.get())
+//!         });
+//!
 //!         col!(
 //!             [
 //!                 txt!("Hello, World!", size: 24.0),
-//!                 btn!("Click Me", primary, on_click: || println!("Button clicked!")),
+//!                 // Use Text::computed for derived values
+//!                 Text::computed(count_text).size(18.0),
+//!                 btn!("Increment", primary, on_click: move || {
+//!                     write_count.update(|c| *c += 1);
+//!                 }),
 //!             ],
 //!             gap: 20.0,
 //!             padding: 20.0

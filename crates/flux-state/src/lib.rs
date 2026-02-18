@@ -25,23 +25,28 @@
 //! use flux_state::{Runtime, Signal, Effect, Computed};
 //!
 //! // 1. Create a runtime (shared via Arc)
+//! // Runtime::new() returns an Arc<Runtime>, which is cheap to clone.
 //! let runtime = Runtime::new();
 //!
 //! // 2. Create a signal
+//! // We pass runtime.clone() because Signal takes ownership of an Arc handle.
 //! let count = Signal::new(runtime.clone(), 0);
 //! let (read_count, write_count) = count.split();
 //!
 //! // 3. Create a computed value (derived state)
 //! // Note: Computed values run immediately upon creation to calculate their initial value.
+//! // We clone the read handle for the closure to capture.
 //! let read_count_computed = read_count.clone();
 //! let double_count = Computed::new(runtime.clone(), move || {
 //!     read_count_computed.get() * 2
 //! });
 //!
 //! // 4. Create an effect (side effect)
-//! // Keep the return value to keep the effect alive
+//! // Keep the return value to keep the effect alive!
+//! let read_count_effect = read_count.clone();
+//! let double_count_effect = double_count.clone();
 //! let _effect = Effect::new(runtime.clone(), move || {
-//!     println!("Count: {}, Double: {}", read_count.get(), double_count.get());
+//!     println!("Count: {}, Double: {}", read_count_effect.get(), double_count_effect.get());
 //! });
 //!
 //! // 5. Update state

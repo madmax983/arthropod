@@ -79,8 +79,7 @@ impl Scene {
     /// # Example
     ///
     /// ```
-    /// use render_engine::{Scene, SceneNode, NodeContent, Color};
-    /// use style_engine::VisualStyle;
+    /// use render_engine::{Scene, SceneNode, NodeContent, Color, VisualStyle};
     ///
     /// let mut scene = Scene::new();
     /// let root = scene.root();
@@ -232,8 +231,7 @@ impl Scene {
     /// # Example
     ///
     /// ```
-    /// # use render_engine::{Scene, SceneNode, NodeContent, Color};
-    /// # use style_engine::VisualStyle;
+    /// # use render_engine::{Scene, SceneNode, NodeContent, Color, VisualStyle};
     /// # let mut scene = Scene::new();
     /// # let root = scene.root();
     /// let node = scene.add_node(root, SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) }));
@@ -320,8 +318,7 @@ impl Scene {
     /// # Example
     ///
     /// ```
-    /// use render_engine::{Scene, SceneNode, NodeContent, Color};
-    /// use style_engine::VisualStyle;
+    /// use render_engine::{Scene, SceneNode, NodeContent, Color, VisualStyle};
     /// use plat_core::Rect;
     ///
     /// let mut scene = Scene::new();

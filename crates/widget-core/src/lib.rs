@@ -113,7 +113,9 @@
 //! impl Widget for MyWidget {
 //!     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
 //!         // Create scene node, configure layout, register ECS components
-//!         todo!()
+//!         // For example, create an empty container:
+//!         let node = ctx.create_node(ctx.root(), NodeContent::Empty);
+//!         node
 //!     }
 //! }
 //! ```

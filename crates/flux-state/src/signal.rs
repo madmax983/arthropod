@@ -18,7 +18,10 @@ use std::sync::{Arc, Mutex};
 /// use flux_state::{Runtime, Signal};
 ///
 /// let runtime = Runtime::new();
-/// let count = Signal::new(runtime, 0);
+/// let count = Signal::new(runtime.clone(), 0);
+///
+/// // Typically, you immediately split the signal into read/write handles
+/// let (read, write) = count.split();
 /// ```
 ///
 /// # See Also
@@ -329,12 +332,17 @@ impl<T: 'static + Send> WriteSignal<T> {
     /// # Example
     ///
     /// ```
-    /// # use flux_state::{Runtime, Signal};
+    /// # use flux_state::{Runtime, Signal, Effect};
     /// # let runtime = Runtime::new();
-    /// let count = Signal::new(runtime, 0);
-    /// let (_, write) = count.split();
+    /// let count = Signal::new(runtime.clone(), 0);
+    /// let (read, write) = count.split();
     ///
-    /// write.set(42);
+    /// let read_clone = read.clone();
+    /// let _e = Effect::new(runtime, move || {
+    ///     println!("Value: {}", read_clone.get());
+    /// });
+    ///
+    /// write.set(42); // Trigger effect update
     /// ```
     ///
     /// # Panics
@@ -361,13 +369,18 @@ impl<T: 'static + Send> WriteSignal<T> {
     /// # Example
     ///
     /// ```
-    /// # use flux_state::{Runtime, Signal};
+    /// # use flux_state::{Runtime, Signal, Effect};
     /// # let runtime = Runtime::new();
-    /// let count = Signal::new(runtime, 0);
-    /// let (_, write) = count.split();
+    /// let count = Signal::new(runtime.clone(), 0);
+    /// let (read, write) = count.split();
     ///
-    /// // The closure argument `c` is `&mut i32`
-    /// write.update(|c| *c += 1);
+    /// let read_clone = read.clone();
+    /// let _e = Effect::new(runtime, move || {
+    ///     println!("Value: {}", read_clone.get());
+    /// });
+    ///
+    /// // Increment value in place
+    /// write.update(|c| *c += 1); // Trigger effect update
     /// ```
     ///
     /// # Panics

@@ -19,9 +19,8 @@
 //!
 //! The `Scene` is designed to be used as a Resource in an ECS (Entity Component System) environment.
 //!
-//! ```no_run
-//! use render_engine::{Scene, SceneNode, NodeContent, Color};
-//! use style_engine::VisualStyle;
+//! ```
+//! use render_engine::{Scene, SceneNode, NodeContent, Color, VisualStyle};
 //!
 //! // Create a scene
 //! let mut scene = Scene::new();

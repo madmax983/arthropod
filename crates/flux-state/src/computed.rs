@@ -35,7 +35,7 @@ use std::sync::{Arc, Mutex};
 /// // Create a computed value that doubles the count
 /// // NOTE: This executes immediately to calculate the initial value (2)
 /// let read_count_clone = read_count.clone();
-/// let double_count = Computed::new(runtime, move || {
+/// let double_count = Computed::new(runtime.clone(), move || {
 ///     read_count_clone.get() * 2
 /// });
 ///
@@ -71,7 +71,7 @@ use std::sync::{Arc, Mutex};
 /// //     D
 /// let b_c = b.clone();
 /// let c_c = c.clone();
-/// let d = Computed::new(runtime, move || b_c.get() + c_c.get());
+/// let d = Computed::new(runtime.clone(), move || b_c.get() + c_c.get());
 ///
 /// // Initial: a=1 => b=2, c=2 => d=4
 /// assert_eq!(d.get(), 4);

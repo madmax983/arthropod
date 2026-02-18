@@ -27,8 +27,9 @@ use std::sync::Arc;
 /// let (read, write) = count.split();
 ///
 /// // Create an effect that prints whenever count changes
-/// let _effect = Effect::new(runtime, move || {
-///     println!("Count changed to: {}", read.get());
+/// let read_clone = read.clone();
+/// let _effect = Effect::new(runtime.clone(), move || {
+///     println!("Count changed to: {}", read_clone.get());
 /// });
 ///
 /// write.set(1); // Prints "Count changed to: 1"
@@ -51,7 +52,7 @@ use std::sync::Arc;
 ///     fn drop(&mut self) { println!("Cleaning up!"); }
 /// }
 ///
-/// let _effect = Effect::new(runtime, || {
+/// let _effect = Effect::new(runtime.clone(), || {
 ///     let _res = MyResource;
 ///     // ... do something with resource
 ///     // _res is dropped when the closure ends or before next run
@@ -68,7 +69,7 @@ use std::sync::Arc;
 /// # use flux_state::{Runtime, Effect};
 /// # let runtime = Runtime::new();
 /// // This effect runs once, then is dropped and stopped immediately!
-/// Effect::new(runtime, || println!("I will only run once!"));
+/// Effect::new(runtime.clone(), || println!("I will only run once!"));
 /// ```
 ///
 /// ✅ **Correct:**
@@ -76,7 +77,7 @@ use std::sync::Arc;
 /// # use flux_state::{Runtime, Effect};
 /// # let runtime = Runtime::new();
 /// // Assign to `_variable` (not `_`) to keep it alive
-/// let _keep_alive = Effect::new(runtime, || println!("I will keep running!"));
+/// let _keep_alive = Effect::new(runtime.clone(), || println!("I will keep running!"));
 /// ```
 #[must_use = "Effects are dropped (and stopped) immediately if not stored. Assign to a variable to keep alive."]
 pub struct Effect {
