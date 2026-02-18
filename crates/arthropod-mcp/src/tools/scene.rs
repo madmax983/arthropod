@@ -293,6 +293,8 @@ fn default_max_depth() -> usize {
     10
 }
 
+const MAX_QUERY_DEPTH: usize = 100;
+
 #[derive(Debug, Serialize)]
 struct HierarchyNode {
     id: u64,
@@ -322,6 +324,14 @@ impl Tool for QueryHierarchyTool {
 
     fn execute(&self, params: Value, ctx: &mut McpFrameworkContext) -> Result<Value> {
         let params: QueryHierarchyParams = serde_json::from_value(params)?;
+
+        if params.max_depth > MAX_QUERY_DEPTH {
+            return Err(anyhow!(
+                "Max depth cannot exceed {} (requested: {})",
+                MAX_QUERY_DEPTH,
+                params.max_depth
+            ));
+        }
 
         let scene = ctx.scene();
         let root_id = params.root_id.map(NodeId).unwrap_or_else(|| scene.root());
@@ -807,5 +817,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.get("marked").unwrap().as_u64().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_query_hierarchy_depth_limit() {
+        let mut ctx = McpFrameworkContext::new();
+        let tool = QueryHierarchyTool;
+
+        let result = tool.execute(json!({ "max_depth": 101 }), &mut ctx);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Max depth cannot exceed")
+        );
     }
 }

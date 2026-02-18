@@ -187,6 +187,8 @@ impl Tool for CreateSceneTool {
         // Track which nodes have been created
         let mut created = std::collections::HashSet::new();
 
+        const MAX_RECURSION_DEPTH: usize = 100;
+
         // Helper function to recursively create a node and its dependencies
         fn create_node_recursive(
             spec_name: &str,
@@ -194,7 +196,15 @@ impl Tool for CreateSceneTool {
             scene: &mut Scene,
             name_to_id: &mut HashMap<String, NodeId>,
             created: &mut std::collections::HashSet<String>,
+            depth: usize,
         ) -> Result<NodeId> {
+            if depth > MAX_RECURSION_DEPTH {
+                return Err(anyhow!(
+                    "Recursion limit exceeded ({}). Scene hierarchy is too deep.",
+                    MAX_RECURSION_DEPTH
+                ));
+            }
+
             // If already created, return the existing ID
             if let Some(node_id) = name_to_id.get(spec_name) {
                 return Ok(*node_id);
@@ -214,7 +224,14 @@ impl Tool for CreateSceneTool {
             // Determine the parent ID
             let parent_id = if let Some(parent_name) = &spec.parent {
                 // Recursively create parent first
-                create_node_recursive(parent_name, node_specs, scene, name_to_id, created)?
+                create_node_recursive(
+                    parent_name,
+                    node_specs,
+                    scene,
+                    name_to_id,
+                    created,
+                    depth + 1,
+                )?
             } else {
                 // Use scene root if no parent specified
                 scene.root()
@@ -260,7 +277,7 @@ impl Tool for CreateSceneTool {
         // Create all nodes (dependencies are resolved recursively)
         let node_names: Vec<String> = params.nodes.iter().map(|s| s.name.clone()).collect();
         for name in &node_names {
-            create_node_recursive(name, &node_specs, scene, &mut name_to_id, &mut created)?;
+            create_node_recursive(name, &node_specs, scene, &mut name_to_id, &mut created, 0)?;
         }
 
         // Register all named nodes in context
@@ -401,5 +418,69 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_create_scene_recursion_limit_exceeded() {
+        let mut ctx = McpFrameworkContext::new();
+        let tool = CreateSceneTool;
+
+        // Create a chain of 105 nodes in reverse order to force recursion
+        let mut nodes = Vec::new();
+        for i in 0..105 {
+            let parent = if i == 0 {
+                None
+            } else {
+                Some(format!("node_{}", i - 1))
+            };
+
+            nodes.push(json!({
+                "name": format!("node_{}", i),
+                "content": { "type": "Rect", "color": [0.0, 0.0, 0.0, 1.0] },
+                "bounds": { "x": 0.0, "y": 0.0, "width": 10.0, "height": 10.0 },
+                "parent": parent
+            }));
+        }
+        // Reverse to force resolution of parents recursively
+        nodes.reverse();
+
+        let result = tool.execute(json!({ "nodes": nodes }), &mut ctx);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Recursion limit exceeded")
+        );
+    }
+
+    #[test]
+    fn test_create_scene_recursion_limit_ok() {
+        let mut ctx = McpFrameworkContext::new();
+        let tool = CreateSceneTool;
+
+        // Create a chain of 50 nodes (safe)
+        let mut nodes = Vec::new();
+        for i in 0..50 {
+            let parent = if i == 0 {
+                None
+            } else {
+                Some(format!("node_{}", i - 1))
+            };
+
+            nodes.push(json!({
+                "name": format!("node_{}", i),
+                "content": { "type": "Rect", "color": [0.0, 0.0, 0.0, 1.0] },
+                "bounds": { "x": 0.0, "y": 0.0, "width": 10.0, "height": 10.0 },
+                "parent": parent
+            }));
+        }
+        // Reverse to ensure we are testing the recursion logic
+        nodes.reverse();
+
+        let result = tool.execute(json!({ "nodes": nodes }), &mut ctx);
+
+        assert!(result.is_ok());
     }
 }
