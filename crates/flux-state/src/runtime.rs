@@ -253,6 +253,24 @@ impl Runtime {
         id
     }
 
+    fn run_with_context<R>(&self, id: NodeId, f: impl FnOnce() -> R) -> R {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if let Err(e) = inner.prepare_execution(id) {
+                // Drop lock before panicking to prevent mutex poisoning,
+                // which would cause double-panics during unwinding cleanup.
+                drop(inner);
+                panic!("{}", e);
+            }
+        }
+
+        // SAFETY: The context guard ensures that `pop_context` is called
+        // even if the closure panics.
+        let _guard = ContextGuard { runtime: self, id };
+
+        f()
+    }
+
     /// Track a dependency (called during signal/computed reads).
     pub(crate) fn track(&self, source: NodeId) {
         let mut inner = self.inner.lock().unwrap();
@@ -294,29 +312,19 @@ impl Runtime {
     }
 
     pub(crate) fn run_effect(&self, id: NodeId) {
-        // Clear old dependencies and set tracking context
-        let (effect_fn, error) = {
-            let mut inner = self.inner.lock().unwrap();
-            match inner.prepare_execution(id) {
-                Ok(_) => (inner.effects.get(&id).cloned(), None),
-                Err(e) => (None, Some(e)),
-            }
+        let effect_fn = {
+            let inner = self.inner.lock().unwrap();
+            inner.effects.get(&id).cloned()
         };
 
-        if let Some(e) = error {
-            panic!("{}", e);
-        }
-
-        // SAFETY: The context guard ensures that `pop_context` is called
-        // even if the effect closure panics.
-        let _guard = ContextGuard { runtime: self, id };
-
-        // Run effect (will re-establish dependencies)
-        if let Some(f) = effect_fn {
-            f();
-        }
-
-        // _guard drops here, calling pop_context()
+        // We run in context regardless of whether the effect exists,
+        // because we need to clear dependencies for zombie nodes.
+        // run_with_context handles prepare_execution (and cleaning deps).
+        self.run_with_context(id, || {
+            if let Some(f) = effect_fn {
+                f();
+            }
+        });
     }
 
     /// Get a handle to the signal value (Arc) without holding the runtime lock.
@@ -360,33 +368,18 @@ impl Runtime {
     ///
     /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
-        // Clear old dependencies and set tracking context, then get compute function
-        let (compute_fn, error) = {
-            let mut inner = self.inner.lock().unwrap();
-            match inner.prepare_execution(id) {
-                Ok(_) => {
-                    let computed = inner
-                        .computeds
-                        .get(&id)
-                        .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
-                    (Some(computed.compute.clone()), None)
-                }
-                Err(e) => (None, Some(e)),
-            }
+        let compute_fn = {
+            let inner = self.inner.lock().unwrap();
+            inner
+                .computeds
+                .get(&id)
+                .unwrap_or_else(|| panic!("Computed not found for id {:?}", id))
+                .compute
+                .clone()
         };
 
-        if let Some(e) = error {
-            panic!("{}", e);
-        }
-
-        let compute_fn = compute_fn.unwrap();
-
-        // SAFETY: The context guard ensures that `pop_context` is called
-        // even if the compute closure panics.
-        let _guard = ContextGuard { runtime: self, id };
-
-        // Call without holding borrow
-        let new_value = compute_fn();
+        // Run computation in context
+        let new_value = self.run_with_context(id, || compute_fn());
 
         // Store new value
         {
@@ -395,8 +388,6 @@ impl Runtime {
                 computed.value = Some(new_value);
             }
         }
-
-        // _guard drops here, calling pop_context()
     }
 
     pub(crate) fn dispose_effect(&self, id: NodeId) {
