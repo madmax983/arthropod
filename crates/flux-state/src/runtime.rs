@@ -122,8 +122,12 @@ impl RuntimeInner {
 
         self.stale.insert(id);
 
-        // If it's an effect, schedule it
-        if self.effects.contains_key(&id) && !self.pending_effects.contains(&id) {
+        // If it's an effect, schedule it.
+        // Optimization: We don't need to check `!self.pending_effects.contains(&id)`
+        // because the `stale` check above guarantees we only enter this block once
+        // per update cycle for a given effect. If it was already pending, it would
+        // be in `stale`, and we would have returned early.
+        if self.effects.contains_key(&id) {
             self.pending_effects.push(id);
         }
 
