@@ -29,3 +29,12 @@
 ## 2026-02-07 - Decompose WgpuBackend
 **Tangle:** `crates/render-engine/src/backend/wgpu/mod.rs` was a "Blob" (2700+ lines) mixing backend lifecycle, instance collection, path interning, clipping logic, and multipass effect rendering. This violated Single Responsibility Principle.
 **Blueprint:** Split `mod.rs` into `path_interner.rs`, `clipping.rs`, `instance_collector.rs`, and `multipass_executor.rs`. Introduced `MultipassRenderer` struct to encapsulate multipass state and borrow checker constraints. `WgpuBackend` now acts as a coordinator.
+
+## 2026-05-18 - Decompose Primitive Pipeline
+**Tangle:** `crates/render-engine/src/backend/wgpu/pipelines/primitive_pipeline.rs` was a "Blob" (1762 lines) mixing `PrimitiveInstance` definitions, `GradientAtlas` management, builder logic, and the actual WGPU pipeline implementation.
+**Blueprint:** Split the module into four cohesive files:
+- `primitive_instance.rs`: POD struct and bit-flag helpers.
+- `gradient_atlas.rs`: Gradient resource management and params.
+- `primitive_builder.rs`: Logic to convert `VisualStyle` to instances.
+- `primitive_pipeline.rs`: The rendering pipeline infrastructure.
+This enforces separation of concerns (Data vs Resource vs Logic vs Infrastructure).

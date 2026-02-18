@@ -16,7 +16,7 @@ use crate::backend::wgpu::pipelines::blur_pipeline::{
     BlurDirection, BlurParams, BlurPipeline, select_blur_tier,
 };
 use crate::backend::wgpu::pipelines::path_pipeline::{PathBatch, PathPipeline, TessellationCache};
-use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitiveInstance;
+use crate::backend::wgpu::pipelines::primitive_instance::PrimitiveInstance;
 use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
 use crate::backend::wgpu::pipelines::stencil_pipeline::plan_clip_sequence_for_nested_clips;
 use crate::backend::wgpu::render_target_pool::{

@@ -4,13 +4,15 @@ use crate::backend::wgpu::GRADIENT_ATLAS_SIZE;
 use crate::backend::wgpu::clipping::{clipped_bounds_for_node, rect_path_for_size};
 use crate::backend::wgpu::effects::style_requires_multipass;
 use crate::backend::wgpu::path_interner::PathInterner;
+use crate::backend::wgpu::pipelines::gradient_atlas::GradientParams;
 use crate::backend::wgpu::pipelines::path_pipeline::{
     PathBatch, TessellationCache, tessellate_fill, tessellate_stroke,
 };
-use crate::backend::wgpu::pipelines::primitive_pipeline::{
-    FLAG_FILL_TYPE_MASK, GradientParams, PrimitiveInstance, PrimitivePipeline,
+use crate::backend::wgpu::pipelines::primitive_builder::{
     create_primitive_instances, create_primitive_instances_with_pipeline,
 };
+use crate::backend::wgpu::pipelines::primitive_instance::{FLAG_FILL_TYPE_MASK, PrimitiveInstance};
+use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
 use crate::{NodeContent, Scene, SceneNode};
 use std::sync::Arc;
 

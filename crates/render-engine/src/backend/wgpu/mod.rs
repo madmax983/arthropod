@@ -23,7 +23,7 @@ use pipelines::blend_pipeline::BlendPipeline;
 use pipelines::blur_pipeline::BlurPipeline;
 pub use pipelines::path_pipeline::TessellationCacheStats;
 use pipelines::path_pipeline::{PathPipeline, TessellationCache};
-pub use pipelines::primitive_pipeline::PrimitiveInstance;
+pub use pipelines::primitive_instance::PrimitiveInstance;
 use pipelines::primitive_pipeline::PrimitivePipeline;
 use pipelines::stencil_pipeline::ClipStack;
 
@@ -577,7 +577,7 @@ mod tests {
     use crate::backend::wgpu::instance_collector;
     use crate::backend::wgpu::instance_collector::{TextFill, apply_text_fill_to_glyph};
     use crate::backend::wgpu::multipass_executor;
-    use crate::backend::wgpu::pipelines::primitive_pipeline::FLAG_FILL_TYPE_MASK;
+    use crate::backend::wgpu::pipelines::primitive_instance::FLAG_FILL_TYPE_MASK;
     use crate::{NodeContent, SceneNode, Transform2D};
 
     #[test]
@@ -996,7 +996,7 @@ mod tests {
         assert!(
             instances
                 .iter()
-                .any(|i| (i.flags & pipelines::primitive_pipeline::FLAG_IS_SHADOW) != 0),
+                .any(|i| (i.flags & pipelines::primitive_instance::FLAG_IS_SHADOW) != 0),
             "expected one shadow instance"
         );
         assert!(
