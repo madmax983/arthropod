@@ -71,6 +71,11 @@ impl Scene {
     ///
     /// Sets the node's parent field automatically for O(1) parent lookup.
     ///
+    /// # Panics
+    ///
+    /// Panics if the `parent` node does not exist in the scene. This prevents creating
+    /// "orphan" or "zombie" nodes that are stored but unreachable.
+    ///
     /// # Example
     ///
     /// ```
@@ -86,6 +91,10 @@ impl Scene {
     /// );
     /// ```
     pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
+        if !self.nodes.contains_key(&parent) {
+            panic!("Parent node {:?} does not exist. Cannot add child.", parent);
+        }
+
         let id = NodeId(self.next_id);
         self.next_id += 1;
 
