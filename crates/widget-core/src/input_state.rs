@@ -122,18 +122,19 @@ pub struct ReactiveColorState {
 
 /// Convert a character index to a byte index in a string.
 fn char_idx_to_byte_idx(s: &str, char_idx: usize) -> Option<usize> {
-    s.char_indices()
-        .nth(char_idx)
-        .map(|(byte_idx, _)| byte_idx)
-        .or_else(|| {
-            // If char_idx equals char count, return the string length
-            // (valid insertion point at the end)
-            if char_idx == s.chars().count() {
-                Some(s.len())
-            } else {
-                None
-            }
-        })
+    let mut count = 0;
+    for (idx, _) in s.char_indices() {
+        if count == char_idx {
+            return Some(idx);
+        }
+        count += 1;
+    }
+    // If we reached here, char_idx >= count
+    if count == char_idx {
+        Some(s.len())
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
