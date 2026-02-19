@@ -7,7 +7,7 @@ use crossterm::{
 use flux_state::{GraphSnapshot, NodeInfo, NodeType, Runtime};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Cell, List, ListItem, ListState, Paragraph, Row, Table},
 };
 use std::{
     io::{self, Stdout},
@@ -135,7 +135,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
         // Refresh data
         app.update_snapshot();
 
-        terminal.draw(|f| ui(f, app))?;
+        terminal.draw(|f| ui(f, &app.snapshot, &mut app.list_state))?;
 
         // Handle events
         if event::poll(Duration::from_millis(100))? {
@@ -150,7 +150,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
     Ok(())
 }
 
-fn ui(f: &mut Frame, app: &mut App) {
+fn ui(f: &mut Frame, snapshot: &GraphSnapshot, list_state: &mut ListState) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -181,31 +181,51 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
-    // --- Left: Node List ---
-    let items: Vec<ListItem> = app
-        .snapshot
+    render_node_list(f, main_chunks[0], snapshot, list_state);
+
+    // --- Right: Details Panel ---
+    if let Some(selected_idx) = list_state.selected() {
+        if let Some(selected_node) = snapshot.nodes.get(selected_idx) {
+            render_details_panel(f, main_chunks[1], selected_node, snapshot);
+        }
+    } else {
+        let placeholder = Paragraph::new("Select a node to view details").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded),
+        );
+        f.render_widget(placeholder, main_chunks[1]);
+    }
+
+    render_status_bar(f, chunks[2], snapshot);
+}
+
+fn render_node_list(
+    f: &mut Frame,
+    area: Rect,
+    snapshot: &GraphSnapshot,
+    list_state: &mut ListState,
+) {
+    let items: Vec<ListItem> = snapshot
         .nodes
         .iter()
         .map(|node| {
-            let mut style = Style::default();
+            let (icon, style) = match node.node_type {
+                NodeType::Signal => ("⚡", Style::default().fg(Color::Green)),
+                NodeType::Computed => ("🧮", Style::default().fg(Color::Cyan)),
+                NodeType::Effect => ("🔥", Style::default().fg(Color::Yellow)),
+            };
 
-            // Color coding by type
-            match node.node_type {
-                NodeType::Signal => style = style.fg(Color::Green),
-                NodeType::Computed => style = style.fg(Color::Blue),
-                NodeType::Effect => style = style.fg(Color::Yellow),
-            }
-
-            // Stale marker
-            let stale_marker = if app.snapshot.stale_nodes.contains(&node.id) {
+            let stale_marker = if snapshot.stale_nodes.contains(&node.id) {
                 "⚠️ "
             } else {
                 "  "
             };
 
-            // Formatting: "  Signal(1) Label"
-            let label = format!("{}{:?} {:?}", stale_marker, node.node_type, node.id.0);
-
+            let label = format!(
+                "{}{} {:?} {:?}",
+                stale_marker, icon, node.node_type, node.id.0
+            );
             ListItem::new(label).style(style)
         })
         .collect();
@@ -224,49 +244,23 @@ fn ui(f: &mut Frame, app: &mut App) {
         )
         .highlight_symbol(">> ");
 
-    f.render_stateful_widget(list, main_chunks[0], &mut app.list_state);
-
-    // --- Right: Details Panel ---
-    // Render details for the selected node
-    if let Some(selected_idx) = app.list_state.selected() {
-        if let Some(selected_node) = app.snapshot.nodes.get(selected_idx) {
-            render_details(f, main_chunks[1], selected_node, &app.snapshot);
-        }
-    } else {
-        let placeholder = Paragraph::new("Select a node to view details").block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
-        );
-        f.render_widget(placeholder, main_chunks[1]);
-    }
-
-    // --- Status Bar ---
-    let status_text = format!(
-        " Total Nodes: {} | Stale: {} ",
-        app.snapshot.nodes.len(),
-        app.snapshot.stale_nodes.len()
-    );
-    let status = Paragraph::new(status_text)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
-        .block(Block::default().borders(Borders::NONE)); // Flat look
-    f.render_widget(status, chunks[2]);
+    f.render_stateful_widget(list, area, list_state);
 }
 
-fn render_details(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &GraphSnapshot) {
+fn render_details_panel(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &GraphSnapshot) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(6),      // Metadata
-            Constraint::Percentage(50), // Dependencies (Upstream)
-            Constraint::Percentage(50), // Subscribers (Downstream)
+            Constraint::Length(8),      // Metadata (Table needs space)
+            Constraint::Percentage(50), // Dependencies
+            Constraint::Percentage(50), // Subscribers
         ])
         .split(area);
 
-    // 1. Metadata
+    // 1. Metadata Table
     let type_color = match node.node_type {
         NodeType::Signal => Color::Green,
-        NodeType::Computed => Color::Blue,
+        NodeType::Computed => Color::Cyan,
         NodeType::Effect => Color::Yellow,
     };
 
@@ -278,41 +272,37 @@ fn render_details(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &GraphSn
     };
     let status_color = if is_stale { Color::Red } else { Color::Green };
 
-    let meta_text = vec![
-        Line::from(vec![
-            Span::raw("ID: "),
-            Span::styled(
-                format!("{:?}", node.id.0),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
+    let rows = vec![
+        Row::new(vec![
+            Cell::from("ID"),
+            Cell::from(format!("{:?}", node.id.0)),
         ]),
-        Line::from(vec![
-            Span::raw("Type: "),
-            Span::styled(
-                format!("{:?}", node.node_type),
-                Style::default().fg(type_color),
-            ),
+        Row::new(vec![
+            Cell::from("Type"),
+            Cell::from(format!("{:?}", node.node_type)).style(Style::default().fg(type_color)),
         ]),
-        Line::from(vec![Span::raw("Label: "), Span::raw(&node.label)]),
-        Line::from(vec![
-            Span::raw("Status: "),
-            Span::styled(status_str, Style::default().fg(status_color)),
+        Row::new(vec![Cell::from("Label"), Cell::from(node.label.clone())]),
+        Row::new(vec![
+            Cell::from("Status"),
+            Cell::from(status_str).style(Style::default().fg(status_color)),
         ]),
     ];
 
-    let meta_p = Paragraph::new(meta_text)
-        .block(Block::default().title(" Metadata ").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    f.render_widget(meta_p, chunks[0]);
+    let table = Table::new(rows, [Constraint::Length(10), Constraint::Min(10)]).block(
+        Block::default()
+            .title(" Metadata ")
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
+    );
 
-    // 2. Dependencies (Incoming: Source -> This Node)
-    // Find edges where target == node.id
+    f.render_widget(table, chunks[0]);
+
+    // 2. Dependencies
     let incoming: Vec<ListItem> = snapshot
         .dependencies
         .iter()
         .filter(|(_, target)| *target == node.id)
         .map(|(source, _)| {
-            // Find source node info for better display
             let src_node = snapshot.nodes.iter().find(|n| n.id == *source);
             let label = if let Some(n) = src_node {
                 format!("{:?} ({:?})", n.node_type, n.id.0)
@@ -326,12 +316,12 @@ fn render_details(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &GraphSn
     let incoming_list = List::new(incoming).block(
         Block::default()
             .title(" Dependencies (Upstream) ")
-            .borders(Borders::ALL),
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
     );
     f.render_widget(incoming_list, chunks[1]);
 
-    // 3. Subscribers (Outgoing: This Node -> Target)
-    // Find edges where source == node.id
+    // 3. Subscribers
     let outgoing: Vec<ListItem> = snapshot
         .dependencies
         .iter()
@@ -350,7 +340,57 @@ fn render_details(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &GraphSn
     let outgoing_list = List::new(outgoing).block(
         Block::default()
             .title(" Subscribers (Downstream) ")
-            .borders(Borders::ALL),
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded),
     );
     f.render_widget(outgoing_list, chunks[2]);
+}
+
+fn render_status_bar(f: &mut Frame, area: Rect, snapshot: &GraphSnapshot) {
+    let total = snapshot.nodes.len();
+    let stale = snapshot.stale_nodes.len();
+    let signals = snapshot
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.node_type, NodeType::Signal))
+        .count();
+    let computeds = snapshot
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.node_type, NodeType::Computed))
+        .count();
+    let effects = snapshot
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.node_type, NodeType::Effect))
+        .count();
+
+    let text = Line::from(vec![
+        Span::raw(format!(" Total: {} | ", total)),
+        Span::styled(
+            format!("Stale: {} | ", stale),
+            if stale > 0 {
+                Style::default().fg(Color::Red)
+            } else {
+                Style::default()
+            },
+        ),
+        Span::styled(
+            format!("⚡ Signals: {} | ", signals),
+            Style::default().fg(Color::Green),
+        ),
+        Span::styled(
+            format!("🧮 Computeds: {} | ", computeds),
+            Style::default().fg(Color::Cyan),
+        ),
+        Span::styled(
+            format!("🔥 Effects: {} ", effects),
+            Style::default().fg(Color::Yellow),
+        ),
+    ]);
+
+    let paragraph = Paragraph::new(text)
+        .style(Style::default().bg(Color::DarkGray).fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, area);
 }
