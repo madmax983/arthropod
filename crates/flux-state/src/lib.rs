@@ -29,7 +29,8 @@
 //! let runtime = Runtime::new();
 //!
 //! // 2. Create a signal
-//! // We pass runtime.clone() because Signal takes ownership of an Arc handle.
+//! // The Runtime is an Arc<Mutex<...>>, so cloning it is cheap and just increments a ref count.
+//! // We pass runtime.clone() because Signal takes ownership of its handle to the runtime.
 //! let count = Signal::new(runtime.clone(), 0);
 //! let (read_count, write_count) = count.split();
 //!

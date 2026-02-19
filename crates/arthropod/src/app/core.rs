@@ -90,6 +90,9 @@ impl App {
     /// Create a new headless App (no window, no GPU).
     ///
     /// Use this for testing, benchmarking, or server-side rendering.
+    ///
+    /// Returns `Ok(App)` on success. Since headless mode doesn't create a window or GPU context,
+    /// it rarely fails, but is fallible to maintain API consistency.
     pub fn new_headless() -> Result<Self, AppError> {
         Ok(Self::new_with_backend(None, None))
     }
@@ -119,7 +122,7 @@ impl App {
 
     /// Access the ECS World (immutable)
     ///
-    /// Use this to read resources like [`Scene`] or [`Runtime`].
+    /// Use this to read resources like [`render_engine::Scene`] or [`Runtime`].
     ///
     /// # Example
     ///

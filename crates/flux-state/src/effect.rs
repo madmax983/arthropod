@@ -89,6 +89,12 @@ impl Effect {
     /// Create a new effect.
     ///
     /// The `effect_fn` will run immediately to establish initial dependencies.
+    ///
+    /// # Warning
+    ///
+    /// The returned `Effect` handle **must be kept alive** (e.g., assigned to a variable).
+    /// If the `Effect` struct is dropped, the effect is immediately stopped and unsubscribed
+    /// from all dependencies.
     pub fn new<F>(runtime: Arc<Runtime>, effect_fn: F) -> Self
     where
         F: Fn() + 'static + Send + Sync,

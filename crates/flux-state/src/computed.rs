@@ -131,7 +131,7 @@ impl<T: 'static + Send> Computed<T> {
     /// # let runtime = Runtime::new();
     /// # let count = Signal::new(runtime.clone(), vec![1, 2, 3]);
     /// # let (read, _) = count.split();
-    /// let computed = Computed::new(runtime, move || read.get());
+    /// let computed = Computed::new(runtime.clone(), move || read.get());
     ///
     /// // Access the internal Vec without cloning it
     /// let len = computed.with(|v| v.len());
@@ -172,7 +172,7 @@ impl<T: 'static + Send> Computed<T> {
     /// # let runtime = Runtime::new();
     /// # let count = Signal::new(runtime.clone(), 10);
     /// # let (read, _) = count.split();
-    /// let computed = Computed::new(runtime, move || read.get() * 2);
+    /// let computed = Computed::new(runtime.clone(), move || read.get() * 2);
     ///
     /// // Read value without subscribing the current effect/computed to updates
     /// let val = computed.with_untracked(|v| *v);
@@ -214,7 +214,7 @@ impl<T: Clone + 'static + Send> Computed<T> {
     /// # let runtime = Runtime::new();
     /// # let count = Signal::new(runtime.clone(), 5);
     /// # let (read, _) = count.split();
-    /// let computed = Computed::new(runtime, move || read.get() + 1);
+    /// let computed = Computed::new(runtime.clone(), move || read.get() + 1);
     ///
     /// assert_eq!(computed.get(), 6);
     /// ```

@@ -243,7 +243,7 @@ impl<T: Clone + 'static + Send> ReadSignal<T> {
     /// let count = Signal::new(runtime.clone(), 0);
     /// let (read, _) = count.split();
     ///
-    /// Effect::new(runtime, move || {
+    /// let _effect = Effect::new(runtime, move || {
     ///     // This effect will NOT re-run when count changes
     ///     println!("Count is: {}", read.get_untracked());
     /// });

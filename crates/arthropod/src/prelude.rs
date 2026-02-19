@@ -25,9 +25,11 @@
 //!         format!("Count: {}", read.get())
 //!     });
 //!
+//!     // Build the UI
 //!     Column::new((
 //!         Text::computed(text),
-//!         Button::new("Click").on_click(move || { write.update(|n| *n += 1); }),
+//!         Button::new("Increment")
+//!             .on_click(move || { write.update(|n| *n += 1); }),
 //!     ))
 //! }).expect("Failed to run app");
 //! ```
