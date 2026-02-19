@@ -5066,7 +5066,6 @@ dependencies = [
 name = "widget-core"
 version = "0.1.0"
 dependencies = [
- "bevy_ecs",
  "criterion",
  "flux-state",
  "glam",
