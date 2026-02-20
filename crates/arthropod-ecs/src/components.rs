@@ -1,9 +1,8 @@
 use bevy_ecs::prelude::*;
-use flux_state::{Computed, ReadSignal, WriteSignal};
+use flux_state::{Computed, ReadSignal};
 use glam::Vec4;
 use layout_engine::{FlexStyle, LayoutConstraints};
 use render_engine::{Color, NodeId, Transform2D};
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 /// Reference to a node in the Scene tree
@@ -171,77 +170,6 @@ pub struct Clickable {
 /// rebuilding the entire node content.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct BackgroundColor(pub Vec4);
-
-/// Text input state component
-///
-/// Stores the reactive signals and cursor state for text input widgets.
-#[derive(Component, Clone)]
-pub struct TextInputState {
-    pub read_signal: MainThreadSignal<String>,
-    pub write_signal_inner: WriteSignal<String>, // WriteSignal is already Send+Sync
-    pub cursor_position: usize,
-    pub readonly: bool,
-    pub max_length: Option<usize>,
-}
-
-impl TextInputState {
-    pub fn new(
-        read_signal: ReadSignal<String>,
-        write_signal: WriteSignal<String>,
-        cursor_position: usize,
-        readonly: bool,
-        max_length: Option<usize>,
-    ) -> Self {
-        Self {
-            read_signal: MainThreadSignal::new(read_signal),
-            write_signal_inner: write_signal,
-            cursor_position,
-            readonly,
-            max_length,
-        }
-    }
-}
-
-/// Validator component - validates node content
-///
-/// Stores validation logic and current error state.
-#[derive(Component, Clone)]
-pub struct Validator(pub widget_core::validation_state::ValidationState);
-
-impl Deref for Validator {
-    type Target = widget_core::validation_state::ValidationState;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Validator {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-/// Form state component - tracks form fields and submission
-///
-/// Stores the mapping of field names to node IDs, validation state,
-/// and submission callback.
-#[derive(Component, Clone)]
-pub struct FormState(pub widget_core::form_state::FormState);
-
-impl Deref for FormState {
-    type Target = widget_core::form_state::FormState;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for FormState {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 /// Accessibility node component
 ///

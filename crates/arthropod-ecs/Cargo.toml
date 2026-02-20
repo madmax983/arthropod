@@ -18,7 +18,6 @@ render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
 layout-engine = { path = "../layout-engine" }
-widget-core = { path = "../widget-core" }
 plat-core = { path = "../plat-core" }
 glam = "0.29"
 rayon = "1.11"

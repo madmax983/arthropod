@@ -255,7 +255,6 @@ dependencies = [
  "plat-core",
  "rayon",
  "render-engine",
- "widget-core",
 ]
 
 [[package]]
