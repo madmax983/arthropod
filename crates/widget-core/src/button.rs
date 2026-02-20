@@ -154,8 +154,7 @@ impl Button {
 
 impl Widget for Button {
     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
-        // Get colors from design tokens (must be done before mutable ctx operations)
-        // We extract colors first to avoid holding a reference across mutable borrows
+        // Extract colors first to avoid holding a reference across mutable borrows
         let (bg_color, text_color) = {
             let tokens = ctx.design_tokens();
             (

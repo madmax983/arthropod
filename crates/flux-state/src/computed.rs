@@ -48,6 +48,20 @@ use std::sync::{Arc, Mutex};
 /// that the computed value updates only once even if multiple paths lead back to the
 /// same source signal.
 ///
+/// ```text
+///      A
+///     / \
+///    B   C
+///     \ /
+///      D
+/// ```
+///
+/// In this graph:
+/// 1. `A` updates.
+/// 2. `B` and `C` are marked stale.
+/// 3. `D` is marked stale.
+/// 4. When `D` is read, it re-evaluates `B` and `C` (if needed), ensuring consistency without glitching.
+///
 /// ```
 /// use flux_state::{Runtime, Signal, Computed};
 ///
@@ -64,11 +78,6 @@ use std::sync::{Arc, Mutex};
 /// let c = Computed::new(runtime.clone(), move || r_a_2.get() + 1);
 ///
 /// // D depends on B and C
-/// //     A
-/// //    / \
-/// //   B   C
-/// //    \ /
-/// //     D
 /// let b_c = b.clone();
 /// let c_c = c.clone();
 /// let d = Computed::new(runtime.clone(), move || b_c.get() + c_c.get());

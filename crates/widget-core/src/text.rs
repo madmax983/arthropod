@@ -63,32 +63,10 @@ impl Text {
         }
     }
 
-    /// Create a text widget with computed content
+    /// Create a text widget with computed content.
     ///
     /// Computed values automatically update when their dependencies change.
     /// Use this when deriving text from other signals.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// # use arthropod::prelude::*;
-    /// # use flux_state::Computed;
-    /// # use widget_core::Text;
-    /// # App::run("Test", 400, 300, |ctx| {
-    /// let counter = ctx.signal(0);
-    /// let (read, _write) = counter.split();
-    ///
-    /// // Text automatically updates when counter changes
-    /// let text = Text::computed(Computed::new(ctx.runtime().clone(), move || {
-    ///     format!("Count: {}", read.get())
-    /// }));
-    /// # text
-    /// # });
-    /// ```
-    /// Create a text widget with computed reactive content
-    ///
-    /// Use this for derived text that automatically updates when dependencies change.
-    /// Computed values are lazy (only recompute when read) and memoized (cache results).
     ///
     /// # Example
     ///

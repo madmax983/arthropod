@@ -26,7 +26,8 @@
 //!         col!(
 //!             [
 //!                 txt!("Hello, World!", size: 24.0),
-//!                 // Use Text::computed for derived values
+//!                 // Note: txt! macro currently supports static strings and signals.
+//!                 // For computed values, use the builder pattern:
 //!                 Text::computed(count_text).size(18.0),
 //!                 btn!("Increment", primary, on_click: move || {
 //!                     write_count.update(|c| *c += 1);
@@ -64,9 +65,9 @@
 //!
 //! ## The Integration Loop
 //!
-//! 1. **Build Phase**: Widgets build a temporary scene graph in a [`widget_core::WidgetContext`].
-//! 2. **Integration**: [`App::integrate_widgets`] bridges this state into the ECS, creating entities with components like [`arthropod_ecs::components::Clickable`] or [`arthropod_ecs::components::ReactiveColor`].
-//! 3. **Update Loop**: The application loop (e.g., [`run_widget_app`](app::widget::run_widget_app)) processes events, updates signals via `flux-state`, and triggers re-renders.
+//! 1. **Build Phase**: Widgets build a temporary scene graph in a [`WidgetContext`] (re-exported in prelude).
+//! 2. **Integration**: [`App::integrate_widgets`] bridges this state into the ECS, creating entities with components like `Clickable` or `ReactiveColor`.
+//! 3. **Update Loop**: The application loop processes events, updates signals via `flux-state`, and triggers re-renders.
 //!
 //! All resources are managed automatically by the [`App`] struct.
 
