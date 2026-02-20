@@ -13,26 +13,15 @@ pub fn revalidate_form(
     validators: &mut HashMap<NodeId, ValidationState>,
 ) {
     // Re-run validators on all fields with current values
-    let field_node_ids: Vec<NodeId> = if let Some(form_state) = form_states.get(&node_id) {
-        form_state.field_mapping.values().copied().collect()
-    } else {
-        return;
-    };
-
-    // Collect current values first to avoid borrowing issues
-    let mut field_values = HashMap::new();
-    for field_node_id in &field_node_ids {
-        if let Some(state) = text_input_states.get(field_node_id) {
-            field_values.insert(*field_node_id, state.read_signal.get_untracked());
-        }
-    }
-
-    // Re-run validation for each field
-    for (field_node_id, current_value) in field_values {
-        if let Some(validator_state) = validators.get_mut(&field_node_id) {
-            // Run validator on current value
-            let result = (validator_state.validator)(&current_value);
-            validator_state.error = result.err();
+    if let Some(form_state) = form_states.get(&node_id) {
+        for field_node_id in form_state.field_mapping.values() {
+            if let Some(state) = text_input_states.get(field_node_id) {
+                let value = state.read_signal.get_untracked();
+                if let Some(validator_state) = validators.get_mut(field_node_id) {
+                    let result = (validator_state.validator)(&value);
+                    validator_state.error = result.err();
+                }
+            }
         }
     }
 
@@ -51,22 +40,21 @@ pub fn get_form_field_errors(
     form_states: &HashMap<NodeId, FormState>,
     validators: &HashMap<NodeId, ValidationState>,
 ) -> HashMap<String, String> {
-    let mut errors = HashMap::new();
-
-    if let Some(form_state) = form_states.get(&node_id) {
-        for (field_name, field_node_id) in &form_state.field_mapping {
-            // Check if node has validation error
-            let error = validators
-                .get(field_node_id)
-                .and_then(|state| state.error.clone());
-
-            if let Some(error) = error {
-                errors.insert(field_name.clone(), error);
-            }
-        }
-    }
-
-    errors
+    form_states
+        .get(&node_id)
+        .map(|form_state| {
+            form_state
+                .field_mapping
+                .iter()
+                .filter_map(|(name, id)| {
+                    validators
+                        .get(id)
+                        .and_then(|v| v.error.clone())
+                        .map(|err| (name.clone(), err))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Trigger form submission
@@ -79,37 +67,34 @@ pub fn trigger_submit(
     // Revalidate first
     revalidate_form(node_id, form_states, text_input_states, validators);
 
-    // Only submit if valid
-    let is_valid = form_states
-        .get(&node_id)
-        .map(|state| state.is_valid)
-        .unwrap_or(true);
+    let Some(form_state) = form_states.get(&node_id) else {
+        return;
+    };
 
-    if !is_valid {
+    if !form_state.is_valid {
         return;
     }
 
-    // Collect form data and callback
-    let mut form_data = FormData::new();
-    let mut callback_opt = None;
+    let Some(callback) = form_state.on_submit.clone() else {
+        return;
+    };
 
-    if let Some(form_state) = form_states.get(&node_id) {
-        callback_opt = form_state.on_submit.clone();
-
-        for (field_name, field_node_id) in &form_state.field_mapping {
-            if let Some(state) = text_input_states.get(field_node_id) {
-                form_data.insert(field_name.clone(), state.read_signal.get_untracked());
-            }
-        }
-    }
+    // Collect form data
+    let form_data: FormData = form_state
+        .field_mapping
+        .iter()
+        .filter_map(|(name, id)| {
+            text_input_states
+                .get(id)
+                .map(|state| (name.clone(), state.read_signal.get_untracked()))
+        })
+        .collect();
 
     // Call submit callback
-    if let Some(callback) = callback_opt {
-        let result = callback(form_data);
+    let result = callback(form_data);
 
-        // Store submit error if any
-        if let Some(form_state_mut) = form_states.get_mut(&node_id) {
-            form_state_mut.submit_error = result.err();
-        }
+    // Store submit error if any
+    if let Some(form_state_mut) = form_states.get_mut(&node_id) {
+        form_state_mut.submit_error = result.err();
     }
 }
