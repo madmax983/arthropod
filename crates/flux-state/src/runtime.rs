@@ -73,6 +73,9 @@ struct RuntimeInner {
 
     // Reusable buffer for graph traversal to avoid allocations
     traversal_buffer: Vec<NodeId>,
+
+    #[cfg(feature = "nova")]
+    labels: HashMap<NodeId, String>,
 }
 
 struct ComputedNode {
@@ -219,6 +222,8 @@ impl Runtime {
                 stale: HashSet::new(),
                 pending_effects: Vec::new(),
                 traversal_buffer: Vec::new(),
+                #[cfg(feature = "nova")]
+                labels: HashMap::new(),
             }),
         })
     }
@@ -449,6 +454,11 @@ pub enum NodeType {
 
 #[cfg(feature = "nova")]
 impl Runtime {
+    pub(crate) fn set_label(&self, id: NodeId, label: String) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.labels.insert(id, label);
+    }
+
     /// Snapshots the current dependency graph for debugging/devtools.
     pub fn inspect_graph(&self) -> GraphSnapshot {
         let inner = self.inner.lock().unwrap();
@@ -458,28 +468,43 @@ impl Runtime {
 
         // Collect Signals
         for id in inner.signals.keys() {
+            let label = inner
+                .labels
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("Signal({:?})", id));
             nodes.push(NodeInfo {
                 id: *id,
                 node_type: NodeType::Signal,
-                label: format!("Signal({:?})", id),
+                label,
             });
         }
 
         // Collect Computeds
         for id in inner.computeds.keys() {
+            let label = inner
+                .labels
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("Computed({:?})", id));
             nodes.push(NodeInfo {
                 id: *id,
                 node_type: NodeType::Computed,
-                label: format!("Computed({:?})", id),
+                label,
             });
         }
 
         // Collect Effects
         for id in inner.effects.keys() {
+            let label = inner
+                .labels
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| format!("Effect({:?})", id));
             nodes.push(NodeInfo {
                 id: *id,
                 node_type: NodeType::Effect,
-                label: format!("Effect({:?})", id),
+                label,
             });
         }
 

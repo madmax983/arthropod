@@ -132,6 +132,13 @@ impl Effect {
 
         Self { id, runtime }
     }
+
+    /// Set a debug label for this effect (only available with "nova" feature).
+    #[cfg(feature = "nova")]
+    pub fn with_label(self, label: impl Into<String>) -> Self {
+        self.runtime.set_label(self.id, label.into());
+        self
+    }
 }
 
 impl Drop for Effect {

@@ -222,10 +222,7 @@ fn render_node_list(
                 "  "
             };
 
-            let label = format!(
-                "{}{} {:?} {:?}",
-                stale_marker, icon, node.node_type, node.id.0
-            );
+            let label = format!("{}{} {}", stale_marker, icon, node.label);
             ListItem::new(label).style(style)
         })
         .collect();
@@ -305,7 +302,7 @@ fn render_details_panel(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &G
         .map(|(source, _)| {
             let src_node = snapshot.nodes.iter().find(|n| n.id == *source);
             let label = if let Some(n) = src_node {
-                format!("{:?} ({:?})", n.node_type, n.id.0)
+                n.label.clone()
             } else {
                 format!("Unknown({:?})", source.0)
             };
@@ -329,7 +326,7 @@ fn render_details_panel(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &G
         .map(|(_, target)| {
             let target_node = snapshot.nodes.iter().find(|n| n.id == *target);
             let label = if let Some(n) = target_node {
-                format!("{:?} ({:?})", n.node_type, n.id.0)
+                n.label.clone()
             } else {
                 format!("Unknown({:?})", target.0)
             };

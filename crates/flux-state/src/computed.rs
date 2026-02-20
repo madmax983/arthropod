@@ -197,6 +197,13 @@ impl<T: 'static + Send> Computed<T> {
             .unwrap();
         f(&*guard)
     }
+
+    /// Set a debug label for this computed value (only available with "nova" feature).
+    #[cfg(feature = "nova")]
+    pub fn with_label(self, label: impl Into<String>) -> Self {
+        self.runtime.set_label(self.id, label.into());
+        self
+    }
 }
 
 impl<T: Clone + 'static + Send> Computed<T> {

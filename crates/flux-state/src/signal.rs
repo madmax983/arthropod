@@ -192,6 +192,13 @@ impl<T: 'static + Send> Signal<T> {
     pub fn runtime(&self) -> &Arc<Runtime> {
         &self.runtime
     }
+
+    /// Set a debug label for this signal (only available with "nova" feature).
+    #[cfg(feature = "nova")]
+    pub fn with_label(self, label: impl Into<String>) -> Self {
+        self.runtime.set_label(self.id, label.into());
+        self
+    }
 }
 
 impl<T: Clone + 'static + Send> ReadSignal<T> {
