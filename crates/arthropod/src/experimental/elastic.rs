@@ -1,29 +1,21 @@
-#[cfg(feature = "nova")]
 use anim_graph::{Animatable, Animation};
-#[cfg(feature = "nova")]
 use bevy_ecs::prelude::*;
-#[cfg(feature = "nova")]
 use flux_state::{ReadSignal, Runtime, Signal, WriteSignal};
-#[cfg(feature = "nova")]
 use std::sync::{Arc, Mutex, Weak};
-#[cfg(feature = "nova")]
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "nova")]
 /// Internal state for an elastic signal.
 struct ElasticState<T: Animatable> {
     animation: Animation<T>,
     target_signal: WriteSignal<T>,
 }
 
-#[cfg(feature = "nova")]
 /// A handle to an elastic signal that can be ticked.
 trait Tickable: Send + Sync {
     /// Update the animation state by dt. Returns true if active, false if can be dropped.
     fn tick(&self, dt: Duration) -> bool;
 }
 
-#[cfg(feature = "nova")]
 impl<T: Animatable + Send + Sync + 'static> Tickable for Mutex<ElasticState<T>> {
     fn tick(&self, dt: Duration) -> bool {
         let (new_value, target_signal) = {
@@ -46,7 +38,6 @@ impl<T: Animatable + Send + Sync + 'static> Tickable for Mutex<ElasticState<T>> 
     }
 }
 
-#[cfg(feature = "nova")]
 /// A reactive signal that animates towards its target value using spring physics.
 ///
 /// Wraps a `flux_state::Signal` and an `anim_graph::Animation`.
@@ -58,7 +49,6 @@ pub struct ElasticSignal<T: Animatable + Send + Sync + 'static> {
     state: Arc<Mutex<ElasticState<T>>>,
 }
 
-#[cfg(feature = "nova")]
 impl<T: Animatable + Send + Sync + 'static> ElasticSignal<T> {
     /// Create a new elastic signal with an initial value.
     ///
@@ -126,14 +116,12 @@ impl<T: Animatable + Send + Sync + 'static> ElasticSignal<T> {
     }
 }
 
-#[cfg(feature = "nova")]
 /// Resource to manage active elastic signals.
 #[derive(Resource, Default, Clone)]
 pub struct ElasticRegistry {
     signals: Arc<Mutex<Vec<Weak<dyn Tickable>>>>,
 }
 
-#[cfg(feature = "nova")]
 impl ElasticRegistry {
     pub fn register<T: Animatable + Send + Sync + 'static>(&self, signal: &ElasticSignal<T>) {
         if let Ok(mut signals) = self.signals.lock() {
@@ -145,7 +133,6 @@ impl ElasticRegistry {
     }
 }
 
-#[cfg(feature = "nova")]
 /// Resource to track time for elastic animations.
 #[derive(Resource)]
 pub struct ElasticTime {
@@ -153,7 +140,6 @@ pub struct ElasticTime {
     pub delta: Duration,
 }
 
-#[cfg(feature = "nova")]
 impl Default for ElasticTime {
     fn default() -> Self {
         Self {
@@ -163,7 +149,6 @@ impl Default for ElasticTime {
     }
 }
 
-#[cfg(feature = "nova")]
 /// System to update the ElasticTime resource.
 pub fn update_elastic_time_system(mut time: ResMut<ElasticTime>) {
     let now = Instant::now();
@@ -173,7 +158,6 @@ pub fn update_elastic_time_system(mut time: ResMut<ElasticTime>) {
     time.last_update = now;
 }
 
-#[cfg(feature = "nova")]
 /// System to tick all registered elastic signals.
 pub fn elastic_tick_system(registry: Res<ElasticRegistry>, time: Res<ElasticTime>) {
     if let Ok(mut signals) = registry.signals.lock() {
@@ -190,7 +174,6 @@ pub fn elastic_tick_system(registry: Res<ElasticRegistry>, time: Res<ElasticTime
     }
 }
 
-#[cfg(feature = "nova")]
 /// Helper to register elastic systems and resources to an App.
 ///
 /// Usage:
@@ -213,7 +196,6 @@ pub fn register_elastic_feature(world: &mut World) {
 }
 
 #[cfg(test)]
-#[cfg(feature = "nova")]
 mod tests {
     use super::*;
 
