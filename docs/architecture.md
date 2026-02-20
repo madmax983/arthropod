@@ -29,20 +29,35 @@ C4Container
     title Container Diagram for Arthropod Framework
 
     Container(app, "Arthropod (App)", "Rust Crate", "Main entry point and orchestrator. Manages the integration of all subsystems.")
-    Container(plat, "Plat Core", "Rust Crate", "Platform abstraction layer. Handles window creation and the main event loop.")
-    Container(flux, "Flux State", "Rust Crate", "Reactive primitives (Signals, Effects, Computed) and graph dependency tracking.")
-    Container(widget, "Widget Core", "Rust Crate", "Defines the high-level Widget trait, input logic, and layout constraints.")
-    Container(ecs, "Arthropod ECS", "Rust Crate", "Manages the ECS World, Systems, and Components (SceneNodeRef, Renderable, etc.).")
-    Container(render, "Render Engine", "Rust Crate", "Handles the low-level WGPU rendering pipeline and Scene Graph storage.")
+    Container(plat, "Plat Core", "Rust Crate", "Platform abstraction layer (Windowing, Event Loop).")
+    Container(flux, "Flux State", "Rust Crate", "Reactive primitives (Signals, Effects).")
+    Container(widget, "Widget Core", "Rust Crate", "High-level Widget traits and input handling.")
+    Container(ecs, "Arthropod ECS", "Rust Crate", "ECS World, Components, and Systems.")
+    Container(render, "Render Engine", "Rust Crate", "WGPU rendering pipeline and Scene Graph.")
 
-    Rel(app, plat, "Uses", "Runs the application loop")
-    Rel(app, widget, "Integrates", "Builds the widget tree and maps it to ECS entities")
-    Rel(app, ecs, "Manages", "Executes systems for layout, animation, and state sync")
-    Rel(app, render, "Controls", "Initiates the render pass")
+    Container(layout, "Layout Engine", "Rust Crate", "Flexbox/Grid layout calculations (Taffy wrapper).")
+    Container(text, "Text Engine", "Rust Crate", "Font loading, shaping, and glyph caching.")
+    Container(style, "Style Engine", "Rust Crate", "Vector paths, gradients, and styling primitives.")
+    Container(theme, "Theme Engine", "Rust Crate", "Design tokens and system theme integration.")
+    Container(anim, "Anim Graph", "Rust Crate", "Animation primitives (Springs, Tweens).")
+    Container(a11y, "A11y Engine", "Rust Crate", "Accessibility tree and platform adapter.")
 
-    Rel(widget, flux, "Uses", "Stores state in signals")
-    Rel(ecs, flux, "Polls", "Updates components based on signal changes")
-    Rel(render, ecs, "Reads", "Accesses the Scene resource for rendering")
+    Rel(app, plat, "Uses", "Runs event loop")
+    Rel(app, ecs, "Manages", "Updates systems")
+    Rel(app, render, "Controls", "Initiates render")
+    Rel(app, anim, "Integrates", "Runs animation tick")
+    Rel(app, a11y, "Syncs", "Updates accessibility tree")
+
+    Rel(widget, flux, "Uses", "Reactive state")
+    Rel(widget, layout, "Uses", "Defines constraints")
+    Rel(widget, theme, "Uses", "Resolves tokens")
+    Rel(widget, text, "Uses", "Measures text")
+
+    Rel(render, text, "Uses", "Rasterizes glyphs")
+    Rel(render, style, "Uses", "Tessellates paths")
+
+    Rel(ecs, flux, "Polls", "Reacts to signals")
+    Rel(render, ecs, "Reads", "Scene data")
 ```
 
 ## Runtime Loop (Sequence)
