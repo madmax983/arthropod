@@ -5,7 +5,7 @@
 
 #![cfg(not(any(target_os = "windows", target_os = "macos")))]
 
-use plat_core::{Application, ControlFlow, Event, EventLoop, WindowConfig, WindowId};
+use plat_core::{Application, ControlFlow, Event, EventLoop, WindowId};
 
 struct StubApp;
 

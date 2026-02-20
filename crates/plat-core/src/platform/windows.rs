@@ -128,6 +128,14 @@ impl WindowImpl {
 
             let id = WindowId(NEXT_WINDOW_ID.fetch_add(1, Ordering::SeqCst));
 
+            // Ensure ID fits in pointer for 32-bit systems where usize < u64
+            // This prevents ID truncation when passing via lpParam
+            if std::mem::size_of::<usize>() < 8 && id.0 > usize::MAX as u64 {
+                return Err(PlatformError::Initialization(
+                    "Window ID overflow on 32-bit system".into(),
+                ));
+            }
+
             let title: Vec<u16> = config
                 .title
                 .encode_utf16()
@@ -294,13 +302,16 @@ impl Drop for WindowImpl {
             }
         }
 
+        // Decrement window count BEFORE destroying the window
+        // This ensures that when WM_DESTROY fires (synchronously inside DestroyWindow),
+        // the count reflects the remaining windows (excluding this one).
+        WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
+
         unsafe {
             // Ensure the window is destroyed when the Rust struct is dropped
             // This handles cases where the app drops the window manually
             let _ = DestroyWindow(self.hwnd);
         }
-        // Decrement window count when window is dropped
-        WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
     }
 }
 

@@ -42,3 +42,7 @@
 ## 2026-02-05 - [Unsafe Integer Overflow in Texture Readback]
 **Threat:** `unpack_readback_pixels` in `render-engine` used unchecked arithmetic `(width * 4)` to calculate buffer sizes. For very large widths, this calculation could wrap around (overflow), causing the allocation of a small buffer for a large image. This would lead to incorrect memory access (logic error) or a panic when accessing the buffer.
 **Defense:** Implemented checked arithmetic using `checked_mul` and `checked_add`. The function now returns `Result<Vec<u8>, RendererError>` and fails gracefully with a descriptive error if dimensions are invalid or if an overflow occurs.
+
+## 2026-02-06 - [Windows Event Loop Hang Fix]
+**Threat:** Application hang (DoS) on Windows. The global `WINDOW_COUNT` was decremented *after* `DestroyWindow` in `WindowImpl::drop`. Since `DestroyWindow` synchronously sends `WM_DESTROY`, the message handler saw the count as non-zero (checking for exit condition) and failed to post `WM_QUIT`.
+**Defense:** Moved `WINDOW_COUNT` decrement to occur *before* `DestroyWindow`. Added integer overflow check for `WindowId` to preventing truncation when passing via `lpParam` on 32-bit systems.
