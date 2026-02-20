@@ -3,8 +3,11 @@ use rayon::prelude::*;
 use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 use std::collections::HashSet;
 
-use crate::adaptive::AdaptiveThresholds;
 use crate::components::{Renderable, SceneNodeRef};
+
+// Minimum number of render nodes to trigger parallel collection.
+// Based on crossover analysis: ~500-1,000 entities for efficient batching.
+const RENDER_PARALLEL_THRESHOLD: usize = 1000;
 
 /// Resource for collecting render commands
 ///
@@ -19,9 +22,7 @@ pub struct RenderCommands(pub Vec<PrimitiveInstance>);
 /// corresponding scene nodes, and generates PrimitiveInstances for the GPU backend.
 /// Invisible nodes and nodes with zero opacity are filtered out.
 ///
-/// Uses adaptive thresholds to decide between parallel and sequential collection.
-/// The threshold is dynamically adjusted based on observed frame metrics to
-/// minimize overhead while maximizing throughput. See `AdaptiveThresholds` for details.
+/// Uses a static threshold to decide between parallel and sequential collection.
 ///
 /// `par_iter().filter_map().collect()` preserves input ordering, maintaining
 /// the Painter's Algorithm z-order.
@@ -29,7 +30,6 @@ pub fn collect_renderables_system(
     query: Query<&SceneNodeRef, With<Renderable>>,
     scene: Res<Scene>,
     mut commands: ResMut<RenderCommands>,
-    thresholds: Res<AdaptiveThresholds>,
 ) {
     commands.0.clear();
 
@@ -42,9 +42,8 @@ pub fn collect_renderables_system(
         .filter(|(id, _)| renderable_nodes.contains(id))
         .collect();
 
-    // 3. Generate instances — use adaptive threshold to choose execution path
-    let threshold = thresholds.as_ref().current().render_parallel_threshold;
-    if visual_nodes.len() >= threshold {
+    // 3. Generate instances — use threshold to choose execution path
+    if visual_nodes.len() >= RENDER_PARALLEL_THRESHOLD {
         commands.0 = visual_nodes
             .par_iter()
             .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
@@ -138,7 +137,6 @@ mod tests {
 
         world.insert_resource(scene);
         world.insert_resource(RenderCommands::default());
-        world.insert_resource(AdaptiveThresholds::new());
         world.spawn((SceneNodeRef(id), Renderable));
 
         let mut schedule = Schedule::default();

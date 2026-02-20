@@ -2,9 +2,7 @@ use a11y_engine::{A11yTree, ArthropodActionHandler, FocusManager};
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
-use std::time::Instant;
 
-use crate::adaptive::AdaptiveThresholds;
 use crate::components::SceneNodeRef;
 use crate::systems::{
     apply_a11y_bounds_system, collect_renderables_system, gather_a11y_bounds_system, layout_system,
@@ -89,7 +87,6 @@ impl FrameworkContext {
         world.insert_resource(RenderCommands::default());
         world.insert_resource(ReactiveChangeBuffer::default());
         world.insert_resource(A11yBoundsBuffer::default());
-        world.insert_resource(AdaptiveThresholds::new());
 
         Self {
             world,
@@ -140,22 +137,9 @@ impl FrameworkContext {
     /// 3. `layout_system` — computes flexbox layout (`ResMut<Scene>`)
     /// 4. `sync_accessible_nodes_system` + `collect_renderables_system` — run in parallel
     ///    (both use `Res<Scene>` with disjoint `ResMut` resources)
-    ///
-    /// Also records frame metrics for adaptive threshold adjustment.
     pub fn update(&mut self) {
-        let start = Instant::now();
-
-        // Count entities before running systems (for adaptive metrics)
-        let entity_count = self.world.entities().len() as usize;
-
         // Run frame schedule
         self.frame_schedule.run(&mut self.world);
-
-        // Record frame metrics for adaptive thresholds
-        let frame_time = start.elapsed();
-        self.world
-            .resource_mut::<AdaptiveThresholds>()
-            .record_frame(frame_time, entity_count);
     }
 
     /// Run render collection and return render commands.

@@ -59,13 +59,11 @@
 //! let instances = context.render();
 //! ```
 
-pub mod adaptive;
 pub mod components;
 pub mod context;
 pub mod systems;
 
 // Re-export main types for convenience
-pub use adaptive::{AdaptiveThresholds, ThresholdConfig};
 pub use components::{
     Hoverable, MainThreadSignal, ReactiveColor, ReactiveComputedText, ReactiveOpacity,
     ReactiveText, ReactiveTransform, Renderable, SceneNodeRef,

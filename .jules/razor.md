@@ -12,3 +12,8 @@
 **Bloat:** `theme_engine::BackgroundMaterial` mirroring `plat_core::BackdropMaterial` via `material_bridge.rs`
 **Cut:** Removed duplicate types and bridge layer, used `BackdropMaterial` directly.
 **Saved:** 1 file (`material_bridge.rs`), ~100 lines of duplicate type definitions and mapping code.
+
+## [Reduction]
+**Bloat:** `AdaptiveThresholds` in `arthropod-ecs` (Speculative Generality)
+**Cut:** Replaced dynamic runtime metrics and sliding window with a simple static constant.
+**Saved:** 1 file (`adaptive.rs`), ~250 lines, removed VecDeque overhead and per-frame calculations.
