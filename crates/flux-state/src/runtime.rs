@@ -98,7 +98,13 @@ impl<'a> Drop for ContextGuard<'a> {
         // This ensures that the node is recomputed on the next access, rather than
         // being left in a zombie state with no dependencies.
         if std::thread::panicking() {
-            inner.stale.insert(self.id);
+            // Only restore stale for Computeds. Effects should be left "clean" (not stale)
+            // so they can be re-triggered by dependencies. If we mark an Effect stale here,
+            // mark_stale() will skip it in the future (thinking it's already scheduled),
+            // effectively creating a zombie effect that never runs again.
+            if inner.computeds.contains_key(&self.id) {
+                inner.stale.insert(self.id);
+            }
         }
     }
 }

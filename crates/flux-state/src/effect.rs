@@ -101,8 +101,34 @@ impl Effect {
     {
         let id = runtime.create_effect(Arc::new(effect_fn));
 
-        // Run the effect immediately to establish dependencies
+        // Run the effect immediately to establish dependencies.
+        // We use a custom guard to ensure that if the initial run panics,
+        // the effect is disposed (unsubscribed) immediately, preventing
+        // it from becoming an "orphaned" zombie that runs again later.
+        struct ConstructionGuard {
+            runtime: Arc<Runtime>,
+            id: NodeId,
+            success: bool,
+        }
+
+        impl Drop for ConstructionGuard {
+            fn drop(&mut self) {
+                if !self.success {
+                    self.runtime.dispose_effect(self.id);
+                }
+            }
+        }
+
+        let mut guard = ConstructionGuard {
+            runtime: Arc::clone(&runtime),
+            id,
+            success: false,
+        };
+
         runtime.run_effect(id);
+
+        // If we get here, execution succeeded
+        guard.success = true;
 
         Self { id, runtime }
     }
