@@ -21,3 +21,7 @@
 **[Quadratic Reactive Blowup]**
 **Learning:** Checking `pending_effects.contains(&id)` inside the O(N) subscriber notification loop creates an O(N^2) bottleneck. When `stale` set already guards entry, this scan is redundant.
 **Action:** Remove redundant collection scans in hot paths when invariants (like `stale` status) guarantee uniqueness. Verified 5x speedup for 20k dependencies (143ms -> 27ms).
+
+**[Batching Lock Acquisitions]**
+**Learning:** In systems with fine-grained locking (like reactive runtimes), repeated lock acquisitions for items in a queue (like pending effects) can be a significant bottleneck. Moving the queue to a local buffer under a single lock allows processing without holding the lock or re-acquiring it repeatedly.
+**Action:** Look for loops that pop from a shared, locked collection one by one. Replace with `swap` or `append` to take the whole batch.

@@ -298,15 +298,28 @@ impl Runtime {
     }
 
     fn flush_effects(&self) {
-        loop {
-            let effect_id = {
-                let mut inner = self.inner.lock().unwrap();
-                inner.pending_effects.pop()
-            };
+        // Optimization: Process effects in batches to reduce lock contention.
+        // Instead of locking for every single effect (N locks), we lock once
+        // to grab all pending effects, then run them.
+        let mut local_effects = Vec::new();
 
-            match effect_id {
-                Some(id) => self.run_effect(id),
-                None => break,
+        loop {
+            {
+                let mut inner = self.inner.lock().unwrap();
+                if inner.pending_effects.is_empty() {
+                    break;
+                }
+                // Move all pending effects to local buffer.
+                // This clears inner.pending_effects but keeps its capacity.
+                local_effects.append(&mut inner.pending_effects);
+            }
+
+            // Process batch in reverse order (LIFO) to match original behavior.
+            // Note: run_effect() might trigger more effects recursively via notify(),
+            // or if run from another thread, pending_effects might be populated again.
+            // The outer loop handles these cases.
+            while let Some(id) = local_effects.pop() {
+                self.run_effect(id);
             }
         }
     }
