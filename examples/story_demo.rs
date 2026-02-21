@@ -24,9 +24,18 @@ mod tui_app {
 
     enum AppState {
         Intro,
-        Generating { start_time: Instant },
-        Display { story: String },
-        Error { message: String },
+        Generating {
+            start_time: Instant,
+        },
+        Display {
+            story: String,
+            scroll_offset: u16,
+            visible_chars: usize,
+            total_chars: usize,
+        },
+        Error {
+            message: String,
+        },
     }
 
     pub fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,6 +94,16 @@ mod tui_app {
                                     };
                                 }
                             }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                if let AppState::Display { scroll_offset, .. } = &mut state {
+                                    *scroll_offset = scroll_offset.saturating_add(1);
+                                }
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                if let AppState::Display { scroll_offset, .. } = &mut state {
+                                    *scroll_offset = scroll_offset.saturating_sub(1);
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -95,18 +114,45 @@ mod tui_app {
                 last_tick = Instant::now();
 
                 // State updates
-                if let AppState::Generating { start_time } = state {
-                    // Simulate some "work" for 1.5 seconds to show off the spinner
-                    if start_time.elapsed() > Duration::from_millis(1500) {
-                        match generate_story() {
-                            Ok(text) => state = AppState::Display { story: text },
-                            Err(e) => {
-                                state = AppState::Error {
-                                    message: e.to_string(),
+                let mut next_state = None;
+
+                match &mut state {
+                    AppState::Generating { start_time } => {
+                        // Simulate some "work" for 1.5 seconds to show off the spinner
+                        if start_time.elapsed() > Duration::from_millis(1500) {
+                            match generate_story() {
+                                Ok(text) => {
+                                    let total = text.chars().count();
+                                    next_state = Some(AppState::Display {
+                                        story: text,
+                                        scroll_offset: 0,
+                                        visible_chars: 0,
+                                        total_chars: total,
+                                    });
+                                }
+                                Err(e) => {
+                                    next_state = Some(AppState::Error {
+                                        message: e.to_string(),
+                                    });
                                 }
                             }
                         }
                     }
+                    AppState::Display {
+                        visible_chars,
+                        total_chars,
+                        ..
+                    } => {
+                        // Typewriter effect: reveal 5 chars per tick (50 chars/sec at 100ms tick)
+                        if *visible_chars < *total_chars {
+                            *visible_chars = (*visible_chars + 5).min(*total_chars);
+                        }
+                    }
+                    _ => {}
+                }
+
+                if let Some(s) = next_state {
+                    state = s;
                 }
             }
         }
@@ -237,9 +283,24 @@ mod tui_app {
 
         // Footer
         let footer_text = match state {
-            AppState::Intro => " Press <ENTER> to Generate | q: Quit ",
-            AppState::Generating { .. } => " Generating... | q: Quit ",
-            AppState::Display { .. } | AppState::Error { .. } => " r: Retry | q: Quit ",
+            AppState::Intro => " Press <ENTER> to Generate | q: Quit ".to_string(),
+            AppState::Generating { .. } => " Generating... | q: Quit ".to_string(),
+            AppState::Display {
+                visible_chars,
+                total_chars,
+                ..
+            } => {
+                let progress = if *total_chars > 0 {
+                    (*visible_chars as f32 / *total_chars as f32 * 100.0) as usize
+                } else {
+                    100
+                };
+                format!(
+                    " Scroll: ↑/↓ | {}% Revealed | r: Retry | q: Quit ",
+                    progress
+                )
+            }
+            AppState::Error { .. } => " r: Retry | q: Quit ".to_string(),
         };
         let footer = Paragraph::new(footer_text)
             .style(Style::default().fg(Color::Cyan))
@@ -306,8 +367,21 @@ mod tui_app {
 
                 f.render_widget(p, v_center[1]);
             }
-            AppState::Display { story } => {
-                let text = parse_markdown(story);
+            AppState::Display {
+                story,
+                scroll_offset,
+                visible_chars,
+                ..
+            } => {
+                // Ensure we don't slice mid-char
+                let safe_end = story
+                    .char_indices()
+                    .map(|(i, _)| i)
+                    .nth(*visible_chars)
+                    .unwrap_or(story.len());
+                let sliced_story = &story[..safe_end];
+
+                let text = parse_markdown(sliced_story);
                 let p = Paragraph::new(text)
                     .block(
                         Block::default()
@@ -317,8 +391,37 @@ mod tui_app {
                             .border_style(Style::default().fg(Color::Yellow))
                             .padding(Padding::new(2, 2, 1, 1)),
                     )
-                    .wrap(Wrap { trim: true });
+                    .wrap(Wrap { trim: true })
+                    .scroll((*scroll_offset, 0));
                 f.render_widget(p, content_area);
+
+                // Render Scrollbar
+                // We'll put it on the right edge of the content area
+                // Since we don't know the full height easily, we'll just indicate current position
+                // and pretend max is somewhat large or based on scroll_offset
+                use ratatui::widgets::Scrollbar;
+                use ratatui::widgets::ScrollbarOrientation;
+                use ratatui::widgets::ScrollbarState;
+
+                // Simple heuristic: content length = scroll_offset + visible height (approx) + some more
+                // A better approach is to let the user scroll until the end, but Ratatui needs a max.
+                // Let's assume a max height of 100 lines for now, or 2 * scroll_offset if > 50.
+                let content_height = 100.max(*scroll_offset as usize + 20);
+                let mut scrollbar_state =
+                    ScrollbarState::new(content_height).position(*scroll_offset as usize);
+
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("▲"))
+                    .end_symbol(Some("▼"));
+
+                f.render_stateful_widget(
+                    scrollbar,
+                    content_area.inner(ratatui::layout::Margin {
+                        vertical: 1,
+                        horizontal: 0,
+                    }), // Adjust to be inside borders
+                    &mut scrollbar_state,
+                );
             }
             AppState::Error { message } => {
                 let p = Paragraph::new(Span::styled(message, Style::default().fg(Color::Red)))
