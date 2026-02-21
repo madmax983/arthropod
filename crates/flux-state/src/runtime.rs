@@ -78,6 +78,27 @@ struct RuntimeInner {
     labels: HashMap<NodeId, String>,
 }
 
+/// Helper struct to ensure pending effects are restored if a panic occurs during flush.
+struct PanicRestorer<'a> {
+    runtime: &'a Runtime,
+    remaining_effects: &'a mut Vec<NodeId>,
+}
+
+impl<'a> Drop for PanicRestorer<'a> {
+    fn drop(&mut self) {
+        if std::thread::panicking() && !self.remaining_effects.is_empty() {
+            // Restore unexecuted effects to the pending queue so they aren't lost.
+            let mut inner = match self.runtime.inner.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            inner
+                .pending_effects
+                .extend_from_slice(self.remaining_effects);
+        }
+    }
+}
+
 struct ComputedNode {
     compute: std::sync::Arc<dyn Fn() -> Arc<dyn Any + Send + Sync> + Send + Sync>,
     value: Option<Arc<dyn Any + Send + Sync>>,
@@ -329,8 +350,15 @@ impl Runtime {
             // Note: run_effect() might trigger more effects recursively via notify(),
             // or if run from another thread, pending_effects might be populated again.
             // The outer loop handles these cases.
-            while let Some(id) = local_effects.pop() {
-                self.run_effect(id);
+            {
+                let restorer = PanicRestorer {
+                    runtime: self,
+                    remaining_effects: &mut local_effects,
+                };
+
+                while let Some(id) = restorer.remaining_effects.pop() {
+                    self.run_effect(id);
+                }
             }
         }
     }
