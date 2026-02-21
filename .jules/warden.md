@@ -43,6 +43,9 @@
 **Threat:** `unpack_readback_pixels` in `render-engine` used unchecked arithmetic `(width * 4)` to calculate buffer sizes. For very large widths, this calculation could wrap around (overflow), causing the allocation of a small buffer for a large image. This would lead to incorrect memory access (logic error) or a panic when accessing the buffer.
 **Defense:** Implemented checked arithmetic using `checked_mul` and `checked_add`. The function now returns `Result<Vec<u8>, RendererError>` and fails gracefully with a descriptive error if dimensions are invalid or if an overflow occurs.
 
+## 2026-02-06 - [WGPU Buffer Alignment Overflow]
+**Threat:** `aligned_bytes_per_row` in `render-engine` used `saturating_mul` followed by addition to calculate buffer stride. For large widths (e.g. `u32::MAX / 4`), the saturation combined with alignment padding caused an integer overflow (panic in debug, wrap in release), leading to potential DoS or invalid memory access.
+**Defense:** Replaced arithmetic with `checked_mul` and `checked_add`. The function now returns `Result<u32, RendererError>` and propagates errors upstream to `with_offscreen_render_pass` and `read_texture_to_rgba`, ensuring graceful failure.
 ## 2026-02-06 - [Windows Event Loop Hang Fix]
 **Threat:** Application hang (DoS) on Windows. The global `WINDOW_COUNT` was decremented *after* `DestroyWindow` in `WindowImpl::drop`. Since `DestroyWindow` synchronously sends `WM_DESTROY`, the message handler saw the count as non-zero (checking for exit condition) and failed to post `WM_QUIT`.
 **Defense:** Moved `WINDOW_COUNT` decrement to occur *before* `DestroyWindow`. Added integer overflow check for `WindowId` to preventing truncation when passing via `lpParam` on 32-bit systems.

@@ -557,7 +557,7 @@ impl WgpuContext {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let bytes_per_pixel = 4u32;
-        let padded_bytes_per_row = aligned_bytes_per_row(width, bytes_per_pixel);
+        let padded_bytes_per_row = aligned_bytes_per_row(width, bytes_per_pixel)?;
         let output_size = padded_bytes_per_row as u64 * height as u64;
         let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Offscreen Capture Readback Buffer"),
@@ -661,7 +661,7 @@ impl WgpuContext {
         }
 
         let bytes_per_pixel = 4u32;
-        let padded_bytes_per_row = aligned_bytes_per_row(width, bytes_per_pixel);
+        let padded_bytes_per_row = aligned_bytes_per_row(width, bytes_per_pixel)?;
         let output_size = padded_bytes_per_row as u64 * height as u64;
         let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Texture Readback Buffer"),
@@ -753,14 +753,22 @@ fn create_projection_matrix(width: u32, height: u32) -> [[f32; 4]; 4] {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn aligned_bytes_per_row(width: u32, bytes_per_pixel: u32) -> u32 {
-    let unaligned = width.saturating_mul(bytes_per_pixel);
+fn aligned_bytes_per_row(width: u32, bytes_per_pixel: u32) -> Result<u32, RendererError> {
+    let unaligned = width.checked_mul(bytes_per_pixel).ok_or_else(|| {
+        RendererError::InitializationFailed(
+            "Overflow calculating unaligned bytes per row".to_string(),
+        )
+    })?;
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let rem = unaligned % align;
     if rem == 0 {
-        unaligned
+        Ok(unaligned)
     } else {
-        unaligned + (align - rem)
+        unaligned.checked_add(align - rem).ok_or_else(|| {
+            RendererError::InitializationFailed(
+                "Overflow calculating aligned bytes per row".to_string(),
+            )
+        })
     }
 }
 
@@ -905,9 +913,9 @@ mod tests {
 
     #[test]
     fn test_aligned_bytes_per_row_rounds_up_to_256_bytes() {
-        assert_eq!(aligned_bytes_per_row(1, 4), 256);
-        assert_eq!(aligned_bytes_per_row(64, 4), 256);
-        assert_eq!(aligned_bytes_per_row(65, 4), 512);
+        assert_eq!(aligned_bytes_per_row(1, 4).unwrap(), 256);
+        assert_eq!(aligned_bytes_per_row(64, 4).unwrap(), 256);
+        assert_eq!(aligned_bytes_per_row(65, 4).unwrap(), 512);
     }
 
     #[test]
@@ -974,6 +982,20 @@ mod tests {
             padded_bpr,
             wgpu::TextureFormat::Rgba8Unorm,
         );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aligned_bytes_per_row_overflow() {
+        // width that causes saturation: u32::MAX / 4 + 100
+        // u32::MAX is 4,294,967,295.
+        // aligned_bytes_per_row uses saturating_mul, so it hits u32::MAX.
+        // u32::MAX % 256 = 255.
+        // padding needed = 256 - 255 = 1.
+        // u32::MAX + 1 overflows.
+        let width = u32::MAX / 4 + 100;
+        let bytes_per_pixel = 4;
+        let result = aligned_bytes_per_row(width, bytes_per_pixel);
         assert!(result.is_err());
     }
 }
