@@ -89,10 +89,10 @@ fn create_primitive_instances_impl(
         instances.push(fill_instance);
     }
 
-    // 3. Render stroke (on top of fill)
+    // 3. Render stroke paints bottom-to-top (on top of fills)
     if let Some(stroke) = &style.stroke {
-        let stroke_instance = if let Some(pipeline) = pipeline.as_mut() {
-            create_stroke_instance(
+        let stroke_instances = if let Some(pipeline) = pipeline.as_mut() {
+            create_stroke_instances(
                 pipeline,
                 stroke,
                 pos,
@@ -102,7 +102,7 @@ fn create_primitive_instances_impl(
                 style.blend_mode,
             )
         } else {
-            create_stroke_instance_without_pipeline(
+            create_stroke_instances_without_pipeline(
                 stroke,
                 pos,
                 size,
@@ -111,7 +111,7 @@ fn create_primitive_instances_impl(
                 style.blend_mode,
             )
         };
-        instances.push(stroke_instance);
+        instances.extend(stroke_instances);
     }
 
     instances
@@ -136,8 +136,8 @@ pub fn create_primitive_instances_with_pipeline(
     create_primitive_instances_impl(Some(pipeline), style, pos, size, opacity)
 }
 
-/// Create a stroke instance
-fn create_stroke_instance(
+/// Create one stroke instance per stroke paint layer.
+fn create_stroke_instances(
     pipeline: &mut PrimitivePipeline,
     stroke: &style_engine::StrokeStyle,
     pos: Vec2,
@@ -145,7 +145,7 @@ fn create_stroke_instance(
     opacity: f32,
     corner_radii: &CornerRadii,
     blend_mode: BlendMode,
-) -> PrimitiveInstance {
+) -> Vec<PrimitiveInstance> {
     use style_engine::StrokeAlign;
 
     let stroke_width = stroke.weight;
@@ -155,7 +155,8 @@ fn create_stroke_instance(
         StrokeAlign::Outside => -1.0,
     };
 
-    let Some(stroke_paint) = stroke.top_paint() else {
+    let mut instances = Vec::new();
+    if stroke.paints.is_empty() {
         let mut instance = PrimitiveInstance::rounded(
             [pos.x, pos.y],
             [size.x, size.y],
@@ -166,66 +167,63 @@ fn create_stroke_instance(
         instance.flags |= FLAG_HAS_STROKE;
         instance.flags = with_blend_mode(instance.flags, blend_mode);
         instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
-        return instance;
-    };
-
-    match stroke_paint {
-        Paint::Solid(color) => {
-            let mut final_color = *color;
-            final_color.w *= opacity;
-
-            let mut instance = PrimitiveInstance::rounded(
-                [pos.x, pos.y],
-                [size.x, size.y],
-                [final_color.x, final_color.y, final_color.z, final_color.w],
-                *corner_radii,
-            );
-            instance.stroke_params = [stroke_width, stroke_align];
-            instance.flags |= FLAG_HAS_STROKE;
-            instance.flags = with_blend_mode(instance.flags, blend_mode);
-            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
-            instance
-        }
-        Paint::Linear(gradient) => {
-            let atlas_row = pipeline.add_gradient(&gradient.stops);
-            let params = GradientParams {
-                start: gradient.start.to_array(),
-                end: gradient.end.to_array(),
-                atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
-                gradient_type: 0,
-                _padding: [0.0; 2],
-            };
-            let param_index = pipeline.add_gradient_params(params);
-
-            let mut instance = PrimitiveInstance::rounded(
-                [pos.x, pos.y],
-                [size.x, size.y],
-                [1.0, 1.0, 1.0, opacity],
-                *corner_radii,
-            );
-            instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
-            instance.stroke_params = [stroke_width, stroke_align];
-            instance.flags = with_fill_type(instance.flags, 1);
-            instance.flags |= FLAG_HAS_STROKE;
-            instance.flags = with_blend_mode(instance.flags, blend_mode);
-            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
-            instance
-        }
-        _ => {
-            // Other gradient types for strokes (implement if needed)
-            let mut instance = PrimitiveInstance::rounded(
-                [pos.x, pos.y],
-                [size.x, size.y],
-                [1.0, 1.0, 1.0, opacity],
-                *corner_radii,
-            );
-            instance.stroke_params = [stroke_width, stroke_align];
-            instance.flags |= FLAG_HAS_STROKE;
-            instance.flags = with_blend_mode(instance.flags, blend_mode);
-            instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
-            instance
-        }
+        instances.push(instance);
+        return instances;
     }
+
+    for stroke_paint in &stroke.paints {
+        let mut instance = match stroke_paint {
+            Paint::Solid(color) => {
+                let mut final_color = *color;
+                final_color.w *= opacity;
+
+                PrimitiveInstance::rounded(
+                    [pos.x, pos.y],
+                    [size.x, size.y],
+                    [final_color.x, final_color.y, final_color.z, final_color.w],
+                    *corner_radii,
+                )
+            }
+            Paint::Linear(gradient) => {
+                let atlas_row = pipeline.add_gradient(&gradient.stops);
+                let params = GradientParams {
+                    start: gradient.start.to_array(),
+                    end: gradient.end.to_array(),
+                    atlas_row: (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32,
+                    gradient_type: 0,
+                    _padding: [0.0; 2],
+                };
+                let param_index = pipeline.add_gradient_params(params);
+
+                let mut instance = PrimitiveInstance::rounded(
+                    [pos.x, pos.y],
+                    [size.x, size.y],
+                    [1.0, 1.0, 1.0, opacity],
+                    *corner_radii,
+                );
+                instance.gradient_params = [param_index as f32, 0.0, 0.0, 0.0];
+                instance.flags = with_fill_type(instance.flags, 1);
+                instance
+            }
+            _ => {
+                // Non-linear gradient/image stroke paint fallback in primitive stroke path.
+                PrimitiveInstance::rounded(
+                    [pos.x, pos.y],
+                    [size.x, size.y],
+                    [1.0, 1.0, 1.0, opacity],
+                    *corner_radii,
+                )
+            }
+        };
+
+        instance.stroke_params = [stroke_width, stroke_align];
+        instance.flags |= FLAG_HAS_STROKE;
+        instance.flags = with_blend_mode(instance.flags, blend_mode);
+        instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+        instances.push(instance);
+    }
+
+    instances
 }
 
 fn fallback_gradient_color(stops: &[ColorStop], opacity: f32) -> [f32; 4] {
@@ -234,14 +232,14 @@ fn fallback_gradient_color(stops: &[ColorStop], opacity: f32) -> [f32; 4] {
     [color.x, color.y, color.z, color.w]
 }
 
-fn create_stroke_instance_without_pipeline(
+fn create_stroke_instances_without_pipeline(
     stroke: &style_engine::StrokeStyle,
     pos: Vec2,
     size: Vec2,
     opacity: f32,
     corner_radii: &CornerRadii,
     blend_mode: BlendMode,
-) -> PrimitiveInstance {
+) -> Vec<PrimitiveInstance> {
     use style_engine::StrokeAlign;
 
     let stroke_width = stroke.weight;
@@ -251,30 +249,50 @@ fn create_stroke_instance_without_pipeline(
         StrokeAlign::Outside => -1.0,
     };
 
-    let stroke_color = match stroke.top_paint() {
-        Some(Paint::Solid(color)) => {
-            let mut final_color = *color;
-            final_color.w *= opacity;
-            [final_color.x, final_color.y, final_color.z, final_color.w]
-        }
-        Some(Paint::Linear(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
-        Some(Paint::Radial(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
-        Some(Paint::Angular(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
-        Some(Paint::Diamond(gradient)) => fallback_gradient_color(&gradient.stops, opacity),
-        Some(Paint::Image(_)) | None => [1.0, 0.0, 1.0, opacity],
-    };
+    let mut instances = Vec::new();
+    if stroke.paints.is_empty() {
+        let mut instance = PrimitiveInstance::rounded(
+            [pos.x, pos.y],
+            [size.x, size.y],
+            [1.0, 0.0, 1.0, opacity],
+            *corner_radii,
+        );
+        instance.stroke_params = [stroke_width, stroke_align];
+        instance.flags |= FLAG_HAS_STROKE;
+        instance.flags = with_blend_mode(instance.flags, blend_mode);
+        instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+        instances.push(instance);
+        return instances;
+    }
 
-    let mut instance = PrimitiveInstance::rounded(
-        [pos.x, pos.y],
-        [size.x, size.y],
-        stroke_color,
-        *corner_radii,
-    );
-    instance.stroke_params = [stroke_width, stroke_align];
-    instance.flags |= FLAG_HAS_STROKE;
-    instance.flags = with_blend_mode(instance.flags, blend_mode);
-    instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
-    instance
+    for stroke_paint in &stroke.paints {
+        let stroke_color = match stroke_paint {
+            Paint::Solid(color) => {
+                let mut final_color = *color;
+                final_color.w *= opacity;
+                [final_color.x, final_color.y, final_color.z, final_color.w]
+            }
+            Paint::Linear(gradient) => fallback_gradient_color(&gradient.stops, opacity),
+            Paint::Radial(gradient) => fallback_gradient_color(&gradient.stops, opacity),
+            Paint::Angular(gradient) => fallback_gradient_color(&gradient.stops, opacity),
+            Paint::Diamond(gradient) => fallback_gradient_color(&gradient.stops, opacity),
+            Paint::Image(_) => [1.0, 0.0, 1.0, opacity],
+        };
+
+        let mut instance = PrimitiveInstance::rounded(
+            [pos.x, pos.y],
+            [size.x, size.y],
+            stroke_color,
+            *corner_radii,
+        );
+        instance.stroke_params = [stroke_width, stroke_align];
+        instance.flags |= FLAG_HAS_STROKE;
+        instance.flags = with_blend_mode(instance.flags, blend_mode);
+        instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
+        instances.push(instance);
+    }
+
+    instances
 }
 
 /// Create a single fill instance (solid or gradient)
@@ -468,8 +486,8 @@ fn create_fill_instance_without_pipeline(
 mod tests {
     use super::*;
     use crate::backend::wgpu::pipelines::primitive_instance::{
-        FLAG_BLEND_MODE_MASK, FLAG_BLEND_MODE_SHIFT, FLAG_FILL_TYPE_MASK, FLAG_STROKE_CAP_MASK,
-        FLAG_STROKE_CAP_SHIFT, FLAG_STROKE_JOIN_MASK, FLAG_STROKE_JOIN_SHIFT,
+        FLAG_BLEND_MODE_MASK, FLAG_BLEND_MODE_SHIFT, FLAG_FILL_TYPE_MASK, FLAG_HAS_STROKE,
+        FLAG_STROKE_CAP_MASK, FLAG_STROKE_CAP_SHIFT, FLAG_STROKE_JOIN_MASK, FLAG_STROKE_JOIN_SHIFT,
     };
     use glam::Vec4;
 
@@ -556,6 +574,34 @@ mod tests {
         assert_eq!(blend, style_engine::BlendMode::Screen.to_flag_bits() as u32);
         assert_eq!(cap, 2);
         assert_eq!(join, 2);
+    }
+
+    #[test]
+    fn test_create_primitive_instances_emits_all_stroke_paints_in_order() {
+        let stroke = style_engine::StrokeStyle {
+            paints: vec![
+                Paint::solid(Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                Paint::solid(Vec4::new(0.0, 0.0, 1.0, 1.0)),
+            ],
+            weight: 2.0,
+            align: style_engine::StrokeAlign::Center,
+            ..Default::default()
+        };
+        let style = VisualStyle::new().stroke(stroke);
+
+        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let stroke_instances: Vec<_> = instances
+            .iter()
+            .filter(|instance| (instance.flags & FLAG_HAS_STROKE) != 0)
+            .collect();
+
+        assert_eq!(
+            stroke_instances.len(),
+            2,
+            "expected one instance per stroke paint"
+        );
+        assert_eq!(stroke_instances[0].color, [1.0, 0.0, 0.0, 1.0]);
+        assert_eq!(stroke_instances[1].color, [0.0, 0.0, 1.0, 1.0]);
     }
 
     #[test]

@@ -185,11 +185,16 @@ pub(crate) fn resolve_path_fill_paint(style: &style_engine::VisualStyle) -> styl
         .unwrap_or_else(|| style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 1.0, 1.0)))
 }
 
-pub(crate) fn resolve_path_stroke_paint(stroke: &style_engine::StrokeStyle) -> style_engine::Paint {
-    stroke
-        .top_paint()
-        .cloned()
-        .unwrap_or_else(|| style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 1.0, 1.0)))
+pub(crate) fn resolve_path_stroke_paints(
+    stroke: &style_engine::StrokeStyle,
+) -> Vec<style_engine::Paint> {
+    if stroke.paints.is_empty() {
+        vec![style_engine::Paint::solid(glam::Vec4::new(
+            1.0, 0.0, 1.0, 1.0,
+        ))]
+    } else {
+        stroke.paints.clone()
+    }
 }
 
 /// Collect instances from the scene.
@@ -322,12 +327,13 @@ fn collect_instances_impl<'a>(
                 }
 
                 if let Some(stroke) = &style.stroke {
-                    let stroke_paint = resolve_path_stroke_paint(stroke);
+                    let stroke_paints = resolve_path_stroke_paints(stroke);
                     if let Some(stroke_paths) = style
                         .stroke_geometry
                         .as_ref()
                         .or(style.fill_geometry.as_ref())
                     {
+                        let mut stroke_meshes = Vec::new();
                         for path in stroke_paths {
                             let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
                                 interner.hash_for(path)
@@ -345,8 +351,14 @@ fn collect_instances_impl<'a>(
                             if let Ok(mesh) = mesh_result
                                 && !mesh.indices.is_empty()
                             {
+                                stroke_meshes.push(mesh);
+                            }
+                        }
+
+                        for stroke_paint in &stroke_paints {
+                            for mesh in &stroke_meshes {
                                 path_batches.push(PathBatch {
-                                    mesh,
+                                    mesh: Arc::clone(mesh),
                                     paint: stroke_paint.clone(),
                                     opacity: effective_opacity,
                                     size: [render_bounds.width, render_bounds.height],
@@ -383,7 +395,7 @@ fn collect_instances_impl<'a>(
                 }
 
                 if let Some(stroke) = &style.stroke {
-                    let stroke_paint = resolve_path_stroke_paint(stroke);
+                    let stroke_paints = resolve_path_stroke_paints(stroke);
                     let stroke_key =
                         TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
                     let stroke_mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut()
@@ -395,13 +407,15 @@ fn collect_instances_impl<'a>(
                     if let Ok(mesh) = stroke_mesh_result
                         && !mesh.indices.is_empty()
                     {
-                        path_batches.push(PathBatch {
-                            mesh,
-                            paint: stroke_paint,
-                            opacity: effective_opacity,
-                            size: [render_bounds.width, render_bounds.height],
-                            offset: [render_bounds.x, render_bounds.y],
-                        });
+                        for stroke_paint in &stroke_paints {
+                            path_batches.push(PathBatch {
+                                mesh: Arc::clone(&mesh),
+                                paint: stroke_paint.clone(),
+                                opacity: effective_opacity,
+                                size: [render_bounds.width, render_bounds.height],
+                                offset: [render_bounds.x, render_bounds.y],
+                            });
+                        }
                     }
                 }
 
@@ -470,12 +484,13 @@ pub(crate) fn collect_style_batches_for_bounds(
         }
 
         if let Some(stroke) = &style.stroke {
-            let stroke_paint = resolve_path_stroke_paint(stroke);
+            let stroke_paints = resolve_path_stroke_paints(stroke);
             if let Some(stroke_paths) = style
                 .stroke_geometry
                 .as_ref()
                 .or(style.fill_geometry.as_ref())
             {
+                let mut stroke_meshes = Vec::new();
                 for path in stroke_paths {
                     let path_hash = ctx.path_interner.hash_for(path);
                     let stroke_key =
@@ -486,8 +501,14 @@ pub(crate) fn collect_style_batches_for_bounds(
                     if let Ok(mesh) = mesh_result
                         && !mesh.indices.is_empty()
                     {
+                        stroke_meshes.push(mesh);
+                    }
+                }
+
+                for stroke_paint in &stroke_paints {
+                    for mesh in &stroke_meshes {
                         path_batches.push(PathBatch {
-                            mesh,
+                            mesh: Arc::clone(mesh),
                             paint: stroke_paint.clone(),
                             opacity: effective_opacity,
                             size: [render_bounds.width, render_bounds.height],

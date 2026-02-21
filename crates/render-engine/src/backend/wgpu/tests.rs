@@ -516,6 +516,74 @@ fn test_collect_instances_adds_stroke_geometry_batches() {
 }
 
 #[test]
+fn test_collect_instances_adds_batch_per_stroke_paint_layer() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut path = style_engine::VectorPath::new();
+    path.move_to(glam::Vec2::new(0.0, 0.0));
+    path.line_to(glam::Vec2::new(60.0, 0.0));
+    path.line_to(glam::Vec2::new(30.0, 40.0));
+    path.close();
+
+    let mut stroke = style_engine::StrokeStyle::solid(
+        style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 0.0, 1.0)),
+        3.0,
+        style_engine::StrokeAlign::Center,
+    );
+    stroke
+        .paints
+        .push(style_engine::Paint::solid(glam::Vec4::new(
+            0.0, 0.0, 1.0, 1.0,
+        )));
+
+    let node = SceneNode {
+        content: NodeContent::Styled {
+            style: Box::new(
+                crate::VisualStyle::new()
+                    .solid_fill(glam::Vec4::new(0.2, 0.8, 0.4, 1.0))
+                    .fill_geometry(vec![path])
+                    .stroke(stroke),
+            ),
+        },
+        transform: Transform2D::identity(),
+        bounds: plat_core::Rect {
+            x: 50.0,
+            y: 50.0,
+            width: 60.0,
+            height: 40.0,
+        },
+        children: vec![],
+        parent: None,
+        visible: true,
+        opacity: 1.0,
+    };
+    scene.add_node(root, node);
+
+    let (instances, _text_nodes, path_batches) =
+        instance_collector::collect_instances_for_tests(&scene);
+    assert!(
+        instances.is_empty(),
+        "geometry node should route through path batches"
+    );
+    assert_eq!(
+        path_batches.len(),
+        3,
+        "expected fill + two stroke paint layer batches"
+    );
+    assert!(matches!(
+        &path_batches[1].paint,
+        style_engine::Paint::Solid(color)
+            if (color.x - 1.0).abs() < 1e-6 && color.y.abs() < 1e-6 && color.z.abs() < 1e-6
+    ));
+    assert!(matches!(
+        &path_batches[2].paint,
+        style_engine::Paint::Solid(color)
+            if color.x.abs() < 1e-6 && color.y.abs() < 1e-6 && (color.z - 1.0).abs() < 1e-6
+    ));
+}
+
+#[test]
 fn test_style_opacity_multiplies_node_opacity_for_path_batches() {
     let mut scene = Scene::new();
     let root = scene.root();
