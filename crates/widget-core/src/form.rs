@@ -165,8 +165,19 @@ macro_rules! form {
         $crate::Form::new(($(($name, $widget),)*))
     }};
 
+    // Fields with colon syntax: "name": widget
+    ([$($name:literal : $widget:expr),* $(,)?]) => {{
+        $crate::Form::new(($(($name, $widget),)*))
+    }};
+
     // Fields + params
     ([$(($name:expr, $widget:expr)),* $(,)?], $($rest:tt)*) => {{
+        let widget = $crate::Form::new(($(($name, $widget),)*));
+        $crate::__form_apply!(widget, $($rest)*)
+    }};
+
+    // Fields with colon syntax + params
+    ([$($name:literal : $widget:expr),* $(,)?], $($rest:tt)*) => {{
         let widget = $crate::Form::new(($(($name, $widget),)*));
         $crate::__form_apply!(widget, $($rest)*)
     }};

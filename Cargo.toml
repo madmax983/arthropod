@@ -167,6 +167,10 @@ path = "examples/visual_test_phase4_blend.rs"
 name = "visual_test_phase4_clipping"
 path = "examples/visual_test_phase4_clipping.rs"
 
+[[example]]
+name = "form_syntax_demo"
+path = "examples/form_syntax_demo.rs"
+
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]

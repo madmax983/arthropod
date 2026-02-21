@@ -77,13 +77,14 @@ cargo run --example story_demo --features nova
 
 ### Troubleshooting
 
-If you encounter the following compiler error when using `arthropod` in your own code:
+If you encounter **deprecation warnings** or **unresolved imports** when using `arthropod` in your own code:
 
 ```text
-error[E0433]: failed to resolve: could not find `experimental` in `arthropod`
+warning: use of deprecated struct `arthropod::experimental::...`: Requires 'nova' feature.
+error[E0432]: unresolved import `arthropod::experimental::...`
 ```
 
-This indicates that you are trying to use an experimental feature (like `arthropod::experimental`) but the `nova` feature flag is not enabled. Please update your `Cargo.toml` to include `features = ["nova"]`.
+This indicates that you are trying to use an experimental feature (like `NarrativeGenerator`) but the `nova` feature flag is not enabled. Please update your `Cargo.toml` to include `features = ["nova"]`.
 
 ## Development & Testing
 

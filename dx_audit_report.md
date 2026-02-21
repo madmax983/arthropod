@@ -22,3 +22,14 @@
 
 ## Conclusion
 The Quick Start code is valid and compiles. The error message for unsupported platforms is clear. The DX is acceptable, but could be friendlier to Linux users.
+
+## Update: Echo Audit Phase 2
+
+### 4. The Complaint: "README lies about error messages!"
+- **Confusion:** The README claimed running without `nova` would cause a compiler error `could not find experimental`.
+- **Reality:** It actually causes deprecation warnings or `unresolved import` errors, because the `experimental` module is always present (just stubbed).
+- **Fix:** Updated `README.md` to accurately describe the behavior (deprecation warnings + runtime errors).
+
+### 5. The Friction Point: `form!` Macro Syntax
+- **Confusion:** `form!` macro required a tuple of tuples: `form!([ ("name", widget) ])`. I kept forgetting the inner parentheses and got confusing "no rules expected" errors.
+- **Fix:** Improved `form!` macro to support intuitive `key: value` syntax: `form!([ "name": widget ])`. Added `examples/form_syntax_demo.rs` to demonstrate this.
