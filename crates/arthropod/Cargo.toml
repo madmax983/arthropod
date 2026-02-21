@@ -15,6 +15,7 @@ a11y-engine = { path = "../a11y-engine" }
 layout-engine = { path = "../layout-engine" }
 widget-core = { path = "../widget-core" }
 theme-engine = { path = "../theme-engine" }
+style-engine = { path = "../style-engine" }
 pollster.workspace = true
 log.workspace = true
 env_logger = "0.11"

@@ -113,11 +113,16 @@ impl App {
             context.world_mut().insert_resource(backend);
         }
 
-        Self {
+        let mut app = Self {
             context, // Drops first
             window,  // Drops last
             runtime,
-        }
+        };
+
+        #[cfg(feature = "nova")]
+        crate::experimental::xray::register_xray(&mut app);
+
+        app
     }
 
     /// Access the ECS World (immutable)

@@ -7,6 +7,9 @@ pub mod story;
 #[cfg(feature = "nova")]
 pub mod elastic;
 
+#[cfg(feature = "nova")]
+pub mod xray;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -51,6 +54,20 @@ pub mod particles {
     /// The `particles` module requires the `nova` feature.
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod xray {
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `xray` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[allow(dead_code)]
+    pub fn register_xray(_app: &mut crate::App) {
+        eprintln!("ERROR: 'register_xray' requires 'nova' feature. Enable it in Cargo.toml.");
+    }
 }
 
 #[cfg(not(feature = "nova"))]

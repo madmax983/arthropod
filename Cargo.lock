@@ -235,6 +235,7 @@ dependencies = [
  "plat-core",
  "pollster",
  "render-engine",
+ "style-engine",
  "theme-engine",
  "thiserror 2.0.18",
  "widget-core",
