@@ -11,6 +11,9 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [002](002-chronos-time-travel.md) | Chronos (Time Travel) | Draft |
 | [003](003-motion-animation.md) | Motion (Reactive Animation) | Draft |
 | [004](004-virtual-list.md) | Virtual List & Infinite Scroll | Draft |
+| [005](005-input-fusion.md) | Input Fusion System | Draft |
+| [006](006-data-grid.md) | Data Grid (DataTable) | Draft |
+| [007](007-flux-devtools-value-inspector.md) | Flux DevTools: Value Inspector | Draft |
 
 ## Lifecycle
 
