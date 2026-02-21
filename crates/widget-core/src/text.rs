@@ -12,18 +12,26 @@ use render_engine::{Color, NodeContent, NodeId};
 /// # Example
 ///
 /// ```no_run
-/// use widget_core::Text;
+/// use widget_core::{Text, txt};
 /// use render_engine::Color;
+/// use flux_state::{Runtime, Signal};
 ///
-/// // Static text
+/// // Static text via builder
 /// let text = Text::new("Hello World")
 ///     .size(20.0)
 ///     .color(Color::rgba(1.0, 1.0, 1.0, 1.0));
 ///
-/// // With generated macro:
-/// // txt!("Hello World")
-/// // txt!("Title", size: 20.0)
-/// // txt!(@signal, size: 20.0)  // Reactive
+/// // Static text via macro
+/// let m1 = txt!("Hello World");
+/// let m2 = txt!("Title", size: 20.0);
+///
+/// // Reactive text via macro
+/// let runtime = Runtime::new();
+/// let signal = Signal::new(runtime, "Dynamic".to_string());
+/// let (read, _) = signal.split();
+///
+/// // Note the `@` syntax for signals
+/// let m3 = txt!(@read, size: 20.0);
 /// ```
 #[derive(Widget)]
 #[widget(name = "txt")]

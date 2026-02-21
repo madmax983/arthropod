@@ -11,7 +11,7 @@ use theme_engine::DesignTokens;
 ///
 /// Use the `input!` macro for declarative construction:
 /// ```no_run
-/// use widget_core::input;
+/// use widget_core::{input, TextInput};
 /// use flux_state::{Runtime, Signal};
 ///
 /// let runtime = Runtime::new();

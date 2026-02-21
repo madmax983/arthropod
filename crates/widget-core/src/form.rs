@@ -8,37 +8,50 @@ use std::sync::Arc;
 
 /// Form widget that aggregates child input fields with validation and submission
 ///
-/// Use the `form!` macro for declarative construction:
+/// Forms collect data from child widgets (like `TextInput`) identified by string keys.
+/// When submitted, the `on_submit` callback receives a snapshot of all field values.
+///
+/// # Data Handling
+///
+/// The `on_submit` callback receives [`FormData`], which is an alias for `HashMap<String, String>`.
+/// Keys correspond to the names provided in the form definition.
+///
+/// # Example
+///
 /// ```no_run
-/// use widget_core::form;
-/// use widget_core::TextInput;
+/// use widget_core::{form, TextInput};
 /// use flux_state::{Runtime, Signal};
 ///
 /// let runtime = Runtime::new();
 /// let name = Signal::new(runtime.clone(), String::new());
 /// let email = Signal::new(runtime.clone(), String::new());
 ///
-/// // Form with tuple-based fields (compile-time typed)
-/// let form1 = form!([
+/// // Create a form with named fields and a submission handler
+/// let my_form = form!([
 ///     ("name", TextInput::new(name)),
 ///     ("email", TextInput::new(email)),
-/// ]);
+/// ],
+/// gap: 16.0,
+/// on_submit: |data| {
+///     // data is FormData (HashMap<String, String>)
+///     let name_val = data.get("name").map(|s| s.as_str()).unwrap_or("");
+///     let email_val = data.get("email").map(|s| s.as_str()).unwrap_or("");
 ///
-/// // Form with options
-/// let runtime2 = Runtime::new();
-/// let username = Signal::new(runtime2.clone(), String::new());
-/// let user_email = Signal::new(runtime2.clone(), String::new());
+///     println!("Submitting: {} <{}>", name_val, email_val);
 ///
-/// let form2 = form!([
-///     ("username", TextInput::new(username)),
-///     ("email", TextInput::new(user_email)),
-/// ], gap: 16.0, padding: 20.0);
+///     // Return Ok(()) on success, or Err(String) to display a form-level error
+///     if name_val.is_empty() {
+///         Err("Name is required".to_string())
+///     } else {
+///         Ok(())
+///     }
+/// });
 /// ```
 ///
-/// Or use the builder pattern directly:
+/// # Builder Usage
+///
 /// ```no_run
-/// use widget_core::Form;
-/// use widget_core::TextInput;
+/// use widget_core::{Form, TextInput};
 /// use flux_state::{Runtime, Signal};
 ///
 /// let runtime = Runtime::new();
@@ -48,7 +61,12 @@ use std::sync::Arc;
 /// let form = Form::new((
 ///     ("name", TextInput::new(name)),
 ///     ("email", TextInput::new(email)),
-/// ));
+/// ))
+/// .padding(20.0)
+/// .on_submit(|data| {
+///     println!("Data: {:?}", data);
+///     Ok(())
+/// });
 /// ```
 pub struct Form<F: NamedWidgetTuple> {
     fields: F,
@@ -69,6 +87,9 @@ impl<F: NamedWidgetTuple> Form<F> {
     }
 
     /// Set submit callback
+    ///
+    /// The callback receives a [`FormData`] map containing the current values of all fields.
+    /// It should return `Ok(())` if submission succeeds, or `Err(String)` with an error message.
     pub fn on_submit<Cb>(mut self, callback: Cb) -> Self
     where
         Cb: Fn(FormData) -> Result<(), String> + Send + Sync + 'static,
@@ -77,13 +98,13 @@ impl<F: NamedWidgetTuple> Form<F> {
         self
     }
 
-    /// Set gap between fields
+    /// Set gap between fields (vertical spacing)
     pub fn gap(mut self, gap: f32) -> Self {
         self.gap = gap;
         self
     }
 
-    /// Set padding
+    /// Set padding around the form
     pub fn padding(mut self, padding: f32) -> Self {
         self.padding = padding;
         self

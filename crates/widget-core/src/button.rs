@@ -13,16 +13,17 @@ use theme_engine::DesignTokens;
 /// # Example
 ///
 /// ```no_run
-/// use widget_core::Button;
+/// use widget_core::{Button, btn};
 ///
+/// // Builder pattern
 /// let button = Button::new("Click Me")
 ///     .primary()
 ///     .on_click(|| println!("Clicked!"));
 ///
-/// // With generated macro:
-/// // btn!("Click Me")
-/// // btn!("Save", primary, on_click: || save())
-/// // btn!("Cancel", disabled, padding: 20.0)
+/// // Macro usage
+/// let b1 = btn!("Click Me");
+/// let b2 = btn!("Save", primary, on_click: || println!("Saved"));
+/// let b3 = btn!("Cancel", disabled, padding: 20.0);
 /// ```
 #[derive(Widget)]
 #[widget(name = "btn", alias = "button")]
