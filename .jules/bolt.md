@@ -25,3 +25,7 @@
 **[Batching Lock Acquisitions]**
 **Learning:** In systems with fine-grained locking (like reactive runtimes), repeated lock acquisitions for items in a queue (like pending effects) can be a significant bottleneck. Moving the queue to a local buffer under a single lock allows processing without holding the lock or re-acquiring it repeatedly.
 **Action:** Look for loops that pop from a shared, locked collection one by one. Replace with `swap` or `append` to take the whole batch.
+
+**[Buffer Recycling in Producer-Consumer Locks]**
+**Learning:** When draining a shared buffer (like `pending_effects`) to a local variable, `std::mem::take` or `append` leaves the shared buffer with 0 capacity, forcing producers to reallocate immediately.
+**Action:** Use a "spare" buffer in the shared state. Swap the empty spare buffer (which retains capacity from previous runs) with the full pending buffer. This keeps both producer and consumer allocation-free after stabilization.

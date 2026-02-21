@@ -71,6 +71,9 @@ struct RuntimeInner {
     // Pending effects to run
     pending_effects: Vec<NodeId>,
 
+    // Reusable buffer to avoid allocations during effect flushing
+    spare_pending_effects: Vec<NodeId>,
+
     // Reusable buffer for graph traversal to avoid allocations
     traversal_buffer: Vec<NodeId>,
 
@@ -242,6 +245,7 @@ impl Runtime {
                 tracking_context: HashMap::new(),
                 stale: HashSet::new(),
                 pending_effects: Vec::new(),
+                spare_pending_effects: Vec::new(),
                 traversal_buffer: Vec::new(),
                 #[cfg(feature = "nova")]
                 labels: HashMap::new(),
@@ -339,11 +343,24 @@ impl Runtime {
             {
                 let mut inner = self.inner.lock().unwrap();
                 if inner.pending_effects.is_empty() {
+                    // Donate our buffer back to the runtime if it has capacity
+                    // and the runtime's spare buffer is smaller.
+                    if local_effects.capacity() > inner.spare_pending_effects.capacity() {
+                        inner.spare_pending_effects = local_effects;
+                    }
                     break;
                 }
-                // Move all pending effects to local buffer.
-                // This clears inner.pending_effects but keeps its capacity.
-                local_effects.append(&mut inner.pending_effects);
+
+                // Swap out pending_effects with an empty buffer.
+                // Prefer reusing spare_pending_effects if available.
+                let empty_buf = if inner.spare_pending_effects.capacity() > 0 {
+                    std::mem::take(&mut inner.spare_pending_effects)
+                } else {
+                    std::mem::take(&mut local_effects)
+                };
+
+                // local_effects gets the full buffer, pending_effects gets the empty one
+                local_effects = std::mem::replace(&mut inner.pending_effects, empty_buf);
             }
 
             // Process batch in reverse order (LIFO) to match original behavior.
