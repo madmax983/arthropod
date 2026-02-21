@@ -1,71 +1,70 @@
 use flux_state::{Computed, Runtime, Signal};
-use std::sync::mpsc;
+use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
 #[test]
+#[should_panic(expected = "Race condition detected")]
 fn test_computed_race_condition() {
     let runtime = Runtime::new();
-
-    // 1. Create a signal S = 0
     let signal = Signal::new(runtime.clone(), 0);
-    let (read_s, write_s) = signal.split();
+    let (read_sig, write_sig) = signal.split();
 
-    // 2. Create a computed C = S + 1
-    //    We inject a sleep to simulate slow computation.
-    let read_s_clone = read_s.clone();
+    // Barrier to synchronize the race:
+    // 2 participants: Thread A (compute) and Main Thread (read)
+    let barrier = Arc::new(Barrier::new(2));
+    let barrier_clone = barrier.clone();
+
+    // The Computed value that depends on `signal`.
+    // We inject a delay/barrier inside the computation to catch the runtime
+    // in the state where `stale` is false (cleared) but the new value isn't stored.
     let computed = Computed::new(runtime.clone(), move || {
-        let val = read_s_clone.get();
-        // Simulate heavy work
-        thread::sleep(Duration::from_millis(50));
-        val + 1
+        let val = read_sig.get();
+        if val == 1 {
+            // We are in the update phase triggered by `write_sig.set(1)`.
+            // Block here. At this point, `Runtime::recompute` has already cleared the `stale` flag.
+            barrier_clone.wait();
+            // Sleep a bit to ensure the other thread has time to read the STALE value.
+            thread::sleep(Duration::from_millis(100));
+        }
+        val + 100
     });
 
-    // Initial state: S=0, C=1.
-    assert_eq!(computed.get(), 1);
+    // Initial value check (runs immediately upon creation)
+    assert_eq!(computed.get(), 100);
 
-    // 3. Update S = 1. C becomes stale.
-    //    Next compute should return 2.
-    write_s.set(1);
+    // Trigger update
+    write_sig.set(1);
+    // `computed` is now marked stale.
 
-    // 4. Spawn Thread 1 (The SlowUpdater)
-    //    It reads C, triggering recomputation.
-    //    It clears the stale flag, then sleeps for 50ms.
-    let c1 = computed.clone();
-    let (tx1, rx1) = mpsc::channel();
-    thread::spawn(move || {
-        let _ = c1.get(); // This blocks for 50ms
-        tx1.send(()).unwrap();
+    // Spawn Thread A to trigger recompute
+    let computed_a = computed.clone();
+    let handle_a = thread::spawn(move || {
+        // Accessing `computed_a` will trigger `recompute`.
+        // Inside `recompute`, it will hit the barrier.
+        computed_a.get()
     });
 
-    // 5. Spawn Thread 2 (The Victim)
-    //    It waits 10ms (so T1 has started and cleared stale flag),
-    //    then reads C.
-    //    It SHOULD block until T1 finishes, or T1 shouldn't have cleared stale flag.
-    //    Instead, it sees stale=false, and reads the OLD value (1).
-    let c2 = computed.clone();
-    let (tx2, rx2) = mpsc::channel();
-    thread::spawn(move || {
-        thread::sleep(Duration::from_millis(10));
-        let val = c2.get();
-        tx2.send(val).unwrap();
-    });
+    // Wait for Thread A to hit the barrier.
+    // This guarantees that Thread A is inside `compute_fn` and has cleared the `stale` flag.
+    barrier.wait();
 
-    // 6. Wait for T2 result
-    let val_t2 = rx2.recv_timeout(Duration::from_millis(200)).unwrap();
+    // Main Thread (Thread B) reads immediately.
+    // Since `stale` is cleared by Thread A, `is_stale()` returns false.
+    // So `recompute()` is skipped.
+    // It proceeds to read the stored value, which is still the OLD value (100)
+    // because Thread A hasn't finished computing/storing the new value yet.
+    let val = computed.get();
 
-    // 7. Assert T2 got the OLD value (1).
-    //    This confirms the race condition.
-    if val_t2 == 1 {
-        println!("SUCCESS: Race condition confirmed! Got OLD value (1) during recomputation.");
-    } else if val_t2 == 2 {
-        panic!(
-            "FAILURE: Race condition missed! Got NEW value (2). The system behaved correctly? Impossible!"
-        );
-    } else {
-        panic!("Unexpected value: {}", val_t2);
-    }
+    // Allow Thread A to finish
+    handle_a.join().unwrap();
 
-    // Wait for T1 to finish
-    let _ = rx1.recv();
+    // The correct behavior requires the value to be consistent with the dependency update.
+    // Since `signal` is 1, `computed` should be 101.
+    // If we read 100, we have a race condition (stale read).
+    assert_eq!(
+        val, 101,
+        "Race condition detected! Read stale value 100 instead of 101. \
+        The `stale` flag was cleared before the new value was written."
+    );
 }
