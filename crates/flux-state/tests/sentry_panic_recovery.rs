@@ -83,3 +83,55 @@ fn test_effect_panic_recovery() {
         "Effect should have recovered and run again"
     );
 }
+
+#[test]
+fn test_effect_panic_before_tracking_leaves_zombie() {
+    let runtime = Runtime::new();
+    let trigger = Signal::new(runtime.clone(), 0);
+    let (read_trigger, write_trigger) = trigger.split();
+
+    let run_count = Arc::new(Mutex::new(0));
+    let run_count_clone = run_count.clone();
+
+    // Effect panics BEFORE reading any signal on first run.
+    let _effect_handle = Effect::new(runtime.clone(), move || {
+        *run_count_clone.lock().unwrap() += 1;
+
+        // We use get_untracked to check value without registering dependency.
+        // If we panic here, we haven't registered any dependencies yet.
+        let current_val = read_trigger.get_untracked();
+
+        if current_val == 1 {
+            panic!("Transient Panic!");
+        }
+
+        // Actual dependency tracking happens here.
+        // If we panicked above, this line is never reached.
+        let _ = read_trigger.get();
+    });
+
+    // 1. Initial run (val=0). Runs once.
+    assert_eq!(*run_count.lock().unwrap(), 1);
+
+    // 2. Set to 1 -> Panic
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        write_trigger.set(1);
+    }));
+    assert!(result.is_err(), "Effect should have panicked");
+    assert_eq!(*run_count.lock().unwrap(), 2);
+
+    // 3. Set to 2 -> Should it run?
+    // If it panicked before tracking, it lost its dependency on `trigger`.
+    // It should NOT run when `trigger` changes to 2.
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        write_trigger.set(2);
+    }));
+    assert!(result.is_ok());
+
+    // Verify count is still 2 (zombie)
+    let count = *run_count.lock().unwrap();
+    assert_eq!(
+        count, 2,
+        "Effect should be a zombie because it panicked before tracking dependency"
+    );
+}
