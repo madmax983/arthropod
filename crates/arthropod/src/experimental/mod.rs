@@ -10,6 +10,9 @@ pub mod elastic;
 #[cfg(feature = "nova")]
 pub mod xray;
 
+#[cfg(feature = "nova")]
+pub mod chronos;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -195,4 +198,25 @@ pub mod elastic {
             "ERROR: 'register_elastic_feature' requires 'nova' feature. Enable it in Cargo.toml."
         );
     }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod chronos {
+    #![allow(deprecated)]
+    use std::marker::PhantomData;
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `chronos` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct Timeline;
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct RetroSignal<T>(PhantomData<T>);
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ChronosDebugger;
 }
