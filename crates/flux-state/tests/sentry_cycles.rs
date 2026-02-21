@@ -59,16 +59,23 @@ fn test_computed_cycle_behavior() {
     // Access A.
     // A recomputes. Calls B.
     // B recomputes. Calls A.
-    // A should return old value (0) because it's currently computing?
+    // A is currently computing, so it returns its old value (0) to break the cycle.
+    // B computes: 0 + 1 = 1.
+    // B finishes. B = 1.
+    // A resumes. A gets B (1).
+    // A computes: 1 + 1 = 2.
+    // A finishes. A = 2.
     let val_a = a.get();
 
     // If it didn't crash:
     println!("Cycle survived! A = {}", val_a);
+    assert_eq!(val_a, 2, "A should resolve to 2 (B=1 + 1)");
 
     // B should also be accessible
     let val_b = b.get();
     println!("Cycle survived! B = {}", val_b);
+    assert_eq!(val_b, 1, "B should resolve to 1 (old A=0 + 1)");
 
-    // We don't enforce specific values as they depend on implementation details of cycle handling,
-    // but we assert it doesn't panic or stack overflow.
+    // We enforce specific values to lock in the "cycle breaking via old value" behavior.
+    // If this behavior changes (e.g., to panic), this test should fail.
 }
