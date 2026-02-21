@@ -99,7 +99,7 @@ sequenceDiagram
     rect rgb(240, 240, 240)
         note right of App: Update Systems
         App->>ECS: app.update()
-        ECS->>ECS: Run Reactive Systems (Apply Signals)
+        ECS->>ECS: Run Reactive Systems (Single-Pass)
         ECS->>ECS: Run Layout System
         ECS->>ECS: Run Animation System
     end
@@ -115,5 +115,5 @@ sequenceDiagram
 ## Key Architectural Decisions
 
 - **Hybrid ECS**: We use a custom `Scene` graph (HashMap-based tree) for hierarchical operations (layout, event bubbling) while using `bevy_ecs` for bulk operations (rendering, animation). See [ADR 0001](./adr/0001-hybrid-ecs-architecture.md).
-- **Reactive State**: State is managed via `flux-state` signals. The ECS polls these signals to update components, ensuring UI properties remain in sync with the underlying data model.
+- **Reactive State**: State is managed via `flux-state` signals. The ECS polls these signals in a single pass (`update_all_reactive_system`) to update components, ensuring UI properties remain in sync with the underlying data model. See [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
 - **Platform Abstraction**: `plat-core` isolates OS-specific code, allowing the rest of the engine to remain platform-agnostic.
