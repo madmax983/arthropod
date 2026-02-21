@@ -291,6 +291,19 @@ impl Scene {
         }
     }
 
+    /// Iterate over visual nodes using a provided stack buffer to avoid allocations.
+    ///
+    /// This is identical to `iter_visuals`, but reuses an existing vector for
+    /// the traversal stack. The stack is cleared before use.
+    pub fn iter_visuals_custom<'a, 'b>(
+        &'a self,
+        stack: &'b mut Vec<NodeId>,
+    ) -> VisualRefIterator<'a, 'b> {
+        stack.clear();
+        stack.push(self.root);
+        VisualRefIterator { scene: self, stack }
+    }
+
     /// Find a visible node at the given screen position.
     ///
     /// This method performs an iterative tree traversal starting from the root,
@@ -434,6 +447,29 @@ pub struct VisualIterator<'a> {
 }
 
 impl<'a> Iterator for VisualIterator<'a> {
+    type Item = (NodeId, &'a SceneNode);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.stack.pop()?;
+        let node = self.scene.get_node(id)?;
+
+        // Push children in reverse order so they are processed in forward order
+        // (stack is LIFO, so pushing [1, 2] means popping 2 then 1, visiting 1 then 2)
+        for &child_id in node.children.iter().rev() {
+            self.stack.push(child_id);
+        }
+
+        Some((id, node))
+    }
+}
+
+/// Iterator for visual nodes using a borrowed stack.
+pub struct VisualRefIterator<'a, 'b> {
+    scene: &'a Scene,
+    stack: &'b mut Vec<NodeId>,
+}
+
+impl<'a, 'b> Iterator for VisualRefIterator<'a, 'b> {
     type Item = (NodeId, &'a SceneNode);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -726,5 +762,42 @@ mod tests {
 
         // Expected order: Root, Child1, Grandchild1, Child2
         assert_eq!(traversal, vec![root, child1, grandchild1, child2]);
+    }
+
+    #[test]
+    fn test_iter_visuals_custom_matches_standard() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Create a complex hierarchy
+        let child1 = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+        let child2 = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+        let _grandchild1 = scene.add_node(child1, SceneNode::new(NodeContent::Empty));
+        let _grandchild2 = scene.add_node(child1, SceneNode::new(NodeContent::Empty));
+        let _grandchild3 = scene.add_node(child2, SceneNode::new(NodeContent::Empty));
+
+        // Standard iterator
+        let standard_order: Vec<NodeId> = scene.iter_visuals().map(|(id, _)| id).collect();
+
+        // Custom iterator with reused stack
+        let mut stack = Vec::new();
+        let custom_order: Vec<NodeId> = scene
+            .iter_visuals_custom(&mut stack)
+            .map(|(id, _)| id)
+            .collect();
+
+        assert_eq!(standard_order, custom_order);
+
+        // Verify stack is empty after completion (consumed by iterator)
+        assert!(stack.is_empty());
+
+        // Verify we can reuse the stack (it should be cleared by iter_visuals_custom)
+        stack.push(NodeId(999)); // Add junk
+        let custom_order_2: Vec<NodeId> = scene
+            .iter_visuals_custom(&mut stack)
+            .map(|(id, _)| id)
+            .collect();
+
+        assert_eq!(standard_order, custom_order_2);
     }
 }

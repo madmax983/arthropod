@@ -30,16 +30,21 @@ pub fn collect_renderables_system(
     query: Query<&SceneNodeRef, With<Renderable>>,
     scene: Res<Scene>,
     mut commands: ResMut<RenderCommands>,
+    // Persistent cache for the set of renderable node IDs to avoid per-frame allocation
+    mut renderable_nodes_cache: Local<HashSet<NodeId>>,
+    // Persistent stack for scene traversal to avoid per-frame allocation
+    mut traversal_stack: Local<Vec<NodeId>>,
 ) {
     commands.0.clear();
+    renderable_nodes_cache.clear();
 
     // 1. Collect renderable NodeIds from ECS to filter the scene traversal
-    let renderable_nodes: HashSet<NodeId> = query.iter().map(|r| r.0).collect();
+    renderable_nodes_cache.extend(query.iter().map(|r| r.0));
 
     // 2. Collect visual nodes in painter's order, filtered by renderable set
     let visual_nodes: Vec<_> = scene
-        .iter_visuals()
-        .filter(|(id, _)| renderable_nodes.contains(id))
+        .iter_visuals_custom(&mut traversal_stack)
+        .filter(|(id, _)| renderable_nodes_cache.contains(id))
         .collect();
 
     // 3. Generate instances — use threshold to choose execution path
