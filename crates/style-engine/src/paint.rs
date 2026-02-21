@@ -19,6 +19,8 @@ pub enum ImageScaleMode {
     Crop,
     /// Tile the image
     Tile,
+    /// Stretch image to target bounds
+    Stretch,
 }
 
 /// Color stop for gradients
@@ -404,6 +406,12 @@ mod tests {
         let _image = Paint::Image(ImageFill {
             image_id: ImageId(123),
             scale_mode: ImageScaleMode::Fill,
+            transform: None,
+        });
+
+        let _image_stretch = Paint::Image(ImageFill {
+            image_id: ImageId(456),
+            scale_mode: ImageScaleMode::Stretch,
             transform: None,
         });
     }

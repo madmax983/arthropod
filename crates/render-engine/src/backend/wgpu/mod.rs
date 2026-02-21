@@ -18,7 +18,9 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tracing::{Level, instrument, span};
 
 use context::WgpuContext;
-use effects::{RenderTargetKey, RenderTargetPool};
+#[cfg(not(target_arch = "wasm32"))]
+use effects::RenderTargetKey;
+use effects::RenderTargetPool;
 use pipelines::blend_pipeline::BlendPipeline;
 use pipelines::blur_pipeline::BlurPipeline;
 pub use pipelines::path_pipeline::TessellationCacheStats;

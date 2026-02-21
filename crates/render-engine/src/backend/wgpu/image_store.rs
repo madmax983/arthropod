@@ -106,6 +106,7 @@ fn map_uv_for_scale_mode(
 
     match scale_mode {
         ImageScaleMode::Tile => Some(Vec2::new(wrap01(uv.x), wrap01(uv.y))),
+        ImageScaleMode::Stretch => Some(uv),
         ImageScaleMode::Fit => {
             if image_aspect > target_aspect {
                 let visible_h = target_aspect / image_aspect;
@@ -207,5 +208,36 @@ mod tests {
         assert!((c.x - 64.0 / 255.0).abs() < 1e-6);
         assert!((c.y - 128.0 / 255.0).abs() < 1e-6);
         assert!((c.z - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_sample_image_fill_stretch_preserves_full_image_range() {
+        register_image_rgba8(
+            ImageId(13),
+            4,
+            1,
+            vec![
+                255, 0, 0, 255, // red
+                0, 255, 0, 255, // green
+                0, 0, 255, 255, // blue
+                255, 255, 0, 255, // yellow
+            ],
+        )
+        .expect("register image");
+
+        let fill = ImageFill {
+            image_id: ImageId(13),
+            scale_mode: ImageScaleMode::Stretch,
+            transform: None,
+        };
+
+        // With stretch, low/high x UV should map to image extremes even with aspect mismatch.
+        let left = sample_image_fill(&fill, Vec2::new(0.1, 0.5), Vec2::new(100.0, 100.0))
+            .expect("sample should exist");
+        let right = sample_image_fill(&fill, Vec2::new(0.9, 0.5), Vec2::new(100.0, 100.0))
+            .expect("sample should exist");
+
+        assert!(left.x > 0.9 && left.y < 0.1 && left.z < 0.1);
+        assert!(right.x > 0.9 && right.y > 0.9 && right.z < 0.1);
     }
 }

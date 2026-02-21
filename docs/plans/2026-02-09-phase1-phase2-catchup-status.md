@@ -40,12 +40,10 @@ intentionally deviating for now.
 
 ## Intentional deviations (documented)
 
-1. Stroke rendering currently uses `top_paint()` only.
-   - Rationale: data model now supports stacked stroke paints, but GPU
-     compositing for multiple stroke paint layers is not yet implemented.
+None currently tracked in this catch-up note.
 
 ## Follow-up tasks
 
-- Decide and schedule:
-  - multi-layer stroke paint compositing.
+- Continue parity hardening from the master render plan
+  (`docs/plans/2026-02-08-figma-rendering-pipeline-design.md`).
 

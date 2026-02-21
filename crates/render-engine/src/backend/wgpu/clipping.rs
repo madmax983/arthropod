@@ -129,12 +129,68 @@ pub(crate) fn rect_to_scissor_bounds(
     Some([x0, y0, x1 - x0, y1 - y0])
 }
 
-pub(crate) fn rect_path_for_size(width: f32, height: f32) -> style_engine::VectorPath {
+pub(crate) fn rounded_rect_path_for_size(
+    width: f32,
+    height: f32,
+    radii: style_engine::CornerRadii,
+) -> style_engine::VectorPath {
+    let width = width.max(0.0);
+    let height = height.max(0.0);
+    if width <= 0.0 || height <= 0.0 {
+        return style_engine::VectorPath::new();
+    }
+
+    let mut tl = radii.top_left.max(0.0);
+    let mut tr = radii.top_right.max(0.0);
+    let mut br = radii.bottom_right.max(0.0);
+    let mut bl = radii.bottom_left.max(0.0);
+
+    let max_radius = (width.min(height)) * 0.5;
+    tl = tl.min(max_radius);
+    tr = tr.min(max_radius);
+    br = br.min(max_radius);
+    bl = bl.min(max_radius);
+
+    let top = tl + tr;
+    let bottom = bl + br;
+    let left = tl + bl;
+    let right = tr + br;
+    let scale = 1.0_f32
+        .min(if top > 0.0 { width / top } else { 1.0 })
+        .min(if bottom > 0.0 { width / bottom } else { 1.0 })
+        .min(if left > 0.0 { height / left } else { 1.0 })
+        .min(if right > 0.0 { height / right } else { 1.0 });
+    if scale < 1.0 {
+        tl *= scale;
+        tr *= scale;
+        br *= scale;
+        bl *= scale;
+    }
+
     let mut path = style_engine::VectorPath::new();
-    path.move_to(glam::Vec2::new(0.0, 0.0));
-    path.line_to(glam::Vec2::new(width, 0.0));
-    path.line_to(glam::Vec2::new(width, height));
-    path.line_to(glam::Vec2::new(0.0, height));
+    path.move_to(glam::Vec2::new(tl, 0.0));
+    path.line_to(glam::Vec2::new(width - tr, 0.0));
+    if tr > 0.0 {
+        path.quadratic_to(glam::Vec2::new(width, 0.0), glam::Vec2::new(width, tr));
+    }
+    path.line_to(glam::Vec2::new(width, height - br));
+    if br > 0.0 {
+        path.quadratic_to(
+            glam::Vec2::new(width, height),
+            glam::Vec2::new(width - br, height),
+        );
+    }
+    path.line_to(glam::Vec2::new(bl, height));
+    if bl > 0.0 {
+        path.quadratic_to(
+            glam::Vec2::new(0.0, height),
+            glam::Vec2::new(0.0, height - bl),
+        );
+    }
+    path.line_to(glam::Vec2::new(0.0, tl));
+    if tl > 0.0 {
+        path.quadratic_to(glam::Vec2::new(0.0, 0.0), glam::Vec2::new(tl, 0.0));
+    }
     path.close();
     path
 }

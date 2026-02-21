@@ -27,7 +27,7 @@ Source plan: `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`
 - `style-engine` crate and `VisualStyle` unified model: implemented.
 - `VisualStyle` includes `corner_smoothing`, `clips_content`, `fill_geometry`, `stroke_geometry`, `text`: implemented (`crates/style-engine/src/visual.rs`).
 - Figma-like paint model and stroke model in public types: implemented.
-- Known deviation: stroke rendering currently uses top stroke paint only (multi-layer stroke paint compositing not yet implemented).
+- Multi-layer stroke paint compositing is implemented (all stroke paint layers render bottom-to-top).
 
 ### Phase 3
 
@@ -95,9 +95,9 @@ CI guardrails added for style-engine path ops:
 ## Notes on plan alignment
 
 - Current implementation is aligned with the plan's architecture direction (unified primitive pipeline + additive path pipeline).
-- A practical deviation is currently used for path gradient rendering:
-  - CPU-side per-vertex paint sampling in `PathPipeline::prepare(...)` rather than full gradient-atlas sampling in `path.wgsl`.
-  - This is functional and visually aligned for current cases, but not yet the final ideal for all transform/stretch edge cases.
+- Path gradient rendering now uses shader-evaluated gradient atlas sampling in `path.wgsl`:
+  - `PathPipeline` provides UV + gradient metadata per vertex and uploads gradient params/atlas for fragment evaluation.
+  - This removes the former CPU per-vertex gradient color baking deviation.
 
 ## 2026-02-10 Optimization Update (cache hits)
 

@@ -469,6 +469,65 @@ fn test_collect_instances_routes_fill_geometry_to_path_batches() {
 }
 
 #[test]
+fn test_collect_instances_adds_batch_per_fill_paint_layer_for_path_geometry() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut path = style_engine::VectorPath::new();
+    path.move_to(glam::Vec2::new(0.0, 0.0));
+    path.line_to(glam::Vec2::new(80.0, 0.0));
+    path.line_to(glam::Vec2::new(40.0, 60.0));
+    path.close();
+
+    let node = SceneNode {
+        content: NodeContent::Styled {
+            style: Box::new(
+                crate::VisualStyle::new()
+                    .solid_fill(glam::Vec4::new(1.0, 0.0, 0.0, 1.0))
+                    .fill(style_engine::Paint::solid(glam::Vec4::new(
+                        0.0, 0.0, 1.0, 1.0,
+                    )))
+                    .fill_geometry(vec![path]),
+            ),
+        },
+        transform: Transform2D::identity(),
+        bounds: plat_core::Rect {
+            x: 100.0,
+            y: 120.0,
+            width: 80.0,
+            height: 60.0,
+        },
+        children: vec![],
+        parent: None,
+        visible: true,
+        opacity: 1.0,
+    };
+    scene.add_node(root, node);
+
+    let (instances, _text_nodes, path_batches) =
+        instance_collector::collect_instances_for_tests(&scene);
+    assert!(
+        instances.is_empty(),
+        "path-only node should not emit primitive rect instances"
+    );
+    assert_eq!(
+        path_batches.len(),
+        2,
+        "expected one path batch per fill paint layer"
+    );
+    assert!(matches!(
+        &path_batches[0].paint,
+        style_engine::Paint::Solid(color)
+            if (color.x - 1.0).abs() < 1e-6 && color.y.abs() < 1e-6 && color.z.abs() < 1e-6
+    ));
+    assert!(matches!(
+        &path_batches[1].paint,
+        style_engine::Paint::Solid(color)
+            if color.x.abs() < 1e-6 && color.y.abs() < 1e-6 && (color.z - 1.0).abs() < 1e-6
+    ));
+}
+
+#[test]
 fn test_collect_instances_adds_stroke_geometry_batches() {
     let mut scene = Scene::new();
     let root = scene.root();
@@ -729,6 +788,77 @@ fn test_image_fill_rect_is_routed_to_path_batches() {
         path_batches[0].paint,
         style_engine::Paint::Image(_)
     ));
+}
+
+#[test]
+fn test_image_fill_rect_with_multiple_fill_layers_routes_all_fills_to_path_batches() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut style = crate::VisualStyle::new().solid_fill(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
+    style = style.fill(style_engine::Paint::Image(style_engine::ImageFill {
+        image_id: style_engine::ImageId(7002),
+        scale_mode: style_engine::ImageScaleMode::Fill,
+        transform: None,
+    }));
+
+    let mut node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(style),
+    });
+    node.bounds = plat_core::Rect::new(20.0, 30.0, 140.0, 90.0);
+    scene.add_node(root, node);
+
+    let (instances, _, path_batches) = instance_collector::collect_instances_for_tests(&scene);
+    assert!(
+        instances.is_empty(),
+        "mixed image fill stacks should avoid primitive image fallback"
+    );
+    assert_eq!(
+        path_batches.len(),
+        2,
+        "expected one path batch per fill layer when an image fill is present"
+    );
+    assert!(matches!(
+        &path_batches[0].paint,
+        style_engine::Paint::Solid(color)
+            if (color.x - 1.0).abs() < 1e-6 && color.y.abs() < 1e-6 && color.z.abs() < 1e-6
+    ));
+    assert!(matches!(
+        &path_batches[1].paint,
+        style_engine::Paint::Image(_)
+    ));
+}
+
+#[test]
+fn test_image_fill_rect_with_corner_radius_uses_rounded_path_geometry() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            crate::VisualStyle::new()
+                .fill(style_engine::Paint::Image(style_engine::ImageFill {
+                    image_id: style_engine::ImageId(7003),
+                    scale_mode: style_engine::ImageScaleMode::Fill,
+                    transform: None,
+                }))
+                .corner_radius(18.0),
+        ),
+    });
+    node.bounds = plat_core::Rect::new(10.0, 20.0, 140.0, 90.0);
+    scene.add_node(root, node);
+
+    let (instances, _, path_batches) = instance_collector::collect_instances_for_tests(&scene);
+    assert!(instances.is_empty());
+    assert_eq!(path_batches.len(), 1);
+    assert!(matches!(
+        path_batches[0].paint,
+        style_engine::Paint::Image(_)
+    ));
+    assert!(
+        path_batches[0].mesh.vertices.len() > 4,
+        "rounded image-filled rects should tessellate to rounded geometry"
+    );
 }
 
 #[test]

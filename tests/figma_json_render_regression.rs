@@ -12,8 +12,9 @@ use render_engine::{
 };
 use serde::Deserialize;
 use style_engine::{
-    BackgroundBlur, DropShadow, ImageFill, ImageId, ImageScaleMode, InnerShadow, LayerBlur,
-    LinearGradient, MaskType, SideWeights, StrokeAlign, StrokeStyle,
+    AngularGradient, BackgroundBlur, DiamondGradient, DropShadow, ImageFill, ImageId,
+    ImageScaleMode, InnerShadow, LayerBlur, LinearGradient, MaskType, RadialGradient, SideWeights,
+    StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle,
 };
 
 const DEFAULT_CHANNEL_TOLERANCE: u8 = 2;
@@ -73,12 +74,16 @@ struct FigmaStyle {
     strokes: Vec<FigmaPaint>,
     stroke_weight: Option<f32>,
     stroke_align: Option<FigmaStrokeAlign>,
+    stroke_cap: Option<FigmaStrokeCap>,
+    stroke_join: Option<FigmaStrokeJoin>,
+    stroke_dashes: Option<Vec<f32>>,
     #[serde(alias = "individualStrokeWeights")]
     individual_stroke_weights: Option<FigmaSideWeights>,
     #[serde(default)]
     effects: Vec<FigmaEffect>,
     corner_radius: Option<f32>,
     rectangle_corner_radii: Option<[f32; 4]>,
+    corner_smoothing: Option<f32>,
     opacity: Option<f32>,
     blend_mode: Option<FigmaBlendMode>,
     clips_content: Option<bool>,
@@ -106,6 +111,22 @@ enum FigmaStrokeAlign {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaStrokeCap {
+    None,
+    Round,
+    Square,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaStrokeJoin {
+    Miter,
+    Round,
+    Bevel,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum FigmaMaskType {
     Alpha,
     Vector,
@@ -119,6 +140,7 @@ enum FigmaImageScaleMode {
     Fit,
     Crop,
     Tile,
+    Stretch,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -155,6 +177,21 @@ enum FigmaPaint {
     GradientLinear {
         start: [f32; 2],
         end: [f32; 2],
+        stops: Vec<FigmaColorStop>,
+    },
+    GradientRadial {
+        center: [f32; 2],
+        radius: f32,
+        stops: Vec<FigmaColorStop>,
+    },
+    GradientAngular {
+        center: [f32; 2],
+        angle: f32,
+        stops: Vec<FigmaColorStop>,
+    },
+    GradientDiamond {
+        center: [f32; 2],
+        scale: f32,
         stops: Vec<FigmaColorStop>,
     },
     Image {
@@ -223,6 +260,42 @@ impl FigmaPaint {
                     .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
                     .collect(),
             }),
+            Self::GradientRadial {
+                center,
+                radius,
+                stops,
+            } => Paint::Radial(RadialGradient {
+                center: vec2(center),
+                radius,
+                stops: stops
+                    .into_iter()
+                    .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
+                    .collect(),
+            }),
+            Self::GradientAngular {
+                center,
+                angle,
+                stops,
+            } => Paint::Angular(AngularGradient {
+                center: vec2(center),
+                angle,
+                stops: stops
+                    .into_iter()
+                    .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
+                    .collect(),
+            }),
+            Self::GradientDiamond {
+                center,
+                scale,
+                stops,
+            } => Paint::Diamond(DiamondGradient {
+                center: vec2(center),
+                scale,
+                stops: stops
+                    .into_iter()
+                    .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
+                    .collect(),
+            }),
             Self::Image {
                 image_id,
                 scale_mode,
@@ -278,8 +351,95 @@ impl From<FigmaImageScaleMode> for ImageScaleMode {
             FigmaImageScaleMode::Fit => Self::Fit,
             FigmaImageScaleMode::Crop => Self::Crop,
             FigmaImageScaleMode::Tile => Self::Tile,
+            FigmaImageScaleMode::Stretch => Self::Stretch,
         }
     }
+}
+
+#[test]
+fn figma_image_scale_mode_stretch_maps_to_style_engine_stretch() {
+    let mapped: ImageScaleMode = FigmaImageScaleMode::Stretch.into();
+    assert!(matches!(mapped, ImageScaleMode::Stretch));
+}
+
+#[test]
+fn figma_style_corner_smoothing_maps_to_visual_style_corner_smoothing() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "fills":[{"type":"SOLID","color":[1.0,0.0,0.0,1.0]}],
+            "cornerSmoothing": 0.72
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+    let style = figma_style.into_visual_style();
+    assert!(
+        (style.corner_smoothing - 0.72).abs() < 1e-6,
+        "corner smoothing should map from figma style"
+    );
+}
+
+#[test]
+fn figma_style_stroke_cap_join_and_dashes_map_to_stroke_style() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeCap": "ROUND",
+            "strokeJoin": "BEVEL",
+            "strokeDashes": [4.0, 2.0]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert_eq!(stroke.cap, StrokeCap::Round);
+    assert_eq!(stroke.join, StrokeJoin::Bevel);
+    assert_eq!(stroke.dash_pattern, vec![4.0, 2.0]);
+}
+
+#[test]
+fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
+    let radial: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"GRADIENT_RADIAL",
+            "center":[0.5,0.5],
+            "radius":0.4,
+            "stops":[
+                {"position":0.0,"color":[1.0,0.0,0.0,1.0]},
+                {"position":1.0,"color":[0.0,0.0,1.0,1.0]}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize radial gradient paint");
+    assert!(matches!(radial.into_paint(), Paint::Radial(_)));
+
+    let angular: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"GRADIENT_ANGULAR",
+            "center":[0.5,0.5],
+            "angle":1.2,
+            "stops":[
+                {"position":0.0,"color":[1.0,1.0,0.0,1.0]},
+                {"position":1.0,"color":[0.0,1.0,1.0,1.0]}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize angular gradient paint");
+    assert!(matches!(angular.into_paint(), Paint::Angular(_)));
+
+    let diamond: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"GRADIENT_DIAMOND",
+            "center":[0.5,0.5],
+            "scale":0.8,
+            "stops":[
+                {"position":0.0,"color":[1.0,0.5,0.0,1.0]},
+                {"position":1.0,"color":[0.0,0.2,1.0,1.0]}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize diamond gradient paint");
+    assert!(matches!(diamond.into_paint(), Paint::Diamond(_)));
 }
 
 impl From<FigmaStrokeAlign> for StrokeAlign {
@@ -288,6 +448,26 @@ impl From<FigmaStrokeAlign> for StrokeAlign {
             FigmaStrokeAlign::Inside => Self::Inside,
             FigmaStrokeAlign::Center => Self::Center,
             FigmaStrokeAlign::Outside => Self::Outside,
+        }
+    }
+}
+
+impl From<FigmaStrokeCap> for StrokeCap {
+    fn from(value: FigmaStrokeCap) -> Self {
+        match value {
+            FigmaStrokeCap::None => Self::Butt,
+            FigmaStrokeCap::Round => Self::Round,
+            FigmaStrokeCap::Square => Self::Square,
+        }
+    }
+}
+
+impl From<FigmaStrokeJoin> for StrokeJoin {
+    fn from(value: FigmaStrokeJoin) -> Self {
+        match value {
+            FigmaStrokeJoin::Miter => Self::Miter,
+            FigmaStrokeJoin::Round => Self::Round,
+            FigmaStrokeJoin::Bevel => Self::Bevel,
         }
     }
 }
@@ -341,6 +521,9 @@ impl FigmaStyle {
         if let Some([tl, tr, br, bl]) = self.rectangle_corner_radii {
             style = style.corner_radii(CornerRadii::new(tl, tr, br, bl));
         }
+        if let Some(corner_smoothing) = self.corner_smoothing {
+            style = style.corner_smoothing(corner_smoothing);
+        }
 
         for effect in self.effects {
             if let Some(effect) = effect.into_effect() {
@@ -357,6 +540,9 @@ impl FigmaStyle {
                     .collect::<Vec<_>>(),
                 weight: self.stroke_weight.unwrap_or(1.0),
                 align: self.stroke_align.unwrap_or(FigmaStrokeAlign::Center).into(),
+                cap: self.stroke_cap.unwrap_or(FigmaStrokeCap::None).into(),
+                join: self.stroke_join.unwrap_or(FigmaStrokeJoin::Miter).into(),
+                dash_pattern: self.stroke_dashes.unwrap_or_default(),
                 ..StrokeStyle::default()
             };
             if stroke.paints.is_empty() {

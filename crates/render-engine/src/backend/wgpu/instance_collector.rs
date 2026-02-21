@@ -1,7 +1,7 @@
 use crate::backend::text::TextRenderer;
 use crate::backend::wgpu::GLYPH_ATLAS_SIZE;
 use crate::backend::wgpu::GRADIENT_ATLAS_SIZE;
-use crate::backend::wgpu::clipping::{clipped_bounds_for_node, rect_path_for_size};
+use crate::backend::wgpu::clipping::{clipped_bounds_for_node, rounded_rect_path_for_size};
 use crate::backend::wgpu::effects::style_requires_multipass;
 use crate::backend::wgpu::path_interner::PathInterner;
 use crate::backend::wgpu::pipelines::gradient_atlas::GradientParams;
@@ -177,12 +177,16 @@ pub(crate) fn resolve_text_fill(
     }
 }
 
-pub(crate) fn resolve_path_fill_paint(style: &style_engine::VisualStyle) -> style_engine::Paint {
-    style
-        .fills
-        .first()
-        .cloned()
-        .unwrap_or_else(|| style_engine::Paint::solid(glam::Vec4::new(1.0, 0.0, 1.0, 1.0)))
+pub(crate) fn resolve_path_fill_paints(
+    style: &style_engine::VisualStyle,
+) -> Vec<style_engine::Paint> {
+    if style.fills.is_empty() {
+        vec![style_engine::Paint::solid(glam::Vec4::new(
+            1.0, 0.0, 1.0, 1.0,
+        ))]
+    } else {
+        style.fills.clone()
+    }
 }
 
 pub(crate) fn resolve_path_stroke_paints(
@@ -299,8 +303,8 @@ fn collect_instances_impl<'a>(
             };
 
             if let Some(paths) = &style.fill_geometry {
-                let fill_paint = resolve_path_fill_paint(style);
-
+                let fill_paints = resolve_path_fill_paints(style);
+                let mut fill_meshes = Vec::new();
                 for path in paths {
                     let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
                         interner.hash_for(path)
@@ -316,8 +320,14 @@ fn collect_instances_impl<'a>(
                     if let Ok(mesh) = mesh_result
                         && !mesh.indices.is_empty()
                     {
+                        fill_meshes.push(mesh);
+                    }
+                }
+
+                for fill_paint in &fill_paints {
+                    for mesh in &fill_meshes {
                         path_batches.push(PathBatch {
-                            mesh,
+                            mesh: Arc::clone(mesh),
                             paint: fill_paint.clone(),
                             opacity: effective_opacity,
                             size: [render_bounds.width, render_bounds.height],
@@ -373,9 +383,17 @@ fn collect_instances_impl<'a>(
 
             // Route image-filled rectangles through path batches so Paint::Image
             // samples are resolved by the path pipeline instead of magenta fallback.
-            if matches!(style.fills.first(), Some(style_engine::Paint::Image(_))) {
-                let fill_paint = resolve_path_fill_paint(style);
-                let rect_path = rect_path_for_size(render_bounds.width, render_bounds.height);
+            if style
+                .fills
+                .iter()
+                .any(|fill| matches!(fill, style_engine::Paint::Image(_)))
+            {
+                let fill_paints = resolve_path_fill_paints(style);
+                let rect_path = rounded_rect_path_for_size(
+                    render_bounds.width,
+                    render_bounds.height,
+                    style.corner_radii,
+                );
                 let path_hash = TessellationCache::fill_key(&rect_path);
                 let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
                     cache.get_or_tessellate_fill_with_key(path_hash, &rect_path)
@@ -385,13 +403,15 @@ fn collect_instances_impl<'a>(
                 if let Ok(mesh) = mesh_result
                     && !mesh.indices.is_empty()
                 {
-                    path_batches.push(PathBatch {
-                        mesh,
-                        paint: fill_paint.clone(),
-                        opacity: effective_opacity,
-                        size: [render_bounds.width, render_bounds.height],
-                        offset: [render_bounds.x, render_bounds.y],
-                    });
+                    for fill_paint in &fill_paints {
+                        path_batches.push(PathBatch {
+                            mesh: Arc::clone(&mesh),
+                            paint: fill_paint.clone(),
+                            opacity: effective_opacity,
+                            size: [render_bounds.width, render_bounds.height],
+                            offset: [render_bounds.x, render_bounds.y],
+                        });
+                    }
                 }
 
                 if let Some(stroke) = &style.stroke {
@@ -462,8 +482,8 @@ pub(crate) fn collect_style_batches_for_bounds(
     let mut path_batches = Vec::new();
 
     if let Some(paths) = &style.fill_geometry {
-        let fill_paint = resolve_path_fill_paint(style);
-
+        let fill_paints = resolve_path_fill_paints(style);
+        let mut fill_meshes = Vec::new();
         for path in paths {
             let path_hash = ctx.path_interner.hash_for(path);
             let mesh_result = ctx
@@ -473,8 +493,14 @@ pub(crate) fn collect_style_batches_for_bounds(
             if let Ok(mesh) = mesh_result
                 && !mesh.indices.is_empty()
             {
+                fill_meshes.push(mesh);
+            }
+        }
+
+        for fill_paint in &fill_paints {
+            for mesh in &fill_meshes {
                 path_batches.push(PathBatch {
-                    mesh,
+                    mesh: Arc::clone(mesh),
                     paint: fill_paint.clone(),
                     opacity: effective_opacity,
                     size: [render_bounds.width, render_bounds.height],
@@ -515,6 +541,56 @@ pub(crate) fn collect_style_batches_for_bounds(
                             offset: [render_bounds.x, render_bounds.y],
                         });
                     }
+                }
+            }
+        }
+    } else if style
+        .fills
+        .iter()
+        .any(|fill| matches!(fill, style_engine::Paint::Image(_)))
+    {
+        let fill_paints = resolve_path_fill_paints(style);
+        let rect_path = rounded_rect_path_for_size(
+            render_bounds.width,
+            render_bounds.height,
+            style.corner_radii,
+        );
+        let path_hash = TessellationCache::fill_key(&rect_path);
+        let mesh_result = ctx
+            .tessellation_cache
+            .get_or_tessellate_fill_with_key(path_hash, &rect_path);
+
+        if let Ok(mesh) = mesh_result
+            && !mesh.indices.is_empty()
+        {
+            for fill_paint in &fill_paints {
+                path_batches.push(PathBatch {
+                    mesh: Arc::clone(&mesh),
+                    paint: fill_paint.clone(),
+                    opacity: effective_opacity,
+                    size: [render_bounds.width, render_bounds.height],
+                    offset: [render_bounds.x, render_bounds.y],
+                });
+            }
+        }
+
+        if let Some(stroke) = &style.stroke {
+            let stroke_paints = resolve_path_stroke_paints(stroke);
+            let stroke_key = TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
+            let stroke_mesh_result = ctx
+                .tessellation_cache
+                .get_or_tessellate_stroke_with_key(stroke_key, &rect_path, stroke);
+            if let Ok(mesh) = stroke_mesh_result
+                && !mesh.indices.is_empty()
+            {
+                for stroke_paint in &stroke_paints {
+                    path_batches.push(PathBatch {
+                        mesh: Arc::clone(&mesh),
+                        paint: stroke_paint.clone(),
+                        opacity: effective_opacity,
+                        size: [render_bounds.width, render_bounds.height],
+                        offset: [render_bounds.x, render_bounds.y],
+                    });
                 }
             }
         }

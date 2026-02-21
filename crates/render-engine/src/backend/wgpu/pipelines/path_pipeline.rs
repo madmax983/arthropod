@@ -1,6 +1,7 @@
 //! Tessellated path utilities and Phase 3 path pipeline foundation.
 
 use crate::backend::wgpu::image_store;
+use crate::backend::wgpu::pipelines::gradient_atlas::{GradientAtlas, GradientParams};
 use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::{
@@ -39,6 +40,9 @@ pub struct PathGpuVertex {
     pub position: [f32; 2],
     pub normal: [f32; 2],
     pub color: [f32; 4],
+    pub uv: [f32; 2],
+    pub fill_type: u32,
+    pub gradient_index: u32,
 }
 
 /// Prepared path draw batch for upload.
@@ -96,7 +100,6 @@ pub enum TessellationError {
 ///
 /// This skeleton exists so Phase 3 can wire tessellation and GPU upload in
 /// incremental steps without changing the public API shape again.
-#[derive(Debug)]
 pub struct PathPipeline {
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -104,10 +107,17 @@ pub struct PathPipeline {
     vertex_capacity: usize,
     index_capacity: usize,
     index_count: u32,
+    gradient_atlas: GradientAtlas,
+    gradient_params_buffer: wgpu::Buffer,
+    gradient_params_capacity: usize,
+    gradient_params: Vec<GradientParams>,
+    gradient_bind_group: Option<wgpu::BindGroup>,
+    gradient_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 const INITIAL_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_INDEX_CAPACITY: usize = 8192;
+const INITIAL_GRADIENT_CAPACITY: usize = 256;
 const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 4.0;
 const IMAGE_SUBDIVISION_MAX: u32 = 128;
 const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 16_384;
@@ -195,6 +205,7 @@ fn hash_paint_fast(mut state: u64, paint: &Paint) -> u64 {
                 style_engine::ImageScaleMode::Fit => 1u64,
                 style_engine::ImageScaleMode::Crop => 2u64,
                 style_engine::ImageScaleMode::Tile => 3u64,
+                style_engine::ImageScaleMode::Stretch => 4u64,
             };
             state = mix_u64(state, scale_mode);
             if let Some(transform) = image.transform {
@@ -261,13 +272,25 @@ fn image_subdivision_steps(size: glam::Vec2, base_triangle_count: usize) -> u32 
 }
 
 fn sample_batch_color(batch: &PathBatch, local_pos: glam::Vec2, size: glam::Vec2) -> [f32; 4] {
-    let mut color = sample_paint_at_uv(
-        &batch.paint,
-        (local_pos / size).clamp(glam::Vec2::ZERO, glam::Vec2::ONE),
-        size,
-    );
-    color.w *= batch.opacity;
-    color.to_array()
+    match &batch.paint {
+        Paint::Solid(color) => {
+            let mut c = *color;
+            c.w *= batch.opacity;
+            c.to_array()
+        }
+        Paint::Image(_) => {
+            let mut c = sample_paint_at_uv(
+                &batch.paint,
+                (local_pos / size).clamp(glam::Vec2::ZERO, glam::Vec2::ONE),
+                size,
+            );
+            c.w *= batch.opacity;
+            c.to_array()
+        }
+        Paint::Linear(_) | Paint::Radial(_) | Paint::Angular(_) | Paint::Diamond(_) => {
+            [1.0, 1.0, 1.0, batch.opacity]
+        }
+    }
 }
 
 fn push_batch_vertex(
@@ -276,12 +299,17 @@ fn push_batch_vertex(
     local_pos: glam::Vec2,
     normal: glam::Vec2,
     size: glam::Vec2,
+    runtime: PaintRuntime,
 ) -> u32 {
     let idx = vertices.len() as u32;
+    let uv = (local_pos / size).clamp(glam::Vec2::ZERO, glam::Vec2::ONE);
     vertices.push(PathGpuVertex {
         position: [local_pos.x + batch.offset[0], local_pos.y + batch.offset[1]],
         normal: normal.to_array(),
         color: sample_batch_color(batch, local_pos, size),
+        uv: uv.to_array(),
+        fill_type: runtime.fill_type,
+        gradient_index: runtime.gradient_index,
     });
     idx
 }
@@ -298,6 +326,7 @@ fn append_subdivided_image_triangle(
     size: glam::Vec2,
     subdivision_steps: u32,
     triangle: &ImageSampleTriangle,
+    runtime: PaintRuntime,
 ) {
     let steps = subdivision_steps.max(1);
     let mut row_indices: Vec<Vec<u32>> = Vec::with_capacity((steps + 1) as usize);
@@ -321,7 +350,9 @@ fn append_subdivided_image_triangle(
             };
             let local_pos = start_pos.lerp(end_pos, col_t);
             let normal = start_normal.lerp(end_normal, col_t);
-            row_ids.push(push_batch_vertex(batch, vertices, local_pos, normal, size));
+            row_ids.push(push_batch_vertex(
+                batch, vertices, local_pos, normal, size, runtime,
+            ));
         }
         row_indices.push(row_ids);
     }
@@ -347,6 +378,7 @@ fn append_batch_geometry(
     batch: &PathBatch,
     vertices: &mut Vec<PathGpuVertex>,
     indices: &mut Vec<u32>,
+    runtime: PaintRuntime,
 ) {
     if batch.mesh.vertices.is_empty() || batch.mesh.indices.is_empty() {
         return;
@@ -381,20 +413,18 @@ fn append_batch_geometry(
                 size,
                 subdivision_steps,
                 &triangle,
+                runtime,
             );
         }
         return;
     }
 
     let base_vertex = vertices.len() as u32;
-    vertices.extend(batch.mesh.vertices.iter().map(|v| {
+    for v in &batch.mesh.vertices {
         let local_pos = glam::Vec2::new(v.position[0], v.position[1]);
-        PathGpuVertex {
-            position: [local_pos.x + batch.offset[0], local_pos.y + batch.offset[1]],
-            normal: v.normal,
-            color: sample_batch_color(batch, local_pos, size),
-        }
-    }));
+        let normal = glam::Vec2::new(v.normal[0], v.normal[1]);
+        let _ = push_batch_vertex(batch, vertices, local_pos, normal, size, runtime);
+    }
     indices.extend(batch.mesh.indices.iter().map(|i| i + base_vertex));
 }
 
@@ -847,6 +877,31 @@ fn tessellate_stroke_from_lyon_path(
     })
 }
 
+fn gradient_params_for_paint(paint: &Paint, atlas_row: u32) -> Option<GradientParams> {
+    match paint {
+        Paint::Linear(gradient) => Some(GradientParams::linear(
+            gradient.start.to_array(),
+            gradient.end.to_array(),
+            atlas_row,
+        )),
+        Paint::Radial(gradient) => Some(GradientParams::radial(
+            gradient.center.to_array(),
+            gradient.radius,
+            atlas_row,
+        )),
+        Paint::Angular(gradient) => Some(GradientParams::angular(
+            gradient.center.to_array(),
+            atlas_row,
+        )),
+        Paint::Diamond(gradient) => Some(GradientParams::diamond(
+            gradient.center.to_array(),
+            [gradient.scale, gradient.scale],
+            atlas_row,
+        )),
+        Paint::Solid(_) | Paint::Image(_) => None,
+    }
+}
+
 impl PathPipeline {
     pub fn new(
         device: &wgpu::Device,
@@ -858,9 +913,75 @@ impl PathPipeline {
             source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/path.wgsl").into()),
         });
 
+        let gradient_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Path Gradient Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let mut gradient_atlas = GradientAtlas::default();
+        gradient_atlas.init_gpu(device);
+        let gradient_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Path Gradient Params Storage Buffer"),
+            size: (INITIAL_GRADIENT_CAPACITY * std::mem::size_of::<GradientParams>()) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let gradient_bind_group = if let (Some(view), Some(sampler)) =
+            (gradient_atlas.texture_view(), gradient_atlas.sampler())
+        {
+            Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Path Gradient Bind Group"),
+                layout: &gradient_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: gradient_params_buffer.as_entire_binding(),
+                    },
+                ],
+            }))
+        } else {
+            None
+        };
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Path Pipeline Layout"),
-            bind_group_layouts: &[globals_bind_group_layout],
+            bind_group_layouts: &[globals_bind_group_layout, &gradient_bind_group_layout],
             immediate_size: 0,
         });
 
@@ -877,7 +998,10 @@ impl PathPipeline {
                     attributes: &wgpu::vertex_attr_array![
                         0 => Float32x2,
                         1 => Float32x2,
-                        2 => Float32x4
+                        2 => Float32x4,
+                        3 => Float32x2,
+                        4 => Uint32,
+                        5 => Uint32
                     ],
                 }],
             },
@@ -926,15 +1050,80 @@ impl PathPipeline {
             vertex_capacity: INITIAL_VERTEX_CAPACITY,
             index_capacity: INITIAL_INDEX_CAPACITY,
             index_count: 0,
+            gradient_atlas,
+            gradient_params_buffer,
+            gradient_params_capacity: INITIAL_GRADIENT_CAPACITY,
+            gradient_params: Vec::new(),
+            gradient_bind_group,
+            gradient_bind_group_layout,
         }
     }
 
-    pub fn prepare(&mut self, device: &wgpu::Device, _queue: &wgpu::Queue, batches: &[PathBatch]) {
+    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, batches: &[PathBatch]) {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
+        self.gradient_params.clear();
 
         for batch in batches {
-            append_batch_geometry(batch, &mut vertices, &mut indices);
+            let runtime = if let Some(mut params) = gradient_params_for_paint(&batch.paint, 0) {
+                let atlas_row = match &batch.paint {
+                    Paint::Linear(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
+                    Paint::Radial(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
+                    Paint::Angular(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
+                    Paint::Diamond(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
+                    Paint::Solid(_) | Paint::Image(_) => 0,
+                };
+                params.atlas_row = (atlas_row as f32 + 0.5) / GradientAtlas::ATLAS_SIZE as f32;
+                let gradient_index = self.gradient_params.len() as u32;
+                self.gradient_params.push(params);
+                PaintRuntime {
+                    fill_type: params.gradient_type + 1,
+                    gradient_index,
+                }
+            } else {
+                PaintRuntime::default()
+            };
+            append_batch_geometry(batch, &mut vertices, &mut indices, runtime);
+        }
+
+        self.gradient_atlas.upload_to_gpu(queue);
+        if !self.gradient_params.is_empty() {
+            if self.gradient_params.len() > self.gradient_params_capacity {
+                let new_capacity = self.gradient_params.len().next_power_of_two();
+                self.gradient_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Path Gradient Params Storage Buffer"),
+                    size: (new_capacity * std::mem::size_of::<GradientParams>()) as u64,
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                self.gradient_params_capacity = new_capacity;
+                if let (Some(view), Some(sampler)) = (
+                    self.gradient_atlas.texture_view(),
+                    self.gradient_atlas.sampler(),
+                ) {
+                    self.gradient_bind_group =
+                        Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Path Gradient Bind Group"),
+                            layout: &self.gradient_bind_group_layout,
+                            entries: &[
+                                wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: wgpu::BindingResource::TextureView(view),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 1,
+                                    resource: wgpu::BindingResource::Sampler(sampler),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 2,
+                                    resource: self.gradient_params_buffer.as_entire_binding(),
+                                },
+                            ],
+                        }));
+                }
+            }
+            let params_bytes = bytemuck::cast_slice(&self.gradient_params);
+            queue.write_buffer(&self.gradient_params_buffer, 0, params_bytes);
         }
 
         self.index_count = indices.len() as u32;
@@ -966,6 +1155,9 @@ impl PathPipeline {
         }
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, globals_bind_group, &[]);
+        if let Some(ref gradient_bg) = self.gradient_bind_group {
+            render_pass.set_bind_group(1, gradient_bg, &[]);
+        }
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.index_count, 0, 0..1);
@@ -1180,7 +1372,12 @@ mod tests {
 
         let mut gpu_vertices = Vec::new();
         let mut gpu_indices = Vec::new();
-        append_batch_geometry(&batch, &mut gpu_vertices, &mut gpu_indices);
+        append_batch_geometry(
+            &batch,
+            &mut gpu_vertices,
+            &mut gpu_indices,
+            PaintRuntime::default(),
+        );
 
         assert!(
             gpu_vertices.len() > batch.mesh.vertices.len(),
@@ -1211,4 +1408,66 @@ mod tests {
             "image batches should use dense subdivision for large scaled content, got {steps}"
         );
     }
+
+    #[test]
+    fn test_append_batch_geometry_defers_linear_gradient_to_shader_path() {
+        let mesh = Arc::new(PathMesh {
+            vertices: vec![
+                PathVertex {
+                    position: [0.0, 0.0],
+                    normal: [0.0, 0.0],
+                },
+                PathVertex {
+                    position: [100.0, 0.0],
+                    normal: [0.0, 0.0],
+                },
+                PathVertex {
+                    position: [0.0, 100.0],
+                    normal: [0.0, 0.0],
+                },
+            ],
+            indices: vec![0, 1, 2],
+        });
+        let batch = PathBatch {
+            mesh,
+            paint: Paint::Linear(style_engine::LinearGradient {
+                start: glam::Vec2::new(0.0, 0.0),
+                end: glam::Vec2::new(1.0, 0.0),
+                stops: vec![
+                    style_engine::ColorStop::new(0.0, glam::Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                    style_engine::ColorStop::new(1.0, glam::Vec4::new(0.0, 0.0, 1.0, 1.0)),
+                ],
+            }),
+            opacity: 0.5,
+            size: [100.0, 100.0],
+            offset: [0.0, 0.0],
+        };
+
+        let mut gpu_vertices = Vec::new();
+        let mut gpu_indices = Vec::new();
+        append_batch_geometry(
+            &batch,
+            &mut gpu_vertices,
+            &mut gpu_indices,
+            PaintRuntime::default(),
+        );
+
+        assert_eq!(gpu_indices.len(), 3);
+        assert!(!gpu_vertices.is_empty());
+        for vertex in gpu_vertices {
+            assert!(
+                (vertex.color[0] - 1.0).abs() < 1e-6
+                    && (vertex.color[1] - 1.0).abs() < 1e-6
+                    && (vertex.color[2] - 1.0).abs() < 1e-6
+                    && (vertex.color[3] - 0.5).abs() < 1e-6,
+                "gradient vertices should keep neutral color for shader evaluation"
+            );
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct PaintRuntime {
+    fill_type: u32,
+    gradient_index: u32,
 }

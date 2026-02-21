@@ -1216,3 +1216,212 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo fmt --all` -> PASS
   - `cargo run --example capture_phase4_visuals` -> PASS
   - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-21 (parity continuation: multi-layer stroke paints + image `STRETCH` scale mode)
+
+- Goal:
+  - Continue closing remaining Figma parity deltas after Phase 4/5 closeout:
+    - render all stroke paint layers (not just top paint)
+    - support REST `IMAGE.scaleMode = STRETCH`
+- Implementation:
+  - Multi-layer stroke paint compositing:
+    - Updated `crates/render-engine/src/backend/wgpu/pipelines/primitive_builder.rs`:
+      - stroke emission now iterates all `StrokeStyle.paints` bottom-to-top.
+      - applies to both pipeline and no-pipeline paths.
+    - Updated `crates/render-engine/src/backend/wgpu/instance_collector.rs`:
+      - path stroke routing now emits one `PathBatch` per stroke paint layer.
+      - applies to scene collection and `collect_style_batches_for_bounds(...)`.
+    - Added regression tests:
+      - `test_create_primitive_instances_emits_all_stroke_paints_in_order`
+      - `test_collect_instances_adds_batch_per_stroke_paint_layer`
+  - Image stretch scale mode:
+    - Added `ImageScaleMode::Stretch` in `crates/style-engine/src/paint.rs`.
+    - Added stretch handling in `crates/render-engine/src/backend/wgpu/image_store.rs`.
+    - Added stretch hash-key branch in
+      `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`.
+    - Extended Figma JSON mapping in `tests/figma_json_render_regression.rs`:
+      - `FigmaImageScaleMode::Stretch` -> `ImageScaleMode::Stretch`.
+    - Added regression tests:
+      - `test_sample_image_fill_stretch_preserves_full_image_range`
+      - `figma_image_scale_mode_stretch_maps_to_style_engine_stretch`
+  - Browser parity wiring:
+    - Added Playwright WebKit project in `playwright.config.mjs`.
+    - Added npm script `visual:test:webkit` in `package.json`.
+    - Updated `docs/testing/phase4-visual-regression.md` for WebKit/Safari.
+  - Restored wasm example gate for web target checks:
+    - Updated root `Cargo.toml` dev-dependency gating:
+      - moved `flux-devtools` from global `[dev-dependencies]` to
+        `[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]`.
+      - avoids pulling `crossterm` into `wasm32` example checks.
+- Verification:
+  - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+  - `cargo test -p style-engine --lib -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (after golden refresh)
+  - `cargo test --test figma_json_render_regression figma_image_scale_mode_stretch_maps_to_style_engine_stretch -- --nocapture` -> PASS
+  - `cargo check --example widget_gallery_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `cargo bench -p render-engine --bench phase4_effects -- --noplot` -> PASS
+  - `cargo clippy -p render-engine --lib -- -D warnings` -> PASS
+  - `cargo clippy -p style-engine --lib -- -D warnings` -> PASS
+  - `cargo fmt --all --check` -> PASS
+  - `npm install` -> PASS
+  - `npx playwright install webkit` -> PASS
+  - `npm run visual:test:chromium` -> PASS (3 skipped: WebGPU unavailable)
+  - `npm run visual:test:firefox` -> PASS (3 skipped: WebGPU unavailable)
+  - `npm run visual:test:webkit` -> PASS (3 skipped: WebGPU unavailable)
+  - `npm run visual:test` -> PASS (9 skipped: WebGPU unavailable across projects)
+
+### 2026-02-21 (parity continuation: multi-layer fill routing in path/image collection)
+
+- Goal:
+  - Close additional Figma fill-stack parity gaps in batch collection:
+    - ensure `fill_geometry` emits one path batch per fill paint layer (not just first fill)
+    - ensure rectangle styles containing any `Paint::Image` route the full fill stack through path batches (avoids primitive magenta fallback for mixed fill stacks)
+- Implementation:
+  - Updated `crates/render-engine/src/backend/wgpu/instance_collector.rs`:
+    - replaced single-fill resolver with `resolve_path_fill_paints(...)`.
+    - `collect_instances_impl(...)` now:
+      - emits one `PathBatch` per fill layer for vector fill geometry.
+      - routes any image-containing rectangle fill stack through path batches.
+    - `collect_style_batches_for_bounds(...)` mirrors the same behavior for multipass/offscreen paths.
+  - Added regression tests in `crates/render-engine/src/backend/wgpu/tests.rs`:
+    - `test_collect_instances_adds_batch_per_fill_paint_layer_for_path_geometry`
+    - `test_image_fill_rect_with_multiple_fill_layers_routes_all_fills_to_path_batches`
+- Verification:
+  - RED:
+    - `cargo test -p render-engine test_collect_instances_adds_batch_per_fill_paint_layer_for_path_geometry -- --nocapture` -> FAIL (expected: only first fill batch emitted)
+    - `cargo test -p render-engine test_image_fill_rect_with_multiple_fill_layers_routes_all_fills_to_path_batches -- --nocapture` -> FAIL (expected: primitive fallback path engaged)
+  - GREEN:
+    - `cargo test -p render-engine test_collect_instances_adds_batch_per_fill_paint_layer_for_path_geometry -- --nocapture` -> PASS
+    - `cargo test -p render-engine test_image_fill_rect_with_multiple_fill_layers_routes_all_fills_to_path_batches -- --nocapture` -> PASS
+  - Regression safety:
+    - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+    - `cargo clippy -p render-engine --lib -- -D warnings` -> PASS
+    - `cargo fmt --all` -> PASS
+
+### 2026-02-21 (parity continuation: Figma JSON mapping for corner smoothing + stroke metadata)
+
+- Goal:
+  - Expand Figma JSON parity mapping coverage in the regression harness for properties present in the master mapping table:
+    - `cornerSmoothing` -> `VisualStyle.corner_smoothing`
+    - `strokeCap` -> `StrokeStyle.cap`
+    - `strokeJoin` -> `StrokeStyle.join`
+    - `strokeDashes` -> `StrokeStyle.dash_pattern`
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - Added `FigmaStyle` fields:
+      - `corner_smoothing`
+      - `stroke_cap`
+      - `stroke_join`
+      - `stroke_dashes`
+    - Added enums and mappings:
+      - `FigmaStrokeCap` -> `StrokeCap`
+      - `FigmaStrokeJoin` -> `StrokeJoin`
+    - Applied mapping in `FigmaStyle::into_visual_style(...)`.
+  - Added regression tests:
+    - `figma_style_corner_smoothing_maps_to_visual_style_corner_smoothing`
+    - `figma_style_stroke_cap_join_and_dashes_map_to_stroke_style`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_corner_smoothing_maps_to_visual_style_corner_smoothing -- --nocapture` -> FAIL
+    - `cargo test --test figma_json_render_regression figma_style_stroke_cap_join_and_dashes_map_to_stroke_style -- --nocapture` -> FAIL
+  - GREEN:
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - Additional gates:
+    - `cargo clippy -p render-engine --lib -- -D warnings` -> PASS
+    - `cargo fmt --all` -> PASS
+    - `cargo clippy --test figma_json_render_regression -- -D warnings` -> FAIL due pre-existing unrelated warning in `crates/arthropod/src/app/core.rs:116` (`unused_mut`)
+
+### 2026-02-21 (parity continuation: Figma JSON gradient variant mapping coverage)
+
+- Goal:
+  - Extend the Figma JSON parity harness to cover additional fill paint gradient variants from the mapping table:
+    - `GRADIENT_RADIAL`
+    - `GRADIENT_ANGULAR`
+    - `GRADIENT_DIAMOND`
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - Added `FigmaPaint` variants:
+      - `GradientRadial { center, radius, stops }`
+      - `GradientAngular { center, angle, stops }`
+      - `GradientDiamond { center, scale, stops }`
+    - Added conversion mapping in `FigmaPaint::into_paint(...)` to:
+      - `Paint::Radial(RadialGradient { ... })`
+      - `Paint::Angular(AngularGradient { ... })`
+      - `Paint::Diamond(DiamondGradient { ... })`
+    - Added regression test:
+      - `figma_gradient_variants_map_to_style_engine_gradient_paints`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_gradient_variants_map_to_style_engine_gradient_paints -- --nocapture`
+      - FAIL (`unknown variant GRADIENT_RADIAL`)
+  - GREEN:
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - Hygiene:
+    - `cargo fmt --all` -> PASS
+  - Parity status check:
+    - `npm run visual:test` -> PASS (9 skipped; WebGPU unavailable in this runtime)
+
+### 2026-02-21 (parity continuation: path gradients now evaluated in shader)
+
+- Goal:
+  - Close the remaining documented Phase 3 deviation where `PathPipeline` pre-baked gradient colors per vertex on CPU.
+- Implementation:
+  - Updated `crates/render-engine/src/backend/wgpu/pipelines/path_pipeline.rs`:
+    - Extended `PathGpuVertex` payload to include:
+      - normalized UV
+      - flat paint metadata (`fill_type`, `gradient_index`)
+    - Added gradient atlas/params state to `PathPipeline` (matching primitive pipeline strategy):
+      - `GradientAtlas`
+      - gradient params storage buffer + bind group
+    - `prepare(...)` now:
+      - registers path gradient stops in atlas
+      - stores per-batch gradient params
+      - uploads gradient resources before draw
+    - `append_batch_geometry(...)` now:
+      - emits neutral base color for gradient paints (opacity in alpha)
+      - keeps CPU sampling path for `Paint::Image` (with subdivision)
+  - Updated `crates/render-engine/src/backend/shaders/path.wgsl`:
+    - Added gradient bind group + storage buffer definitions.
+    - Added per-fragment gradient sampling logic for linear/radial/angular/diamond.
+    - Fragment shader now evaluates gradient color from UV + params when `fill_type != 0`.
+  - Added regression test:
+    - `test_append_batch_geometry_defers_linear_gradient_to_shader_path`
+- Verification:
+  - RED:
+    - `cargo test -p render-engine test_append_batch_geometry_defers_linear_gradient_to_shader_path -- --nocapture` -> FAIL
+  - GREEN:
+    - `cargo test -p render-engine test_append_batch_geometry_defers_linear_gradient_to_shader_path -- --nocapture` -> PASS
+  - Regression safety:
+    - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+    - `cargo clippy -p render-engine --lib -- -D warnings` -> PASS
+    - `cargo fmt --all` -> PASS
+
+### 2026-02-21 (parity continuation: rounded corners preserved for image-filled rect routing)
+
+- Goal:
+  - Preserve `cornerRadius`/`rectangleCornerRadii` behavior when rectangle nodes with image fills are routed through path batches.
+- Implementation:
+  - Added `rounded_rect_path_for_size(...)` in `crates/render-engine/src/backend/wgpu/clipping.rs`:
+    - builds a rounded rectangle `VectorPath` with quadratic corner segments.
+    - normalizes corner radii against width/height constraints.
+  - Updated image-fill routing in `crates/render-engine/src/backend/wgpu/instance_collector.rs`:
+    - replaced sharp `rect_path_for_size(...)` usage with `rounded_rect_path_for_size(...)` in:
+      - scene collection path
+      - `collect_style_batches_for_bounds(...)` multipass path
+  - Added regression test:
+    - `test_image_fill_rect_with_corner_radius_uses_rounded_path_geometry`
+- Verification:
+  - RED:
+    - `cargo test -p render-engine test_image_fill_rect_with_corner_radius_uses_rounded_path_geometry -- --nocapture` -> FAIL
+  - GREEN:
+    - `cargo test -p render-engine test_image_fill_rect_with_corner_radius_uses_rounded_path_geometry -- --nocapture` -> PASS
+  - Regression safety:
+    - `cargo test -p render-engine --lib -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+    - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+    - `cargo clippy -p render-engine --lib -- -D warnings` -> PASS
+    - `cargo fmt --all` -> PASS
+  - Parity status check:
+    - `npm run visual:test` -> PASS (9 skipped; WebGPU unavailable in this runtime)

@@ -209,8 +209,8 @@ wasm-bindgen-futures = "0.4"
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
-flux-devtools = { path = "experiments/flux-devtools" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 ratatui = "0.30"
 crossterm = "0.28"
+flux-devtools = { path = "experiments/flux-devtools" }

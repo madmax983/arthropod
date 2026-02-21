@@ -12,12 +12,13 @@ Configured browser projects:
 
 - Chromium (`Desktop Chrome`)
 - Firefox (`Desktop Firefox`)
+- WebKit (`Desktop Safari`)
 
 ## Setup
 
 ```bash
 npm install
-npx playwright install chromium firefox
+npx playwright install chromium firefox webkit
 ```
 
 ## Update Baselines
@@ -41,6 +42,7 @@ Run browser-specific checks:
 ```bash
 npm run visual:test:chromium
 npm run visual:test:firefox
+npm run visual:test:webkit
 ```
 
 ## Fixture App
