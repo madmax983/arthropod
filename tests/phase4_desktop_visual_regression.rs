@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use arthropod_test::visual_test::{compare_images_with_tolerance, load_image, save_image};
-use plat_core::{EventLoop, Size, WindowConfig};
+use plat_core::{EventLoop, Rect, Size, WindowConfig};
+use render_engine::backend::wgpu::effects::composite_blend_over;
 use render_engine::{
-    Color,
+    BlendMode, Color, NodeContent, Scene, SceneNode, VisualStyle,
     backend::{RenderBackend, WgpuBackend},
 };
 
@@ -216,6 +217,137 @@ fn phase4_blend_modes_render_distinct_outputs() {
         lum_screen > lum_multiply,
         "expected Screen to be brighter than Multiply, got multiply_luma={lum_multiply}, screen_luma={lum_screen}, multiply={px_multiply:?}, screen={px_screen:?}"
     );
+}
+
+#[test]
+fn phase4_blend_shader_matches_cpu_reference() {
+    let _guard = acquire_visual_test_lock();
+    const TEST_WIDTH: u32 = 128;
+    const TEST_HEIGHT: u32 = 128;
+    const MAX_CHANNEL_ERROR: f32 = 0.04;
+    let event_loop = EventLoop::new().expect("failed to create event loop");
+    let window = event_loop
+        .create_window(WindowConfig {
+            title: "Phase4 Blend CPU/GPU Conformance".to_string(),
+            size: Size::new(TEST_WIDTH, TEST_HEIGHT),
+            visible: false,
+            ..Default::default()
+        })
+        .expect("failed to create window");
+    // SAFETY: backend is dropped before window due to declaration order in this scope.
+    let mut backend = unsafe { WgpuBackend::new(&window, TEST_WIDTH, TEST_HEIGHT, false) }
+        .expect("backend init failed");
+    backend.set_clear_color(Color::rgba(0.0, 0.0, 0.0, 0.0));
+
+    let modes = [
+        BlendMode::Darken,
+        BlendMode::Multiply,
+        BlendMode::ColorBurn,
+        BlendMode::Lighten,
+        BlendMode::Screen,
+        BlendMode::ColorDodge,
+        BlendMode::Overlay,
+        BlendMode::SoftLight,
+        BlendMode::HardLight,
+        BlendMode::Difference,
+        BlendMode::Exclusion,
+        BlendMode::Hue,
+        BlendMode::Saturation,
+        BlendMode::Color,
+        BlendMode::Luminosity,
+        BlendMode::LinearBurn,
+        BlendMode::LinearDodge,
+    ];
+    let color_cases = [
+        ([0.95, 0.35, 0.30, 0.78], [0.23, 0.46, 0.94, 0.85]),
+        ([0.08, 0.92, 0.41, 0.63], [0.88, 0.18, 0.54, 0.72]),
+        ([0.65, 0.25, 0.90, 1.00], [0.40, 0.85, 0.30, 1.00]),
+    ];
+
+    for mode in modes {
+        for (src, dst) in color_cases {
+            let scene = build_two_layer_blend_scene(TEST_WIDTH, TEST_HEIGHT, src, dst, mode);
+            let rendered = backend
+                .render_scene_to_rgba(&scene, TEST_WIDTH, TEST_HEIGHT)
+                .expect("failed to render conformance scene");
+            let px = sample_rgba(&rendered, TEST_WIDTH, TEST_WIDTH / 2, TEST_HEIGHT / 2);
+
+            let expected = composite_blend_over(mode, src, dst);
+            let actual_identity = rgba8_to_identity_linear(px);
+            let actual_srgb = rgba8_to_srgb_linear(px);
+            let err_identity = max_abs_channel_diff(expected, actual_identity);
+            let err_srgb = max_abs_channel_diff(expected, actual_srgb);
+            let best_err = err_identity.min(err_srgb);
+
+            assert!(
+                best_err <= MAX_CHANNEL_ERROR,
+                "blend conformance failed for mode={mode:?}, src={src:?}, dst={dst:?}. expected={expected:?}, actual_px={px:?}, actual_identity={actual_identity:?}, actual_srgb={actual_srgb:?}, err_identity={err_identity:.5}, err_srgb={err_srgb:.5}, max={MAX_CHANNEL_ERROR:.5}"
+            );
+        }
+    }
+}
+
+fn build_two_layer_blend_scene(
+    width: u32,
+    height: u32,
+    src: [f32; 4],
+    dst: [f32; 4],
+    mode: BlendMode,
+) -> Scene {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut base = SceneNode::new(NodeContent::Styled {
+        style: Box::new(VisualStyle::new().solid_fill(dst.into())),
+    });
+    base.bounds = Rect::new(0.0, 0.0, width as f32, height as f32);
+    scene.add_node(root, base);
+
+    let mut top = SceneNode::new(NodeContent::Styled {
+        style: Box::new(VisualStyle::new().solid_fill(src.into()).blend_mode(mode)),
+    });
+    top.bounds = Rect::new(0.0, 0.0, width as f32, height as f32);
+    scene.add_node(root, top);
+
+    scene
+}
+
+fn rgba8_to_identity_linear(px: [u8; 4]) -> [f32; 4] {
+    [
+        px[0] as f32 / 255.0,
+        px[1] as f32 / 255.0,
+        px[2] as f32 / 255.0,
+        px[3] as f32 / 255.0,
+    ]
+}
+
+fn srgb_channel_to_linear(v: u8) -> f32 {
+    let c = v as f32 / 255.0;
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn rgba8_to_srgb_linear(px: [u8; 4]) -> [f32; 4] {
+    [
+        srgb_channel_to_linear(px[0]),
+        srgb_channel_to_linear(px[1]),
+        srgb_channel_to_linear(px[2]),
+        px[3] as f32 / 255.0,
+    ]
+}
+
+fn max_abs_channel_diff(a: [f32; 4], b: [f32; 4]) -> f32 {
+    [
+        (a[0] - b[0]).abs(),
+        (a[1] - b[1]).abs(),
+        (a[2] - b[2]).abs(),
+        (a[3] - b[3]).abs(),
+    ]
+    .into_iter()
+    .fold(0.0, f32::max)
 }
 
 fn env_u8(name: &str, default: u8) -> u8 {

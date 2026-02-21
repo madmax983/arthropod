@@ -23,15 +23,7 @@ impl BlendParams {
 /// Whether the shader has an explicit branch for this blend mode.
 #[must_use]
 pub fn has_explicit_shader_branch(mode: BlendMode) -> bool {
-    !matches!(
-        mode,
-        BlendMode::Normal
-            | BlendMode::PassThrough
-            | BlendMode::Hue
-            | BlendMode::Saturation
-            | BlendMode::Color
-            | BlendMode::Luminosity
-    )
+    !matches!(mode, BlendMode::Normal | BlendMode::PassThrough)
 }
 
 /// GPU pipeline for source/destination compositing.
@@ -203,7 +195,12 @@ mod tests {
         assert!(has_explicit_shader_branch(BlendMode::Multiply));
         assert!(has_explicit_shader_branch(BlendMode::Screen));
         assert!(has_explicit_shader_branch(BlendMode::Overlay));
-        assert!(!has_explicit_shader_branch(BlendMode::Hue));
+        assert!(has_explicit_shader_branch(BlendMode::Hue));
+        assert!(has_explicit_shader_branch(BlendMode::Saturation));
+        assert!(has_explicit_shader_branch(BlendMode::Color));
+        assert!(has_explicit_shader_branch(BlendMode::Luminosity));
+        assert!(!has_explicit_shader_branch(BlendMode::Normal));
+        assert!(!has_explicit_shader_branch(BlendMode::PassThrough));
     }
 
     #[test]

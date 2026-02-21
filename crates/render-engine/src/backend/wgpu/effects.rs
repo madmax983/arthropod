@@ -169,28 +169,188 @@ pub fn blend_exclusion(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
     ]
 }
 
+/// CPU reference color burn blend.
+#[must_use]
+pub fn blend_color_burn(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let channel = |s: f32, d: f32| {
+        let eps = 1e-6;
+        1.0 - ((1.0 - d) / s.max(eps)).min(1.0)
+    };
+    [
+        channel(src[0], dst[0]),
+        channel(src[1], dst[1]),
+        channel(src[2], dst[2]),
+    ]
+}
+
+/// CPU reference color dodge blend.
+#[must_use]
+pub fn blend_color_dodge(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let channel = |s: f32, d: f32| {
+        let eps = 1e-6;
+        (d / (1.0 - s).max(eps)).min(1.0)
+    };
+    [
+        channel(src[0], dst[0]),
+        channel(src[1], dst[1]),
+        channel(src[2], dst[2]),
+    ]
+}
+
+/// CPU reference linear burn blend.
+#[must_use]
+pub fn blend_linear_burn(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    [
+        (src[0] + dst[0] - 1.0).max(0.0),
+        (src[1] + dst[1] - 1.0).max(0.0),
+        (src[2] + dst[2] - 1.0).max(0.0),
+    ]
+}
+
+/// CPU reference linear dodge blend.
+#[must_use]
+pub fn blend_linear_dodge(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    [
+        (src[0] + dst[0]).min(1.0),
+        (src[1] + dst[1]).min(1.0),
+        (src[2] + dst[2]).min(1.0),
+    ]
+}
+
+/// CPU reference soft light blend.
+///
+/// Current parity target matches the shader fallback branch.
+#[must_use]
+pub fn blend_soft_light(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    blend_screen(src, dst)
+}
+
+/// CPU reference hard light blend.
+#[must_use]
+pub fn blend_hard_light(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    blend_overlay(dst, src)
+}
+
+fn rgb_to_hsl(rgb: [f32; 3]) -> [f32; 3] {
+    let r = rgb[0];
+    let g = rgb[1];
+    let b = rgb[2];
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let l = (max + min) * 0.5;
+    let delta = max - min;
+    if delta <= 1e-6 {
+        return [0.0, 0.0, l];
+    }
+    let s = {
+        let denom = 1.0 - (2.0 * l - 1.0).abs();
+        if denom <= 1e-6 { 0.0 } else { delta / denom }
+    };
+    let mut h = if (max - r).abs() <= 1e-6 {
+        (g - b) / delta + if g < b { 6.0 } else { 0.0 }
+    } else if (max - g).abs() <= 1e-6 {
+        (b - r) / delta + 2.0
+    } else {
+        (r - g) / delta + 4.0
+    };
+    h /= 6.0;
+    if h < 0.0 {
+        h += 1.0;
+    }
+    [h, s.clamp(0.0, 1.0), l.clamp(0.0, 1.0)]
+}
+
+fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
+    if t < 0.0 {
+        t += 1.0;
+    }
+    if t > 1.0 {
+        t -= 1.0;
+    }
+    if t < 1.0 / 6.0 {
+        return p + (q - p) * 6.0 * t;
+    }
+    if t < 1.0 / 2.0 {
+        return q;
+    }
+    if t < 2.0 / 3.0 {
+        return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    }
+    p
+}
+
+fn hsl_to_rgb(hsl: [f32; 3]) -> [f32; 3] {
+    let h = hsl[0];
+    let s = hsl[1];
+    let l = hsl[2];
+    if s <= 1e-6 {
+        return [l, l, l];
+    }
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
+    let p = 2.0 * l - q;
+    [
+        hue_to_rgb(p, q, h + 1.0 / 3.0).clamp(0.0, 1.0),
+        hue_to_rgb(p, q, h).clamp(0.0, 1.0),
+        hue_to_rgb(p, q, h - 1.0 / 3.0).clamp(0.0, 1.0),
+    ]
+}
+
+/// CPU reference hue blend (non-separable).
+#[must_use]
+pub fn blend_hue(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let src_hsl = rgb_to_hsl(src);
+    let dst_hsl = rgb_to_hsl(dst);
+    hsl_to_rgb([src_hsl[0], dst_hsl[1], dst_hsl[2]])
+}
+
+/// CPU reference saturation blend (non-separable).
+#[must_use]
+pub fn blend_saturation(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let src_hsl = rgb_to_hsl(src);
+    let dst_hsl = rgb_to_hsl(dst);
+    hsl_to_rgb([dst_hsl[0], src_hsl[1], dst_hsl[2]])
+}
+
+/// CPU reference color blend (non-separable).
+#[must_use]
+pub fn blend_color(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let src_hsl = rgb_to_hsl(src);
+    let dst_hsl = rgb_to_hsl(dst);
+    hsl_to_rgb([src_hsl[0], src_hsl[1], dst_hsl[2]])
+}
+
+/// CPU reference luminosity blend (non-separable).
+#[must_use]
+pub fn blend_luminosity(src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
+    let src_hsl = rgb_to_hsl(src);
+    let dst_hsl = rgb_to_hsl(dst);
+    hsl_to_rgb([dst_hsl[0], dst_hsl[1], src_hsl[2]])
+}
+
 fn apply_blend_mode(mode: BlendMode, src: [f32; 3], dst: [f32; 3]) -> [f32; 3] {
     match mode {
         BlendMode::Darken => blend_darken(src, dst),
         BlendMode::Multiply => blend_multiply(src, dst),
+        BlendMode::ColorBurn => blend_color_burn(src, dst),
         BlendMode::Lighten => blend_lighten(src, dst),
         BlendMode::Screen => blend_screen(src, dst),
+        BlendMode::ColorDodge => blend_color_dodge(src, dst),
         BlendMode::Overlay => blend_overlay(src, dst),
+        BlendMode::SoftLight => blend_soft_light(src, dst),
+        BlendMode::HardLight => blend_hard_light(src, dst),
         BlendMode::Difference => blend_difference(src, dst),
         BlendMode::Exclusion => blend_exclusion(src, dst),
-        // TODO(phase4): add CPU references for color burn/dodge/linear variants.
-        BlendMode::ColorBurn
-        | BlendMode::ColorDodge
-        | BlendMode::LinearBurn
-        | BlendMode::LinearDodge
-        | BlendMode::SoftLight
-        | BlendMode::HardLight
-        | BlendMode::Hue
-        | BlendMode::Saturation
-        | BlendMode::Color
-        | BlendMode::Luminosity
-        | BlendMode::Normal
-        | BlendMode::PassThrough => src,
+        BlendMode::Hue => blend_hue(src, dst),
+        BlendMode::Saturation => blend_saturation(src, dst),
+        BlendMode::Color => blend_color(src, dst),
+        BlendMode::Luminosity => blend_luminosity(src, dst),
+        BlendMode::LinearBurn => blend_linear_burn(src, dst),
+        BlendMode::LinearDodge => blend_linear_dodge(src, dst),
+        BlendMode::Normal | BlendMode::PassThrough => src,
     }
 }
 
