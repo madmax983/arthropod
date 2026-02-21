@@ -41,17 +41,24 @@ C4Container
     Container(theme, "Theme Engine", "Rust Crate", "Design tokens and system theme integration.")
     Container(anim, "Anim Graph", "Rust Crate", "Animation primitives (Springs, Tweens).")
     Container(a11y, "A11y Engine", "Rust Crate", "Accessibility tree and platform adapter.")
+    Container(macros, "Widget Macros", "Rust Crate", "Procedural macros for declarative widget definition.")
+    Container(mcp, "Arthropod MCP", "Rust Crate", "Model Context Protocol server for live debugging.")
+    Container(test, "Arthropod Test", "Rust Crate", "Test harness and debugging tools.")
 
     Rel(app, plat, "Uses", "Runs event loop")
     Rel(app, ecs, "Manages", "Updates systems")
     Rel(app, render, "Controls", "Initiates render")
     Rel(app, anim, "Integrates", "Runs animation tick")
     Rel(app, a11y, "Syncs", "Updates accessibility tree")
+    Rel(app, mcp, "Connects to", "TCP (Live Debugging)")
+
+    Rel(test, app, "Wraps", "Headless testing")
 
     Rel(widget, flux, "Uses", "Reactive state")
     Rel(widget, layout, "Uses", "Defines constraints")
     Rel(widget, theme, "Uses", "Resolves tokens")
     Rel(widget, text, "Uses", "Measures text")
+    Rel(widget, macros, "Uses", "Expands macros")
 
     Rel(render, text, "Uses", "Rasterizes glyphs")
     Rel(render, style, "Uses", "Tessellates paths")
@@ -73,6 +80,7 @@ sequenceDiagram
     participant Context as WidgetContext
     participant ECS as ECS World
     participant Render as WgpuBackend
+    participant MCP as Arthropod MCP
 
     Note over User, Plat: Interaction Phase
     User->>Plat: Input Event (Click/Key)
@@ -94,6 +102,10 @@ sequenceDiagram
         ECS->>ECS: Run Reactive Systems (Apply Signals)
         ECS->>ECS: Run Layout System
         ECS->>ECS: Run Animation System
+    end
+
+    opt Every 60 Frames (Debugging)
+        App->>MCP: send_scene_update(json)
     end
 
     App->>Render: render(Scene)
