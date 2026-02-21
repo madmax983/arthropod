@@ -64,6 +64,60 @@ unsafe impl<T: Send> Sync for Signal<T> {}
 unsafe impl<T: Send> Sync for ReadSignal<T> {}
 unsafe impl<T: Send> Sync for WriteSignal<T> {}
 
+impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Signal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let handle = self.runtime.get_signal_handle(self.id);
+
+        let guard = match handle.downcast_ref::<Mutex<T>>() {
+            Some(m) => m.try_lock(),
+            None => {
+                return write!(f, "Signal(id: {:?}, value: <type mismatch>)", self.id);
+            }
+        };
+
+        match guard {
+            Ok(val) => write!(f, "Signal(id: {:?}, value: {:?})", self.id, *val),
+            Err(_) => write!(f, "Signal(id: {:?}, value: <locked>)", self.id),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for ReadSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let handle = self.runtime.get_signal_handle(self.id);
+
+        let guard = match handle.downcast_ref::<Mutex<T>>() {
+            Some(m) => m.try_lock(),
+            None => {
+                return write!(f, "ReadSignal(id: {:?}, value: <type mismatch>)", self.id);
+            }
+        };
+
+        match guard {
+            Ok(val) => write!(f, "ReadSignal(id: {:?}, value: {:?})", self.id, *val),
+            Err(_) => write!(f, "ReadSignal(id: {:?}, value: <locked>)", self.id),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for WriteSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let handle = self.runtime.get_signal_handle(self.id);
+
+        let guard = match handle.downcast_ref::<Mutex<T>>() {
+            Some(m) => m.try_lock(),
+            None => {
+                return write!(f, "WriteSignal(id: {:?}, value: <type mismatch>)", self.id);
+            }
+        };
+
+        match guard {
+            Ok(val) => write!(f, "WriteSignal(id: {:?}, value: {:?})", self.id, *val),
+            Err(_) => write!(f, "WriteSignal(id: {:?}, value: <locked>)", self.id),
+        }
+    }
+}
+
 impl<T: 'static + Send> Signal<T> {
     /// Create a new signal with an initial value.
     ///

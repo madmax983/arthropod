@@ -96,6 +96,30 @@ pub struct Computed<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
+impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Computed<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Recompute if stale to show fresh value.
+        // We do this because debugging usually implies wanting to know the *current* state.
+        if self.runtime.is_stale(self.id) {
+            self.runtime.recompute(self.id);
+        }
+
+        let handle = self.runtime.get_computed_handle(self.id);
+
+        let guard = match handle.downcast_ref::<Mutex<T>>() {
+            Some(m) => m.try_lock(),
+            None => {
+                return write!(f, "Computed(id: {:?}, value: <type mismatch>)", self.id);
+            }
+        };
+
+        match guard {
+            Ok(val) => write!(f, "Computed(id: {:?}, value: {:?})", self.id, *val),
+            Err(_) => write!(f, "Computed(id: {:?}, value: <locked>)", self.id),
+        }
+    }
+}
+
 impl<T: 'static + Send> Computed<T> {
     /// Create a new computed value.
     ///
