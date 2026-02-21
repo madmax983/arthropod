@@ -191,6 +191,16 @@ impl GradientAtlas {
         }
 
         // Allocate new row
+        if self.next_row >= Self::ATLAS_SIZE as u32 {
+            // Atlas full - log error and fallback to row 0
+            // This prevents buffer overflow panic in rasterize_gradient
+            tracing::error!(
+                "GradientAtlas overflow: max {} gradients exceeded",
+                Self::ATLAS_SIZE
+            );
+            return 0;
+        }
+
         let row = self.next_row;
         self.next_row += 1;
 
@@ -449,5 +459,38 @@ mod tests {
         assert_eq!(row1, 0);
         assert_eq!(row2, 1);
         assert_ne!(row1, row2, "Different gradients should use different rows");
+    }
+}
+#[cfg(test)]
+mod overflow_tests {
+    use super::*;
+    use glam::Vec4;
+    use style_engine::ColorStop;
+
+    #[test]
+    fn test_gradient_atlas_overflow_safe() {
+        let mut atlas = GradientAtlas::default();
+
+        // Add 1025 unique gradients
+        for i in 0..1025 {
+            let val = i as f32 / 2000.0;
+            let stops = vec![
+                ColorStop::new(0.0, Vec4::new(val, 0.0, 0.0, 1.0)),
+                ColorStop::new(1.0, Vec4::new(0.0, 0.0, 0.0, 1.0)),
+            ];
+            let row = atlas.add_gradient(&stops);
+
+            if i < 1024 {
+                assert_eq!(
+                    row, i as u32,
+                    "Row should match index for first 1024 gradients"
+                );
+            } else {
+                assert_eq!(row, 0, "Overflow should return fallback row 0");
+            }
+        }
+
+        // Ensure we didn't exceed limits
+        assert_eq!(atlas.next_row, 1024);
     }
 }

@@ -744,6 +744,14 @@ impl WgpuContext {
 }
 
 fn create_projection_matrix(width: u32, height: u32) -> [[f32; 4]; 4] {
+    if width == 0 || height == 0 {
+        return [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+    }
     [
         [2.0 / width as f32, 0.0, 0.0, 0.0],
         [0.0, -2.0 / height as f32, 0.0, 0.0],
@@ -789,8 +797,15 @@ fn unpack_readback_pixels(
     })?;
 
     let padded = padded_bytes_per_row as usize;
-    // Note: vec! allocation may still panic on OOM if total_size is huge but valid.
-    let mut out = vec![0u8; total_size];
+    // Use try_reserve to prevent panic on OOM for large allocations
+    let mut out = Vec::new();
+    if out.try_reserve(total_size).is_err() {
+        return Err(RendererError::InitializationFailed(
+            "Out of memory during texture readback".to_string(),
+        ));
+    }
+    // Safe to resize now as we reserved capacity
+    out.resize(total_size, 0u8);
 
     for row in 0..height as usize {
         let src_start = row.checked_mul(padded).ok_or_else(|| {
@@ -883,6 +898,17 @@ mod tests {
         let ndc_y = projection[1][1] * y + projection[3][1];
         assert!(ndc_x.abs() < 0.001);
         assert!(ndc_y.abs() < 0.001);
+    }
+
+    #[test]
+    fn test_projection_matrix_handles_zero_dimensions() {
+        let matrix = create_projection_matrix(0, 0);
+        // Should return identity matrix (no NaNs or Infs)
+        assert_eq!(matrix[0][0], 1.0);
+        assert_eq!(matrix[1][1], 1.0);
+        assert_eq!(matrix[2][2], 1.0);
+        assert_eq!(matrix[3][3], 1.0);
+        assert_eq!(matrix[0][1], 0.0);
     }
 
     #[test]
@@ -997,5 +1023,40 @@ mod tests {
         let bytes_per_pixel = 4;
         let result = aligned_bytes_per_row(width, bytes_per_pixel);
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_unpack_readback_pixels_oom() {
+        // Request allocation of ~4GB buffer (should fail on most CI runners or return error)
+        // width = 32768, height = 32768 -> 1073741824 pixels * 4 bytes = 4GB
+        let width = 32768;
+        let height = 32768;
+        let padded_bpr = width * 4; // aligned
+        let readback = vec![]; // Empty readback, we expect allocation error before reading it
+
+        // We expect an error due to OOM or readback buffer size mismatch (if allocation succeeded)
+        // But since readback is empty, it fails early if it checks readback len?
+        // unpack_readback_pixels calculates dst_end using row math.
+        // But allocation happens first.
+        let result = unpack_readback_pixels(
+            &readback,
+            width,
+            height,
+            padded_bpr,
+            wgpu::TextureFormat::Rgba8Unorm,
+        );
+
+        // If allocation fails, it returns InitializationFailed("Out of memory...")
+        // If allocation succeeds (on 64GB RAM machine), it will hit "Readback buffer too small"
+        // Either way, it must not panic.
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        match err {
+            RendererError::InitializationFailed(msg) => {
+                assert!(msg.contains("Out of memory") || msg.contains("Readback buffer too small"));
+            }
+            _ => panic!("Unexpected error type: {:?}", err),
+        }
     }
 }

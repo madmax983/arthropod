@@ -49,3 +49,15 @@
 ## 2026-02-06 - [Windows Event Loop Hang Fix]
 **Threat:** Application hang (DoS) on Windows. The global `WINDOW_COUNT` was decremented *after* `DestroyWindow` in `WindowImpl::drop`. Since `DestroyWindow` synchronously sends `WM_DESTROY`, the message handler saw the count as non-zero (checking for exit condition) and failed to post `WM_QUIT`.
 **Defense:** Moved `WINDOW_COUNT` decrement to occur *before* `DestroyWindow`. Added integer overflow check for `WindowId` to preventing truncation when passing via `lpParam` on 32-bit systems.
+
+## 2026-02-21 - [Gradient Atlas Overflow]
+**Threat:** `GradientAtlas::add_gradient` did not check if the atlas was full (`next_row >= 1024`). Adding more than 1024 gradients would cause an index out of bounds panic in `rasterize_gradient`, leading to Denial of Service.
+**Defense:** Added a bounds check in `add_gradient`. If the atlas is full, it logs an error and returns row 0 (fallback) instead of panicking.
+
+## 2026-02-21 - [Readback Buffer Allocation OOM]
+**Threat:** `unpack_readback_pixels` used `vec![0u8; size]` which panics on allocation failure. An attacker triggering a massive window resize or offscreen render could crash the application via OOM.
+**Defense:** Switched to `Vec::try_reserve` and `resize`. Returns `RendererError::InitializationFailed` on allocation failure instead of crashing.
+
+## 2026-02-21 - [Projection Matrix Division by Zero]
+**Threat:** `create_projection_matrix` divided by width/height without checking for zero. Zero dimensions (e.g. during minimization or startup) resulted in `Inf`/`NaN` in the projection matrix.
+**Defense:** Added check for zero width/height. Returns an identity matrix as a safe fallback.
