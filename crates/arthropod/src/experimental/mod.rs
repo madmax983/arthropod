@@ -49,22 +49,107 @@ pub mod story {
 
 #[cfg(not(feature = "nova"))]
 pub mod particles {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::{Component, Resource};
+
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
     /// The `particles` module requires the `nova` feature.
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
+
+    #[derive(Component, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct Particle;
+
+    #[derive(Component, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ParticleEmitter;
+
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ParticleTime;
+
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ParticleGlobalState;
+
+    #[derive(Component, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub enum ForceField {
+        #[default]
+        None,
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn update_particle_time(
+        _time: bevy_ecs::prelude::ResMut<ParticleTime>,
+        _state: bevy_ecs::prelude::ResMut<ParticleGlobalState>,
+    ) {
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn emit_particles(
+        _commands: bevy_ecs::prelude::Commands,
+        _emitters: bevy_ecs::prelude::Query<&mut ParticleEmitter>,
+        _time: bevy_ecs::prelude::Res<ParticleTime>,
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+    ) {
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn apply_forces(
+        _particles: bevy_ecs::prelude::Query<&mut Particle>,
+        _forces: bevy_ecs::prelude::Query<&ForceField>,
+        _time: bevy_ecs::prelude::Res<ParticleTime>,
+        _scene: bevy_ecs::prelude::Res<render_engine::Scene>,
+    ) {
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn update_particles(
+        _commands: bevy_ecs::prelude::Commands,
+        _particles: bevy_ecs::prelude::Query<(bevy_ecs::prelude::Entity, &mut Particle)>,
+        _time: bevy_ecs::prelude::Res<ParticleTime>,
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+    ) {
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn register_particles(_app: &mut crate::App) {
+        eprintln!("ERROR: 'register_particles' requires 'nova' feature. Enable it in Cargo.toml.");
+    }
 }
 
 #[cfg(not(feature = "nova"))]
 pub mod xray {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::Resource;
+
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
     /// The `xray` module requires the `nova` feature.
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
 
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct XRayConfig;
+
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct XRayState;
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn update_xray(
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+        _config: bevy_ecs::prelude::Res<XRayConfig>,
+        _state: bevy_ecs::prelude::ResMut<XRayState>,
+    ) {
+    }
+
     #[allow(dead_code)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
     pub fn register_xray(_app: &mut crate::App) {
         eprintln!("ERROR: 'register_xray' requires 'nova' feature. Enable it in Cargo.toml.");
     }
@@ -72,9 +157,42 @@ pub mod xray {
 
 #[cfg(not(feature = "nova"))]
 pub mod elastic {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::Resource;
+    use std::marker::PhantomData;
+
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
     /// The `elastic` module requires the `nova` feature.
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
+
+    #[derive(Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ElasticSignal<T>(PhantomData<T>);
+
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ElasticRegistry;
+
+    #[derive(Resource, Default)]
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub struct ElasticTime;
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn update_elastic_time_system(_time: bevy_ecs::prelude::ResMut<ElasticTime>) {}
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn elastic_tick_system(
+        _registry: bevy_ecs::prelude::Res<ElasticRegistry>,
+        _time: bevy_ecs::prelude::Res<ElasticTime>,
+    ) {
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn register_elastic_feature(_world: &mut bevy_ecs::prelude::World) {
+        eprintln!(
+            "ERROR: 'register_elastic_feature' requires 'nova' feature. Enable it in Cargo.toml."
+        );
+    }
 }
