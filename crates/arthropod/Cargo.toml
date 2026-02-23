@@ -37,4 +37,4 @@ harness = false
 required-features = ["nova"]
 
 [features]
-nova = []
+nova = ["flux-state/nova"]
