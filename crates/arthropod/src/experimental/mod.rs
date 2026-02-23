@@ -13,7 +13,31 @@ pub mod xray;
 #[cfg(feature = "nova")]
 pub mod chronos;
 
+#[cfg(feature = "nova")]
+pub mod ghost_replay;
+
 // --- Stubs for missing features ---
+
+#[cfg(not(feature = "nova"))]
+pub mod ghost_replay {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `ghost_replay` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn record_event(_world: &mut bevy_ecs::prelude::World, _event: &plat_core::Event) {
+        // No-op
+    }
+
+    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    pub fn init_ghost_replay(_app: &mut crate::App) {
+        eprintln!("ERROR: 'init_ghost_replay' requires 'nova' feature. Enable it in Cargo.toml.");
+    }
+}
 
 #[cfg(not(feature = "nova"))]
 pub mod story {

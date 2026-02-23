@@ -202,6 +202,9 @@ impl Application for WidgetApp {
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
+        #[cfg(feature = "nova")]
+        crate::experimental::ghost_replay::record_event(self.app.world_mut(), &event);
+
         match &event {
             Event::Window {
                 event: WindowEvent::CloseRequested,
