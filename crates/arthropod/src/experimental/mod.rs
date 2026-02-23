@@ -16,6 +16,9 @@ pub mod chronos;
 #[cfg(feature = "nova")]
 pub mod ghost_replay;
 
+#[cfg(feature = "nova")]
+pub mod signal_graph;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -301,4 +304,52 @@ pub mod chronos {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub struct ChronosDebugger;
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod signal_graph {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::Component;
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `signal_graph` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(Component)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct SignalGraph;
+
+    impl SignalGraph {
+        /// Stub for missing feature
+        #[allow(clippy::new_ret_no_self)]
+        pub fn new<T>(_signal: T, _min: f32, _max: f32) -> Self {
+            panic!("SignalGraph requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
+        pub fn with_color(self, _color: render_engine::Color) -> Self {
+            self
+        }
+
+        pub fn with_history(self, _length: usize) -> Self {
+            self
+        }
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn update_signal_graphs(_commands: bevy_ecs::prelude::Commands) {}
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_signal_graph(_app: &mut crate::App) {
+        eprintln!(
+            "ERROR: 'register_signal_graph' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
+    }
 }
