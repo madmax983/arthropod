@@ -50,19 +50,27 @@ pub mod story {
     ///
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     #[derive(Component, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct NarrativeGenerator;
 
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
     /// You are trying to use `register_story`, but the `nova` feature is not enabled.
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn register_story(_app: &mut crate::App) {
-        eprintln!("ERROR: 'register_story' requires 'nova' feature. Enable it in Cargo.toml.");
+        eprintln!(
+            "ERROR: 'register_story' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
     }
 
     /// ⚠️ **MISSING FEATURE** ⚠️
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     #[allow(deprecated)]
     pub fn generate_narrative(
         _query: bevy_ecs::prelude::Query<
@@ -86,36 +94,50 @@ pub mod particles {
     pub const MISSING_FEATURE: () = ();
 
     #[derive(Component, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct Particle;
 
     #[derive(Component, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ParticleEmitter;
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ParticleTime;
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ParticleGlobalState;
 
     #[derive(Component, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub enum ForceField {
         #[default]
         None,
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn update_particle_time(
         _time: bevy_ecs::prelude::ResMut<ParticleTime>,
         _state: bevy_ecs::prelude::ResMut<ParticleGlobalState>,
     ) {
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn emit_particles(
         _commands: bevy_ecs::prelude::Commands,
         _emitters: bevy_ecs::prelude::Query<&mut ParticleEmitter>,
@@ -124,7 +146,9 @@ pub mod particles {
     ) {
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn apply_forces(
         _particles: bevy_ecs::prelude::Query<&mut Particle>,
         _forces: bevy_ecs::prelude::Query<&ForceField>,
@@ -133,7 +157,9 @@ pub mod particles {
     ) {
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn update_particles(
         _commands: bevy_ecs::prelude::Commands,
         _particles: bevy_ecs::prelude::Query<(bevy_ecs::prelude::Entity, &mut Particle)>,
@@ -142,9 +168,13 @@ pub mod particles {
     ) {
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn register_particles(_app: &mut crate::App) {
-        eprintln!("ERROR: 'register_particles' requires 'nova' feature. Enable it in Cargo.toml.");
+        eprintln!(
+            "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
     }
 }
 
@@ -160,14 +190,20 @@ pub mod xray {
     pub const MISSING_FEATURE: () = ();
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct XRayConfig;
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct XRayState;
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn update_xray(
         _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
         _config: bevy_ecs::prelude::Res<XRayConfig>,
@@ -176,9 +212,13 @@ pub mod xray {
     }
 
     #[allow(dead_code)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn register_xray(_app: &mut crate::App) {
-        eprintln!("ERROR: 'register_xray' requires 'nova' feature. Enable it in Cargo.toml.");
+        eprintln!(
+            "ERROR: 'register_xray' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
     }
 }
 
@@ -195,31 +235,43 @@ pub mod elastic {
     pub const MISSING_FEATURE: () = ();
 
     #[derive(Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ElasticSignal<T>(PhantomData<T>);
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ElasticRegistry;
 
     #[derive(Resource, Default)]
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ElasticTime;
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn update_elastic_time_system(_time: bevy_ecs::prelude::ResMut<ElasticTime>) {}
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn elastic_tick_system(
         _registry: bevy_ecs::prelude::Res<ElasticRegistry>,
         _time: bevy_ecs::prelude::Res<ElasticTime>,
     ) {
     }
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub fn register_elastic_feature(_world: &mut bevy_ecs::prelude::World) {
         eprintln!(
-            "ERROR: 'register_elastic_feature' requires 'nova' feature. Enable it in Cargo.toml."
+            "ERROR: 'register_elastic_feature' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
         );
     }
 }
@@ -235,12 +287,18 @@ pub mod chronos {
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct Timeline;
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct RetroSignal<T>(PhantomData<T>);
 
-    #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
     pub struct ChronosDebugger;
 }

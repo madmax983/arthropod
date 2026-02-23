@@ -41,6 +41,8 @@ Arthropod separates concerns into three distinct layers:
 
 Add `arthropod` to your `Cargo.toml`.
 
+> **Note**: `App::run` currently requires **Windows** or **macOS**. Linux support is planned. For Linux, please use `App::new_headless()` or run the TUI-based examples (like `story_demo` which requires the `nova` feature: `cargo run --example story_demo --features nova`).
+
 ```rust
 use arthropod::prelude::*;
 
