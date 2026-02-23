@@ -261,19 +261,13 @@ impl SystemTheme {
 
                 let _ = RegCloseKey(hkey);
 
-                if result.is_ok() && data_size > 0 {
-                    // Convert UTF-16 string to build number
-                    let len = (data_size / 2) as usize;
-                    let build_str = String::from_utf16_lossy(
-                        &data
-                            .chunks(2)
-                            .take(len - 1) // Remove null terminator
-                            .map(|c| u16::from_ne_bytes([c[0], c[1]]))
-                            .collect::<Vec<_>>(),
-                    );
+                if result.is_ok() {
+                    // Safe parsing with bounds checking
+                    // Use min(data_size, 64) to prevent reading uninitialized memory
+                    // if registry somehow claimed to write more than buffer size
+                    let len = (data_size as usize).min(data.len());
 
-                    if let Ok(build) = build_str.parse::<u32>() {
-                        // Major version is always 10 for Windows 10/11
+                    if let Some(build) = Self::parse_build_number(&data[..len]) {
                         return (10, 0, build);
                     }
                 }
@@ -283,6 +277,38 @@ impl SystemTheme {
         // Ultimate fallback: assume Windows 10 version 1809 (conservative)
         // This ensures we don't enable Mica on systems that don't support it
         (10, 0, 17763)
+    }
+
+    /// Safely parse a build number from UTF-16 bytes (little-endian)
+    /// Handles null termination and invalid lengths gracefully
+    #[allow(dead_code)]
+    fn parse_build_number(data: &[u8]) -> Option<u32> {
+        if data.is_empty() {
+            return None;
+        }
+
+        // Convert bytes to u16s (UTF-16)
+        // chunks_exact ensures we only process complete u16s (2 bytes)
+        // ignoring any trailing odd byte
+        let chars: Vec<u16> = data
+            .chunks_exact(2)
+            .map(|chunk| u16::from_ne_bytes([chunk[0], chunk[1]]))
+            .collect();
+
+        if chars.is_empty() {
+            return None;
+        }
+
+        // Remove null terminator if present
+        let chars = if let Some(&0) = chars.last() {
+            &chars[..chars.len() - 1]
+        } else {
+            &chars[..]
+        };
+
+        // Convert to string and parse
+        let build_str = String::from_utf16_lossy(chars);
+        build_str.trim().parse::<u32>().ok()
     }
 }
 
@@ -308,5 +334,47 @@ mod tests {
         let theme = result.unwrap();
         assert!(theme.accent_color.w > 0.0);
         assert!(!theme.available_materials.is_empty());
+    }
+
+    #[test]
+    fn test_registry_parsing_safety() {
+        // Test empty
+        assert!(SystemTheme::parse_build_number(&[]).is_none());
+
+        // Test 1 byte (previously caused panic)
+        assert!(SystemTheme::parse_build_number(&[0]).is_none());
+
+        // Test odd bytes (should be safe, ignores last byte)
+        assert!(SystemTheme::parse_build_number(&[0, 0, 0]).is_none()); // "\0" -> empty string -> parse fail
+
+        // Test valid string "22000"
+        let valid_str: Vec<u8> = "22000"
+            .encode_utf16()
+            .flat_map(|u| u.to_ne_bytes())
+            .collect();
+        assert_eq!(SystemTheme::parse_build_number(&valid_str), Some(22000));
+
+        // Test valid string with null terminator "22000\0"
+        let mut valid_with_null = valid_str.clone();
+        valid_with_null.extend(0u16.to_ne_bytes());
+        assert_eq!(
+            SystemTheme::parse_build_number(&valid_with_null),
+            Some(22000)
+        );
+
+        // Test valid string with garbage at end (if data len > string len)
+        // parse_build_number takes slice, so it parses strictly.
+        // If "22000\0garbage", it will try to parse "22000\0garb..." as string?
+        // No, it converts ALL bytes to string.
+        // If null terminator is at the very end, it removes it.
+        // If null terminator is in middle, string contains \0. "22000\0garbage".
+        // Rust string parse might fail or stop? "22000\0garbage".parse::<u32>() fails.
+        // So it's safe.
+
+        // Test invalid utf16
+        // 0xD800 is a lone surrogate
+        let invalid_utf16 = 0xD800u16.to_ne_bytes();
+        // String::from_utf16_lossy replaces with replacement char, which fails parsing u32
+        assert!(SystemTheme::parse_build_number(&invalid_utf16).is_none());
     }
 }
