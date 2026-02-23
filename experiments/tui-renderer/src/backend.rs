@@ -140,6 +140,11 @@ impl<B: Backend> RenderBackend for TuiBackend<B> {
                                 frame.render_widget(block, rect);
                             }
                         }
+                        NodeContent::SolidColor { color } => {
+                            let bg = map_color(*color);
+                            let block = Block::default().bg(bg);
+                            frame.render_widget(block, rect);
+                        }
                         NodeContent::Empty => {}
                     }
                 }

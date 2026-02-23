@@ -58,7 +58,7 @@ impl EffectPlanNode {
     pub fn from_scene(node_id: NodeId, node: &SceneNode) -> Self {
         let style = match &node.content {
             NodeContent::Styled { style } => Some((**style).clone()),
-            NodeContent::Empty => None,
+            NodeContent::Empty | NodeContent::SolidColor { .. } => None,
         };
         Self {
             node_id,

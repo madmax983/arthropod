@@ -99,6 +99,7 @@ impl Tool for ListNodesTool {
                             "Empty"
                         }
                     }
+                    NodeContent::SolidColor { .. } => "Rect",
                     NodeContent::Empty => "Empty",
                 };
                 if node_type != content_type {
@@ -130,6 +131,7 @@ impl Tool for ListNodesTool {
                         "Empty"
                     }
                 }
+                NodeContent::SolidColor { .. } => "Rect",
                 NodeContent::Empty => "Empty",
             };
 
@@ -246,6 +248,9 @@ impl Tool for GetNodeTool {
                     NodeContentData::Empty
                 }
             }
+            NodeContent::SolidColor { color } => NodeContentData::Rect {
+                color: color.to_array(),
+            },
             NodeContent::Empty => NodeContentData::Empty,
         };
 
@@ -360,6 +365,7 @@ impl Tool for QueryHierarchyTool {
                         "Empty"
                     }
                 }
+                NodeContent::SolidColor { .. } => "Rect",
                 NodeContent::Empty => "Empty",
             };
 
@@ -588,6 +594,10 @@ impl Tool for UpdateNodeTool {
                         return Err(anyhow!("Cannot set color on node without fills"));
                     }
                     style.fills[0] = render_engine::Paint::Solid(color.as_vec4());
+                    updated_fields.push("color");
+                }
+                NodeContent::SolidColor { color: node_color } => {
+                    *node_color = color;
                     updated_fields.push("color");
                 }
                 NodeContent::Empty => {

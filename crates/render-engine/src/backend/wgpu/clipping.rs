@@ -27,13 +27,14 @@ pub(crate) fn ancestor_clip_bounds(
             break;
         };
 
-        if let NodeContent::Styled { style } = &parent_node.content
-            && style.clips_content
-        {
-            clip = Some(match clip {
-                Some(existing) => rect_intersection(existing, parent_node.bounds)?,
-                None => parent_node.bounds,
-            });
+        match &parent_node.content {
+            NodeContent::Styled { style } if style.clips_content => {
+                clip = Some(match clip {
+                    Some(existing) => rect_intersection(existing, parent_node.bounds)?,
+                    None => parent_node.bounds,
+                });
+            }
+            _ => {}
         }
 
         current = parent_node.parent;
@@ -71,10 +72,11 @@ pub(crate) fn ancestor_mask_bounds(
             if !sibling.visible || sibling.opacity <= 0.0 {
                 continue;
             }
-            if let NodeContent::Styled { style } = &sibling.content
-                && style.is_mask
-            {
-                level_mask = Some(sibling.bounds);
+            match &sibling.content {
+                NodeContent::Styled { style } if style.is_mask => {
+                    level_mask = Some(sibling.bounds);
+                }
+                _ => {}
             }
         }
 

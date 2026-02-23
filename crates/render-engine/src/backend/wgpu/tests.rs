@@ -1051,3 +1051,39 @@ fn test_classify_scene_effect_kinds_detects_offscreen_effects() {
     assert!(kinds.contains(&effects::EffectPassKind::BlurHorizontal));
     assert!(kinds.contains(&effects::EffectPassKind::BlurVertical));
 }
+
+#[test]
+fn test_solid_color_instance_collection() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let node = SceneNode {
+        content: NodeContent::SolidColor {
+            color: Color::rgba(1.0, 0.5, 0.0, 0.8),
+        },
+        transform: Transform2D::identity(),
+        bounds: plat_core::Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 50.0,
+        },
+        children: vec![],
+        parent: None,
+        visible: true,
+        opacity: 0.5,
+    };
+    scene.add_node(root, node);
+
+    let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
+
+    assert_eq!(instances.len(), 1);
+    let instance = &instances[0];
+
+    assert_eq!(instance.pos, [10.0, 20.0]);
+    assert_eq!(instance.size, [100.0, 50.0]);
+    // Color should be multiplied by node opacity
+    // 1.0, 0.5, 0.0, 0.8 * 0.5 = 0.4
+    assert_eq!(instance.color, [1.0, 0.5, 0.0, 0.4]);
+    assert_eq!(instance.corner_radii, [0.0; 4]);
+}

@@ -111,6 +111,15 @@ pub enum NodeContent {
         /// The visual style (fills, stroke, effects, text, etc.)
         style: Box<style_engine::VisualStyle>,
     },
+    /// Optimization for solid color rectangles (e.g. backgrounds).
+    ///
+    /// Avoids heap allocation of `Box<VisualStyle>` for the most common case.
+    /// This variant is equivalent to a `Styled` node with a single solid fill,
+    /// no stroke, no effects, and zero corner radii.
+    SolidColor {
+        /// The fill color.
+        color: Color,
+    },
 }
 
 /// RGBA color backed by glam::Vec4 for SIMD performance.
@@ -269,5 +278,23 @@ impl Transform2D {
     #[inline]
     pub fn compose(&self, other: &Transform2D) -> Transform2D {
         Self(self.0 * other.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_node_content_size() {
+        // NodeContent should be relatively small.
+        // Empty: 1 byte + alignment
+        // Styled: 8 bytes (Box) + tag
+        // SolidColor: 16 bytes (Color) + tag
+        // Enum size is driven by the largest variant + alignment.
+        // Color is 16 bytes (Vec4), likely 16-byte aligned on some archs, or 4-byte aligned.
+        // sizeof(NodeContent) should be around 24-32 bytes.
+        // If it's > 64 bytes, something is wrong.
+        assert!(std::mem::size_of::<NodeContent>() <= 32);
     }
 }
