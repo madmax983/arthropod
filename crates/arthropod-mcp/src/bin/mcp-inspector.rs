@@ -37,14 +37,51 @@ use tokio::{
 
 use arthropod_mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
 
+#[derive(PartialEq, Clone, Copy)]
+enum LogDirection {
+    Outgoing, // ->
+    Incoming, // <-
+    Error,    // ERR:
+}
+
+struct LogEntry {
+    timestamp: Instant,
+    direction: LogDirection,
+    content: String,
+    parsed: Option<Value>,
+}
+
+#[derive(PartialEq, Clone, Copy)]
+enum Focus {
+    ToolsList,
+    LogHistory,
+    LogDetails,
+    Input,
+}
+
+#[derive(PartialEq)]
+enum InputMode {
+    Normal,
+    Editing,
+}
+
 /// Application state
 struct App {
     /// List of available tools
     tools: Vec<String>,
     /// Selected tool index
     tool_list_state: ListState,
+
     /// Logs (requests and responses)
-    logs: VecDeque<String>,
+    logs: VecDeque<LogEntry>,
+    /// Selected log index for details view
+    log_list_state: ListState,
+    /// Vertical scroll offset for details view
+    details_scroll: u16,
+
+    /// Current UI Focus
+    focus: Focus,
+
     /// Whether to quit
     should_quit: bool,
     /// Command being typed (for custom JSON params)
@@ -55,12 +92,6 @@ struct App {
     status: String,
     /// Current request ID counter
     request_id: u64,
-}
-
-#[derive(PartialEq)]
-enum InputMode {
-    Normal,
-    Editing,
 }
 
 enum AppEvent {
@@ -74,15 +105,41 @@ impl App {
         let mut tool_list_state = ListState::default();
         tool_list_state.select(Some(0));
 
+        let mut log_list_state = ListState::default();
+        // log_list_state.select(Some(0)); // No logs initially
+
         Self {
             tools: Vec::new(),
             tool_list_state,
             logs: VecDeque::with_capacity(100),
+            log_list_state,
+            details_scroll: 0,
+            focus: Focus::ToolsList,
             should_quit: false,
             input: String::new(),
             input_mode: InputMode::Normal,
             status: "Starting...".to_string(),
             request_id: 1,
+        }
+    }
+
+    fn add_log(&mut self, content: String, direction: LogDirection) {
+        let parsed = serde_json::from_str::<Value>(&content).ok();
+        let entry = LogEntry {
+            timestamp: Instant::now(),
+            direction,
+            content,
+            parsed,
+        };
+        self.logs.push_back(entry);
+        if self.logs.len() > 100 {
+            self.logs.pop_front();
+        }
+
+        // Auto-scroll if we are at the bottom or nothing selected
+        if self.focus != Focus::LogHistory {
+            self.log_list_state
+                .select(Some(self.logs.len().saturating_sub(1)));
         }
     }
 
@@ -118,6 +175,42 @@ impl App {
             None => 0,
         };
         self.tool_list_state.select(Some(i));
+    }
+
+    fn next_log(&mut self) {
+        if self.logs.is_empty() {
+            return;
+        }
+        let i = match self.log_list_state.selected() {
+            Some(i) => {
+                if i >= self.logs.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.log_list_state.select(Some(i));
+        self.details_scroll = 0;
+    }
+
+    fn previous_log(&mut self) {
+        if self.logs.is_empty() {
+            return;
+        }
+        let i = match self.log_list_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.logs.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.log_list_state.select(Some(i));
+        self.details_scroll = 0;
     }
 
     fn next_request_id(&mut self) -> u64 {
@@ -249,7 +342,7 @@ async fn main() -> Result<()> {
         .write_all(format!("{}\n", init_str).as_bytes())
         .await?;
     stdin_writer.flush().await?;
-    app.logs.push_back(format!("-> {}", init_str));
+    app.add_log(init_str, LogDirection::Outgoing);
     app.status = "Initializing...".to_string();
 
     // Main loop
@@ -263,33 +356,58 @@ async fn main() -> Result<()> {
                         InputMode::Normal => {
                             match key.code {
                                 KeyCode::Char('q') => app.should_quit = true,
-                                KeyCode::Down => app.next_tool(),
-                                KeyCode::Up => app.previous_tool(),
+                                KeyCode::Tab => {
+                                    app.focus = match app.focus {
+                                        Focus::ToolsList => Focus::LogHistory,
+                                        Focus::LogHistory => Focus::LogDetails,
+                                        Focus::LogDetails => Focus::Input,
+                                        Focus::Input => Focus::ToolsList,
+                                    };
+                                }
+                                KeyCode::Down => match app.focus {
+                                    Focus::ToolsList => app.next_tool(),
+                                    Focus::LogHistory => app.next_log(),
+                                    Focus::LogDetails => {
+                                        app.details_scroll = app.details_scroll.saturating_add(1)
+                                    }
+                                    Focus::Input => {}
+                                },
+                                KeyCode::Up => match app.focus {
+                                    Focus::ToolsList => app.previous_tool(),
+                                    Focus::LogHistory => app.previous_log(),
+                                    Focus::LogDetails => {
+                                        app.details_scroll = app.details_scroll.saturating_sub(1)
+                                    }
+                                    Focus::Input => {}
+                                },
                                 KeyCode::Enter => {
-                                    // Trigger selected tool with default/empty params
-                                    if let Some(idx) = app.tool_list_state.selected() {
-                                        if idx < app.tools.len() {
-                                            let tool_name = app.tools[idx].clone();
-                                            let id = app.next_request_id();
-                                            let req = JsonRpcRequest::new(
-                                                id,
-                                                "tools/call",
-                                                serde_json::json!({
-                                                    "name": tool_name,
-                                                    "arguments": {}
-                                                }),
-                                            );
-                                            let req_str = serde_json::to_string(&req)?;
-                                            stdin_writer
-                                                .write_all(format!("{}\n", req_str).as_bytes())
-                                                .await?;
-                                            stdin_writer.flush().await?;
-                                            app.logs.push_back(format!("-> {}", req_str));
+                                    // Trigger selected tool with default/empty params if focused
+                                    if app.focus == Focus::ToolsList {
+                                        if let Some(idx) = app.tool_list_state.selected() {
+                                            if idx < app.tools.len() {
+                                                let tool_name = app.tools[idx].clone();
+                                                let id = app.next_request_id();
+                                                let req = JsonRpcRequest::new(
+                                                    id,
+                                                    "tools/call",
+                                                    serde_json::json!({
+                                                        "name": tool_name,
+                                                        "arguments": {}
+                                                    }),
+                                                );
+                                                let req_str = serde_json::to_string(&req)?;
+                                                stdin_writer
+                                                    .write_all(format!("{}\n", req_str).as_bytes())
+                                                    .await?;
+                                                stdin_writer.flush().await?;
+                                                app.add_log(req_str, LogDirection::Outgoing);
+                                            }
                                         }
                                     }
                                 }
                                 KeyCode::Char('i') => {
                                     app.input_mode = InputMode::Editing;
+                                    app.focus = Focus::Input;
                                 }
                                 KeyCode::Char('l') => {
                                     // Refresh tools
@@ -304,7 +422,7 @@ async fn main() -> Result<()> {
                                         .write_all(format!("{}\n", req_str).as_bytes())
                                         .await?;
                                     stdin_writer.flush().await?;
-                                    app.logs.push_back(format!("-> {}", req_str));
+                                    app.add_log(req_str, LogDirection::Outgoing);
                                 }
                                 _ => {}
                             }
@@ -315,6 +433,7 @@ async fn main() -> Result<()> {
                                     let input_cmd = app.input.clone();
                                     app.input.clear();
                                     app.input_mode = InputMode::Normal;
+                                    app.focus = Focus::ToolsList; // Return focus to tools
 
                                     // Parse input: "method json_params"
                                     let parts: Vec<&str> =
@@ -335,20 +454,21 @@ async fn main() -> Result<()> {
                                                         )
                                                         .await?;
                                                     stdin_writer.flush().await?;
-                                                    app.logs.push_back(format!("-> {}", req_str));
+                                                    app.add_log(req_str, LogDirection::Outgoing);
                                                 }
                                             }
                                             Err(e) => {
-                                                app.logs.push_back(format!(
-                                                    "Error parsing params: {}",
-                                                    e
-                                                ));
+                                                app.add_log(
+                                                    format!("Error parsing params: {}", e),
+                                                    LogDirection::Error,
+                                                );
                                             }
                                         }
                                     }
                                 }
                                 KeyCode::Esc => {
                                     app.input_mode = InputMode::Normal;
+                                    app.focus = Focus::ToolsList;
                                 }
                                 KeyCode::Backspace => {
                                     app.input.pop();
@@ -362,9 +482,16 @@ async fn main() -> Result<()> {
                     }
                 }
                 AppEvent::Message(msg) => {
-                    app.logs.push_back(format!("<- {}", msg));
-                    // Try to parse message
-                    if let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(&msg) {
+                    let (direction, content) = if let Some(stripped) = msg.strip_prefix("ERR: ") {
+                        (LogDirection::Error, stripped.to_string())
+                    } else {
+                        (LogDirection::Incoming, msg.clone())
+                    };
+
+                    app.add_log(content.clone(), direction);
+
+                    // Try to parse message for tools list
+                    if let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(&content) {
                         // Check if it's tools/list response
                         if let Some(result) = resp.result {
                             if let Some(tools_val) = result.get("tools") {
@@ -381,11 +508,6 @@ async fn main() -> Result<()> {
                                 }
                             }
                         }
-                    }
-
-                    // Keep logs trimmed
-                    if app.logs.len() > 100 {
-                        app.logs.pop_front();
                     }
                 }
                 AppEvent::Tick => {}
@@ -413,22 +535,59 @@ async fn main() -> Result<()> {
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
+    // Top level layout: Main Area vs Status Bar
+    let main_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+        .split(f.area());
+
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
-        .split(f.area());
+        .split(main_layout[0]);
 
+    // Left Column: Tools
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(100)].as_ref())
         .split(chunks[0]);
 
+    // Right Column: History (Top), Details (Middle), Input (Bottom)
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
+        .constraints(
+            [
+                Constraint::Percentage(40),
+                Constraint::Min(0),
+                Constraint::Length(3),
+            ]
+            .as_ref(),
+        )
         .split(chunks[1]);
 
-    // Tools List
+    // Styles based on Focus
+    let tools_border_style = if app.focus == Focus::ToolsList {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+    let history_border_style = if app.focus == Focus::LogHistory {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+    let details_border_style = if app.focus == Focus::LogDetails {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+    let input_border_style = if app.focus == Focus::Input {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+
+    // --- Tools List ---
     let items: Vec<ListItem> = app
         .tools
         .iter()
@@ -436,7 +595,12 @@ fn ui(f: &mut Frame, app: &mut App) {
         .collect();
 
     let tools_list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Tools"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Tools")
+                .border_style(tools_border_style),
+        )
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -446,27 +610,84 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     f.render_stateful_widget(tools_list, left_chunks[0], &mut app.tool_list_state);
 
-    // Logs
-    // Extract last 20 entries
-    let recent_logs: Vec<&String> = app.logs.iter().rev().take(20).rev().collect();
+    // --- Log History ---
+    // We want to show logs in order.
+    let log_items: Vec<ListItem> = app
+        .logs
+        .iter()
+        .map(|entry| {
+            let (prefix, style) = match entry.direction {
+                LogDirection::Outgoing => ("-> ", Style::default().fg(Color::Blue)),
+                LogDirection::Incoming => ("<- ", Style::default().fg(Color::Green)),
+                LogDirection::Error => ("ERR: ", Style::default().fg(Color::Red)),
+            };
 
-    let mut log_lines = Vec::new();
-    for entry in recent_logs {
-        log_lines.extend(format_log_entry(entry));
-        log_lines.push(Line::raw("")); // Spacing between entries
-    }
+            // Summary: Method name or short preview
+            let summary = if let Some(val) = &entry.parsed {
+                if let Some(method) = val.get("method").and_then(|v| v.as_str()) {
+                    format!("{} {}", prefix, method)
+                } else if let Some(result) = val.get("result") {
+                    format!("{} Response", prefix)
+                } else if let Some(error) = val.get("error") {
+                    format!("{} Error", prefix)
+                } else {
+                    format!("{} JSON", prefix)
+                }
+            } else {
+                format!(
+                    "{} {}",
+                    prefix,
+                    entry.content.chars().take(50).collect::<String>()
+                )
+            };
 
-    let logs = Paragraph::new(log_lines)
+            ListItem::new(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::raw(summary),
+            ]))
+        })
+        .collect();
+
+    let logs_list = List::new(log_items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("Logs - {}", app.status)),
+                .title("History")
+                .border_style(history_border_style),
         )
-        .wrap(Wrap { trim: true });
+        .highlight_style(Style::default().bg(Color::DarkGray));
 
-    f.render_widget(logs, right_chunks[0]);
+    f.render_stateful_widget(logs_list, right_chunks[0], &mut app.log_list_state);
 
-    // Input
+    // --- Log Details ---
+    let selected_index = app.log_list_state.selected();
+    let details_text = if let Some(idx) = selected_index {
+        if let Some(entry) = app.logs.get(idx) {
+            if let Some(parsed) = &entry.parsed {
+                pretty_print_json(parsed)
+            } else {
+                vec![Line::from(entry.content.clone())]
+            }
+        } else {
+            vec![Line::from("No log selected")]
+        }
+    } else {
+        vec![Line::from("Select a log entry to view details")]
+    };
+
+    let details = Paragraph::new(details_text)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Details")
+                .border_style(details_border_style),
+        )
+        .wrap(Wrap { trim: false }) // Preserved indentation
+        .scroll((app.details_scroll, 0));
+
+    f.render_widget(details, right_chunks[1]);
+
+    // --- Input ---
     let input_title = match app.input_mode {
         InputMode::Normal => "Input (i: edit, q: quit, l: refresh)",
         InputMode::Editing => "Input (Esc: cancel, Enter: send)",
@@ -477,65 +698,138 @@ fn ui(f: &mut Frame, app: &mut App) {
             InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),
         })
-        .block(Block::default().borders(Borders::ALL).title(input_title));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(input_title)
+                .border_style(input_border_style),
+        );
 
-    f.render_widget(input, right_chunks[1]);
+    f.render_widget(input, right_chunks[2]);
+
+    // --- Status Bar ---
+    let status_line = Line::from(vec![
+        Span::styled(" Status: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(&app.status),
+        Span::raw(" | "),
+        Span::styled("Focus: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(match app.focus {
+            Focus::ToolsList => "Tools (Tab to switch)",
+            Focus::LogHistory => "History (Tab to switch)",
+            Focus::LogDetails => "Details (Up/Down to scroll, Tab to switch)",
+            Focus::Input => "Input (Esc to exit)",
+        }),
+    ]);
+
+    let status_bar =
+        Paragraph::new(status_line).style(Style::default().bg(Color::Blue).fg(Color::White));
+
+    f.render_widget(status_bar, main_layout[1]);
 }
 
-fn format_log_entry(entry: &str) -> Vec<Line<'_>> {
-    let (prefix, rest) = if let Some(stripped) = entry.strip_prefix("-> ") {
-        ("-> ", stripped)
-    } else if let Some(stripped) = entry.strip_prefix("<- ") {
-        ("<- ", stripped)
-    } else if let Some(stripped) = entry.strip_prefix("ERR: ") {
-        ("ERR: ", stripped)
-    } else {
-        ("", entry)
-    };
-
-    let style = match prefix {
-        "-> " => Style::default().fg(Color::Blue),
-        "<- " => Style::default().fg(Color::Green),
-        "ERR: " => Style::default().fg(Color::Red),
-        _ => Style::default(),
-    };
-
+fn pretty_print_json(value: &Value) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-
-    // Attempt to pretty print JSON
-    let content = if !rest.trim().is_empty() {
-        match serde_json::from_str::<Value>(rest) {
-            Ok(val) => match serde_json::to_string_pretty(&val) {
-                Ok(pretty) => pretty,
-                Err(_) => rest.to_string(),
-            },
-            Err(_) => rest.to_string(),
-        }
-    } else {
-        rest.to_string()
-    };
-
-    // Add first line with prefix
-    let mut content_lines = content.lines();
-    if let Some(first) = content_lines.next() {
-        lines.push(Line::from(vec![
-            Span::styled(prefix, style),
-            Span::raw(first.to_string()),
-        ]));
-    } else {
-        // Empty content, just prefix
-        lines.push(Line::from(Span::styled(prefix, style)));
-    }
-
-    // Add remaining lines indented
-    for line in content_lines {
-        lines.push(Line::from(vec![
-            Span::raw("   "), // Indentation matching prefix length roughly
-            Span::raw(line.to_string()),
-        ]));
-    }
-
+    format_json_value(value, 0, &mut lines);
     lines
+}
+
+fn format_json_value(value: &Value, indent_level: usize, lines: &mut Vec<Line<'static>>) {
+    let indent = " ".repeat(indent_level * 2);
+
+    match value {
+        Value::Null => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled("null", Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+        Value::Bool(b) => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(b.to_string(), Style::default().fg(Color::Yellow)),
+            ]));
+        }
+        Value::Number(n) => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(n.to_string(), Style::default().fg(Color::Cyan)),
+            ]));
+        }
+        Value::String(s) => {
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::styled(format!("\"{}\"", s), Style::default().fg(Color::Green)),
+            ]));
+        }
+        Value::Array(arr) => {
+            if arr.is_empty() {
+                lines.push(Line::from(vec![Span::raw(indent), Span::raw("[]")]));
+                return;
+            }
+
+            lines.push(Line::from(vec![Span::raw(indent.clone()), Span::raw("[")]));
+
+            for (i, v) in arr.iter().enumerate() {
+                format_json_value(v, indent_level + 1, lines);
+                // Add comma if not last, but we are line-based so maybe not strictly necessary for viewing
+                // But let's try to append comma to the last line we just added
+                if i < arr.len() - 1 {
+                    if let Some(last_line) = lines.last_mut() {
+                        last_line.spans.push(Span::raw(","));
+                    }
+                }
+            }
+
+            lines.push(Line::from(vec![Span::raw(indent), Span::raw("]")]));
+        }
+        Value::Object(obj) => {
+            if obj.is_empty() {
+                lines.push(Line::from(vec![Span::raw(indent), Span::raw("{}")]));
+                return;
+            }
+
+            lines.push(Line::from(vec![Span::raw(indent.clone()), Span::raw("{")]));
+
+            for (i, (k, v)) in obj.iter().enumerate() {
+                // Key
+                let key_indent = " ".repeat((indent_level + 1) * 2);
+                let mut spans = vec![
+                    Span::raw(key_indent),
+                    Span::styled(format!("\"{}\"", k), Style::default().fg(Color::Blue)),
+                    Span::raw(": "),
+                ];
+
+                // Value - if it's primitive, put on same line. If complex, new line.
+                match v {
+                    Value::Array(_) | Value::Object(_) => {
+                        lines.push(Line::from(spans));
+                        format_json_value(v, indent_level + 1, lines);
+                    }
+                    _ => {
+                        // Create a temporary line for the value to reuse logic, but we need to merge spans
+                        let mut temp_lines = Vec::new();
+                        format_json_value(v, 0, &mut temp_lines); // 0 indent because we append
+
+                        if let Some(val_line) = temp_lines.into_iter().next() {
+                            // Skip the indent span of the value
+                            for span in val_line.spans.into_iter().skip(1) {
+                                spans.push(span);
+                            }
+                        }
+                        lines.push(Line::from(spans));
+                    }
+                }
+
+                if i < obj.len() - 1 {
+                    if let Some(last_line) = lines.last_mut() {
+                        last_line.spans.push(Span::raw(","));
+                    }
+                }
+            }
+
+            lines.push(Line::from(vec![Span::raw(indent), Span::raw("}")]));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -543,27 +837,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_log_entry_json() {
-        let entry = r#"-> {"jsonrpc":"2.0","method":"test"}"#;
-        let lines = format_log_entry(entry);
-
-        // Should have multiple lines due to pretty printing
-        assert!(lines.len() > 1);
-
-        // First line should have blue prefix
-        let first_line = &lines[0];
-        assert_eq!(first_line.spans[0].content, "-> ");
-        assert_eq!(first_line.spans[0].style.fg, Some(Color::Blue));
-    }
-
-    #[test]
-    fn test_format_log_entry_error() {
-        let entry = "ERR: Connection failed";
-        let lines = format_log_entry(entry);
-
-        assert_eq!(lines.len(), 1);
-        assert_eq!(lines[0].spans[0].content, "ERR: ");
-        assert_eq!(lines[0].spans[0].style.fg, Some(Color::Red));
-        assert_eq!(lines[0].spans[1].content, "Connection failed");
+    fn test_pretty_print_simple() {
+        let v = serde_json::json!({ "key": "value", "num": 123 });
+        let lines = pretty_print_json(&v);
+        assert!(!lines.is_empty());
+        // Basic check that we have lines for braces and keys
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.spans.iter().any(|s| s.content == "{"))
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.spans.iter().any(|s| s.content == "\"key\""))
+        );
     }
 }
