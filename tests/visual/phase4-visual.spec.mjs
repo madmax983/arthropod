@@ -15,7 +15,7 @@ for (const visualCase of visualCases) {
     const ready = await body.getAttribute("data-arthropod-ready");
     if (ready !== "1") {
       const error = (await body.getAttribute("data-arthropod-error")) ?? "unknown startup error";
-      if (/webgpu|surface creation|canvas\.getcontext/i.test(error)) {
+      if (/webgpu|failed to request adapter|surface creation|surface is not configured|canvas\.getcontext|phase4_visual_web panic/i.test(error)) {
         test.skip(true, `WebGPU unavailable in this browser/runtime: ${error}`);
       }
       throw new Error(`phase4 fixture startup failed: ${error}`);

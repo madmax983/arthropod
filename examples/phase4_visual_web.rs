@@ -130,6 +130,17 @@ mod wasm_app {
         let _ = body.set_attribute("data-arthropod-error", message);
     }
 
+    fn install_panic_marker_hook() {
+        console_error_panic_hook::set_once();
+        let previous_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic_info| {
+            let message = format!("phase4_visual_web panic: {panic_info}");
+            console::error_1(&message.clone().into());
+            set_error_marker(&message);
+            previous_hook(panic_info);
+        }));
+    }
+
     impl Phase4VisualApp {
         fn build_blur_scene() -> Scene {
             let mut scene = Scene::new();
@@ -478,7 +489,7 @@ mod wasm_app {
 
     #[wasm_bindgen(start)]
     pub fn start() -> Result<(), JsValue> {
-        console_error_panic_hook::set_once();
+        install_panic_marker_hook();
         plat_core::run::<Phase4VisualApp>().map_err(|e| {
             let message = format!("phase4_visual_web run failed: {e}");
             console::error_1(&message.clone().into());

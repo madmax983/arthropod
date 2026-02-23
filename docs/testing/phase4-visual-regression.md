@@ -41,8 +41,15 @@ Run browser-specific checks:
 
 ```bash
 npm run visual:test:chromium
+npm run visual:test:chromium:headed
 npm run visual:test:firefox
 npm run visual:test:webkit
+```
+
+Capture/update Chromium WebGPU baselines with a real adapter:
+
+```bash
+npm run visual:update:chromium:headed
 ```
 
 ## Fixture App
@@ -70,3 +77,8 @@ If WebGPU is unavailable for a browser/runtime, the fixture sets:
 - `body[data-arthropod-error="<message>"]`
 
 The Playwright test skips that browser project only for explicit WebGPU-unavailable startup errors, and fails for all other startup errors.
+
+Notes:
+
+- In headless Chromium, `navigator.gpu` may exist while `requestAdapter()` still returns `null`; use the headed Chromium command for true WebGPU capture.
+- If wasm panics during startup/render, the fixture panic hook now marks `data-arthropod-ready="0"` so tests skip/fail deterministically instead of timing out.
