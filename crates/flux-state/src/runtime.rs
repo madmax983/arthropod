@@ -30,8 +30,11 @@ pub struct NodeId(pub u64);
 /// use flux_state::Runtime;
 /// use std::sync::Arc;
 ///
+/// // Runtime::new() returns an Arc<Runtime>
 /// let runtime = Runtime::new();
-/// // Pass runtime.clone() to signals/effects
+///
+/// // Pass runtime.clone() to signals/effects.
+/// // See Signal::new() for more details.
 /// ```
 ///
 /// # Limits
