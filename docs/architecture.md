@@ -112,6 +112,41 @@ sequenceDiagram
     Render-->>User: Present Frame (GPU)
 ```
 
+## Widget System Structure
+
+The widget system uses a trait-based architecture for type-safe composition, allowing declarative UI construction without runtime overhead.
+
+```mermaid
+classDiagram
+    class Widget {
+        <<trait>>
+        +build(ctx: WidgetContext) NodeId
+    }
+
+    class WidgetTuple {
+        <<trait>>
+        +build_all(ctx: WidgetContext, parent: NodeId)
+        +build_all_to_vec(ctx: WidgetContext) Vec~NodeId~
+    }
+
+    class WidgetContext {
+        +Scene scene
+        +create_node(parent: NodeId, content: NodeContent) NodeId
+        +set_layout_style(node: NodeId, style: FlexStyle)
+        +add_clickable(node: NodeId, callback: Fn)
+    }
+
+    class NodeId {
+        <<value>>
+        +u64 id
+    }
+
+    Widget ..> WidgetContext : Uses
+    Widget ..> NodeId : Returns
+    WidgetTuple ..> Widget : Composes
+    WidgetContext "1" *-- "*" NodeId : Manages
+```
+
 ## Key Architectural Decisions
 
 - **Hybrid ECS**: We use a custom `Scene` graph (HashMap-based tree) for hierarchical operations (layout, event bubbling) while using `bevy_ecs` for bulk operations (rendering, animation). See [ADR 0001](./adr/0001-hybrid-ecs-architecture.md).
