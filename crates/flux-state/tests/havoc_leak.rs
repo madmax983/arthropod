@@ -1,3 +1,4 @@
+#[cfg(feature = "nova")]
 use flux_state::{Computed, Runtime, Signal};
 
 // We need the `nova` feature to access `inspect_graph`.
