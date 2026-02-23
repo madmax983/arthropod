@@ -12,46 +12,19 @@ use std::sync::Arc;
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SceneNodeRef(pub NodeId);
 
-/// Thread-safe wrapper for ReadSignal
-///
-/// Wraps a `ReadSignal` to provide a consistent interface for components.
-/// `ReadSignal` is intrinsically thread-safe (Send + Sync) thanks to internal
-/// mutex locking in the flux-state runtime.
-pub struct MainThreadSignal<T: 'static>(ReadSignal<T>);
-
-impl<T: 'static> MainThreadSignal<T> {
-    /// Create a new MainThreadSignal from a ReadSignal
-    pub fn new(signal: ReadSignal<T>) -> Self {
-        Self(signal)
-    }
-
-    /// Get the inner ReadSignal
-    pub fn inner(&self) -> &ReadSignal<T> {
-        &self.0
-    }
-}
-
-impl<T: Clone + 'static> Clone for MainThreadSignal<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
 /// Reactive color - polls signal to update scene node
 ///
 /// When this component is present, the reactive color system will poll the signal
 /// and update the corresponding scene node's color property each frame.
 #[derive(Component, Clone)]
 pub struct ReactiveColor {
-    pub signal: MainThreadSignal<Color>,
+    pub signal: ReadSignal<Color>,
 }
 
 impl ReactiveColor {
     /// Create a new ReactiveColor from a ReadSignal
     pub fn new(signal: ReadSignal<Color>) -> Self {
-        Self {
-            signal: MainThreadSignal::new(signal),
-        }
+        Self { signal }
     }
 }
 
@@ -61,15 +34,13 @@ impl ReactiveColor {
 /// and update the corresponding scene node's transform each frame.
 #[derive(Component, Clone)]
 pub struct ReactiveTransform {
-    pub signal: MainThreadSignal<Transform2D>,
+    pub signal: ReadSignal<Transform2D>,
 }
 
 impl ReactiveTransform {
     /// Create a new ReactiveTransform from a ReadSignal
     pub fn new(signal: ReadSignal<Transform2D>) -> Self {
-        Self {
-            signal: MainThreadSignal::new(signal),
-        }
+        Self { signal }
     }
 }
 
@@ -79,15 +50,13 @@ impl ReactiveTransform {
 /// and update the corresponding scene node's opacity each frame.
 #[derive(Component, Clone)]
 pub struct ReactiveOpacity {
-    pub signal: MainThreadSignal<f32>,
+    pub signal: ReadSignal<f32>,
 }
 
 impl ReactiveOpacity {
     /// Create a new ReactiveOpacity from a ReadSignal
     pub fn new(signal: ReadSignal<f32>) -> Self {
-        Self {
-            signal: MainThreadSignal::new(signal),
-        }
+        Self { signal }
     }
 }
 
@@ -97,15 +66,13 @@ impl ReactiveOpacity {
 /// and update the corresponding scene node's text content each frame.
 #[derive(Component, Clone)]
 pub struct ReactiveText {
-    pub signal: MainThreadSignal<String>,
+    pub signal: ReadSignal<String>,
 }
 
 impl ReactiveText {
     /// Create a new ReactiveText from a ReadSignal
     pub fn new(signal: ReadSignal<String>) -> Self {
-        Self {
-            signal: MainThreadSignal::new(signal),
-        }
+        Self { signal }
     }
 }
 

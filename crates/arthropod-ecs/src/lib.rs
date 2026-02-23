@@ -65,8 +65,8 @@ pub mod systems;
 
 // Re-export main types for convenience
 pub use components::{
-    Hoverable, MainThreadSignal, ReactiveColor, ReactiveComputedText, ReactiveOpacity,
-    ReactiveText, ReactiveTransform, Renderable, SceneNodeRef,
+    Hoverable, ReactiveColor, ReactiveComputedText, ReactiveOpacity, ReactiveText,
+    ReactiveTransform, Renderable, SceneNodeRef,
 };
 pub use context::FrameworkContext;
 pub use systems::{

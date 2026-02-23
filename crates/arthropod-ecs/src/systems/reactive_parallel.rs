@@ -42,21 +42,21 @@ pub fn gather_reactive_changes_system(
     buffer.changes.clear();
 
     for (node_ref, reactive) in color_query.iter() {
-        let color = reactive.signal.inner().get_untracked();
+        let color = reactive.signal.get_untracked();
         buffer
             .changes
             .push(ReactiveChange::Color(node_ref.0, color));
     }
 
     for (node_ref, reactive) in transform_query.iter() {
-        let transform = reactive.signal.inner().get_untracked();
+        let transform = reactive.signal.get_untracked();
         buffer
             .changes
             .push(ReactiveChange::Transform(node_ref.0, transform));
     }
 
     for (node_ref, reactive) in opacity_query.iter() {
-        let opacity = reactive.signal.inner().get_untracked();
+        let opacity = reactive.signal.get_untracked();
         buffer
             .changes
             .push(ReactiveChange::Opacity(node_ref.0, opacity));

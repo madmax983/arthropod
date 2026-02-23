@@ -25,7 +25,7 @@ pub fn update_all_reactive_system(
     // Colors
     for (node_ref, reactive) in color_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_color = reactive.signal.inner().get_untracked();
+            let new_color = reactive.signal.get_untracked();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if !style.fills.is_empty() {
                     style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
@@ -41,7 +41,7 @@ pub fn update_all_reactive_system(
     // Text content
     for (node_ref, reactive) in text_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_text = reactive.signal.inner().get_untracked();
+            let new_text = reactive.signal.get_untracked();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if let Some(ref mut text_content) = style.text {
                     text_content.text = new_text;
@@ -65,14 +65,14 @@ pub fn update_all_reactive_system(
     // Transforms
     for (node_ref, reactive) in transform_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.transform = reactive.signal.inner().get_untracked();
+            node.transform = reactive.signal.get_untracked();
         }
     }
 
     // Opacity
     for (node_ref, reactive) in opacity_query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.opacity = reactive.signal.inner().get_untracked();
+            node.opacity = reactive.signal.get_untracked();
         }
     }
 }
@@ -93,7 +93,7 @@ pub fn update_reactive_colors_system(
 ) {
     for (node_ref, reactive) in query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_color = reactive.signal.inner().get_untracked();
+            let new_color = reactive.signal.get_untracked();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if !style.fills.is_empty() {
                     style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
@@ -121,7 +121,7 @@ pub fn update_reactive_transforms_system(
 ) {
     for (node_ref, reactive) in query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.transform = reactive.signal.inner().get_untracked();
+            node.transform = reactive.signal.get_untracked();
         }
     }
 }
@@ -140,7 +140,7 @@ pub fn update_reactive_opacity_system(
 ) {
     for (node_ref, reactive) in query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.opacity = reactive.signal.inner().get_untracked();
+            node.opacity = reactive.signal.get_untracked();
         }
     }
 }

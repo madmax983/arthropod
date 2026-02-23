@@ -43,8 +43,8 @@ pub use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 
 // ECS integration
 pub use arthropod_ecs::{
-    FrameworkContext, MainThreadSignal, ReactiveColor, ReactiveOpacity, ReactiveText,
-    ReactiveTransform, Renderable, SceneNodeRef,
+    FrameworkContext, ReactiveColor, ReactiveOpacity, ReactiveText, ReactiveTransform, Renderable,
+    SceneNodeRef,
 };
 
 // Accessibility

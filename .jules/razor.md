@@ -17,3 +17,8 @@
 **Bloat:** `AdaptiveThresholds` in `arthropod-ecs` (Speculative Generality)
 **Cut:** Replaced dynamic runtime metrics and sliding window with a simple static constant.
 **Saved:** 1 file (`adaptive.rs`), ~250 lines, removed VecDeque overhead and per-frame calculations.
+
+## [Reduction]
+**Bloat:** `MainThreadSignal<T>` in `arthropod-ecs` (Redundant Wrapper)
+**Cut:** Removed wrapper struct and used `ReadSignal<T>` directly (which is already thread-safe).
+**Saved:** ~30 lines of boilerplate, removed unnecessary indirection (`.inner()`) and cognitive overhead.
