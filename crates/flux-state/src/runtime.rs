@@ -235,6 +235,29 @@ impl RuntimeInner {
         }
         self.push_context(id)
     }
+
+    fn take_pending_effects(&mut self, buffer: &mut Vec<NodeId>) -> bool {
+        if self.pending_effects.is_empty() {
+            // Donate our buffer back to the runtime if it has capacity
+            // and the runtime's spare buffer is smaller.
+            if buffer.capacity() > self.spare_pending_effects.capacity() {
+                self.spare_pending_effects = std::mem::take(buffer);
+            }
+            return false;
+        }
+
+        // Swap out pending_effects with an empty buffer.
+        // Prefer reusing spare_pending_effects if available.
+        let empty_buf = if self.spare_pending_effects.capacity() > 0 {
+            std::mem::take(&mut self.spare_pending_effects)
+        } else {
+            std::mem::take(buffer)
+        };
+
+        // buffer gets the full buffer, pending_effects gets the empty one
+        *buffer = std::mem::replace(&mut self.pending_effects, empty_buf);
+        true
+    }
 }
 
 impl Runtime {
@@ -350,44 +373,28 @@ impl Runtime {
         // to grab all pending effects, then run them.
         let mut local_effects = Vec::new();
 
-        loop {
-            {
-                let mut inner = self.inner.lock().unwrap();
-                if inner.pending_effects.is_empty() {
-                    // Donate our buffer back to the runtime if it has capacity
-                    // and the runtime's spare buffer is smaller.
-                    if local_effects.capacity() > inner.spare_pending_effects.capacity() {
-                        inner.spare_pending_effects = local_effects;
-                    }
-                    break;
-                }
+        while self
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut local_effects)
+        {
+            self.process_effect_batch(&mut local_effects);
+        }
+    }
 
-                // Swap out pending_effects with an empty buffer.
-                // Prefer reusing spare_pending_effects if available.
-                let empty_buf = if inner.spare_pending_effects.capacity() > 0 {
-                    std::mem::take(&mut inner.spare_pending_effects)
-                } else {
-                    std::mem::take(&mut local_effects)
-                };
+    fn process_effect_batch(&self, batch: &mut Vec<NodeId>) {
+        // Process batch in reverse order (LIFO) to match original behavior.
+        // Note: run_effect() might trigger more effects recursively via notify(),
+        // or if run from another thread, pending_effects might be populated again.
+        // The outer loop handles these cases.
+        let restorer = PanicRestorer {
+            runtime: self,
+            remaining_effects: batch,
+        };
 
-                // local_effects gets the full buffer, pending_effects gets the empty one
-                local_effects = std::mem::replace(&mut inner.pending_effects, empty_buf);
-            }
-
-            // Process batch in reverse order (LIFO) to match original behavior.
-            // Note: run_effect() might trigger more effects recursively via notify(),
-            // or if run from another thread, pending_effects might be populated again.
-            // The outer loop handles these cases.
-            {
-                let restorer = PanicRestorer {
-                    runtime: self,
-                    remaining_effects: &mut local_effects,
-                };
-
-                while let Some(id) = restorer.remaining_effects.pop() {
-                    self.run_effect(id);
-                }
-            }
+        while let Some(id) = restorer.remaining_effects.pop() {
+            self.run_effect(id);
         }
     }
 
