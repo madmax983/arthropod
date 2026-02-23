@@ -79,41 +79,54 @@ fn test_flush_effects_order_and_recursion() {
 }
 
 #[test]
-fn test_flush_effects_batching() {
-    // This test ensures that if multiple effects are pending, they are all executed.
+fn test_flush_effects_fanout_batching() {
+    // This test ensures that if multiple effects depend on the same signal,
+    // they are all executed exactly once when the signal updates.
+    // Note: Execution order of sibling effects is not guaranteed due to HashSet storage,
+    // but we verify that all run.
+
     let runtime = Runtime::new();
     let s = Signal::new(runtime.clone(), 0);
     let (read, write) = s.split();
 
-    let counter = Arc::new(Mutex::new(0));
+    let log = Arc::new(Mutex::new(Vec::new()));
 
-    let c1 = counter.clone();
+    let log1 = log.clone();
     let r1 = read.clone();
     let _e1 = Effect::new(runtime.clone(), move || {
         r1.get();
-        *c1.lock().unwrap() += 1;
+        log1.lock().unwrap().push("E1".to_string());
     });
 
-    let c2 = counter.clone();
+    let log2 = log.clone();
     let r2 = read.clone();
     let _e2 = Effect::new(runtime.clone(), move || {
         r2.get();
-        *c2.lock().unwrap() += 1;
+        log2.lock().unwrap().push("E2".to_string());
     });
 
-    let c3 = counter.clone();
+    let log3 = log.clone();
     let r3 = read.clone();
     let _e3 = Effect::new(runtime.clone(), move || {
         r3.get();
-        *c3.lock().unwrap() += 1;
+        log3.lock().unwrap().push("E3".to_string());
     });
 
     // Initial run
-    assert_eq!(*counter.lock().unwrap(), 3);
+    {
+        let mut recorded = log.lock().unwrap();
+        recorded.sort();
+        assert_eq!(*recorded, vec!["E1", "E2", "E3"]);
+        recorded.clear();
+    }
 
     // Update
-    *counter.lock().unwrap() = 0;
     write.set(1);
 
-    assert_eq!(*counter.lock().unwrap(), 3);
+    {
+        let mut recorded = log.lock().unwrap();
+        recorded.sort();
+        // Verify all ran exactly once
+        assert_eq!(*recorded, vec!["E1", "E2", "E3"]);
+    }
 }

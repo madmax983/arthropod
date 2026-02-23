@@ -43,3 +43,18 @@
 ### Actions Taken
 
 *   Updated `test_glitch_freedom_effect` in `sentry_correctness.rs` to assert `3*B == 2*C`, ensuring that the effect always sees a consistent snapshot of the dependency graph (avoiding mixed old/new values).
+
+## 2026-02-23 - [Audit of flux-state Batching]
+**Module:** `crates/flux-state/tests/flush_batching.rs`
+**Verdict:** 🟢 Acquitted (Strengthened)
+
+### Findings
+
+| Test File | Verdict | Reasoning |
+| :--- | :--- | :--- |
+| `flush_batching.rs` | 🟢 Acquitted (Strengthened) | Previously relied on a shared counter to verify batch execution (weak assertion). Strengthened to use a log-based verification to ensure every effect runs exactly once in fan-out scenarios, respecting the non-deterministic nature of sibling effect execution order while verifying completeness. |
+
+### Actions Taken
+
+*   Refactored `test_flush_effects_batching` into `test_flush_effects_fanout_batching` using `Vec<String>` logging.
+*   Verified that `test_flush_effects_order_and_recursion` correctly tests recursive LIFO execution.
