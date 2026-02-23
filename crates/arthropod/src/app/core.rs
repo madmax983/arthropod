@@ -113,6 +113,7 @@ impl App {
             context.world_mut().insert_resource(backend);
         }
 
+        #[cfg_attr(not(feature = "nova"), allow(unused_mut))]
         let mut app = Self {
             context, // Drops first
             window,  // Drops last

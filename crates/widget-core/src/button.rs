@@ -8,12 +8,14 @@ use render_engine::{Color, NodeContent, NodeId};
 use std::sync::Arc;
 use theme_engine::DesignTokens;
 
-/// Button widget with hover and click interactions
+/// Button widget with hover and click interactions.
+///
+/// Styles are defined by the [`ButtonStyle`] enum and can be applied via helper methods.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use widget_core::{Button, btn};
+/// use widget_core::{Button, btn, ButtonStyle};
 ///
 /// // Builder pattern
 /// let button = Button::new("Click Me")
@@ -21,9 +23,9 @@ use theme_engine::DesignTokens;
 ///     .on_click(|| println!("Clicked!"));
 ///
 /// // Macro usage
-/// let b1 = btn!("Click Me");
-/// let b2 = btn!("Save", primary, on_click: || println!("Saved"));
-/// let b3 = btn!("Cancel", disabled, padding: 20.0);
+/// let b1 = btn!("Click Me"); // Default style
+/// let b2 = btn!("Save", primary, on_click: || println!("Saved")); // Primary style
+/// let b3 = btn!("Cancel", secondary, disabled, padding: 20.0); // Secondary style
 /// ```
 #[derive(Widget)]
 #[widget(name = "btn", alias = "button")]

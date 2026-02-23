@@ -26,9 +26,9 @@
 //!         col!(
 //!             [
 //!                 txt!("Hello, World!", size: 24.0),
-//!                 // Note: txt! macro currently supports static strings and signals.
-//!                 // For computed values, use the builder pattern:
+//!                 // Text::computed allows using derived state
 //!                 Text::computed(count_text).size(18.0),
+//!                 // btn! macro with 'primary' style flag
 //!                 btn!("Increment", primary, on_click: move || {
 //!                     write_count.update(|c| *c += 1);
 //!                 }),

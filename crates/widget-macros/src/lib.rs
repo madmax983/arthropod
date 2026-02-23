@@ -78,7 +78,7 @@ mod widget_enum;
 /// # Field-Level Attributes
 ///
 /// - `#[positional]` - First positional argument
-/// - `#[positional(reactive)]` - Positional with `@signal` support
+/// - `#[positional(reactive)]` - Positional field with `@signal` support. This enables the `txt!(@read)` syntax in the generated macro.
 /// - `#[children]` - Multiple children (uses WidgetTuple trait)
 /// - `#[scaffold]` - Named slots for scaffold pattern: `"slot" => widget`
 /// - `#[layout(...)]` - Slot-specific layout (applied to child's layout style)
@@ -96,6 +96,7 @@ mod widget_enum;
 /// #[derive(Widget)]
 /// #[widget(name = "txt")]
 /// pub struct Text {
+///     // Mark the content as reactive to enable special macro syntax
 ///     #[positional(reactive)]
 ///     content: TextContent,
 ///
@@ -103,7 +104,9 @@ mod widget_enum;
 ///     font_size: f32,
 /// }
 ///
-/// // Usage: txt!("Hello"), txt!(@signal, size: 20.0)
+/// // Usage:
+/// // txt!("Hello")                  // Static string
+/// // txt!(@read_signal, size: 20.0) // Reactive signal (via @ syntax)
 /// ```
 ///
 /// ## Container Widget with Layout
