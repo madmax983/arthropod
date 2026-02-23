@@ -14,6 +14,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [005](005-input-fusion.md) | Input Fusion System | Draft |
 | [006](006-data-grid.md) | Data Grid (DataTable) | Draft |
 | [007](007-flux-devtools-value-inspector.md) | Flux DevTools: Value Inspector | Draft |
+| [008](008-router-navigation.md) | Router & Navigation | Approved |
 
 ## Lifecycle
 

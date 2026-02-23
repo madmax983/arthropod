@@ -1,6 +1,6 @@
 # 🔭 Vantage: Spec for Router & Navigation System
 
-**Status**: Draft
+**Status**: Approved
 **Owner**: Vantage
 **Target Release**: Arthropod Core (Feature Promotion)
 
