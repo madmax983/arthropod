@@ -2,7 +2,7 @@
 
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 /// Unique identifier for reactive nodes.
@@ -44,6 +44,7 @@ pub struct NodeId(pub u64);
 /// This limit applies to the depth of the dependency chain (e.g., Computed A -> Computed B -> ...).
 pub struct Runtime {
     inner: Mutex<RuntimeInner>,
+    condvar: Condvar,
 }
 
 struct RuntimeInner {
@@ -67,6 +68,9 @@ struct RuntimeInner {
 
     // Stale tracking
     stale: HashSet<NodeId>,
+
+    // Nodes currently being computed (to prevent concurrent recomputation)
+    computing: HashSet<NodeId>,
 
     // Pending effects to run
     pending_effects: Vec<NodeId>,
@@ -221,9 +225,11 @@ impl RuntimeInner {
             .and_then(|stack| stack.last().copied())
     }
 
-    fn prepare_execution(&mut self, id: NodeId) -> Result<(), String> {
+    fn prepare_execution(&mut self, id: NodeId, keep_stale: bool) -> Result<(), String> {
         self.cleanup_dependencies(id);
-        self.stale.remove(&id);
+        if !keep_stale {
+            self.stale.remove(&id);
+        }
         self.push_context(id)
     }
 }
@@ -244,12 +250,14 @@ impl Runtime {
                 subscribers: HashMap::new(),
                 tracking_context: HashMap::new(),
                 stale: HashSet::new(),
+                computing: HashSet::new(),
                 pending_effects: Vec::new(),
                 spare_pending_effects: Vec::new(),
                 traversal_buffer: Vec::new(),
                 #[cfg(feature = "nova")]
                 labels: HashMap::new(),
             }),
+            condvar: Condvar::new(),
         })
     }
 
@@ -289,10 +297,10 @@ impl Runtime {
         id
     }
 
-    fn run_with_context<R>(&self, id: NodeId, f: impl FnOnce() -> R) -> R {
+    fn run_with_context<R>(&self, id: NodeId, keep_stale: bool, f: impl FnOnce() -> R) -> R {
         {
             let mut inner = self.inner.lock().unwrap();
-            if let Err(e) = inner.prepare_execution(id) {
+            if let Err(e) = inner.prepare_execution(id, keep_stale) {
                 // Drop lock before panicking to prevent mutex poisoning,
                 // which would cause double-panics during unwinding cleanup.
                 drop(inner);
@@ -389,7 +397,7 @@ impl Runtime {
         // We run in context regardless of whether the effect exists,
         // because we need to clear dependencies for zombie nodes.
         // run_with_context handles prepare_execution (and cleaning deps).
-        self.run_with_context(id, || {
+        self.run_with_context(id, false, || {
             if let Some(f) = effect_fn {
                 f();
             }
@@ -438,24 +446,75 @@ impl Runtime {
     /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
         let compute_fn = {
-            let inner = self.inner.lock().unwrap();
-            inner
-                .computeds
-                .get(&id)
-                .unwrap_or_else(|| panic!("Computed not found for id {:?}", id))
-                .compute
-                .clone()
+            let mut inner = self.inner.lock().unwrap();
+
+            // Check for recursion (cycle detection) - return stale value if we are already computing this
+            if inner
+                .tracking_context
+                .get(&thread::current().id())
+                .is_some_and(|stack| stack.contains(&id))
+            {
+                return;
+            }
+
+            // Wait if currently computing (prevent concurrent recomputation)
+            while inner.computing.contains(&id) {
+                inner = self.condvar.wait(inner).unwrap();
+            }
+
+            let (is_uninit, compute) = {
+                let computed = inner
+                    .computeds
+                    .get(&id)
+                    .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+                (computed.value.is_none(), computed.compute.clone())
+            };
+
+            let is_stale = inner.stale.contains(&id);
+
+            // Check if still stale (someone else might have recomputed it while we waited)
+            if !is_stale && !is_uninit {
+                return;
+            }
+
+            // Mark as computing
+            inner.computing.insert(id);
+
+            compute
         };
 
-        // Run computation in context
-        let new_value = self.run_with_context(id, || compute_fn());
+        // Guard to ensure `computing` is cleaned up if panic occurs
+        struct ComputingGuard<'a> {
+            runtime: &'a Runtime,
+            id: NodeId,
+        }
+        impl<'a> Drop for ComputingGuard<'a> {
+            fn drop(&mut self) {
+                if std::thread::panicking() {
+                    let mut inner = match self.runtime.inner.lock() {
+                        Ok(g) => g,
+                        Err(p) => p.into_inner(),
+                    };
+                    inner.computing.remove(&self.id);
+                    self.runtime.condvar.notify_all();
+                }
+            }
+        }
+        let _guard = ComputingGuard { runtime: self, id };
 
-        // Store new value
+        // Run computation in context, keeping stale flag until we are done
+        // so concurrent readers see it as stale and wait on computing.
+        let new_value = self.run_with_context(id, true, || compute_fn());
+
+        // Store new value and clear stale/computing
         {
             let mut inner = self.inner.lock().unwrap();
             if let Some(computed) = inner.computeds.get_mut(&id) {
                 computed.value = Some(new_value);
             }
+            inner.stale.remove(&id);
+            inner.computing.remove(&id);
+            self.condvar.notify_all();
         }
     }
 

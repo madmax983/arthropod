@@ -4,67 +4,76 @@ use std::thread;
 use std::time::Duration;
 
 #[test]
-#[should_panic(expected = "Race condition detected")]
-fn test_computed_race_condition() {
+fn test_stale_read_race() {
     let runtime = Runtime::new();
     let signal = Signal::new(runtime.clone(), 0);
-    let (read_sig, write_sig) = signal.split();
+    let (read, write) = signal.split();
 
-    // Barrier to synchronize the race:
-    // 2 participants: Thread A (compute) and Main Thread (read)
+    // Use a barrier to synchronize threads
     let barrier = Arc::new(Barrier::new(2));
     let barrier_clone = barrier.clone();
 
-    // The Computed value that depends on `signal`.
-    // We inject a delay/barrier inside the computation to catch the runtime
-    // in the state where `stale` is false (cleared) but the new value isn't stored.
+    // Create a computed that simulates a slow computation
     let computed = Computed::new(runtime.clone(), move || {
-        let val = read_sig.get();
-        if val == 1 {
-            // We are in the update phase triggered by `write_sig.set(1)`.
-            // Block here. At this point, `Runtime::recompute` has already cleared the `stale` flag.
-            barrier_clone.wait();
-            // Sleep a bit to ensure the other thread has time to read the STALE value.
-            thread::sleep(Duration::from_millis(100));
+        // This is called initially.
+        // We only want to block on subsequent calls.
+        if read.get() == 0 {
+            return 0;
         }
-        val + 100
+
+        // Wait for main thread to be ready to read
+        // But only if we are the "slow" thread?
+        // Let's use the barrier unconditionally here, but we need to make sure
+        // the initial computation doesn't block.
+        // The initial computation happens inside Computed::new, before we spawn the other thread.
+        // So the barrier must be met by the main thread too? No.
+
+        // Let's just use a simple flag or atomic, or rely on the signal value.
+        // If signal is 1, we block.
+        barrier_clone.wait();
+
+        // Simulate work
+        thread::sleep(Duration::from_millis(50));
+
+        read.get()
     });
 
-    // Initial value check (runs immediately upon creation)
-    assert_eq!(computed.get(), 100);
+    // Verify initial state
+    assert_eq!(computed.get(), 0);
 
-    // Trigger update
-    write_sig.set(1);
-    // `computed` is now marked stale.
+    // Make computed stale
+    write.set(1);
 
-    // Spawn Thread A to trigger recompute
-    let computed_a = computed.clone();
-    let handle_a = thread::spawn(move || {
-        // Accessing `computed_a` will trigger `recompute`.
-        // Inside `recompute`, it will hit the barrier.
-        computed_a.get()
+    // Spawn a thread to trigger recomputation
+    let computed_thread = computed.clone();
+    let handle = thread::spawn(move || {
+        // This will trigger recompute because it's stale (signal is 1).
+        // Inside compute closure:
+        // 1. Checks signal == 1.
+        // 2. Waits on barrier.
+        // 3. Sleeps.
+        // 4. Returns 1.
+        computed_thread.get()
     });
 
-    // Wait for Thread A to hit the barrier.
-    // This guarantees that Thread A is inside `compute_fn` and has cleared the `stale` flag.
+    // Main thread waits for the background thread to reach the barrier (start computing)
     barrier.wait();
 
-    // Main Thread (Thread B) reads immediately.
-    // Since `stale` is cleared by Thread A, `is_stale()` returns false.
-    // So `recompute()` is skipped.
-    // It proceeds to read the stored value, which is still the OLD value (100)
-    // because Thread A hasn't finished computing/storing the new value yet.
+    // At this point:
+    // The background thread is inside the compute closure.
+    // The `stale` flag has likely been cleared by `prepare_execution`.
+    // The new value has NOT been stored yet.
+
+    // Main thread tries to read.
+    // If the bug exists, `is_stale` returns false, and we get the OLD value (0).
+    // If fixed, `recompute` (or `get`) blocks until computation finishes, then returns 1.
     let val = computed.get();
 
-    // Allow Thread A to finish
-    handle_a.join().unwrap();
+    handle.join().unwrap();
 
-    // The correct behavior requires the value to be consistent with the dependency update.
-    // Since `signal` is 1, `computed` should be 101.
-    // If we read 100, we have a race condition (stale read).
+    // Assert we got the fresh value
     assert_eq!(
-        val, 101,
-        "Race condition detected! Read stale value 100 instead of 101. \
-        The `stale` flag was cleared before the new value was written."
+        val, 1,
+        "Read stale value 0 while recomputing! Race condition detected."
     );
 }
