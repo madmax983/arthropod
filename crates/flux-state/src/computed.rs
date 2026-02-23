@@ -98,6 +98,9 @@ pub struct Computed<T> {
 
 impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Computed<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Track the dependency so that effects re-run when the computed value changes.
+        self.runtime.track(self.id);
+
         // Recompute if stale to show fresh value.
         // We do this because debugging usually implies wanting to know the *current* state.
         if self.runtime.is_stale(self.id) {

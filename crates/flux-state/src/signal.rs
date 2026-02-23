@@ -66,6 +66,9 @@ unsafe impl<T: Send> Sync for WriteSignal<T> {}
 
 impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Signal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Track the dependency so that effects re-run when the signal changes.
+        self.runtime.track(self.id);
+
         let handle = self.runtime.get_signal_handle(self.id);
 
         let guard = match handle.downcast_ref::<Mutex<T>>() {
@@ -84,6 +87,9 @@ impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Signal<T> {
 
 impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for ReadSignal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Track the dependency so that effects re-run when the signal changes.
+        self.runtime.track(self.id);
+
         let handle = self.runtime.get_signal_handle(self.id);
 
         let guard = match handle.downcast_ref::<Mutex<T>>() {
@@ -102,6 +108,9 @@ impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for ReadSignal<T> {
 
 impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for WriteSignal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Track the dependency so that effects re-run when the signal changes.
+        self.runtime.track(self.id);
+
         let handle = self.runtime.get_signal_handle(self.id);
 
         let guard = match handle.downcast_ref::<Mutex<T>>() {

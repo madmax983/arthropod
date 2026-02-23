@@ -23,3 +23,7 @@
 ## 2024-05-24 - [Silent Stale Value Bug]
 **Learning:** If a `Computed` value panics during recomputation, it is prematurely unmarked as `stale` before the new value is stored. This causes subsequent reads to return the old (stale) value without re-attempting the computation, even if dependencies have changed.
 **Action:** Modified `ContextGuard` to restore the node's `stale` status if the computation panics. This ensures correct panic recovery while preserving "optimistic staleness removal" needed for cycle handling.
+
+## 2024-05-24 - [Debug Reactivity]
+**Learning:** `Debug` formatting of reactive primitives (Signal, Computed) was non-reactive, meaning effects using only `println!("{:?}", signal)` would not re-run on updates.
+**Action:** Always verify that "observation" (even via Debug) triggers "dependency tracking" in reactive systems. Added `runtime.track(id)` to `Debug` implementations.
