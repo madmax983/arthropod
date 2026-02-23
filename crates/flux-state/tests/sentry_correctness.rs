@@ -96,9 +96,19 @@ fn test_glitch_freedom_effect() {
 
     let _effect = Effect::new(runtime.clone(), move || {
         count_clone.fetch_add(1, Ordering::SeqCst);
-        let val = b_clone.get() + c_clone.get();
-        // Just read them to establish dependency
-        let _ = val;
+        let val_b = b_clone.get();
+        let val_c = c_clone.get();
+
+        // Elenchus: Verify consistency between B and C.
+        // B = A*2, C = A*3. Thus B/2 = A = C/3 => 3*B == 2*C.
+        // This ensures we aren't seeing a "glitch" where B is from new A and C is from old A.
+        assert_eq!(
+            val_b * 3,
+            val_c * 2,
+            "Glitch detected! Inconsistent state: B={}, C={} (Expected 3B==2C)",
+            val_b,
+            val_c
+        );
     });
 
     // Initial run

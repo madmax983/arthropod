@@ -27,3 +27,19 @@
 *   Verified that `havoc_recursion.rs` correctly tests the recursion limit.
 *   Verified that `sentry_cycles.rs` correctly identifies that `Computed` cycles do not panic (unlike `Effect` cycles).
 *   Planning to strengthen `sentry_cycles.rs` to assert specific values.
+
+## 2024-05-26 - [Audit of flux-state Phase 2]
+**Module:** `crates/flux-state`
+**Verdict:** 🟢 Acquitted (Strengthened)
+
+### Findings
+
+| Test File | Verdict | Reasoning |
+| :--- | :--- | :--- |
+| `sentry_correctness.rs` | 🟢 Acquitted (Strengthened) | `test_glitch_freedom_effect` now asserts consistency of values seen by effect, preventing "Lost Update" bugs from passing unnoticed. |
+| `havoc_race.rs` | 🟢 Acquitted | Properly uses `#[should_panic]` to document a known race condition (The Wreckage). |
+| `sentry_cycles.rs` | 🟢 Acquitted | Verified that it asserts specific values (A=2, B=1) consistent with the current implementation's cycle-breaking strategy. |
+
+### Actions Taken
+
+*   Updated `test_glitch_freedom_effect` in `sentry_correctness.rs` to assert `3*B == 2*C`, ensuring that the effect always sees a consistent snapshot of the dependency graph (avoiding mixed old/new values).
