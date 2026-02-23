@@ -67,6 +67,28 @@ C4Container
     Rel(render, ecs, "Reads", "Scene data")
 ```
 
+## Render Engine Architecture
+
+The `render-engine` has been decomposed into specialized components to handle the complexity of multipass rendering and resource management. See [ADR 0026](./adr/0026-modular-wgpu-backend.md).
+
+```mermaid
+C4Component
+    title Component Diagram for Render Engine
+
+    Container_Boundary(render, "Render Engine") {
+        Component(backend, "WgpuBackend", "Coordinator", "Orchestrates frame lifecycle and resources.")
+        Component(multipass, "MultipassRenderer", "Worker", "Executes render passes and commands.")
+        Component(collector, "InstanceCollector", "Worker", "Converts SceneNodes to instances.")
+        Component(clipping, "Clipping", "Worker", "Manages stencil buffer.")
+        Component(primitive, "PrimitivePipeline", "Worker", "Renders vector primitives.")
+
+        Rel(backend, multipass, "Delegates to", "Rust")
+        Rel(backend, collector, "Delegates to", "Rust")
+        Rel(multipass, primitive, "Uses", "Rust")
+        Rel(multipass, clipping, "Uses", "Rust")
+    }
+```
+
 ## Runtime Loop (Sequence)
 
 The `WidgetApp` runtime loop orchestrates the flow of events from the OS to the application logic and back to the screen. This sequence diagram illustrates a typical frame update.
