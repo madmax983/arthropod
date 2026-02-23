@@ -5,7 +5,7 @@ mod tui_app {
         time::{Duration, Instant},
     };
 
-    use arthropod::experimental::story::{NarrativeGenerator, register_story};
+    use arthropod::experimental::story::{NarrativeGenerator, StoryRuntime, register_story};
     use arthropod::prelude::*;
     use crossterm::{
         event::{self, Event, KeyCode, KeyEventKind},
@@ -24,18 +24,7 @@ mod tui_app {
 
     enum AppState {
         Intro,
-        Generating {
-            start_time: Instant,
-        },
-        Display {
-            story: String,
-            scroll_offset: u16,
-            visible_chars: usize,
-            total_chars: usize,
-        },
-        Error {
-            message: String,
-        },
+        StoryLoop,
     }
 
     pub fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,13 +34,6 @@ mod tui_app {
         execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-
-        // Setup App
-        // We'll create the app fresh each time we generate, or reset it.
-        // Actually, let's keep one app instance but we might need to clear the scene if we regenerate.
-        // For simplicity, let's just create a new app instance when needed or just append.
-        // But `App` owns the world.
-        // Let's create the app inside the generation step to simulate a fresh start.
 
         // Run Loop
         let res = run_app(&mut terminal);
@@ -69,13 +51,30 @@ mod tui_app {
     }
 
     #[allow(clippy::collapsible_if)]
-    fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Result<()> {
+    fn run_app(
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Initialize Arthropod App
+        let mut app = App::new_headless()?;
+        register_story(&mut app);
+
+        // Spawn NarrativeGenerator entity attached to root
+        let root_id = app.world().resource::<Scene>().root();
+        app.spawn(root_id).insert(NarrativeGenerator);
+
+        // Initial update to generate first frame
+        app.update();
+
         let mut state = AppState::Intro;
-        let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(100);
+        let mut last_tick = Instant::now();
+        let mut scroll_offset = 0u16;
 
         loop {
-            terminal.draw(|f| ui(f, &state))?;
+            // Extract current text from Scene for rendering
+            let story_text = extract_story_text(&app);
+
+            terminal.draw(|f| ui(f, &state, &story_text, scroll_offset))?;
 
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
@@ -86,23 +85,33 @@ mod tui_app {
                     if key.kind == KeyEventKind::Press {
                         match key.code {
                             KeyCode::Char('q') => return Ok(()),
-                            KeyCode::Char('r') => state = AppState::Intro,
                             KeyCode::Enter => {
                                 if let AppState::Intro = state {
-                                    state = AppState::Generating {
-                                        start_time: Instant::now(),
-                                    };
+                                    state = AppState::StoryLoop;
+                                    app.update(); // Ensure fresh state
+                                }
+                            }
+                            // Number keys for choices
+                            KeyCode::Char(c) if c.is_ascii_digit() => {
+                                if let AppState::StoryLoop = state {
+                                    let idx = c.to_digit(10).unwrap() as usize;
+                                    if idx > 0 {
+                                        // 1-based index
+                                        let mut runtime =
+                                            app.world_mut().resource_mut::<StoryRuntime>();
+                                        // Try to make a choice (0-based internally)
+                                        if runtime.choose(idx - 1).is_ok() {
+                                            // Reset scroll on new passage
+                                            scroll_offset = 0;
+                                        }
+                                    }
                                 }
                             }
                             KeyCode::Down | KeyCode::Char('j') => {
-                                if let AppState::Display { scroll_offset, .. } = &mut state {
-                                    *scroll_offset = scroll_offset.saturating_add(1);
-                                }
+                                scroll_offset = scroll_offset.saturating_add(1);
                             }
                             KeyCode::Up | KeyCode::Char('k') => {
-                                if let AppState::Display { scroll_offset, .. } = &mut state {
-                                    *scroll_offset = scroll_offset.saturating_sub(1);
-                                }
+                                scroll_offset = scroll_offset.saturating_sub(1);
                             }
                             _ => {}
                         }
@@ -112,50 +121,34 @@ mod tui_app {
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
-
-                // State updates
-                let mut next_state = None;
-
-                match &mut state {
-                    AppState::Generating { start_time } => {
-                        // Simulate some "work" for 1.5 seconds to show off the spinner
-                        if start_time.elapsed() > Duration::from_millis(1500) {
-                            match generate_story() {
-                                Ok(text) => {
-                                    let total = text.chars().count();
-                                    next_state = Some(AppState::Display {
-                                        story: text,
-                                        scroll_offset: 0,
-                                        visible_chars: 0,
-                                        total_chars: total,
-                                    });
-                                }
-                                Err(e) => {
-                                    next_state = Some(AppState::Error {
-                                        message: e.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    AppState::Display {
-                        visible_chars,
-                        total_chars,
-                        ..
-                    } => {
-                        // Typewriter effect: reveal 5 chars per tick (50 chars/sec at 100ms tick)
-                        if *visible_chars < *total_chars {
-                            *visible_chars = (*visible_chars + 5).min(*total_chars);
-                        }
-                    }
-                    _ => {}
-                }
-
-                if let Some(s) = next_state {
-                    state = s;
-                }
+                // Run ECS systems
+                app.update();
             }
         }
+    }
+
+    fn extract_story_text(app: &App) -> String {
+        let scene = app.world().resource::<Scene>();
+        let root = scene.root();
+        let root_node = match scene.get_node(root) {
+            Some(n) => n,
+            None => return String::new(),
+        };
+
+        let mut full_text = String::new();
+
+        // Iterate all children (Text + Choices)
+        for &child_id in &root_node.children {
+            if let Some(child) = scene.get_node(child_id)
+                && let NodeContent::Styled { style } = &child.content
+                && let Some(text_content) = &style.text
+            {
+                full_text.push_str(&text_content.text);
+                full_text.push_str("\n\n");
+            }
+        }
+
+        full_text
     }
 
     fn parse_markdown(text: &str) -> Vec<Line<'_>> {
@@ -168,7 +161,6 @@ mod tui_app {
             }
 
             if let Some(rest) = line.strip_prefix("# ") {
-                // H1: Centered, Yellow, Bold, Underlined
                 lines.push(
                     Line::from(vec![Span::styled(
                         rest,
@@ -180,15 +172,22 @@ mod tui_app {
                 );
                 lines.push(Line::from(""));
             } else if let Some(rest) = line.strip_prefix("## ") {
-                // H2: Cyan, Bold
                 lines.push(Line::from(vec![Span::styled(
                     rest,
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 )]));
+            } else if line.trim().starts_with('[') {
+                // Highlight choices [1] ...
+                lines.push(Line::from(vec![Span::styled(
+                    line,
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )]));
             } else {
-                // Body text with **bold** parsing
+                // Standard markdown body
                 let mut spans = Vec::new();
                 let mut current_text = line;
 
@@ -211,7 +210,6 @@ mod tui_app {
                         ));
                         current_text = &rest[end_idx + 2..];
                     } else {
-                        // Unclosed **, treat as raw
                         spans.push(Span::styled(
                             &current_text[start_idx..],
                             Style::default().fg(Color::Gray),
@@ -232,35 +230,7 @@ mod tui_app {
         lines
     }
 
-    #[allow(clippy::collapsible_if)]
-    fn generate_story() -> Result<String, Box<dyn std::error::Error>> {
-        let mut app = App::new_headless()?;
-        register_story(&mut app);
-
-        let root_id = app.world().resource::<Scene>().root();
-        app.spawn(root_id).insert(NarrativeGenerator);
-        app.update();
-
-        let scene = app.world().resource::<Scene>();
-        let root = scene.root();
-        let root_node = scene.get_node(root).ok_or("Root node missing")?;
-
-        if !root_node.children.is_empty() {
-            for &child_id in &root_node.children {
-                if let Some(child) = scene.get_node(child_id) {
-                    if let NodeContent::Styled { style } = &child.content {
-                        if let Some(text_content) = &style.text {
-                            return Ok(text_content.text.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        Err("No narrative generated".into())
-    }
-
-    fn ui(f: &mut ratatui::Frame, state: &AppState) {
+    fn ui(f: &mut ratatui::Frame, state: &AppState, story_text: &str, scroll_offset: u16) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -271,7 +241,7 @@ mod tui_app {
             .split(f.area());
 
         // Title
-        let title = Paragraph::new(" ✨ Nova Story Generator ✨ ")
+        let title = Paragraph::new(" ✨ Nova Story Engine ✨ ")
             .style(
                 Style::default()
                     .fg(Color::Yellow)
@@ -281,48 +251,20 @@ mod tui_app {
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(title, chunks[0]);
 
-        // Footer
-        let footer_text = match state {
-            AppState::Intro => " Press <ENTER> to Generate | q: Quit ".to_string(),
-            AppState::Generating { .. } => " Generating... | q: Quit ".to_string(),
-            AppState::Display {
-                visible_chars,
-                total_chars,
-                ..
-            } => {
-                let progress = if *total_chars > 0 {
-                    (*visible_chars as f32 / *total_chars as f32 * 100.0) as usize
-                } else {
-                    100
-                };
-                format!(
-                    " Scroll: ↑/↓ | {}% Revealed | r: Retry | q: Quit ",
-                    progress
-                )
-            }
-            AppState::Error { .. } => " r: Retry | q: Quit ".to_string(),
-        };
-        let footer = Paragraph::new(footer_text)
-            .style(Style::default().fg(Color::Cyan))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL));
-        f.render_widget(footer, chunks[2]);
-
         // Content
         let content_area = chunks[1];
         match state {
             AppState::Intro => {
                 let text = vec![
-                    Line::from("Welcome to the Narrative Engine."),
+                    Line::from("Welcome to the Nova Story Engine."),
                     Line::from(""),
-                    Line::from(
-                        "This tool demonstrates the procedural story generation capabilities",
-                    ),
-                    Line::from("of the experimental 'Nova' feature set."),
+                    Line::from("This is a fully reactive, ECS-driven narrative runtime."),
                     Line::from(""),
                     Line::from(Span::styled(
-                        "Ready to weave a new tale?",
-                        Style::default().fg(Color::Green),
+                        "Press <ENTER> to Begin",
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::SLOW_BLINK),
                     )),
                 ];
                 let p = Paragraph::new(text)
@@ -330,7 +272,6 @@ mod tui_app {
                     .block(Block::default().borders(Borders::NONE))
                     .wrap(Wrap { trim: true });
 
-                // Center vertically
                 let v_center = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
@@ -342,93 +283,32 @@ mod tui_app {
 
                 f.render_widget(p, v_center[1]);
             }
-            AppState::Generating { start_time } => {
-                let elapsed = start_time.elapsed().as_millis();
-                let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-                let i = (elapsed / 100) as usize % frames.len();
-                let spinner = frames[i];
-
-                let text = vec![Line::from(Span::styled(
-                    format!("{} Weaving destiny...", spinner),
-                    Style::default()
-                        .fg(Color::Magenta)
-                        .add_modifier(Modifier::BOLD),
-                ))];
-                let p = Paragraph::new(text).alignment(Alignment::Center);
-
-                let v_center = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Percentage(45),
-                        Constraint::Length(1),
-                        Constraint::Percentage(45),
-                    ])
-                    .split(content_area);
-
-                f.render_widget(p, v_center[1]);
-            }
-            AppState::Display {
-                story,
-                scroll_offset,
-                visible_chars,
-                ..
-            } => {
-                // Ensure we don't slice mid-char
-                let safe_end = story
-                    .char_indices()
-                    .map(|(i, _)| i)
-                    .nth(*visible_chars)
-                    .unwrap_or(story.len());
-                let sliced_story = &story[..safe_end];
-
-                let text = parse_markdown(sliced_story);
+            AppState::StoryLoop => {
+                let text = parse_markdown(story_text);
                 let p = Paragraph::new(text)
                     .block(
                         Block::default()
                             .title(" 📜 The Chronicle ")
                             .borders(Borders::ALL)
                             .border_type(BorderType::Double)
-                            .border_style(Style::default().fg(Color::Yellow))
                             .padding(Padding::new(2, 2, 1, 1)),
                     )
                     .wrap(Wrap { trim: true })
-                    .scroll((*scroll_offset, 0));
-                f.render_widget(p, content_area);
-
-                // Render Scrollbar
-                // We'll put it on the right edge of the content area
-                // Since we don't know the full height easily, we'll just indicate current position
-                // and pretend max is somewhat large or based on scroll_offset
-                use ratatui::widgets::Scrollbar;
-                use ratatui::widgets::ScrollbarOrientation;
-                use ratatui::widgets::ScrollbarState;
-
-                // Simple heuristic: content length = scroll_offset + visible height (approx) + some more
-                // A better approach is to let the user scroll until the end, but Ratatui needs a max.
-                // Let's assume a max height of 100 lines for now, or 2 * scroll_offset if > 50.
-                let content_height = 100.max(*scroll_offset as usize + 20);
-                let mut scrollbar_state =
-                    ScrollbarState::new(content_height).position(*scroll_offset as usize);
-
-                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(Some("▲"))
-                    .end_symbol(Some("▼"));
-
-                f.render_stateful_widget(
-                    scrollbar,
-                    content_area.inner(ratatui::layout::Margin {
-                        vertical: 1,
-                        horizontal: 0,
-                    }), // Adjust to be inside borders
-                    &mut scrollbar_state,
-                );
-            }
-            AppState::Error { message } => {
-                let p = Paragraph::new(Span::styled(message, Style::default().fg(Color::Red)))
-                    .block(Block::default().title(" Error ").borders(Borders::ALL));
+                    .scroll((scroll_offset, 0));
                 f.render_widget(p, content_area);
             }
         }
+
+        // Footer
+        let footer_text = match state {
+            AppState::Intro => " q: Quit ".to_string(),
+            AppState::StoryLoop => " Select Choice: [1-9] | Scroll: ↑/↓ | q: Quit ".to_string(),
+        };
+        let footer = Paragraph::new(footer_text)
+            .style(Style::default().fg(Color::Cyan))
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL));
+        f.render_widget(footer, chunks[2]);
     }
 }
 
