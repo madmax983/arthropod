@@ -5,8 +5,20 @@
 [![Security Audit](https://github.com/madmax983/arthropod/workflows/CI/badge.svg?job=audit)](https://github.com/madmax983/arthropod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/madmax983/arthropod/branch/trunk/graph/badge.svg)](https://codecov.io/gh/madmax983/arthropod)
 
-> [!WARNING]
-> **REQUIRES FEATURE NOVA**: Experimental features (like `NarrativeGenerator`) **must** have the `nova` feature flag enabled. See [Experimental Features](#experimental-features-nova) below.
+# ⚠️ IMPORTANT: EXPERIMENTAL FEATURES ⚠️
+
+> [!CAUTION]
+> **You are likely here because `NarrativeGenerator` is missing.**
+>
+> All experimental features (including **Nova Story Engine**, **Particles**, **Time Travel**) are hidden behind the `nova` feature flag.
+>
+> **TO FIX THIS:**
+> 1. Add `features = ["nova"]` to your `Cargo.toml`.
+> 2. Run examples with `--features nova`.
+>
+> ```bash
+> cargo run --example story_demo --features nova
+> ```
 
 Arthropod is a high-performance, retained-mode GUI framework built for Rust. It combines a fine-grained reactive state management system with a modular ECS architecture and GPU-accelerated rendering to deliver scalable and performant user interfaces.
 
