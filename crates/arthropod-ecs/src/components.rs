@@ -19,12 +19,14 @@ pub struct SceneNodeRef(pub NodeId);
 #[derive(Component, Clone)]
 pub struct ReactiveColor {
     pub signal: ReadSignal<Color>,
+    pub last_value: Color,
 }
 
 impl ReactiveColor {
     /// Create a new ReactiveColor from a ReadSignal
     pub fn new(signal: ReadSignal<Color>) -> Self {
-        Self { signal }
+        let last_value = signal.get_untracked();
+        Self { signal, last_value }
     }
 }
 
@@ -35,12 +37,14 @@ impl ReactiveColor {
 #[derive(Component, Clone)]
 pub struct ReactiveTransform {
     pub signal: ReadSignal<Transform2D>,
+    pub last_value: Transform2D,
 }
 
 impl ReactiveTransform {
     /// Create a new ReactiveTransform from a ReadSignal
     pub fn new(signal: ReadSignal<Transform2D>) -> Self {
-        Self { signal }
+        let last_value = signal.get_untracked();
+        Self { signal, last_value }
     }
 }
 
@@ -51,12 +55,14 @@ impl ReactiveTransform {
 #[derive(Component, Clone)]
 pub struct ReactiveOpacity {
     pub signal: ReadSignal<f32>,
+    pub last_value: f32,
 }
 
 impl ReactiveOpacity {
     /// Create a new ReactiveOpacity from a ReadSignal
     pub fn new(signal: ReadSignal<f32>) -> Self {
-        Self { signal }
+        let last_value = signal.get_untracked();
+        Self { signal, last_value }
     }
 }
 
@@ -67,12 +73,14 @@ impl ReactiveOpacity {
 #[derive(Component, Clone)]
 pub struct ReactiveText {
     pub signal: ReadSignal<String>,
+    pub last_value: String,
 }
 
 impl ReactiveText {
     /// Create a new ReactiveText from a ReadSignal
     pub fn new(signal: ReadSignal<String>) -> Self {
-        Self { signal }
+        let last_value = signal.get_untracked();
+        Self { signal, last_value }
     }
 }
 
@@ -84,12 +92,17 @@ impl ReactiveText {
 #[derive(Component, Clone)]
 pub struct ReactiveComputedText {
     pub computed: Computed<String>,
+    pub last_value: String,
 }
 
 impl ReactiveComputedText {
     /// Create a new ReactiveComputedText from a Computed
     pub fn new(computed: Computed<String>) -> Self {
-        Self { computed }
+        let last_value = computed.get();
+        Self {
+            computed,
+            last_value,
+        }
     }
 }
 

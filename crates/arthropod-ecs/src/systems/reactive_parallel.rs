@@ -34,29 +34,41 @@ pub struct ReactiveChangeBuffer {
 /// need `Res<Scene>` or `ResMut<Scene>`. The buffer is consumed by
 /// `apply_reactive_changes_system`.
 pub fn gather_reactive_changes_system(
-    color_query: Query<(&SceneNodeRef, &ReactiveColor)>,
-    transform_query: Query<(&SceneNodeRef, &ReactiveTransform)>,
-    opacity_query: Query<(&SceneNodeRef, &ReactiveOpacity)>,
+    mut color_query: Query<(&SceneNodeRef, &mut ReactiveColor)>,
+    mut transform_query: Query<(&SceneNodeRef, &mut ReactiveTransform)>,
+    mut opacity_query: Query<(&SceneNodeRef, &mut ReactiveOpacity)>,
     mut buffer: ResMut<ReactiveChangeBuffer>,
 ) {
     buffer.changes.clear();
 
-    for (node_ref, reactive) in color_query.iter() {
+    for (node_ref, mut reactive) in color_query.iter_mut() {
         let color = reactive.signal.get_untracked();
+        if color == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = color;
         buffer
             .changes
             .push(ReactiveChange::Color(node_ref.0, color));
     }
 
-    for (node_ref, reactive) in transform_query.iter() {
+    for (node_ref, mut reactive) in transform_query.iter_mut() {
         let transform = reactive.signal.get_untracked();
+        if transform == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = transform;
         buffer
             .changes
             .push(ReactiveChange::Transform(node_ref.0, transform));
     }
 
-    for (node_ref, reactive) in opacity_query.iter() {
+    for (node_ref, mut reactive) in opacity_query.iter_mut() {
         let opacity = reactive.signal.get_untracked();
+        if (opacity - reactive.last_value).abs() < f32::EPSILON {
+            continue;
+        }
+        reactive.last_value = opacity;
         buffer
             .changes
             .push(ReactiveChange::Opacity(node_ref.0, opacity));

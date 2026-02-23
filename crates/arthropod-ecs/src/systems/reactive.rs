@@ -15,17 +15,22 @@ use crate::components::{
 /// Replaces the individual `update_reactive_colors_system`, `update_reactive_text_system`,
 /// `update_reactive_transforms_system`, and `update_reactive_opacity_system`.
 pub fn update_all_reactive_system(
-    color_query: Query<(&SceneNodeRef, &ReactiveColor)>,
-    text_query: Query<(&SceneNodeRef, &ReactiveText)>,
-    computed_text_query: Query<(&SceneNodeRef, &ReactiveComputedText)>,
-    transform_query: Query<(&SceneNodeRef, &ReactiveTransform)>,
-    opacity_query: Query<(&SceneNodeRef, &ReactiveOpacity)>,
+    mut color_query: Query<(&SceneNodeRef, &mut ReactiveColor)>,
+    mut text_query: Query<(&SceneNodeRef, &mut ReactiveText)>,
+    mut computed_text_query: Query<(&SceneNodeRef, &mut ReactiveComputedText)>,
+    mut transform_query: Query<(&SceneNodeRef, &mut ReactiveTransform)>,
+    mut opacity_query: Query<(&SceneNodeRef, &mut ReactiveOpacity)>,
     mut scene: ResMut<Scene>,
 ) {
     // Colors
-    for (node_ref, reactive) in color_query.iter() {
+    for (node_ref, mut reactive) in color_query.iter_mut() {
+        let new_color = reactive.signal.get_untracked();
+        if new_color == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = new_color;
+
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_color = reactive.signal.get_untracked();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if !style.fills.is_empty() {
                     style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
@@ -39,9 +44,14 @@ pub fn update_all_reactive_system(
     }
 
     // Text content
-    for (node_ref, reactive) in text_query.iter() {
+    for (node_ref, mut reactive) in text_query.iter_mut() {
+        let new_text = reactive.signal.get_untracked();
+        if new_text == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = new_text.clone();
+
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_text = reactive.signal.get_untracked();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if let Some(ref mut text_content) = style.text {
                     text_content.text = new_text;
@@ -51,9 +61,14 @@ pub fn update_all_reactive_system(
     }
 
     // Computed text content
-    for (node_ref, reactive) in computed_text_query.iter() {
+    for (node_ref, mut reactive) in computed_text_query.iter_mut() {
+        let new_text = reactive.computed.get();
+        if new_text == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = new_text.clone();
+
         if let Some(node) = scene.get_mut(node_ref.0) {
-            let new_text = reactive.computed.get();
             if let NodeContent::Styled { ref mut style } = node.content {
                 if let Some(ref mut text_content) = style.text {
                     text_content.text = new_text;
@@ -63,16 +78,28 @@ pub fn update_all_reactive_system(
     }
 
     // Transforms
-    for (node_ref, reactive) in transform_query.iter() {
+    for (node_ref, mut reactive) in transform_query.iter_mut() {
+        let new_transform = reactive.signal.get_untracked();
+        if new_transform == reactive.last_value {
+            continue;
+        }
+        reactive.last_value = new_transform;
+
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.transform = reactive.signal.get_untracked();
+            node.transform = new_transform;
         }
     }
 
     // Opacity
-    for (node_ref, reactive) in opacity_query.iter() {
+    for (node_ref, mut reactive) in opacity_query.iter_mut() {
+        let new_opacity = reactive.signal.get_untracked();
+        if (new_opacity - reactive.last_value).abs() < f32::EPSILON {
+            continue;
+        }
+        reactive.last_value = new_opacity;
+
         if let Some(node) = scene.get_mut(node_ref.0) {
-            node.opacity = reactive.signal.get_untracked();
+            node.opacity = new_opacity;
         }
     }
 }

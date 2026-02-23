@@ -194,7 +194,7 @@ impl Color {
 }
 
 /// 2D affine transform backed by glam::Affine2 for SIMD performance.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Transform2D(pub glam::Affine2);
 
 impl Serialize for Transform2D {

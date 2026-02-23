@@ -9,7 +9,7 @@ use arthropod_ecs::{
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use flux_state::{Runtime, Signal};
 use plat_core::Rect;
-use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D};
+use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, VisualStyle};
 use std::sync::Arc;
 
 /// Create a test scene with N rectangles (color-only reactive components)
