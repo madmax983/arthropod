@@ -12,14 +12,30 @@
 use arthropod_mcp::{ArthropodServer, MCP_PORT, McpFrameworkContext, start_tcp_server};
 use render_engine::{Color, NodeContent, SceneNode};
 use rmcp::ServiceExt;
+use std::env;
 use tokio::io::{stdin, stdout};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Handle CLI arguments
+    let args: Vec<String> = env::args().collect();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        print_help();
+        return Ok(());
+    }
+    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("arthropod-mcp {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     // Initialize logging to stderr (critical for stdio protocol)
+    // Default to info if RUST_LOG is not set so user sees startup messages
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
         .init();
 
     tracing::info!("Starting Arthropod MCP server (stdio mode)");
@@ -54,6 +70,27 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("MCP server shutting down");
 
     Ok(())
+}
+
+fn print_help() {
+    eprintln!(
+        "\x1b[1;34m🎨 Arthropod MCP Server v{}\x1b[0m",
+        env!("CARGO_PKG_VERSION")
+    );
+    eprintln!();
+    eprintln!("Usage: arthropod-mcp [OPTIONS]");
+    eprintln!();
+    eprintln!("Options:");
+    eprintln!("  -h, --help       Print help");
+    eprintln!("  -V, --version    Print version");
+    eprintln!();
+    eprintln!("Description:");
+    eprintln!("  Starts the Model Context Protocol (MCP) server over stdio.");
+    eprintln!("  This allows AI assistants and other tools to interact with");
+    eprintln!("  running Arthropod applications.");
+    eprintln!();
+    eprintln!("  If no arguments are provided, the server starts immediately.");
+    eprintln!("  Connect via MCP-compliant client (e.g. Claude Desktop, VSCode).");
 }
 
 /// Setup a basic test scene with some rectangles for demonstration
