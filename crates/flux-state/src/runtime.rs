@@ -73,7 +73,11 @@ struct RuntimeInner {
     stale: HashSet<NodeId>,
 
     // Nodes currently being computed (to prevent concurrent recomputation)
-    computing: HashSet<NodeId>,
+    // Maps NodeId -> ThreadId of the thread computing it.
+    computing: HashMap<NodeId, std::thread::ThreadId>,
+
+    // Tracks which node a thread is waiting for (for deadlock detection).
+    waiting_for: HashMap<std::thread::ThreadId, NodeId>,
 
     // Pending effects to run
     pending_effects: Vec<NodeId>,
@@ -276,7 +280,8 @@ impl Runtime {
                 subscribers: HashMap::new(),
                 tracking_context: HashMap::new(),
                 stale: HashSet::new(),
-                computing: HashSet::new(),
+                computing: HashMap::new(),
+                waiting_for: HashMap::new(),
                 pending_effects: Vec::new(),
                 spare_pending_effects: Vec::new(),
                 traversal_buffer: Vec::new(),
@@ -468,8 +473,41 @@ impl Runtime {
             }
 
             // Wait if currently computing (prevent concurrent recomputation)
-            while inner.computing.contains(&id) {
+            while inner.computing.contains_key(&id) {
+                // Deadlock detection
+                let current_thread = std::thread::current().id();
+                let mut target_node = id;
+
+                // Trace the dependency chain: Me -> Node -> Owner -> WaitingFor -> Node...
+                loop {
+                    // Who owns the lock for the target node?
+                    if let Some(owner_thread) = inner.computing.get(&target_node) {
+                        if *owner_thread == current_thread {
+                            // Cycle detected!
+                            // We are waiting for a node that is ultimately held by us (or a chain leading to us).
+                            // Drop the lock before panicking to avoid poisoning?
+                            // Actually, we want to panic to break the deadlock.
+                            // The RuntimeInner mutex will be poisoned, but that's better than a hang.
+                            // Or we can explicitly release? No, panic is fine, ContextGuard handles cleanup.
+                            panic!(
+                                "Deadlock detected: Cyclic dependency in computed values across threads."
+                            );
+                        }
+
+                        // What is that thread waiting for?
+                        if let Some(next_node) = inner.waiting_for.get(owner_thread) {
+                            target_node = *next_node;
+                            continue;
+                        }
+                    }
+                    // Chain ends (owner is running but not waiting)
+                    break;
+                }
+
+                // Register that we are waiting
+                inner.waiting_for.insert(current_thread, id);
                 inner = self.condvar.wait(inner).unwrap();
+                inner.waiting_for.remove(&current_thread);
             }
 
             let (is_uninit, compute) = {
@@ -488,7 +526,7 @@ impl Runtime {
             }
 
             // Mark as computing
-            inner.computing.insert(id);
+            inner.computing.insert(id, std::thread::current().id());
 
             compute
         };
