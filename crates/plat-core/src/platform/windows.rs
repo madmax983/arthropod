@@ -17,6 +17,7 @@ use std::collections::HashSet;
 use std::sync::Once;
 use std::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
+use std::thread;
 use windows::{
     Win32::Foundation::*, Win32::Graphics::Gdi::*, Win32::System::LibraryLoader::GetModuleHandleW,
     Win32::System::Threading::INFINITE, Win32::UI::Accessibility::*,
@@ -54,6 +55,14 @@ fn get_y_lparam(lparam: LPARAM) -> f64 {
     ((lparam.0 >> 16) as i16) as f64
 }
 
+/// Helper to safely retrieve WindowId from HWND user data, handling 32-bit sign extension correctly.
+#[inline]
+unsafe fn get_window_id(hwnd: HWND) -> WindowId {
+    // Cast to usize first to ensure zero-extension on 32-bit systems where isize is negative
+    // but the original ID was a large u32.
+    WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as usize as u64)
+}
+
 /// Windows event loop implementation.
 pub struct EventLoopImpl {
     hinstance: HINSTANCE,
@@ -86,6 +95,7 @@ pub struct WindowImpl {
     #[allow(dead_code)]
     hinstance: HINSTANCE,
     id: WindowId,
+    thread_id: thread::ThreadId,
     /// Current backdrop material (stored as u8: 0=None, 1=Mica, 2=MicaAlt, 3=Acrylic)
     backdrop_material: AtomicU8,
     /// DirectComposition integration (only if composition_mode enabled)
@@ -224,6 +234,7 @@ impl WindowImpl {
                 hwnd,
                 hinstance,
                 id,
+                thread_id: thread::current().id(),
                 backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
                 composition,
             })
@@ -278,6 +289,14 @@ impl WindowImpl {
     #[cfg(target_os = "windows")]
     #[allow(dead_code)] // Future API for accessibility integration
     pub fn register_a11y_provider(&self, provider: IRawElementProviderSimple) {
+        // Ensure we are on the correct thread, as A11Y_PROVIDERS is thread-local
+        // and wndproc expects to find the provider in its own thread-local map.
+        if thread::current().id() != self.thread_id {
+            panic!(
+                "register_a11y_provider must be called from the same thread that created the window"
+            );
+        }
+
         // Register the provider for this window's HWND
         A11Y_PROVIDERS.with(|providers| {
             // Cast *mut c_void to isize
@@ -400,7 +419,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_SIZE => {
             // Retrieve WindowId from window user data
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
             // Extract new window size from lparam
             let width = (lparam.0 & 0xFFFF) as u32;
             let height = ((lparam.0 >> 16) & 0xFFFF) as u32;
@@ -419,7 +438,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_MOUSEMOVE => {
             // Retrieve WindowId from window user data
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
 
             // Extract mouse coordinates using helpers (handles negative coords on multi-monitor)
             let x = get_x_lparam(lparam);
@@ -443,7 +462,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         | WM_MBUTTONUP => {
             use crate::{ElementState, MouseButton, MouseInput};
 
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
             let x = get_x_lparam(lparam);
             let y = get_y_lparam(lparam);
 
@@ -479,7 +498,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
             use crate::{ElementState, Key, KeyboardInput};
 
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
             let vk = wparam.0 as u32;
             let state = if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
                 ElementState::Pressed
@@ -542,7 +561,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_PAINT => {
             // Mark window as needing redraw
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
             DIRTY_WINDOWS.with(|dirty| {
                 dirty.borrow_mut().insert(window_id);
             });
@@ -556,7 +575,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_CLOSE => {
-            let window_id = unsafe { WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u64) };
+            let window_id = unsafe { get_window_id(hwnd) };
             EVENT_SENDER.with(|sender| {
                 if let Some(sender) = sender.borrow().as_ref() {
                     let _ = sender.send(Event::Window {
