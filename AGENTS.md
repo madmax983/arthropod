@@ -310,7 +310,7 @@ if let Some(node) = scene.get_node_mut(node_id) {
 
 ### Adding a Reactive Component
 
-1. Create signal type in component (e.g., `MainThreadSignal<T>`)
+1. Create signal type in component (e.g., `ReadSignal<T>`)
 2. Create reactive component wrapper (e.g., `ReactiveOpacity`)
 3. Implement update system (e.g., `update_reactive_opacity_system`)
 4. Add to update schedule in `FrameworkContext::build_update_schedule()`
@@ -355,11 +355,11 @@ cargo run --release --example colored_rectangles
 
 ## Safety Invariants
 
-### MainThreadSignal
+### ReadSignal
 
-- Only safe on main thread (GUI is single-threaded)
-- Never send to other threads
-- Wrapped in unsafe impl Send/Sync with clear documentation
+- Thread-safe (Send + Sync) via internal Mutex
+- Can be safely shared across threads
+- Use directly in ECS components
 
 ### SceneResource
 
@@ -407,7 +407,6 @@ See `docs/design/arthropod-design-doc.md` for roadmap. Key upcoming features:
 - **Forgetting to update context**: Call `context.update(&mut scene)` before render
 - **Signal runtime lifetime**: Must keep Runtime alive (use Rc)
 - **Scene node bounds**: Must manually update on resize (not in ECS yet)
-- **MainThreadSignal**: Don't try to send across threads
 
 ## Commit Guidelines
 

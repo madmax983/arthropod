@@ -515,7 +515,7 @@ cargo run --example hello_world
 
 **For Signal-based reactivity (mutable state):**
 1. Define reactive state type in `widget-core/src/input_state.rs` (e.g., `ReactiveColorState`)
-2. Create ECS component in `arthropod-ecs/src/components.rs` (e.g., `ReactiveColor`)
+2. Create ECS component in `arthropod-ecs/src/components.rs` (e.g., `ReactiveColor` holding `ReadSignal<Color>`)
 3. Add polling logic to `update_all_reactive_system` in `arthropod-ecs/src/systems/reactive.rs`
 4. Wire up in widget context (e.g., `ctx.add_reactive_color_state()`)
 5. Test with signal changes
@@ -568,11 +568,11 @@ cargo run --release --example colored_rectangles
 
 ## Safety Invariants
 
-### MainThreadSignal
+### ReadSignal
 
-- Only safe on main thread (GUI is single-threaded)
-- Never send to other threads
-- Wrapped in unsafe impl Send/Sync with clear documentation
+- Thread-safe (Send + Sync) via internal Mutex
+- Can be safely shared across threads
+- Use directly in ECS components
 
 ### SceneResource
 
@@ -620,7 +620,6 @@ See `docs/design/arthropod-design-doc.md` for roadmap. Key upcoming features:
 - **Forgetting to update context**: Call `context.update(&mut scene)` before render
 - **Signal runtime lifetime**: Must keep Runtime alive (use Arc/Rc)
 - **Scene node bounds**: Must manually update on resize (not in ECS yet)
-- **MainThreadSignal**: Don't try to send across threads
 - **Using Effect for derived values**: If you're using Effect just to `.set()` another signal, use Computed instead
 - **Not storing Effects**: Effects drop immediately unless stored (use `ctx.store_effect()` in widgets)
 - **Computed vs Effect confusion**: Use Computed when you need a VALUE, Effect when you need to DO something

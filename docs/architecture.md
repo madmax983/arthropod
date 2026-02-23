@@ -136,7 +136,7 @@ sequenceDiagram
 
 ## Widget System Structure
 
-The widget system uses a trait-based architecture for type-safe composition, allowing declarative UI construction without runtime overhead.
+The widget system follows a "Functional Core, Imperative Shell" approach. `WidgetContext` acts as a flattened state container, while complex logic is delegated to pure functional modules. See [ADR 0028](./adr/0028-widget-state-delegation.md).
 
 ```mermaid
 classDiagram
@@ -145,32 +145,35 @@ classDiagram
         +build(ctx: WidgetContext) NodeId
     }
 
-    class WidgetTuple {
-        <<trait>>
-        +build_all(ctx: WidgetContext, parent: NodeId)
-        +build_all_to_vec(ctx: WidgetContext) Vec~NodeId~
-    }
-
     class WidgetContext {
         +Scene scene
-        +create_node(parent: NodeId, content: NodeContent) NodeId
-        +set_layout_style(node: NodeId, style: FlexStyle)
-        +add_clickable(node: NodeId, callback: Fn)
+        -IndexMap~NodeId, TextInputState~ text_input_states
+        -HashMap~NodeId, FormState~ form_states
+        -HashMap~NodeId, ValidationState~ validators
+        +create_node()
+        +focus_next()
     }
 
-    class NodeId {
-        <<value>>
-        +u64 id
+    class LogicModules {
+        <<Namespace>>
+        +input_logic
+        +form_logic
+        +validation
+    }
+
+    class TextInputState {
+        +ReadSignal~String~ read
+        +WriteSignal~String~ write
+        +usize cursor_position
     }
 
     Widget ..> WidgetContext : Uses
-    Widget ..> NodeId : Returns
-    WidgetTuple ..> Widget : Composes
-    WidgetContext "1" *-- "*" NodeId : Manages
+    WidgetContext "1" *-- "*" TextInputState : Owns
+    WidgetContext ..> LogicModules : Delegates to
 ```
 
 ## Key Architectural Decisions
 
 - **Hybrid ECS**: We use a custom `Scene` graph (HashMap-based tree) for hierarchical operations (layout, event bubbling) while using `bevy_ecs` for bulk operations (rendering, animation). See [ADR 0001](./adr/0001-hybrid-ecs-architecture.md).
-- **Reactive State**: State is managed via `flux-state` signals. The ECS polls these signals in a single pass (`update_all_reactive_system`) to update components, ensuring UI properties remain in sync with the underlying data model. See [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
+- **Reactive State**: State is managed via `flux-state` signals. We use `ReadSignal<T>` directly (which is thread-safe) to propagate changes from the UI to the ECS. See [ADR 0027](./adr/0027-reactive-signal-simplification.md) and [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
 - **Platform Abstraction**: `plat-core` isolates OS-specific code, allowing the rest of the engine to remain platform-agnostic.
