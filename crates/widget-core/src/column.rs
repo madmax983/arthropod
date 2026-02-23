@@ -8,14 +8,17 @@ use crate::{Widget, WidgetContext, WidgetTuple};
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId};
 
-/// Column widget for vertical layout
+/// Column widget for vertical layout.
 ///
 /// A convenience wrapper around flexbox column layout.
 /// Children are laid out vertically (top-to-bottom).
 ///
+/// The generic type `C` represents the children, which must implement [`WidgetTuple`].
+/// This trait is implemented for tuples of widgets up to a certain size (e.g., `(W1, W2, W3)`).
+///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use widget_core::{Column, Text, Button};
 ///
 /// // Simple column
@@ -40,7 +43,20 @@ pub struct Column<C: WidgetTuple> {
 }
 
 impl<C: WidgetTuple> Column<C> {
-    /// Create a new column with children
+    /// Create a new column with the given children.
+    ///
+    /// Children are provided as a tuple of widgets.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use widget_core::{Column, Text};
+    ///
+    /// let col = Column::new((
+    ///     Text::new("First"),
+    ///     Text::new("Second"),
+    /// ));
+    /// ```
     pub fn new(children: C) -> Self {
         Self {
             children,
@@ -49,13 +65,31 @@ impl<C: WidgetTuple> Column<C> {
         }
     }
 
-    /// Set gap between children
+    /// Set the gap between children (in logical pixels).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use widget_core::{Column, Text};
+    ///
+    /// let col = Column::new((Text::new("A"), Text::new("B")))
+    ///     .gap(10.0);
+    /// ```
     pub fn gap(mut self, gap: f32) -> Self {
         self.gap = gap;
         self
     }
 
-    /// Set uniform padding
+    /// Set uniform padding around the column content (in logical pixels).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use widget_core::{Column, Text};
+    ///
+    /// let col = Column::new((Text::new("A"), Text::new("B")))
+    ///     .padding(20.0);
+    /// ```
     pub fn padding(mut self, padding: f32) -> Self {
         self.padding = padding;
         self

@@ -33,22 +33,23 @@ impl<W: Widget> WidgetBoxed for W {
 /// List widget for dynamic collections of widgets
 ///
 /// Unlike Container which uses compile-time tuples, List uses runtime
-/// Vec storage with type erasure (Box<dyn WidgetBoxed>). This enables
+/// `Vec` storage with type erasure (`Box<dyn WidgetBoxed>`). This enables
 /// dynamic widget lists from runtime data.
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use widget_core::{List, Text};
 ///
 /// let items = vec!["Apple", "Banana", "Cherry"];
 ///
+/// // Create a list and push items
 /// let mut list = List::column().gap(8.0);
 /// for item in &items {
 ///     list.push(Text::new(*item));
 /// }
 ///
-/// // Or use extend:
+/// // Or use extend
 /// let items2 = vec!["A", "B", "C"];
 /// let mut list2 = List::row();
 /// list2.extend(items2.iter().map(|s| Text::new(*s)));
