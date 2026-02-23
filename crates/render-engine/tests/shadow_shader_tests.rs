@@ -1,8 +1,8 @@
-/// CPU reference tests for drop shadow shader logic.
-///
-/// These tests verify the SDF-based shadow blur by replicating the WGSL shader logic in Rust.
-/// Shadows use a smoothstep falloff to approximate Gaussian blur for blur radii < 20px.
-/// This is the "fast path" - larger blurs use multi-pass Gaussian blur (Phase 4).
+//! CPU reference tests for drop shadow shader logic.
+//!
+//! These tests verify the SDF-based shadow blur by replicating the WGSL shader logic in Rust.
+//! Shadows use a smoothstep falloff to approximate Gaussian blur for blur radii < 20px.
+//! This is the "fast path" - larger blurs use multi-pass Gaussian blur (Phase 4).
 
 // ============================================================================
 // CPU Reference Implementation (mirrors WGSL shader)

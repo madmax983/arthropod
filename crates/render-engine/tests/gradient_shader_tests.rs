@@ -245,7 +245,7 @@ fn test_radial_gradient_circular_symmetry() {
     let edge = Vec2::new(1.0, 0.5); // Radius = 0.5
 
     // Points at same distance should have same t
-    let points = vec![
+    let points = [
         Vec2::new(0.75, 0.5), // Right
         Vec2::new(0.5, 0.75), // Top
         Vec2::new(0.25, 0.5), // Left
@@ -306,7 +306,7 @@ fn test_angular_gradient_quadrants() {
     // Left (180 degrees): atan2(0, -1) = π
     let t = compute_gradient_t(Vec2::new(0.0, 0.5), center, _end, GradientType::Angular);
     assert!(
-        t < 0.01 || t > 0.99,
+        !(0.01..=0.99).contains(&t),
         "Left should be t≈0.0 or t≈1.0 (wrap), got {}",
         t
     );
@@ -472,7 +472,7 @@ fn test_all_gradients_clamp_to_0_1() {
         for point in &test_points {
             let t = compute_gradient_t(*point, start, end, gradient_type);
             assert!(
-                t >= 0.0 && t <= 1.0,
+                (0.0..=1.0).contains(&t),
                 "{:?} gradient at {:?} should clamp to [0,1], got {}",
                 gradient_type,
                 point,

@@ -146,6 +146,7 @@ impl BenchPathInterner {
         }
     }
 
+    #[allow(clippy::collapsible_if)]
     fn hash_for(&mut self, path: &VectorPath) -> u64 {
         let ptr = path as *const VectorPath as usize;
         let fp = Self::fingerprint(path);

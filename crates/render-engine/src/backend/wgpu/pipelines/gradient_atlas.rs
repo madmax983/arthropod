@@ -260,7 +260,7 @@ impl GradientAtlas {
     pub fn get_texel(&self, row: u32, texel: usize) -> Vec4 {
         let base = (row as usize) * Self::TEXELS_PER_ROW * 4 + texel * 4;
         Vec4::new(
-            half::f16::from_bits(self.data[base + 0]).to_f32(),
+            half::f16::from_bits(self.data[base]).to_f32(),
             half::f16::from_bits(self.data[base + 1]).to_f32(),
             half::f16::from_bits(self.data[base + 2]).to_f32(),
             half::f16::from_bits(self.data[base + 3]).to_f32(),

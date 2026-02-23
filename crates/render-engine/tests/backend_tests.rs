@@ -290,7 +290,7 @@ fn test_render_instances_api() {
     // This test verifies that we can pass RectInstances directly to the backend
     // without building a Scene graph
 
-    let instances = vec![
+    let instances = [
         PrimitiveInstance::solid([0.0, 0.0], [100.0, 100.0], [1.0, 0.0, 0.0, 1.0]), // Red
         PrimitiveInstance::solid([100.0, 0.0], [100.0, 100.0], [0.0, 1.0, 0.0, 1.0]), // Green
         PrimitiveInstance::solid([200.0, 0.0], [100.0, 100.0], [0.0, 0.0, 1.0, 1.0]), // Blue

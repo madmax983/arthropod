@@ -1,13 +1,13 @@
-/// CPU reference tests for stroke rendering shader logic.
-///
-/// These tests verify the stroke SDF math by replicating the WGSL shader logic in Rust.
-/// Strokes are rendered using the SDF distance field with offset-based alignment:
-/// - Center (0.0): Stroke centered on the boundary (extends half_width on each side)
-/// - Inside (1.0): Stroke offset inward by half_width (still extends half_width from offset)
-/// - Outside (-1.0): Stroke offset outward by half_width (still extends half_width from offset)
-///
-/// Note: This is an offset-based implementation, not a clipping-based one.
-/// Inside/outside strokes may still slightly overlap the boundary due to anti-aliasing.
+//! CPU reference tests for stroke rendering shader logic.
+//!
+//! These tests verify the stroke SDF math by replicating the WGSL shader logic in Rust.
+//! Strokes are rendered using the SDF distance field with offset-based alignment:
+//! - Center (0.0): Stroke centered on the boundary (extends half_width on each side)
+//! - Inside (1.0): Stroke offset inward by half_width (still extends half_width from offset)
+//! - Outside (-1.0): Stroke offset outward by half_width (still extends half_width from offset)
+//!
+//! Note: This is an offset-based implementation, not a clipping-based one.
+//! Inside/outside strokes may still slightly overlap the boundary due to anti-aliasing.
 
 // ============================================================================
 // CPU Reference Implementation (mirrors WGSL shader)

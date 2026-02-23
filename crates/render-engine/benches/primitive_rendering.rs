@@ -4,6 +4,7 @@
 //! Phase 1:
 //! - 1000 solid primitives: < 200μs
 //! - Scene node operations: < 10μs
+//!
 //! Phase 2:
 //! - 1000 gradient primitives: < 400μs
 //! - 1000 stroked primitives: < 300μs
@@ -105,6 +106,7 @@ fn bench_node_lookup(c: &mut Criterion) {
 }
 
 /// Benchmark mutable node access (for reactive updates)
+#[allow(clippy::collapsible_if)]
 fn bench_node_mutation(c: &mut Criterion) {
     // Setup: Create a scene with 100 nodes
     let mut scene = Scene::new();
@@ -122,11 +124,11 @@ fn bench_node_mutation(c: &mut Criterion) {
     c.bench_function("mutate_100_node_colors", |b| {
         b.iter(|| {
             for &id in &node_ids {
-                if let Some(node) = scene.get_node_mut(id) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if !style.fills.is_empty() {
-                            style.fills[0] = Paint::Solid(Color::BLUE.as_vec4());
-                        }
+                if let Some(NodeContent::Styled { style }) =
+                    scene.get_node_mut(id).map(|n| &mut n.content)
+                {
+                    if !style.fills.is_empty() {
+                        style.fills[0] = Paint::Solid(Color::BLUE.as_vec4());
                     }
                 }
             }

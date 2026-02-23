@@ -179,19 +179,12 @@ impl Scene {
         }
 
         // Prevent cycle: check if child_id is an ancestor of new_parent
-        let mut ancestor = new_parent;
-        loop {
-            if ancestor == child_id {
-                // Cycle detected: child is an ancestor of new_parent!
-                // Abort reparenting.
+        let mut current = new_parent;
+        while let Some(parent) = self.parent(current) {
+            if parent == child_id {
                 return;
             }
-            if let Some(p) = self.parent(ancestor) {
-                ancestor = p;
-            } else {
-                // Reached a root (or orphan), no cycle detected in this path
-                break;
-            }
+            current = parent;
         }
 
         // Remove child from old parent's children list
@@ -358,23 +351,14 @@ impl Scene {
             stack.clear();
 
             // Start with root
-            if let Some(root_node) = self.nodes.get(&self.root) {
-                stack.push((self.root, root_node.children.len()));
-            } else {
-                return None;
-            }
+            let root_node = self.nodes.get(&self.root)?;
+            stack.push((self.root, root_node.children.len()));
 
-            while !stack.is_empty() {
-                // Peek at the current node state
-                let (node_id, child_index) = *stack.last().unwrap();
-
-                let node = match self.nodes.get(&node_id) {
-                    Some(n) => n,
-                    None => {
-                        // Should not happen in a valid scene, but handle safely
-                        stack.pop();
-                        continue;
-                    }
+            while let Some(&(node_id, child_index)) = stack.last() {
+                let Some(node) = self.nodes.get(&node_id) else {
+                    // Should not happen in a valid scene, but handle safely
+                    stack.pop();
+                    continue;
                 };
 
                 if !node.visible {
@@ -799,5 +783,40 @@ mod tests {
             .collect();
 
         assert_eq!(standard_order, custom_order_2);
+    }
+
+    #[test]
+    fn test_reparent_cycle_prevention_immediate() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        let child = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+
+        // Attempt to reparent child to itself
+        scene.reparent_node(child, root, child);
+
+        // Verify child is still attached to root
+        assert_eq!(scene.get_node(child).unwrap().parent, Some(root));
+        assert!(scene.get_node(root).unwrap().children.contains(&child));
+        assert!(!scene.get_node(child).unwrap().children.contains(&child));
+    }
+
+    #[test]
+    fn test_reparent_cycle_prevention_ancestor() {
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Structure: Root -> A -> B
+        let a = scene.add_node(root, SceneNode::new(NodeContent::Empty));
+        let b = scene.add_node(a, SceneNode::new(NodeContent::Empty));
+
+        // Attempt to reparent A to B (cycle: A -> B -> A)
+        scene.reparent_node(a, root, b);
+
+        // Verify A is still attached to Root
+        assert_eq!(scene.get_node(a).unwrap().parent, Some(root));
+        assert_eq!(scene.get_node(b).unwrap().parent, Some(a));
+        assert!(scene.get_node(root).unwrap().children.contains(&a));
+        assert!(!scene.get_node(b).unwrap().children.contains(&a));
     }
 }
