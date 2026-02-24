@@ -19,9 +19,6 @@ pub mod ghost_replay;
 #[cfg(feature = "nova")]
 pub mod signal_graph;
 
-#[cfg(feature = "nova")]
-pub mod anim_graph;
-
 pub mod flux_radar;
 
 // --- Stubs for missing features ---

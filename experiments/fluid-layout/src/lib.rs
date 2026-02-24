@@ -5,7 +5,7 @@
 //!
 //! It bridges `flux-state` (reactivity), `layout-engine` (data), and `anim-graph` (physics).
 
-use arthropod::experimental::anim_graph::{Animatable, Animation, Easing};
+use anim_graph::{Animatable, Animation, Easing};
 use flux_state::{Effect, ReadSignal, Runtime, Signal};
 use glam::Vec4;
 use layout_engine::ComputedLayout;

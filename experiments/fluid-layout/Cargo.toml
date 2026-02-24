@@ -7,7 +7,7 @@ description = "Physics-based layout interpolation for Arthropod"
 [dependencies]
 flux-state = { path = "../../crates/flux-state" }
 layout-engine = { path = "../../crates/layout-engine" }
-arthropod = { path = "../../crates/arthropod", features = ["nova"] }
+anim-graph = { path = "../../crates/anim-graph" }
 glam = "0.29"
 
 [dev-dependencies]

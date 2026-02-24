@@ -22,8 +22,3 @@
 **Bloat:** `MainThreadSignal<T>` in `arthropod-ecs` (Redundant Wrapper)
 **Cut:** Removed wrapper struct and used `ReadSignal<T>` directly (which is already thread-safe).
 **Saved:** ~30 lines of boilerplate, removed unnecessary indirection (`.inner()`) and cognitive overhead.
-
-## [Reduction]
-**Bloat:** `anim-graph` (Standalone crate for 1 module used only by experimental features)
-**Cut:** Merged into `arthropod::experimental::anim_graph`
-**Saved:** 1 crate maintenance overhead, ~3 Cargo.toml entries, simplified build graph.

@@ -55,7 +55,7 @@
 //! This crate is part of the `experiments/` directory and is subject to breaking changes.
 //! It is intended to explore reactive animation patterns before stabilization.
 
-use arthropod::experimental::anim_graph::{Animatable, Animation, Easing};
+use anim_graph::{Animatable, Animation, Easing};
 use flux_state::{Effect, ReadSignal, Runtime, Signal};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

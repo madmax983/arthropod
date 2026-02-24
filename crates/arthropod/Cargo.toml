@@ -8,6 +8,7 @@ description = "Enterprise-grade cross-platform Rust GUI framework"
 [dependencies]
 plat-core = { path = "../plat-core" }
 render-engine = { path = "../render-engine" }
+anim-graph = { path = "../anim-graph" }
 flux-state = { path = "../flux-state" }
 arthropod-ecs = { path = "../arthropod-ecs" }
 a11y-engine = { path = "../a11y-engine" }
