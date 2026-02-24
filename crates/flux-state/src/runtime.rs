@@ -113,6 +113,24 @@ impl<'a> Drop for PanicRestorer<'a> {
     }
 }
 
+struct ComputingGuard<'a> {
+    runtime: &'a Runtime,
+    id: NodeId,
+}
+
+impl<'a> Drop for ComputingGuard<'a> {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            let mut inner = match self.runtime.inner.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            inner.computing.remove(&self.id);
+            self.runtime.condvar.notify_all();
+        }
+    }
+}
+
 struct ComputedNode {
     compute: std::sync::Arc<dyn Fn() -> Arc<dyn Any + Send + Sync> + Send + Sync>,
     value: Option<Arc<dyn Any + Send + Sync>>,
@@ -148,6 +166,12 @@ impl<'a> Drop for ContextGuard<'a> {
 }
 
 impl RuntimeInner {
+    fn check_recursion(&self, id: NodeId) -> bool {
+        self.tracking_context
+            .get(&thread::current().id())
+            .is_some_and(|stack| stack.contains(&id))
+    }
+
     fn cleanup_dependencies(&mut self, id: NodeId) {
         if let Some(deps) = self.dependencies.remove(&id) {
             for dep in deps {
@@ -499,6 +523,16 @@ impl Runtime {
         inner
     }
 
+    fn finish_computation(&self, id: NodeId, new_value: Arc<dyn Any + Send + Sync>) {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(computed) = inner.computeds.get_mut(&id) {
+            computed.value = Some(new_value);
+        }
+        inner.stale.remove(&id);
+        inner.computing.remove(&id);
+        self.condvar.notify_all();
+    }
+
     /// Recompute the value of a computed node.
     ///
     /// # Panics
@@ -509,11 +543,7 @@ impl Runtime {
             let mut inner = self.inner.lock().unwrap();
 
             // Check for recursion (cycle detection) - return stale value if we are already computing this
-            if inner
-                .tracking_context
-                .get(&thread::current().id())
-                .is_some_and(|stack| stack.contains(&id))
-            {
+            if inner.check_recursion(id) {
                 return;
             }
 
@@ -542,22 +572,6 @@ impl Runtime {
         };
 
         // Guard to ensure `computing` is cleaned up if panic occurs
-        struct ComputingGuard<'a> {
-            runtime: &'a Runtime,
-            id: NodeId,
-        }
-        impl<'a> Drop for ComputingGuard<'a> {
-            fn drop(&mut self) {
-                if std::thread::panicking() {
-                    let mut inner = match self.runtime.inner.lock() {
-                        Ok(g) => g,
-                        Err(p) => p.into_inner(),
-                    };
-                    inner.computing.remove(&self.id);
-                    self.runtime.condvar.notify_all();
-                }
-            }
-        }
         let _guard = ComputingGuard { runtime: self, id };
 
         // Run computation in context, keeping stale flag until we are done
@@ -565,15 +579,7 @@ impl Runtime {
         let new_value = self.run_with_context(id, true, || compute_fn());
 
         // Store new value and clear stale/computing
-        {
-            let mut inner = self.inner.lock().unwrap();
-            if let Some(computed) = inner.computeds.get_mut(&id) {
-                computed.value = Some(new_value);
-            }
-            inner.stale.remove(&id);
-            inner.computing.remove(&id);
-            self.condvar.notify_all();
-        }
+        self.finish_computation(id, new_value);
     }
 
     pub(crate) fn dispose_effect(&self, id: NodeId) {
