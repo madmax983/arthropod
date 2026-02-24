@@ -19,6 +19,9 @@ pub mod ghost_replay;
 #[cfg(feature = "nova")]
 pub mod signal_graph;
 
+#[cfg(feature = "nova")]
+pub mod noise;
+
 pub mod flux_radar;
 
 // --- Stubs for missing features ---
@@ -198,6 +201,27 @@ pub mod particles {
             "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
         );
     }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod noise {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `noise` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct NoiseSignal;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct NoiseSignal2D;
 }
 
 #[cfg(not(feature = "nova"))]
