@@ -1,5 +1,6 @@
 #![cfg(all(not(target_arch = "wasm32"), target_os = "windows"))]
 
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
@@ -61,6 +62,10 @@ enum FigmaImagePattern {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FigmaNodeFixture {
+    #[serde(default)]
+    id: Option<u64>,
+    #[serde(default, alias = "parentId")]
+    parent_id: Option<u64>,
     bounds: [f32; 4],
     style: FigmaStyle,
 }
@@ -442,6 +447,82 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
     assert!(matches!(diamond.into_paint(), Paint::Diamond(_)));
 }
 
+#[test]
+fn figma_node_parent_id_maps_to_scene_hierarchy() {
+    let fixture: FigmaSceneFixture = serde_json::from_str(
+        r#"{
+            "width": 100,
+            "height": 100,
+            "clearColor": [0.0, 0.0, 0.0, 1.0],
+            "nodes": [
+                {
+                    "id": 1,
+                    "bounds": [0.0, 0.0, 100.0, 100.0],
+                    "style": {"fills":[{"type":"SOLID","color":[0.1,0.1,0.1,1.0]}]}
+                },
+                {
+                    "id": 2,
+                    "parentId": 1,
+                    "bounds": [5.0, 5.0, 60.0, 60.0],
+                    "style": {"clipsContent": true}
+                },
+                {
+                    "id": 3,
+                    "parentId": 2,
+                    "bounds": [10.0, 10.0, 80.0, 80.0],
+                    "style": {"fills":[{"type":"SOLID","color":[1.0,0.0,0.0,1.0]}]}
+                },
+                {
+                    "id": 4,
+                    "parentId": 1,
+                    "bounds": [70.0, 70.0, 20.0, 20.0],
+                    "style": {"fills":[{"type":"SOLID","color":[0.0,1.0,0.0,1.0]}]}
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma fixture");
+
+    let scene = build_scene(&fixture);
+    let root = scene.root();
+    let root_children = scene
+        .get_node(root)
+        .expect("scene root should exist")
+        .children
+        .clone();
+    assert_eq!(
+        root_children.len(),
+        1,
+        "expected one top-level imported node under scene root"
+    );
+
+    let top_level = root_children[0];
+    let top_level_children = scene
+        .get_node(top_level)
+        .expect("top-level imported node should exist")
+        .children
+        .clone();
+    assert_eq!(
+        top_level_children.len(),
+        2,
+        "expected parentId children to attach under their declared parent"
+    );
+
+    let nested_parent = top_level_children[0];
+    let nested_leaf = scene
+        .get_node(nested_parent)
+        .expect("nested parent should exist")
+        .children
+        .first()
+        .copied()
+        .expect("nested parent should contain leaf child");
+    assert_eq!(
+        scene.parent(nested_leaf),
+        Some(nested_parent),
+        "leaf should remain attached to parentId chain"
+    );
+}
+
 impl From<FigmaStrokeAlign> for StrokeAlign {
     fn from(value: FigmaStrokeAlign) -> Self {
         match value {
@@ -598,17 +679,68 @@ fn build_scene(fixture: &FigmaSceneFixture) -> Scene {
     let mut scene = Scene::new();
     let root = scene.root();
 
-    for node in &fixture.nodes {
-        let mut scene_node = SceneNode::new(NodeContent::Styled {
-            style: Box::new(node.style.clone().into_visual_style()),
-        });
-        scene_node.bounds = Rect::new(
-            node.bounds[0],
-            node.bounds[1],
-            node.bounds[2].max(0.0),
-            node.bounds[3].max(0.0),
-        );
-        scene.add_node(root, scene_node);
+    let mut used_ids = HashSet::new();
+    let mut resolved_ids = Vec::with_capacity(fixture.nodes.len());
+    for (index, node) in fixture.nodes.iter().enumerate() {
+        let fallback_id = 1_000_000_000_u64.saturating_add(index as u64);
+        let mut stable_id = node.id.unwrap_or(fallback_id);
+        while !used_ids.insert(stable_id) {
+            stable_id = stable_id.saturating_add(1);
+        }
+        resolved_ids.push(stable_id);
+    }
+
+    let mut figma_to_scene = HashMap::new();
+    let mut pending: Vec<usize> = (0..fixture.nodes.len()).collect();
+
+    while !pending.is_empty() {
+        let mut progressed = false;
+        let mut unresolved = Vec::new();
+
+        for index in pending {
+            let node = &fixture.nodes[index];
+            let parent = match node.parent_id {
+                Some(parent_id) => figma_to_scene.get(&parent_id).copied(),
+                None => Some(root),
+            };
+
+            if let Some(parent) = parent {
+                let mut scene_node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(node.style.clone().into_visual_style()),
+                });
+                scene_node.bounds = Rect::new(
+                    node.bounds[0],
+                    node.bounds[1],
+                    node.bounds[2].max(0.0),
+                    node.bounds[3].max(0.0),
+                );
+                let scene_id = scene.add_node(parent, scene_node);
+                figma_to_scene.insert(resolved_ids[index], scene_id);
+                progressed = true;
+            } else {
+                unresolved.push(index);
+            }
+        }
+
+        if !progressed {
+            for index in unresolved {
+                let node = &fixture.nodes[index];
+                let mut scene_node = SceneNode::new(NodeContent::Styled {
+                    style: Box::new(node.style.clone().into_visual_style()),
+                });
+                scene_node.bounds = Rect::new(
+                    node.bounds[0],
+                    node.bounds[1],
+                    node.bounds[2].max(0.0),
+                    node.bounds[3].max(0.0),
+                );
+                let scene_id = scene.add_node(root, scene_node);
+                figma_to_scene.insert(resolved_ids[index], scene_id);
+            }
+            break;
+        }
+
+        pending = unresolved;
     }
 
     scene

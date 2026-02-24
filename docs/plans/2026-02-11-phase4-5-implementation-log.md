@@ -1425,3 +1425,35 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
   - Parity status check:
     - `npm run visual:test` -> PASS (9 skipped; WebGPU unavailable in this runtime)
+
+### 2026-02-24 (parity continuation: Figma fixture hierarchy + mask/clip scope)
+
+- Goal:
+  - Close hierarchy parity gap in the JSON fixture importer by mapping `parentId` relationships into the scene tree instead of flattening all nodes under scene root.
+  - Add nested fixture coverage so mask/clip scope behavior is exercised through hierarchical import.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - extended `FigmaNodeFixture` with optional `id` and `parent_id`.
+    - added hierarchy regression test:
+      - `figma_node_parent_id_maps_to_scene_hierarchy`
+    - replaced flat `build_scene(...)` insertion with parent-aware construction:
+      - stable fixture ID resolution
+      - parent-first multi-pass insertion
+      - deterministic root fallback for dangling `parentId` references
+  - Updated fixture `tests/fixtures/figma/figma_import_scene.json`:
+    - added explicit `id` across nodes and `parentId` links for nested structure.
+    - moved content nodes under a container frame with `clipsContent`.
+    - added nested mask scope container (`id: 70`) with mask/target children and an overlapping sibling outside mask scope to validate hierarchy-scoped masking behavior in rendered output.
+  - Regenerated figma golden:
+    - `tests/visual/golden/figma/figma_import_scene.png`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_node_parent_id_maps_to_scene_hierarchy -- --nocapture` -> FAIL (`expected one top-level imported node under scene root`, got 4)
+  - GREEN:
+    - `cargo test --test figma_json_render_regression figma_node_parent_id_maps_to_scene_hierarchy -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> FAIL initially on expected golden drift (`diff_ratio=0.0554`)
+    - `ARTHROPOD_UPDATE_GOLDENS=1 cargo test --test figma_json_render_regression figma_json_render_regression_matches_golden -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - Regression safety:
+    - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+    - `cargo fmt --all` -> PASS
