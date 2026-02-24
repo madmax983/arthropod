@@ -58,3 +58,19 @@
 
 *   Refactored `test_flush_effects_batching` into `test_flush_effects_fanout_batching` using `Vec<String>` logging.
 *   Verified that `test_flush_effects_order_and_recursion` correctly tests recursive LIFO execution.
+
+## 2026-02-23 - [Audit of widget-core input_state]
+**Module:** `crates/widget-core` (specifically `input_state.rs`)
+**Verdict:** 🟢 Acquitted (Strengthened)
+
+### Findings
+
+| Test File | Verdict | Reasoning |
+| :--- | :--- | :--- |
+| `text_input_logic_test.rs` | ⭐ Commended | New rigorous test suite covering Unicode (emojis), boundary conditions, and state resiliency. Proves that `char_idx_to_byte_idx` correctly handles multi-byte characters and that `ensure_cursor_valid` prevents panics on external signal updates. |
+| `text_input_tests.rs` | 🟢 Acquitted | Good integration tests for widget lifecycle, but inadequate for complex text logic verification. |
+
+### Actions Taken
+
+*   Created `crates/widget-core/tests/text_input_logic_test.rs` to isolate `TextInputState` logic testing from the widget/rendering layer.
+*   Verified that `TextInputState` robustly handles external signal mutations (lazy cursor clamping).
