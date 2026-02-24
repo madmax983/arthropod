@@ -62,6 +62,23 @@ pub mod story {
 
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
+    /// You are trying to use `StoryRuntime`, but the `nova` feature is not enabled.
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct StoryRuntime;
+
+    impl StoryRuntime {
+        /// Stub for `choose` method
+        #[allow(clippy::result_unit_err)]
+        pub fn choose(&mut self, _index: usize) -> Result<(), String> {
+            panic!("StoryRuntime requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+    }
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
     /// You are trying to use `register_story`, but the `nova` feature is not enabled.
     #[deprecated(
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
