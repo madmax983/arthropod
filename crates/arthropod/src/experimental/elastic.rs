@@ -1,4 +1,4 @@
-use anim_graph::{Animatable, Animation};
+use crate::experimental::anim_graph::{Animatable, Animation};
 use bevy_ecs::prelude::*;
 use flux_state::{ReadSignal, Runtime, Signal, WriteSignal};
 use std::sync::{Arc, Mutex, Weak};
