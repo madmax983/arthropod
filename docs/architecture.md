@@ -177,3 +177,49 @@ classDiagram
 - **Hybrid ECS**: We use a custom `Scene` graph (HashMap-based tree) for hierarchical operations (layout, event bubbling) while using `bevy_ecs` for bulk operations (rendering, animation). See [ADR 0001](./adr/0001-hybrid-ecs-architecture.md).
 - **Reactive State**: State is managed via `flux-state` signals. We use `ReadSignal<T>` directly (which is thread-safe) to propagate changes from the UI to the ECS. See [ADR 0027](./adr/0027-reactive-signal-simplification.md) and [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
 - **Platform Abstraction**: `plat-core` isolates OS-specific code, allowing the rest of the engine to remain platform-agnostic.
+
+## Experimental Subsystems (Nova)
+
+The `nova` feature flag unlocks several experimental modules designed for advanced interactivity and debugging. These are guarded to keep the core lean. See [ADR 0029](./adr/0029-experimental-feature-strategy.md).
+
+```mermaid
+classDiagram
+    namespace Arthropod {
+        class App
+        class Runtime
+    }
+
+    namespace Experimental {
+        class StoryRuntime {
+            +NarrativeGenerator
+            +register_story()
+        }
+        class FluxRadar {
+            +FluxRadarConfig
+            +FluxRadarState
+            +register_flux_radar()
+        }
+        class Chronos {
+            +Timeline
+            +RetroSignal
+        }
+        class Elastic {
+            +ElasticSignal
+            +ElasticRegistry
+        }
+        class Particles {
+            +Particle
+            +ParticleEmitter
+            +ForceField
+        }
+        class XRay {
+            +XRayConfig
+            +XRayState
+        }
+    }
+
+    App ..> Experimental : "nova" feature enables
+    FluxRadar ..> Runtime : Inspects Graph
+    StoryRuntime ..> App : Modifies World
+    Particles ..> App : Adds Systems
+```
