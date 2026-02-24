@@ -4,7 +4,7 @@
 //!
 //! # Architecture
 //!
-//! The rendering engine is built around a **Scene Graph** (`Scene`) which manages the visual
+//! The rendering engine is built around a **Scene Graph** ([`Scene`]) which manages the visual
 //! hierarchy of the application.
 //!
 //! - **Retained Mode**: The scene graph persists across frames. You modify it (add/remove/update nodes),
@@ -17,19 +17,29 @@
 //!
 //! # Integration
 //!
-//! The `Scene` is designed to be used as a Resource in an ECS (Entity Component System) environment.
+//! The [`Scene`] is designed to be used as a Resource in an ECS (Entity Component System) environment.
 //!
 //! ```
-//! use render_engine::{Scene, SceneNode, NodeContent, Color, VisualStyle};
+//! use render_engine::{Scene, SceneNode, NodeContent, Color, Transform2D};
+//! use style_engine::VisualStyle;
+//! use plat_core::Rect;
 //!
 //! // Create a scene
 //! let mut scene = Scene::new();
 //! let root = scene.root();
 //!
-//! // Add styled content
-//! scene.add_node(root, SceneNode::new(NodeContent::Styled {
-//!     style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())),
-//! }));
+//! // Create a styled node (Red Rectangle)
+//! let style = VisualStyle::new().solid_fill(Color::RED.as_vec4());
+//! let mut node = SceneNode::new(NodeContent::Styled {
+//!     style: Box::new(style),
+//! });
+//!
+//! // Set transform and bounds
+//! node.transform = Transform2D::translate(100.0, 50.0);
+//! node.bounds = Rect::new(0.0, 0.0, 200.0, 100.0);
+//!
+//! // Add to scene
+//! scene.add_node(root, node);
 //! ```
 
 pub mod backend;

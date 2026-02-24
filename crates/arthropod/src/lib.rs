@@ -5,9 +5,19 @@
 //! - **wgpu**: Modern GPU-accelerated rendering
 //! - **flux-state**: Fine-grained reactive state management
 //!
+//! # Overview
+//!
+//! Arthropod combines the ergonomics of modern declarative UI frameworks (like React or SwiftUI)
+//! with the power of an Entity-Component-System (ECS) architecture. This "Hybrid ECS" approach
+//! allows for:
+//!
+//! - **Zero-cost Abstractions**: Complex widgets compile down to simple scene nodes.
+//! - **High Performance**: Layout and rendering are batched and optimized.
+//! - **Extensibility**: You can hook into the ECS to add custom behaviors or systems.
+//!
 //! # Quick Start
 //!
-//! For widget-based applications, use the high-level `App::run` API:
+//! For widget-based applications, use the high-level [`App::run`] API:
 //!
 //! ```no_run
 //! use arthropod::prelude::*;
@@ -57,11 +67,11 @@
 //!
 //! # Architecture
 //!
-//! Arthropod uses a hybrid architecture combining a retained-mode scene graph with an ECS runtime:
+//! Arthropod separates concerns into three distinct layers:
 //!
-//! - **Scene Graph**: A [`render_engine::Scene`] manages the visual hierarchy (nodes, transforms, bounds) optimized for rendering.
-//! - **ECS Runtime**: [`bevy_ecs`] manages cross-cutting concerns like input handling, animation, and reactive state updates.
-//! - **Widget Layer**: The `widget-core` crate provides a high-level, declarative API that builds the scene graph.
+//! 1.  **Widget Layer (`widget-core`)**: The high-level API where you define your UI. It uses the Facade pattern to hide complexity.
+//! 2.  **Scene Graph (`render-engine`)**: A retained-mode tree structure that manages layout and rendering primitives.
+//! 3.  **ECS Runtime (`arthropod-ecs`)**: The backbone that orchestrates the application lifecycle, handling events, updates, and resource management.
 //!
 //! ## The Integration Loop
 //!
@@ -70,6 +80,11 @@
 //! 3. **Update Loop**: The application loop processes events, updates signals via `flux-state`, and triggers re-renders.
 //!
 //! All resources are managed automatically by the [`App`] struct.
+//!
+//! # Feature Flags
+//!
+//! - `nova`: Enables experimental features (Story Engine, Particles, Flux Radar).
+//!   See [`experimental`] module for details.
 
 pub mod app;
 pub mod event_dispatcher;
@@ -81,3 +96,9 @@ pub mod prelude;
 pub use app::{App, AppError};
 pub use event_dispatcher::{DispatchResult, EventDispatcher};
 pub use layout::{auto_layout, layout_widget_tree};
+
+// Re-export core crates for convenience
+pub use arthropod_ecs;
+pub use flux_state;
+pub use render_engine;
+pub use widget_core;

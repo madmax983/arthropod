@@ -1,6 +1,6 @@
 //! ECS integration layer for Arthropod GUI framework
 //!
-//! This crate provides Entity-Component-System (ECS) integration for Arthropod using bevy_ecs.
+//! This crate provides Entity-Component-System (ECS) integration for Arthropod using [`bevy_ecs`].
 //! It implements a hybrid architecture where:
 //!
 //! - **Scene hierarchy** uses a custom tree (Arena/HashMap) for O(1) access and cache-friendly traversal
@@ -31,34 +31,41 @@
 //!
 //! # Usage
 //!
+//! This example demonstrates how to set up the ECS environment, spawn an entity,
+//! and link it to a scene node with reactive properties.
+//!
 //! ```
 //! use arthropod_ecs::{FrameworkContext, Renderable, ReactiveColor};
 //! use render_engine::{Scene, Color};
 //! use flux_state::{Runtime, Signal};
 //!
-//! // Create a runtime
+//! // 1. Create the runtime and context
 //! let runtime = Runtime::new();
 //! let mut context = FrameworkContext::new();
 //!
-//! // Access Scene from World to get root node
-//! let node_id = {
+//! // 2. Access the Scene resource to get the root node
+//! let root_id = {
 //!     let scene = context.world().resource::<Scene>();
 //!     scene.root()
 //! };
 //!
-//! // Spawn ECS entity linked to scene node
+//! // 3. Create a reactive signal for color
 //! let color_signal = Signal::new(runtime, Color::RED);
 //! let (read_signal, _write_signal) = color_signal.split();
 //!
-//! context.spawn(node_id)
+//! // 4. Spawn an ECS entity linked to the scene node
+//! // We attach `Renderable` (tag) and `ReactiveColor` (component)
+//! context.spawn(root_id)
 //!     .insert(Renderable)
 //!     .insert(ReactiveColor::new(read_signal));
 //!
-//! // Update reactive systems (Scene accessed from World automatically)
+//! // 5. Run the update loop
+//! // This triggers systems that propagate signal changes to the Scene
 //! context.update();
 //!
-//! // Render and get GPU instances (Scene accessed from World automatically)
-//! let instances = context.render();
+//! // 6. Render
+//! // The renderer traverses the Scene, which now has the updated color
+//! let _instances = context.render();
 //! ```
 
 pub mod components;
