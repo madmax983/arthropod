@@ -262,6 +262,32 @@ impl RuntimeInner {
         *buffer = std::mem::replace(&mut self.pending_effects, empty_buf);
         true
     }
+
+    fn detect_deadlock(&self, target_node: NodeId, current_thread: std::thread::ThreadId) {
+        let mut current_target = target_node;
+
+        // Trace the dependency chain: Me -> Node -> Owner -> WaitingFor -> Node...
+        loop {
+            // Who owns the lock for the target node?
+            if let Some(owner_thread) = self.computing.get(&current_target) {
+                if *owner_thread == current_thread {
+                    // Cycle detected!
+                    // We are waiting for a node that is ultimately held by us (or a chain leading to us).
+                    panic!(
+                        "Deadlock detected: Cyclic dependency in computed values across threads."
+                    );
+                }
+
+                // What is that thread waiting for?
+                if let Some(next_node) = self.waiting_for.get(owner_thread) {
+                    current_target = *next_node;
+                    continue;
+                }
+            }
+            // Chain ends (owner is running but not waiting)
+            break;
+        }
+    }
 }
 
 impl Runtime {
@@ -454,6 +480,25 @@ impl Runtime {
         self.inner.lock().unwrap().stale.contains(&id)
     }
 
+    fn wait_for_computation<'a>(
+        &'a self,
+        mut inner: std::sync::MutexGuard<'a, RuntimeInner>,
+        id: NodeId,
+    ) -> std::sync::MutexGuard<'a, RuntimeInner> {
+        // Wait if currently computing (prevent concurrent recomputation)
+        while inner.computing.contains_key(&id) {
+            // Deadlock detection
+            let current_thread = std::thread::current().id();
+            inner.detect_deadlock(id, current_thread);
+
+            // Register that we are waiting
+            inner.waiting_for.insert(current_thread, id);
+            inner = self.condvar.wait(inner).unwrap();
+            inner.waiting_for.remove(&current_thread);
+        }
+        inner
+    }
+
     /// Recompute the value of a computed node.
     ///
     /// # Panics
@@ -473,42 +518,7 @@ impl Runtime {
             }
 
             // Wait if currently computing (prevent concurrent recomputation)
-            while inner.computing.contains_key(&id) {
-                // Deadlock detection
-                let current_thread = std::thread::current().id();
-                let mut target_node = id;
-
-                // Trace the dependency chain: Me -> Node -> Owner -> WaitingFor -> Node...
-                loop {
-                    // Who owns the lock for the target node?
-                    if let Some(owner_thread) = inner.computing.get(&target_node) {
-                        if *owner_thread == current_thread {
-                            // Cycle detected!
-                            // We are waiting for a node that is ultimately held by us (or a chain leading to us).
-                            // Drop the lock before panicking to avoid poisoning?
-                            // Actually, we want to panic to break the deadlock.
-                            // The RuntimeInner mutex will be poisoned, but that's better than a hang.
-                            // Or we can explicitly release? No, panic is fine, ContextGuard handles cleanup.
-                            panic!(
-                                "Deadlock detected: Cyclic dependency in computed values across threads."
-                            );
-                        }
-
-                        // What is that thread waiting for?
-                        if let Some(next_node) = inner.waiting_for.get(owner_thread) {
-                            target_node = *next_node;
-                            continue;
-                        }
-                    }
-                    // Chain ends (owner is running but not waiting)
-                    break;
-                }
-
-                // Register that we are waiting
-                inner.waiting_for.insert(current_thread, id);
-                inner = self.condvar.wait(inner).unwrap();
-                inner.waiting_for.remove(&current_thread);
-            }
+            inner = self.wait_for_computation(inner, id);
 
             let (is_uninit, compute) = {
                 let computed = inner
