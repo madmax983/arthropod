@@ -234,10 +234,11 @@ impl GradientAtlas {
 
     /// Simple hash for gradient deduplication
     fn hash_gradient(&self, stops: &[ColorStop]) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use std::hash::{BuildHasher, Hash, Hasher};
 
-        let mut hasher = DefaultHasher::new();
+        // Use the map's hasher builder (AHash via hashbrown default) for speed
+        let mut hasher = self.cache.hasher().build_hasher();
+
         stops.len().hash(&mut hasher);
         for stop in stops {
             // Hash position and color components

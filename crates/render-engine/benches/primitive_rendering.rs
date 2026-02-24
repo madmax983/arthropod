@@ -14,6 +14,7 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use glam::{Vec2, Vec4};
 use plat_core::Rect;
+use render_engine::backend::wgpu::pipelines::gradient_atlas::GradientAtlas;
 use render_engine::{
     Color, ColorStop, NodeContent, Paint, Scene, SceneNode, StrokeStyle, VisualStyle,
 };
@@ -411,6 +412,28 @@ criterion_group!(
     bench_create_shadowed_nodes,
     bench_complex_visual_style,
     bench_create_gradient_text_nodes,
+    bench_gradient_atlas_hashing,
 );
+
+/// Benchmark GradientAtlas hashing (hot path for cached gradients)
+fn bench_gradient_atlas_hashing(c: &mut Criterion) {
+    c.bench_function("gradient_atlas_hashing_1000", |b| {
+        let mut atlas = GradientAtlas::default();
+        let stops = vec![
+            ColorStop::new(0.0, Vec4::new(1.0, 0.0, 0.0, 1.0)),
+            ColorStop::new(1.0, Vec4::new(0.0, 0.0, 1.0, 1.0)),
+        ];
+
+        // Pre-fill cache to only measure hashing lookup
+        atlas.add_gradient(&stops);
+
+        b.iter(|| {
+            // Add same gradient repeatedly
+            for _ in 0..1000 {
+                black_box(atlas.add_gradient(&stops));
+            }
+        });
+    });
+}
 
 criterion_main!(benches);
