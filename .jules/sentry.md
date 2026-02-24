@@ -27,3 +27,7 @@
 ## 2024-05-24 - [Debug Reactivity]
 **Learning:** `Debug` formatting of reactive primitives (Signal, Computed) was non-reactive, meaning effects using only `println!("{:?}", signal)` would not re-run on updates.
 **Action:** Always verify that "observation" (even via Debug) triggers "dependency tracking" in reactive systems. Added `runtime.track(id)` to `Debug` implementations.
+
+## 2024-05-25 - [String Manipulation Safety]
+**Learning:** `TextInputState` relies heavily on `char_idx_to_byte_idx` to safely map character indices (cursor position) to byte indices for `String` mutation. This prevents panics when handling multi-byte Unicode characters (e.g., Emoji).
+**Action:** Added comprehensive unit tests covering Unicode insertion/deletion and boundary conditions to ensure `String::insert` and `String::remove` never panic due to invalid byte indices.

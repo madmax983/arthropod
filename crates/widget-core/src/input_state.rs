@@ -191,6 +191,20 @@ fn char_idx_to_byte_idx(s: &str, char_idx: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use flux_state::{Runtime, Signal};
+
+    fn create_state(initial: &str) -> TextInputState {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, initial.to_string());
+        let (read, write) = signal.split();
+        TextInputState {
+            read_signal: read,
+            write_signal: write,
+            cursor_position: initial.chars().count(), // Default to end
+            readonly: false,
+            max_length: None,
+        }
+    }
 
     #[test]
     fn test_char_idx_to_byte_idx_helper() {
@@ -213,5 +227,120 @@ mod tests {
         // Out of bounds
         assert_eq!(char_idx_to_byte_idx("abc", 10), None);
         assert_eq!(char_idx_to_byte_idx("😀", 5), None);
+    }
+
+    #[test]
+    fn test_insert_char() {
+        let mut state = create_state("ac");
+        state.cursor_position = 1; // "a|c"
+        state.insert_char('b');
+        assert_eq!(state.read_signal.get(), "abc");
+        assert_eq!(state.cursor_position, 2); // "ab|c"
+    }
+
+    #[test]
+    fn test_insert_unicode() {
+        let mut state = create_state("a");
+        state.cursor_position = 1;
+        state.insert_char('😀');
+        assert_eq!(state.read_signal.get(), "a😀");
+        assert_eq!(state.cursor_position, 2);
+
+        state.insert_char('b');
+        assert_eq!(state.read_signal.get(), "a😀b");
+        assert_eq!(state.cursor_position, 3);
+    }
+
+    #[test]
+    fn test_backspace() {
+        let mut state = create_state("abc"); // cursor at 3
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "ab");
+        assert_eq!(state.cursor_position, 2);
+
+        state.cursor_position = 1; // "a|b"
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "b");
+        assert_eq!(state.cursor_position, 0);
+
+        state.backspace(); // At 0, no-op
+        assert_eq!(state.read_signal.get(), "b");
+        assert_eq!(state.cursor_position, 0);
+    }
+
+    #[test]
+    fn test_backspace_unicode() {
+        let mut state = create_state("a😀b"); // len 3 chars
+        state.cursor_position = 2; // "a😀|b"
+        state.backspace(); // Should remove emoji
+        assert_eq!(state.read_signal.get(), "ab");
+        assert_eq!(state.cursor_position, 1);
+    }
+
+    #[test]
+    fn test_delete() {
+        let mut state = create_state("abc");
+        state.cursor_position = 1; // "a|bc"
+        state.delete();
+        assert_eq!(state.read_signal.get(), "ac");
+        assert_eq!(state.cursor_position, 1); // Cursor stays
+    }
+
+    #[test]
+    fn test_delete_unicode() {
+        let mut state = create_state("a😀b");
+        state.cursor_position = 1; // "a|😀b"
+        state.delete();
+        assert_eq!(state.read_signal.get(), "ab");
+        assert_eq!(state.cursor_position, 1);
+    }
+
+    #[test]
+    fn test_max_length() {
+        let mut state = create_state("abc");
+        state.max_length = Some(3);
+        state.insert_char('d');
+        assert_eq!(state.read_signal.get(), "abc"); // No change
+    }
+
+    #[test]
+    fn test_readonly() {
+        let mut state = create_state("abc");
+        state.readonly = true;
+        state.insert_char('d');
+        assert_eq!(state.read_signal.get(), "abc");
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "abc");
+        state.delete();
+        assert_eq!(state.read_signal.get(), "abc");
+    }
+
+    #[test]
+    fn test_cursor_clamping() {
+        let mut state = create_state("hello");
+        state.cursor_position = 5;
+
+        // Simulate external update
+        state.write_signal.set("hi".to_string());
+
+        // Trigger clamp via ensure_cursor_valid (called by move/insert/etc)
+        state.move_cursor_right(); // should clamp first, then try to move right (blocked)
+
+        assert_eq!(state.cursor_position, 2); // clamped to len("hi")
+    }
+
+    #[test]
+    fn test_move_cursor() {
+        let mut state = create_state("abc");
+        state.cursor_position = 0;
+        state.move_cursor_left(); // No-op
+        assert_eq!(state.cursor_position, 0);
+
+        state.move_cursor_right();
+        assert_eq!(state.cursor_position, 1);
+
+        state.cursor_position = 3;
+        state.move_cursor_right(); // No-op
+        assert_eq!(state.cursor_position, 3);
     }
 }
