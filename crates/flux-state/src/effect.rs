@@ -90,6 +90,22 @@ impl Effect {
     ///
     /// The `effect_fn` will run immediately to establish initial dependencies.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Effect};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime.clone(), 0);
+    /// let (read, write) = count.split();
+    ///
+    /// let read_clone = read.clone();
+    /// let _effect = Effect::new(runtime, move || {
+    ///     println!("Count is: {}", read_clone.get());
+    /// });
+    ///
+    /// write.set(1);
+    /// ```
+    ///
     /// # Warning
     ///
     /// The returned `Effect` handle **must be kept alive** (e.g., assigned to a variable).

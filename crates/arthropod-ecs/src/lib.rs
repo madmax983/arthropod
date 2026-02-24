@@ -31,12 +31,13 @@
 //!
 //! # Usage
 //!
-//! ```no_run
+//! ```
 //! use arthropod_ecs::{FrameworkContext, Renderable, ReactiveColor};
-//! use render_engine::Scene;
-//! use flux_state::Signal;
+//! use render_engine::{Scene, Color};
+//! use flux_state::{Runtime, Signal};
 //!
-//! # let runtime = flux_state::Runtime::new();
+//! // Create a runtime
+//! let runtime = Runtime::new();
 //! let mut context = FrameworkContext::new();
 //!
 //! // Access Scene from World to get root node
@@ -46,8 +47,9 @@
 //! };
 //!
 //! // Spawn ECS entity linked to scene node
-//! let color_signal = Signal::new(runtime, render_engine::Color::RED);
+//! let color_signal = Signal::new(runtime, Color::RED);
 //! let (read_signal, _write_signal) = color_signal.split();
+//!
 //! context.spawn(node_id)
 //!     .insert(Renderable)
 //!     .insert(ReactiveColor::new(read_signal));

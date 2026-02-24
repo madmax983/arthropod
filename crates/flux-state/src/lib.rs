@@ -21,7 +21,7 @@
 //!
 //! # Quick Start
 //!
-//! ```
+//! ```rust
 //! use flux_state::{Runtime, Signal, Effect, Computed};
 //!
 //! // 1. Create a runtime (shared via Arc)
@@ -29,8 +29,10 @@
 //! let runtime = Runtime::new();
 //!
 //! // 2. Create a signal
-//! // Signal::new takes ownership of the runtime handle.
+//! // Signal::new takes ownership of the runtime handle (passed as Arc).
 //! let count = Signal::new(runtime.clone(), 0);
+//!
+//! // Split into read/write handles (consumes the original signal wrapper)
 //! let (read_count, write_count) = count.split();
 //!
 //! // 3. Create a computed value (derived state)

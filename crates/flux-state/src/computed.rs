@@ -130,6 +130,22 @@ impl<T: 'static + Send> Computed<T> {
     /// and then automatically called again whenever any signal it reads changes and the
     /// computed value is accessed.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// let count = Signal::new(runtime.clone(), 10);
+    /// let (read, _) = count.split();
+    ///
+    /// let read_clone = read.clone();
+    /// let double = Computed::new(runtime, move || {
+    ///     read_clone.get() * 2
+    /// });
+    ///
+    /// assert_eq!(double.get(), 20);
+    /// ```
+    ///
     /// # Panics
     ///
     /// - Panics if the `compute` closure panics.

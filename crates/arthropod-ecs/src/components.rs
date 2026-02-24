@@ -9,6 +9,15 @@ use std::sync::Arc;
 ///
 /// This component links an ECS entity to a specific node in the custom Scene tree.
 /// Systems can query this component to find which scene node to operate on.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::SceneNodeRef;
+/// # use render_engine::NodeId;
+/// // Create a reference to node with ID 42
+/// let node_ref = SceneNodeRef(NodeId(42));
+/// ```
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SceneNodeRef(pub NodeId);
 
@@ -16,6 +25,19 @@ pub struct SceneNodeRef(pub NodeId);
 ///
 /// When this component is present, the reactive color system will poll the signal
 /// and update the corresponding scene node's color property each frame.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::ReactiveColor;
+/// # use flux_state::{Runtime, Signal};
+/// # use render_engine::Color;
+/// # let runtime = Runtime::new();
+/// let color = Signal::new(runtime, Color::RED);
+/// let (read, _) = color.split();
+///
+/// let reactive = ReactiveColor::new(read);
+/// ```
 #[derive(Component, Clone)]
 pub struct ReactiveColor {
     pub signal: ReadSignal<Color>,
@@ -34,6 +56,19 @@ impl ReactiveColor {
 ///
 /// When this component is present, the reactive transform system will poll the signal
 /// and update the corresponding scene node's transform each frame.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::ReactiveTransform;
+/// # use flux_state::{Runtime, Signal};
+/// # use render_engine::Transform2D;
+/// # let runtime = Runtime::new();
+/// let transform = Signal::new(runtime, Transform2D::identity());
+/// let (read, _) = transform.split();
+///
+/// let reactive = ReactiveTransform::new(read);
+/// ```
 #[derive(Component, Clone)]
 pub struct ReactiveTransform {
     pub signal: ReadSignal<Transform2D>,
@@ -52,6 +87,18 @@ impl ReactiveTransform {
 ///
 /// When this component is present, the reactive opacity system will poll the signal
 /// and update the corresponding scene node's opacity each frame.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::ReactiveOpacity;
+/// # use flux_state::{Runtime, Signal};
+/// # let runtime = Runtime::new();
+/// let opacity = Signal::new(runtime, 1.0);
+/// let (read, _) = opacity.split();
+///
+/// let reactive = ReactiveOpacity::new(read);
+/// ```
 #[derive(Component, Clone)]
 pub struct ReactiveOpacity {
     pub signal: ReadSignal<f32>,
@@ -70,6 +117,18 @@ impl ReactiveOpacity {
 ///
 /// When this component is present, the reactive text system will poll the signal
 /// and update the corresponding scene node's text content each frame.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::ReactiveText;
+/// # use flux_state::{Runtime, Signal};
+/// # let runtime = Runtime::new();
+/// let text = Signal::new(runtime, "Hello".to_string());
+/// let (read, _) = text.split();
+///
+/// let reactive = ReactiveText::new(read);
+/// ```
 #[derive(Component, Clone)]
 pub struct ReactiveText {
     pub signal: ReadSignal<String>,
@@ -89,6 +148,20 @@ impl ReactiveText {
 /// When this component is present, the reactive computed text system will poll the computed
 /// and update the corresponding scene node's text content each frame.
 /// Computed values automatically update when their dependencies change.
+///
+/// # Example
+///
+/// ```
+/// # use arthropod_ecs::ReactiveComputedText;
+/// # use flux_state::{Runtime, Signal, Computed};
+/// # let runtime = Runtime::new();
+/// let count = Signal::new(runtime.clone(), 0);
+/// let (read, _) = count.split();
+///
+/// let computed = Computed::new(runtime, move || format!("Count: {}", read.get()));
+///
+/// let reactive = ReactiveComputedText::new(computed);
+/// ```
 #[derive(Component, Clone)]
 pub struct ReactiveComputedText {
     pub computed: Computed<String>,
