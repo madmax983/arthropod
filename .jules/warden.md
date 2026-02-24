@@ -63,9 +63,9 @@
 **Defense:** Added check for zero width/height. Returns an identity matrix as a safe fallback.
 
 ## 2026-02-22 - [Theme-Engine Registry Panic Fix]
-**Threat:** Integer underflow in  caused by malformed registry data (buffer size 1). The logic  panicked when  was 0 (from  integer division). This could crash the application on startup if the registry key  was corrupted.
-**Defense:** Extracted parsing logic into  with strict bounds checking. Used  to safely handle odd-length buffers and  to prevent reading uninitialized memory. Added regression tests covering empty, short, and malformed inputs.
-
-## 2026-02-22 - [Theme-Engine Registry Panic Fix]
 **Threat:** Integer underflow in `detect_windows_version_from_registry` caused by malformed registry data (buffer size 1). The logic `len - 1` panicked when `len` was 0 (from `1 / 2` integer division). This could crash the application on startup if the registry key `CurrentBuildNumber` was corrupted.
 **Defense:** Extracted parsing logic into `parse_build_number` with strict bounds checking. Used `chunks_exact(2)` to safely handle odd-length buffers and `min` to prevent reading uninitialized memory. Added regression tests covering empty, short, and malformed inputs.
+
+## 2026-02-22 - [MCP Server Unbounded Read DoS]
+**Threat:** The MCP server used `BufReader::read_line` to read incoming JSON messages. A malicious client could send an endless stream of bytes without a newline, causing the server to buffer indefinitely until Out-Of-Memory (DoS).
+**Defense:** Implemented `read_line_bounded` helper that enforces a strict `MAX_MESSAGE_SIZE` (64MB) limit. The server now validates message length and UTF-8 validity incrementally, closing the connection if the limit is exceeded. Added regression test `tests/dos_protection.rs`.

@@ -18,6 +18,9 @@ use std::thread;
 /// Default port for MCP server to listen on
 pub const MCP_PORT: u16 = 7777;
 
+/// Maximum message size allowed (64MB) to prevent DoS
+const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024;
+
 /// Message sent from app to MCP server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AppMessage {
@@ -67,15 +70,23 @@ pub struct ConnectedApp {
 ///
 /// Returns an Arc<Mutex<Option<ConnectedApp>>> that MCP tools can use
 pub fn start_tcp_server() -> Arc<Mutex<Option<ConnectedApp>>> {
+    let (app, _) = start_tcp_server_with_port(MCP_PORT);
+    app
+}
+
+/// Start the TCP server on a specific port.
+/// Returns the shared app state and the bound port.
+pub fn start_tcp_server_with_port(port: u16) -> (Arc<Mutex<Option<ConnectedApp>>>, u16) {
+    let listener =
+        TcpListener::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind MCP server");
+    let local_port = listener.local_addr().unwrap().port();
+
     let connected_app = Arc::new(Mutex::new(None));
     let connected_app_clone = connected_app.clone();
 
+    tracing::info!("MCP server listening on localhost:{}", local_port);
+
     thread::spawn(move || {
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", MCP_PORT))
-            .expect("Failed to bind MCP server");
-
-        tracing::info!("MCP server listening on localhost:{}", MCP_PORT);
-
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
@@ -89,7 +100,59 @@ pub fn start_tcp_server() -> Arc<Mutex<Option<ConnectedApp>>> {
         }
     });
 
-    connected_app
+    (connected_app, local_port)
+}
+
+/// Read a line with a maximum length limit to prevent DoS.
+///
+/// Returns the number of bytes read (including delimiter).
+fn read_line_bounded(
+    reader: &mut impl BufRead,
+    buf: &mut String,
+    limit: usize,
+) -> std::io::Result<usize> {
+    let mut bytes = Vec::new();
+    let mut total_read = 0;
+
+    loop {
+        let available = reader.fill_buf()?;
+        let len = available.len();
+        if len == 0 {
+            break; // EOF
+        }
+
+        let (consume, newline) = if let Some(i) = available.iter().position(|&b| b == b'\n') {
+            (i + 1, true)
+        } else {
+            (len, false)
+        };
+
+        if total_read + consume > limit {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Line too long",
+            ));
+        }
+
+        bytes.extend_from_slice(&available[..consume]);
+        reader.consume(consume);
+        total_read += consume;
+
+        if newline {
+            break;
+        }
+    }
+
+    if total_read == 0 {
+        return Ok(0);
+    }
+
+    // Convert to string (validates UTF-8)
+    let s = String::from_utf8(bytes)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+
+    buf.push_str(&s);
+    Ok(total_read)
 }
 
 /// Handle a connection from an Arthropod app
@@ -97,49 +160,53 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<Conn
     let mut reader = BufReader::new(stream.try_clone().expect("Failed to clone stream"));
     let mut line = String::new();
 
-    while reader.read_line(&mut line).is_ok() {
-        if line.is_empty() {
-            break; // Connection closed
-        }
+    loop {
+        line.clear();
+        match read_line_bounded(&mut reader, &mut line, MAX_MESSAGE_SIZE) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                match serde_json::from_str::<AppMessage>(&line) {
+                    Ok(AppMessage::Register { name, pid }) => {
+                        tracing::info!("App registered: {} (PID: {})", name, pid);
 
-        match serde_json::from_str::<AppMessage>(&line) {
-            Ok(AppMessage::Register { name, pid }) => {
-                tracing::info!("App registered: {} (PID: {})", name, pid);
+                        // Replace any existing connected app
+                        *connected_app.lock().unwrap() = Some(ConnectedApp {
+                            name: name.clone(),
+                            pid,
+                            scene: None,
+                            stream: stream.try_clone().expect("Failed to clone stream"),
+                        });
 
-                // Replace any existing connected app
-                *connected_app.lock().unwrap() = Some(ConnectedApp {
-                    name: name.clone(),
-                    pid,
-                    scene: None,
-                    stream: stream.try_clone().expect("Failed to clone stream"),
-                });
-
-                // Send acknowledgment
-                let _ = writeln!(
-                    &stream,
-                    "{}",
-                    serde_json::to_string(&ServerMessage::Registered).unwrap()
-                );
-            }
-            Ok(AppMessage::SceneUpdate { scene }) => {
-                if let Some(app) = connected_app.lock().unwrap().as_mut() {
-                    let node_count = scene
-                        .get("node_count")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0);
-                    app.scene = Some(scene);
-                    tracing::info!("Scene state updated from app - {} nodes", node_count);
+                        // Send acknowledgment
+                        let _ = writeln!(
+                            &stream,
+                            "{}",
+                            serde_json::to_string(&ServerMessage::Registered).unwrap()
+                        );
+                    }
+                    Ok(AppMessage::SceneUpdate { scene }) => {
+                        if let Some(app) = connected_app.lock().unwrap().as_mut() {
+                            let node_count = scene
+                                .get("node_count")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            app.scene = Some(scene);
+                            tracing::info!("Scene state updated from app - {} nodes", node_count);
+                        }
+                    }
+                    Ok(AppMessage::Heartbeat) => {
+                        // App is alive, do nothing
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to parse message: {}", e);
+                    }
                 }
             }
-            Ok(AppMessage::Heartbeat) => {
-                // App is alive, do nothing
-            }
             Err(e) => {
-                tracing::error!("Failed to parse message: {}", e);
+                tracing::error!("Connection error: {}", e);
+                break;
             }
         }
-
-        line.clear();
     }
 
     // Connection closed
