@@ -1457,3 +1457,18 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - Regression safety:
     - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
     - `cargo fmt --all` -> PASS
+
+### 2026-02-24 (parity continuation: CI gate includes figma visual regression)
+
+- Goal:
+  - Prevent regressions in hierarchy-aware Figma import parity by enforcing `figma_json_render_regression` in CI alongside desktop Phase 4 visual regression.
+- Implementation:
+  - Updated `.github/workflows/ci.yml` job `phase4-desktop-visual-regression`:
+    - expanded job comment to include figma golden checks.
+    - added step:
+      - `cargo test --test figma_json_render_regression -- --nocapture`
+    - added artifact upload on failure for figma outputs:
+      - `tests/visual/artifacts/figma`
+- Verification:
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+  - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS

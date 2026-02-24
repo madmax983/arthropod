@@ -232,7 +232,7 @@ jobs:
           grep -q "Arthropod Widget Gallery Live" target/trunk/widget_gallery_web/index.html
           grep -q 'id="arthropod-canvas"' target/trunk/widget_gallery_web/index.html
 
-  # Job 11: Native desktop visual regression (golden image diff)
+  # Job 11: Native desktop visual regressions (phase4 + figma golden diffs)
   phase4-desktop-visual-regression:
     name: Phase 4 Desktop Visual Regression
     runs-on: windows-latest
@@ -246,10 +246,22 @@ jobs:
           ARTHROPOD_VISUAL_CHANNEL_TOLERANCE: "2"
           ARTHROPOD_VISUAL_MAX_DIFF_RATIO: "0.04"
         run: cargo test --test phase4_desktop_visual_regression -- --nocapture
+      - name: Run figma JSON golden regression test
+        env:
+          ARTHROPOD_VISUAL_CHANNEL_TOLERANCE: "2"
+          ARTHROPOD_VISUAL_MAX_DIFF_RATIO: "0.04"
+        run: cargo test --test figma_json_render_regression -- --nocapture
       - name: Upload desktop visual artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: phase4-desktop-visual-artifacts
           path: tests/visual/artifacts/phase4
+          if-no-files-found: ignore
+      - name: Upload figma visual artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: figma-visual-artifacts
+          path: tests/visual/artifacts/figma
           if-no-files-found: ignore
