@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -20,6 +21,9 @@ pub const MCP_PORT: u16 = 7777;
 
 /// Maximum message size allowed (64MB) to prevent DoS
 const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024;
+
+/// Maximum number of concurrent connections
+const MAX_CONNECTIONS: usize = 100;
 
 /// Message sent from app to MCP server
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +87,7 @@ pub fn start_tcp_server_with_port(port: u16) -> (Arc<Mutex<Option<ConnectedApp>>
 
     let connected_app = Arc::new(Mutex::new(None));
     let connected_app_clone = connected_app.clone();
+    let active_connections = Arc::new(AtomicUsize::new(0));
 
     tracing::info!("MCP server listening on localhost:{}", local_port);
 
@@ -90,8 +95,29 @@ pub fn start_tcp_server_with_port(port: u16) -> (Arc<Mutex<Option<ConnectedApp>>
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
+                    // Check limit atomically to prevent race conditions
+                    let prev_count = active_connections.fetch_add(1, Ordering::SeqCst);
+                    if prev_count >= MAX_CONNECTIONS {
+                        // Revert increment immediately
+                        active_connections.fetch_sub(1, Ordering::SeqCst);
+                        tracing::warn!(
+                            "Max connections reached ({}), rejecting connection",
+                            MAX_CONNECTIONS
+                        );
+                        // Dropping stream closes it
+                        continue;
+                    }
+
                     let app = connected_app_clone.clone();
-                    thread::spawn(move || handle_app_connection(stream, app));
+                    let counter_guard = active_connections.clone();
+
+                    thread::spawn(move || {
+                        // Ensure we decrement when thread exits (even on panic)
+                        let _guard = ConnectionGuard {
+                            counter: counter_guard,
+                        };
+                        handle_app_connection(stream, app);
+                    });
                 }
                 Err(e) => {
                     tracing::error!("Failed to accept connection: {}", e);
@@ -101,6 +127,16 @@ pub fn start_tcp_server_with_port(port: u16) -> (Arc<Mutex<Option<ConnectedApp>>
     });
 
     (connected_app, local_port)
+}
+
+struct ConnectionGuard {
+    counter: Arc<AtomicUsize>,
+}
+
+impl Drop for ConnectionGuard {
+    fn drop(&mut self) {
+        self.counter.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 /// Read a line with a maximum length limit to prevent DoS.
