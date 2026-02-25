@@ -2,6 +2,10 @@
 
 > "A GUI without input is just a screenshot."
 
+**Status**: Approved
+**Owner**: Vantage
+**Target Release**: Arthropod Core (Feature Promotion)
+
 ## 1. 👤 User Story
 
 **As a** UI Developer,
@@ -20,8 +24,9 @@ Currently, implementing a simple "Draggable Box" in Arthropod requires:
 -   **Brittle Code**: Hard to maintain and debug.
 -   **Inconsistent UX**: Every developer re-invents the wheel (e.g., drag threshold).
 -   **Slow Iteration**: Developers spend time plumbing events instead of building features.
+-   **Inaccessible Apps**: Custom input handling often bypasses standard accessibility hooks.
 
-**Utility is Revenue**: By abstracting this complexity, we enable developers to build higher-quality apps faster.
+**Utility is Revenue**: By abstracting this complexity, we enable developers to build higher-quality, accessible apps faster.
 
 ## 3. 🔍 Gap Analysis
 
@@ -31,7 +36,8 @@ Currently, implementing a simple "Draggable Box" in Arthropod requires:
 | **Hit Testing** | None | Manual / Ad-hoc | Automatic (Scene Graph) |
 | **Gestures** | None | Hardcoded (TextInput) | Declarative (`.on_click(...)`) |
 | **State Mgmt** | Manual | Widget-internal | ECS Component (`InputState`) |
-| **Device Support** | Mouse/Keyboard | Keyboard (mostly) | Mouse, Touch, Pen, Gamepad |
+| **Focus** | Manual | `TextInput` only | Global Focus Manager (Tab/Trap) |
+| **Accessibility**| None | Manual wiring | Automatic A11y Tree Updates |
 
 ## 4. 📝 Solution Overview
 
@@ -39,57 +45,74 @@ We will introduce a new system, **Input Fusion**, that sits between `plat-core` 
 
 ### Architecture
 
-1.  **Input Source**: Consumes raw `plat-core::WindowEvent`s.
-2.  **Pointer Abstraction**: Unifies Mouse, Touch, and Pen into generic `Pointer` events.
-3.  **Hit Testing System**: Queries the `Scene` graph to find the target node under the cursor.
-4.  **Event Propagation**: Implements a Bubbling/Capturing phase (similar to DOM) to allow parent widgets to intercept events.
-5.  **Gesture Recognizers**: ECS Components that attach to entities and interpret event streams into high-level actions.
+1.  **Input Manager Resource**: A central ECS resource (`InputManager`) that:
+    -   Consumes raw `plat-core::WindowEvent`s.
+    -   Normalizes them into `PointerEvent` (Mouse/Touch/Pen) and `KeyboardEvent`.
+    -   Maintains the current state of devices (cursor position, pressed keys).
 
-### Key Features
+2.  **Hit Testing System**:
+    -   Queries the `Scene` graph to find the target node under the cursor.
+    -   **Algorithm**: Traverses the scene tree in reverse render order (front-to-back) to respect Z-indexing.
+    -   **Optimization**: Must use bounding box checks before precise shape checks.
 
--   **`InputState` Resource**: A centralized resource in the ECS that tracks the current state of input devices (cursor position, pressed keys).
--   **Declarative API**:
-    ```rust
-    // Example (Conceptual)
-    Button::new("Click Me")
-        .on_click(|ctx| println!("Clicked!"))
-        .on_hover(|ctx, hovering| ctx.set_color(if hovering { RED } else { BLUE }))
-    ```
--   **Focus Management**: A robust system for handling keyboard focus (Tab navigation) and focus groups.
+3.  **Event Propagation (The Bubble)**:
+    -   Events traverse from the **Target Node** up to the **Root**.
+    -   Widgets can "capture" events to stop propagation (e.g., a button eats the click so the container doesn't see it).
+
+4.  **Focus Management**:
+    -   Maintains a "Focus Chain" for keyboard navigation.
+    -   Handles `Tab` / `Shift+Tab` to cycle through focusable widgets.
+    -   Supports **Focus Traps** for modal dialogs (prevent tabbing outside the modal).
+
+5.  **Gesture Recognizers**:
+    -   ECS Components attached to entities (e.g., `Clickable`, `Draggable`, `Hoverable`).
+    -   The `InputSystem` iterates these components and triggers callbacks when patterns match.
+
+### Integration with Accessibility (A11y)
+-   **Focus Sync**: When `InputManager` changes focus, it **must** update the `a11y-engine` selection.
+-   **Action Mapping**: A "Click" gesture must also be triggerable via the A11y "Activate" action (e.g., from a Screen Reader).
 
 ## 5. 📊 Metrics (Success Definition)
 
 -   **Code Reduction**: Implement a "Draggable Box" example with **50% fewer lines of code** compared to the raw implementation.
--   **Latency**: Input processing overhead < 1ms per frame.
--   **Coverage**: Support 100% of standard desktop interactions (Click, DoubleClick, Drag, Scroll, Hover, Focus).
+-   **Latency**: Input processing overhead < **1ms** per frame.
+-   **Hit Test Performance**: Querying the scene graph for a target must take < **0.1ms** for 1000 nodes.
+-   **Coverage**: Support 100% of standard interactions (Click, DoubleClick, Drag, Scroll, Hover, Focus).
 
 ## 6. ✅ Acceptance Criteria
 
 ### Must Have (Phase 1)
--   [ ] **Pointer Events**: `PointerDown`, `PointerUp`, `PointerMove` (abstracted from Mouse).
--   [ ] **Hit Testing**: ability to identify the Scene Node under the cursor.
--   [ ] **Event Propagation**: Events bubble up from the target node to the root.
--   [ ] **Basic Gestures**:
+-   [ ] **Pointer Abstraction**: Unified `PointerDown`, `PointerUp`, `PointerMove` events.
+-   [ ] **Efficient Hit Testing**: O(N) or better lookup of the node under cursor, respecting bounds and visibility.
+-   [ ] **Event Bubbling**: Events start at the target and bubble up to the root.
+-   [ ] **Declarative Gestures**:
     -   `OnClick`: Fires on down + up on the same element.
-    -   `OnHover`: Fires when pointer enters/leaves bounds.
-    -   `OnDrag`: Fires delta updates while pointer is down and moving.
--   [ ] **ECS Integration**: Input state is stored in ECS components/resources.
+    -   `OnHover`: Fires `HoverEnter` / `HoverLeave`.
+    -   `OnDrag`: Fires `DragStart` -> `DragMove` -> `DragEnd`.
+-   [ ] **Focus System**:
+    -   `Tab` navigation between focusable elements.
+    -   Visual focus indication (e.g., `pseudoclass: focus`).
+-   [ ] **ECS Integration**: Input state is stored in ECS, allowing systems to query "Is Shift held?" or "Is Mouse(Left) pressed?".
 
 ### Should Have (Phase 2)
--   [ ] **Keyboard Shortcuts**: Declarative binding of keys to actions (e.g., `Ctrl+S`).
--   [ ] **Focus Trapping**: For modals/dialogs.
+-   [ ] **Keyboard Shortcuts**: Declarative binding (e.g., `Ctrl+S` -> Save).
+-   [ ] **Focus Trapping**: `FocusScope` component for Modals.
+-   [ ] **Multi-touch**: Pinch/Zoom gestures.
 
 ### Could Have (Future)
--   [ ] **Multi-touch**: Pinch-to-zoom, Rotate.
 -   [ ] **Gamepad Support**: Navigation via D-pad.
+-   [ ] **Gesture Recording**: For automated testing.
 
 ## 7. 🚫 Out of Scope
 
--   **Gesture Recording/Replay**: While useful for testing, it's not core to the runtime.
 -   **Haptic Feedback**: Not MVP.
 -   **Voice Control**: Not MVP.
+-   **Complex Gesture Recognition**: e.g., "Draw a Circle" (unless via custom recognizer).
 
 ## 8. 📅 Timeline / ROI
 
--   **ROI**: High. This is a foundational capability for any GUI framework. Without it, `widget-core` cannot scale beyond simple forms.
--   **Effort**: Medium (2-3 weeks). Requires careful design of the hit-testing and propagation algorithms.
+-   **ROI**: **Critical**. This is the "nervous system" of the framework. Without it, we cannot build complex, accessible applications.
+-   **Effort**: Medium (2-3 weeks).
+    -   Week 1: Hit Testing & Pointer Events.
+    -   Week 2: Event Propagation & Basic Gestures (Click/Hover).
+    -   Week 3: Focus Management & A11y Integration.
