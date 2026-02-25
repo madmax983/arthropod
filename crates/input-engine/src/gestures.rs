@@ -1,7 +1,4 @@
-//! Input Fusion: Gesture Recognition and Sequencing
-//!
-//! This crate provides tools to fuse raw input events into meaningful gestures.
-//! It uses `flux-state` for reactive updates.
+//! Gesture recognition and sequencing.
 
 use flux_state::{Effect, ReadSignal, Runtime, Signal};
 use plat_core::{ElementState, Key, WindowEvent};
@@ -57,6 +54,7 @@ impl<G: Clone + Send + Sync + PartialEq + std::fmt::Debug> InputPattern for Sequ
                         // Mismatch, reset
                         self.current_index = 0;
                         // Retry start of sequence?
+                        #[allow(clippy::collapsible_if)]
                         if let Some(&start_key) = self.sequence.first() {
                             if input.key == start_key {
                                 self.current_index = 1;
@@ -292,14 +290,6 @@ mod tests {
 
         // Release S
         release(Key::S);
-        // It might still report detecting if update logic returns Some.
-        // But our logic returns None on release.
-        // Wait, update returns None on release because it falls through match arm?
-        // Ah, SequenceMatcher handles release by returning None.
-        // ChordMatcher:
-        // match input.state { Released => remove, return None? }
-        // Yes, my implementation returns None on release (implicitly at end of function).
-        // So signal becomes None.
         assert_eq!(gesture_signal.get_untracked(), None);
     }
 }

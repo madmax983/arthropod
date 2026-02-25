@@ -1,0 +1,16 @@
+[package]
+name = "input-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Input and gesture recognition engine for Arthropod GUI framework"
+
+[dependencies]
+flux-state = { path = "../flux-state" }
+plat-core = { path = "../plat-core" }
+log.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+flux-state = { path = "../flux-state" }
+plat-core = { path = "../plat-core" }

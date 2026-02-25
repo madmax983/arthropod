@@ -100,5 +100,6 @@ pub use layout::{auto_layout, layout_widget_tree};
 // Re-export core crates for convenience
 pub use arthropod_ecs;
 pub use flux_state;
+pub use input_engine;
 pub use render_engine;
 pub use widget_core;
