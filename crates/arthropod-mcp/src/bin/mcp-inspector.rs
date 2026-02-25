@@ -45,6 +45,7 @@ enum LogDirection {
 }
 
 struct LogEntry {
+    #[allow(dead_code)]
     timestamp: Instant,
     direction: LogDirection,
     content: String,
@@ -65,10 +66,15 @@ enum InputMode {
     Editing,
 }
 
+struct ToolInfo {
+    name: String,
+    description: String,
+}
+
 /// Application state
 struct App {
     /// List of available tools
-    tools: Vec<String>,
+    tools: Vec<ToolInfo>,
     /// Selected tool index
     tool_list_state: ListState,
 
@@ -90,6 +96,8 @@ struct App {
     input_mode: InputMode,
     /// Connection status
     status: String,
+    /// Connected server command
+    server_cmd: String,
     /// Current request ID counter
     request_id: u64,
 }
@@ -101,11 +109,11 @@ enum AppEvent {
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(server_cmd: String) -> Self {
         let mut tool_list_state = ListState::default();
         tool_list_state.select(Some(0));
 
-        let mut log_list_state = ListState::default();
+        let log_list_state = ListState::default();
         // log_list_state.select(Some(0)); // No logs initially
 
         Self {
@@ -119,6 +127,7 @@ impl App {
             input: String::new(),
             input_mode: InputMode::Normal,
             status: "Starting...".to_string(),
+            server_cmd,
             request_id: 1,
         }
     }
@@ -325,7 +334,8 @@ async fn main() -> Result<()> {
     });
 
     // 4. App Loop
-    let mut app = App::new();
+    let server_cmd_display = format!("{} {}", program, program_args.join(" "));
+    let mut app = App::new(server_cmd_display);
 
     // Send initialize
     let id = app.next_request_id();
@@ -385,7 +395,7 @@ async fn main() -> Result<()> {
                                     if app.focus == Focus::ToolsList {
                                         if let Some(idx) = app.tool_list_state.selected() {
                                             if idx < app.tools.len() {
-                                                let tool_name = app.tools[idx].clone();
+                                                let tool_name = app.tools[idx].name.clone();
                                                 let id = app.next_request_id();
                                                 let req = JsonRpcRequest::new(
                                                     id,
@@ -499,9 +509,14 @@ async fn main() -> Result<()> {
                                     app.tools = tools_arr
                                         .iter()
                                         .filter_map(|t| {
-                                            t.get("name")
-                                                .and_then(|n| n.as_str())
-                                                .map(|s| s.to_string())
+                                            let name =
+                                                t.get("name").and_then(|n| n.as_str())?.to_string();
+                                            let description = t
+                                                .get("description")
+                                                .and_then(|d| d.as_str())
+                                                .unwrap_or("")
+                                                .to_string();
+                                            Some(ToolInfo { name, description })
                                         })
                                         .collect();
                                     app.status = format!("Connected ({} tools)", app.tools.len());
@@ -591,7 +606,24 @@ fn ui(f: &mut Frame, app: &mut App) {
     let items: Vec<ListItem> = app
         .tools
         .iter()
-        .map(|t| ListItem::new(Line::from(vec![Span::raw(t)])))
+        .map(|t| {
+            let mut spans = vec![Span::styled(
+                &t.name,
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )];
+
+            if !t.description.is_empty() {
+                spans.push(Span::raw(" - "));
+                spans.push(Span::styled(
+                    &t.description,
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+
+            ListItem::new(Line::from(spans))
+        })
         .collect();
 
     let tools_list = List::new(items)
@@ -626,9 +658,9 @@ fn ui(f: &mut Frame, app: &mut App) {
             let summary = if let Some(val) = &entry.parsed {
                 if let Some(method) = val.get("method").and_then(|v| v.as_str()) {
                     format!("{} {}", prefix, method)
-                } else if let Some(result) = val.get("result") {
+                } else if val.get("result").is_some() {
                     format!("{} Response", prefix)
-                } else if let Some(error) = val.get("error") {
+                } else if val.get("error").is_some() {
                     format!("{} Error", prefix)
                 } else {
                     format!("{} JSON", prefix)
@@ -712,6 +744,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         Span::styled(" Status: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(&app.status),
         Span::raw(" | "),
+        Span::styled(" Cmd: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(&app.server_cmd),
+        Span::raw(" | "),
         Span::styled("Focus: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(match app.focus {
             Focus::ToolsList => "Tools (Tab to switch)",
@@ -729,105 +764,102 @@ fn ui(f: &mut Frame, app: &mut App) {
 
 fn pretty_print_json(value: &Value) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    format_json_value(value, 0, &mut lines);
+    format_json_value(None, value, 0, &mut lines, false);
     lines
 }
 
-fn format_json_value(value: &Value, indent_level: usize, lines: &mut Vec<Line<'static>>) {
+fn format_json_value(
+    key: Option<&str>,
+    value: &Value,
+    indent_level: usize,
+    lines: &mut Vec<Line<'static>>,
+    trailing_comma: bool,
+) {
     let indent = " ".repeat(indent_level * 2);
+    let comma = if trailing_comma { "," } else { "" };
+
+    let mut spans = Vec::new();
+    spans.push(Span::raw(indent.clone()));
+
+    if let Some(k) = key {
+        spans.push(Span::styled(
+            format!("\"{}\"", k),
+            Style::default().fg(Color::Blue),
+        ));
+        spans.push(Span::raw(": "));
+    }
 
     match value {
         Value::Null => {
-            lines.push(Line::from(vec![
-                Span::raw(indent),
-                Span::styled("null", Style::default().fg(Color::DarkGray)),
-            ]));
+            spans.push(Span::styled("null", Style::default().fg(Color::DarkGray)));
+            spans.push(Span::raw(comma));
+            lines.push(Line::from(spans));
         }
         Value::Bool(b) => {
-            lines.push(Line::from(vec![
-                Span::raw(indent),
-                Span::styled(b.to_string(), Style::default().fg(Color::Yellow)),
-            ]));
+            spans.push(Span::styled(
+                b.to_string(),
+                Style::default().fg(Color::Magenta),
+            ));
+            spans.push(Span::raw(comma));
+            lines.push(Line::from(spans));
         }
         Value::Number(n) => {
-            lines.push(Line::from(vec![
-                Span::raw(indent),
-                Span::styled(n.to_string(), Style::default().fg(Color::Cyan)),
-            ]));
+            spans.push(Span::styled(
+                n.to_string(),
+                Style::default().fg(Color::Cyan),
+            ));
+            spans.push(Span::raw(comma));
+            lines.push(Line::from(spans));
         }
         Value::String(s) => {
-            lines.push(Line::from(vec![
-                Span::raw(indent),
-                Span::styled(format!("\"{}\"", s), Style::default().fg(Color::Green)),
-            ]));
+            spans.push(Span::styled(
+                format!("\"{}\"", s),
+                Style::default().fg(Color::Green),
+            ));
+            spans.push(Span::raw(comma));
+            lines.push(Line::from(spans));
         }
         Value::Array(arr) => {
             if arr.is_empty() {
-                lines.push(Line::from(vec![Span::raw(indent), Span::raw("[]")]));
+                spans.push(Span::raw("[]"));
+                spans.push(Span::raw(comma));
+                lines.push(Line::from(spans));
                 return;
             }
 
-            lines.push(Line::from(vec![Span::raw(indent.clone()), Span::raw("[")]));
+            spans.push(Span::raw("["));
+            lines.push(Line::from(spans));
 
             for (i, v) in arr.iter().enumerate() {
-                format_json_value(v, indent_level + 1, lines);
-                // Add comma if not last, but we are line-based so maybe not strictly necessary for viewing
-                // But let's try to append comma to the last line we just added
-                if i < arr.len() - 1 {
-                    if let Some(last_line) = lines.last_mut() {
-                        last_line.spans.push(Span::raw(","));
-                    }
-                }
+                format_json_value(None, v, indent_level + 1, lines, i < arr.len() - 1);
             }
 
-            lines.push(Line::from(vec![Span::raw(indent), Span::raw("]")]));
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::raw("]"),
+                Span::raw(comma),
+            ]));
         }
         Value::Object(obj) => {
             if obj.is_empty() {
-                lines.push(Line::from(vec![Span::raw(indent), Span::raw("{}")]));
+                spans.push(Span::raw("{}"));
+                spans.push(Span::raw(comma));
+                lines.push(Line::from(spans));
                 return;
             }
 
-            lines.push(Line::from(vec![Span::raw(indent.clone()), Span::raw("{")]));
+            spans.push(Span::raw("{"));
+            lines.push(Line::from(spans));
 
             for (i, (k, v)) in obj.iter().enumerate() {
-                // Key
-                let key_indent = " ".repeat((indent_level + 1) * 2);
-                let mut spans = vec![
-                    Span::raw(key_indent),
-                    Span::styled(format!("\"{}\"", k), Style::default().fg(Color::Blue)),
-                    Span::raw(": "),
-                ];
-
-                // Value - if it's primitive, put on same line. If complex, new line.
-                match v {
-                    Value::Array(_) | Value::Object(_) => {
-                        lines.push(Line::from(spans));
-                        format_json_value(v, indent_level + 1, lines);
-                    }
-                    _ => {
-                        // Create a temporary line for the value to reuse logic, but we need to merge spans
-                        let mut temp_lines = Vec::new();
-                        format_json_value(v, 0, &mut temp_lines); // 0 indent because we append
-
-                        if let Some(val_line) = temp_lines.into_iter().next() {
-                            // Skip the indent span of the value
-                            for span in val_line.spans.into_iter().skip(1) {
-                                spans.push(span);
-                            }
-                        }
-                        lines.push(Line::from(spans));
-                    }
-                }
-
-                if i < obj.len() - 1 {
-                    if let Some(last_line) = lines.last_mut() {
-                        last_line.spans.push(Span::raw(","));
-                    }
-                }
+                format_json_value(Some(k), v, indent_level + 1, lines, i < obj.len() - 1);
             }
 
-            lines.push(Line::from(vec![Span::raw(indent), Span::raw("}")]));
+            lines.push(Line::from(vec![
+                Span::raw(indent),
+                Span::raw("}"),
+                Span::raw(comma),
+            ]));
         }
     }
 }
