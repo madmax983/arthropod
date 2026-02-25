@@ -13,7 +13,6 @@ use plat_core::{
     ElementState, Event, Key, KeyboardInput, MouseButton, MouseInput, Point, WindowEvent,
 };
 use render_engine::{NodeContent, NodeId, Scene};
-use std::collections::HashMap;
 use widget_core::WidgetContext;
 
 /// Result of dispatching an event.
@@ -40,8 +39,6 @@ pub struct EventDispatcher {
     mouse_pos: (f32, f32),
     /// Whether shift key is held
     shift_held: bool,
-    /// Mapping from widget NodeIds to app Scene NodeIds
-    node_id_map: HashMap<NodeId, NodeId>,
     /// Form node (if any) for Enter submission
     form_node: Option<NodeId>,
 }
@@ -51,13 +48,11 @@ impl EventDispatcher {
     ///
     /// # Arguments
     ///
-    /// * `node_id_map` - Mapping from widget context NodeIds to app scene NodeIds
     /// * `form_node` - Optional form node for Enter key submission
-    pub fn new(node_id_map: HashMap<NodeId, NodeId>, form_node: Option<NodeId>) -> Self {
+    pub fn new(form_node: Option<NodeId>) -> Self {
         Self {
             mouse_pos: (0.0, 0.0),
             shift_held: false,
-            node_id_map,
             form_node,
         }
     }
@@ -225,15 +220,8 @@ impl EventDispatcher {
             }
         }
 
-        // Find the corresponding widget node ID
-        let Some(widget_node_id) = self
-            .node_id_map
-            .iter()
-            .find(|&(_, &app_id)| app_id == app_node_id)
-            .map(|(&widget_id, _)| widget_id)
-        else {
-            return DispatchResult::Ignored;
-        };
+        // Widget node ID == App node ID (identity mapping)
+        let widget_node_id = app_node_id;
 
         if widget_ctx.is_text_input(widget_node_id) {
             widget_ctx.focus_node(widget_node_id);
@@ -246,11 +234,6 @@ impl EventDispatcher {
         }
 
         DispatchResult::Ignored
-    }
-
-    /// Get the node ID map (widget -> app scene)
-    pub fn node_id_map(&self) -> &HashMap<NodeId, NodeId> {
-        &self.node_id_map
     }
 
     /// Get the form node (if any)
@@ -338,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_event_dispatcher_new() {
-        let dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let dispatcher = EventDispatcher::new(None);
         assert_eq!(dispatcher.mouse_pos(), (0.0, 0.0));
         assert!(!dispatcher.shift_held());
         assert!(dispatcher.form_node().is_none());
@@ -347,19 +330,8 @@ mod tests {
     #[test]
     fn test_event_dispatcher_with_form() {
         let form_node = NodeId(42);
-        let dispatcher = EventDispatcher::new(HashMap::new(), Some(form_node));
+        let dispatcher = EventDispatcher::new(Some(form_node));
         assert_eq!(dispatcher.form_node(), Some(form_node));
-    }
-
-    #[test]
-    fn test_event_dispatcher_node_id_map() {
-        let mut map = HashMap::new();
-        map.insert(NodeId(1), NodeId(100));
-        map.insert(NodeId(2), NodeId(200));
-
-        let dispatcher = EventDispatcher::new(map.clone(), None);
-        assert_eq!(dispatcher.node_id_map().len(), 2);
-        assert_eq!(dispatcher.node_id_map().get(&NodeId(1)), Some(&NodeId(100)));
     }
 
     // =========================================================================
@@ -372,7 +344,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::A, ElementState::Pressed);
@@ -388,7 +360,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Press shift
@@ -404,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_dispatch_shift_release_clears_shift_state() {
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let mut ctx = create_test_context();
         let scene = Scene::new();
 
@@ -438,7 +410,7 @@ mod tests {
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Backspace, ElementState::Pressed);
@@ -472,7 +444,7 @@ mod tests {
         ctx.send_key_left();
         ctx.send_key_left();
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Delete, ElementState::Pressed);
@@ -499,7 +471,7 @@ mod tests {
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Cursor starts at end (position 3)
@@ -535,7 +507,7 @@ mod tests {
         ctx.send_key_left();
         assert_eq!(ctx.get_cursor_position(node_id), Some(0));
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Right, ElementState::Pressed);
@@ -552,7 +524,7 @@ mod tests {
         let _node2 = create_text_input_node(&mut ctx);
         ctx.focus_node(node1);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Tab, ElementState::Pressed);
@@ -570,7 +542,7 @@ mod tests {
         let _node2 = create_text_input_node(&mut ctx);
         ctx.focus_node(node1);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Press shift first
@@ -590,7 +562,7 @@ mod tests {
         let form_node = NodeId(42);
         ctx.add_form_state(form_node, IndexMap::new(), None);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), Some(form_node));
+        let mut dispatcher = EventDispatcher::new(Some(form_node));
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Enter, ElementState::Pressed);
@@ -602,7 +574,7 @@ mod tests {
     #[test]
     fn test_dispatch_enter_without_form_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Enter, ElementState::Pressed);
@@ -614,7 +586,7 @@ mod tests {
     #[test]
     fn test_dispatch_unknown_key_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::F12, ElementState::Pressed);
@@ -626,7 +598,7 @@ mod tests {
     #[test]
     fn test_dispatch_key_released_non_shift_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::A, ElementState::Released);
@@ -642,7 +614,7 @@ mod tests {
     #[test]
     fn test_dispatch_cursor_moved_updates_position() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_cursor_moved_event(150.0, 200.0);
@@ -655,7 +627,7 @@ mod tests {
     #[test]
     fn test_dispatch_click_on_empty_scene_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Move cursor to a position
@@ -672,7 +644,7 @@ mod tests {
     #[test]
     fn test_dispatch_right_click_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = Event::Window {
@@ -692,7 +664,7 @@ mod tests {
     #[test]
     fn test_dispatch_mouse_release_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = Event::Window {
@@ -716,7 +688,7 @@ mod tests {
     #[test]
     fn test_dispatch_lifecycle_event_is_ignored() {
         let mut ctx = create_test_context();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = Event::Lifecycle(plat_core::LifecycleEvent::Resumed);
@@ -735,7 +707,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Type "hi"
@@ -753,7 +725,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Key5, ElementState::Pressed);
@@ -768,7 +740,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         // Press shift
@@ -788,7 +760,7 @@ mod tests {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let event = create_keyboard_event(Key::Space, ElementState::Pressed);

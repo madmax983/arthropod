@@ -60,10 +60,10 @@ pub struct WidgetContext {
 }
 
 impl WidgetContext {
-    /// Create a new widget context (for testing and widget building)
-    pub fn new_test() -> Self {
+    /// Create a new widget context with a given scene
+    pub fn new(scene: Scene) -> Self {
         Self {
-            scene: Scene::new(),
+            scene,
             layout_styles: HashMap::new(),
             hover_states: HashSet::new(),
             clickables: HashMap::new(),
@@ -79,6 +79,11 @@ impl WidgetContext {
             design_tokens: None,
             effects: Vec::new(),
         }
+    }
+
+    /// Create a new widget context (for testing and widget building)
+    pub fn new_test() -> Self {
+        Self::new(Scene::new())
     }
 
     /// Set design tokens for theming
@@ -595,6 +600,13 @@ impl WidgetContext {
     /// Take ownership of the scene (consumes self)
     pub fn into_scene(self) -> Scene {
         self.scene
+    }
+
+    /// Take the scene out of the context, replacing it with an empty one.
+    ///
+    /// This allows reclaiming the scene while keeping the context alive (e.g., for state access).
+    pub fn take_scene(&mut self) -> Scene {
+        std::mem::replace(&mut self.scene, Scene::new())
     }
 }
 

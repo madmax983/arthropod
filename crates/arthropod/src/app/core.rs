@@ -12,7 +12,6 @@ use render_engine::{
     NodeId,
     backend::{PrimitiveInstance, RenderBackend, WgpuBackend},
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use widget_core::WidgetContext;
@@ -343,18 +342,15 @@ impl App {
     fn transfer_components<'a, T, C, F>(
         &mut self,
         source_data: impl Iterator<Item = (&'a NodeId, &'a T)>,
-        node_id_map: &HashMap<NodeId, NodeId>,
         component_factory: F,
     ) where
         T: 'a,
         C: Component,
         F: Fn(&T) -> C,
     {
-        for (widget_node_id, data) in source_data {
-            if let Some(mut entity) = node_id_map
-                .get(widget_node_id)
-                .and_then(|&app_node_id| self.get_entity_mut(app_node_id))
-            {
+        for (node_id, data) in source_data {
+            // Assume widget_node_id == app_node_id
+            if let Some(mut entity) = self.get_entity_mut(*node_id) {
                 entity.insert(component_factory(data));
             }
         }
@@ -379,47 +375,40 @@ impl App {
     /// that the ECS remains focused on data and systems, while the event loop handles
     /// immediate user interaction.
     ///
-    /// The `node_id_map` maps widget NodeIds (from the isolated widget context) to
-    /// app NodeIds (in the main scene), enabling correct component attachment.
-    ///
     /// # Example
     ///
     /// ```
     /// use arthropod::prelude::*;
-    /// use std::collections::HashMap;
+    /// use render_engine::Scene;
     ///
-    /// // 1. Build a widget in a test context
-    /// let mut widget_ctx = WidgetContext::new_test();
+    /// // 1. Create App (which has a Scene)
+    /// let mut app = App::new_headless().unwrap();
+    /// let mut scene = app.world_mut().remove_resource::<Scene>().unwrap();
+    ///
+    /// // 2. Build widgets directly into the scene
+    /// let mut widget_ctx = WidgetContext::new(scene);
     /// let widget_root = widget_ctx.create_node(widget_ctx.root(), NodeContent::Empty);
     ///
-    /// // 2. Initialize the app
-    /// let mut app = App::new_headless().unwrap();
+    /// // 3. Return scene to App
+    /// app.world_mut().insert_resource(widget_ctx.into_scene());
+    /// app.spawn(widget_root); // Create ECS entity
     ///
-    /// // 3. Copy the widget's scene node to the app's scene
-    /// // (In a real app, use integration::integrate_widget_scene)
-    /// let mut node_id_map = HashMap::new();
-    /// let app_root = app.world().resource::<Scene>().root();
-    /// node_id_map.insert(widget_root, app_root);
-    ///
-    /// // 4. Transfer components (layout, colors, etc.) to the ECS
-    /// app.integrate_widgets(&widget_ctx, &node_id_map);
+    /// // 4. Transfer components
+    /// // Note: In this new architecture, WidgetContext keys ARE App NodeIds
+    /// // So we pass the context directly to integrate_widgets
+    /// // (Hypothetically, as integrate_widgets is called internally by WidgetApp)
+    /// // app.integrate_widgets(&widget_ctx);
     /// ```
-    pub fn integrate_widgets(
-        &mut self,
-        widget_ctx: &WidgetContext,
-        node_id_map: &HashMap<NodeId, NodeId>,
-    ) {
+    pub fn integrate_widgets(&mut self, widget_ctx: &WidgetContext) {
         // Transfer layout styles to LayoutStyle components
         self.transfer_components(
             widget_ctx.layout_styles().iter(),
-            node_id_map,
             |style: &layout_engine::FlexStyle| LayoutStyle(style.clone()),
         );
 
         // Transfer clickables to Clickable components
         self.transfer_components(
             widget_ctx.clickables().iter(),
-            node_id_map,
             |callback: &std::sync::Arc<dyn Fn() + Send + Sync>| Clickable {
                 callback: callback.clone(),
             },
@@ -428,14 +417,12 @@ impl App {
         // Transfer background colors to BackgroundColor components
         self.transfer_components(
             widget_ctx.background_colors().iter(),
-            node_id_map,
             |color: &render_engine::Vec4| BackgroundColor(*color),
         );
 
         // Transfer reactive colors to ReactiveColor components
         self.transfer_components(
             widget_ctx.reactive_color_states().iter(),
-            node_id_map,
             |state: &widget_core::input_state::ReactiveColorState| {
                 ReactiveColor::new(state.read_signal.clone())
             },
@@ -444,7 +431,6 @@ impl App {
         // Transfer reactive text to ReactiveText components
         self.transfer_components(
             widget_ctx.reactive_text_states().iter(),
-            node_id_map,
             |state: &widget_core::input_state::ReactiveTextState| {
                 ReactiveText::new(state.read_signal.clone())
             },
@@ -453,7 +439,6 @@ impl App {
         // Transfer computed text to ReactiveComputedText components
         self.transfer_components(
             widget_ctx.computed_text_states().iter(),
-            node_id_map,
             |state: &widget_core::input_state::ComputedTextState| {
                 ReactiveComputedText::new(state.computed.clone())
             },

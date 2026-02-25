@@ -13,7 +13,6 @@ use render_engine::{
     backend::{RenderBackend, WgpuBackend},
 };
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::sync::Arc;
 use widget_core::{Widget, WidgetContext};
 
@@ -122,7 +121,6 @@ struct WidgetApp {
     app: App,
     widget_ctx: WidgetContext,
     dispatcher: EventDispatcher,
-    node_id_map: HashMap<NodeId, NodeId>,
     viewport: (u32, u32),
 }
 
@@ -159,19 +157,29 @@ impl Application for WidgetApp {
         // Create app context for builder
         let mut app_ctx = AppContext { runtime };
 
+        // Take scene from app to build widgets directly into it
+        let scene = app
+            .world_mut()
+            .remove_resource::<Scene>()
+            .expect("Scene resource missing");
+
         // Build widget tree
         let widget = (config.builder)(&mut app_ctx);
-        let mut widget_ctx = WidgetContext::new_test();
+        let mut widget_ctx = WidgetContext::new(scene);
         let widget_root = widget.build_boxed(&mut widget_ctx);
 
         // Detect form node (for Enter submission)
         let form_node = widget_ctx.form_states().keys().next().copied();
 
-        // Integrate widget scene into app scene
-        let (_app_root, node_id_map) = integrate_widget_scene(&mut app, &widget_ctx, widget_root);
+        // Return scene to app
+        let scene = widget_ctx.take_scene();
+        app.world_mut().insert_resource(scene);
+
+        // Integrate widget scene into app ECS (spawn entities)
+        integrate_widget_scene(&mut app, widget_root);
 
         // Integrate widget components (LayoutStyle, Clickable, etc.) into ECS
-        app.integrate_widgets(&widget_ctx, &node_id_map);
+        app.integrate_widgets(&widget_ctx);
 
         // Set initial layout constraints
         app.world_mut()
@@ -183,7 +191,7 @@ impl Application for WidgetApp {
             }));
 
         // Create event dispatcher
-        let dispatcher = EventDispatcher::new(node_id_map.clone(), form_node);
+        let dispatcher = EventDispatcher::new(form_node);
 
         println!("=== Widget App Started ===");
         println!("Interactions:");
@@ -196,7 +204,6 @@ impl Application for WidgetApp {
             app,
             widget_ctx,
             dispatcher,
-            node_id_map,
             viewport: (config.width, config.height),
         }
     }
@@ -319,12 +326,12 @@ impl WidgetApp {
         const TEXT_COLOR: Color = Color::rgba(0.2, 0.2, 0.2, 1.0);
         const PLACEHOLDER_COLOR: Color = Color::rgba(0.5, 0.5, 0.5, 1.0);
 
-        for (&widget_node, &app_node) in &self.node_id_map {
-            if !self.widget_ctx.is_text_input(widget_node) {
-                continue;
-            }
+        // Iterate over text input states directly
+        for &node_id in self.widget_ctx.text_input_states().keys() {
+            // Since we share the scene, widget_node_id == app_node_id
+            let app_node = node_id;
 
-            let Some(value) = self.widget_ctx.get_text_input_value(widget_node) else {
+            let Some(value) = self.widget_ctx.get_text_input_value(node_id) else {
                 continue;
             };
 
@@ -364,10 +371,8 @@ impl WidgetApp {
         let mut scene = self.app.world_mut().resource_mut::<Scene>();
 
         // Reset all text input colors to white
-        for (&widget_node, &app_node) in &self.node_id_map {
-            if !self.widget_ctx.is_text_input(widget_node) {
-                continue;
-            }
+        for &node_id in self.widget_ctx.text_input_states().keys() {
+            let app_node = node_id;
 
             if let Some(node) = scene.get_node_mut(app_node) {
                 if let NodeContent::Styled { ref mut style } = node.content {
@@ -383,9 +388,8 @@ impl WidgetApp {
             return;
         };
 
-        let Some(&app_node) = self.node_id_map.get(&focused_widget) else {
-            return;
-        };
+        // widget node id == app node id
+        let app_node = focused_widget;
 
         if let Some(node) = scene.get_node_mut(app_node) {
             if let NodeContent::Styled { ref mut style } = node.content {
