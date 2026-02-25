@@ -11,8 +11,8 @@ use crate::backend::wgpu::pipelines::path_pipeline::{
 use crate::backend::wgpu::pipelines::primitive_builder::{
     create_primitive_instances, create_primitive_instances_with_pipeline,
 };
-use crate::backend::wgpu::pipelines::primitive_instance::{FLAG_FILL_TYPE_MASK, PrimitiveInstance};
 use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
+use crate::primitives::{FLAG_FILL_TYPE_MASK, PrimitiveInstance};
 use crate::{NodeContent, Scene, SceneNode};
 use std::sync::Arc;
 

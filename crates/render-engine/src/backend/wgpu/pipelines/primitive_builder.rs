@@ -2,11 +2,11 @@ use glam::Vec2;
 use style_engine::{BlendMode, ColorStop, CornerRadii, Paint, VisualStyle};
 
 use super::gradient_atlas::{GradientAtlas, GradientParams};
-use super::primitive_instance::{
+use super::primitive_pipeline::PrimitivePipeline;
+use crate::primitives::{
     FLAG_HAS_STROKE, FLAG_IS_SHADOW, PrimitiveInstance, with_blend_mode, with_fill_type,
     with_stroke_cap_join,
 };
-use super::primitive_pipeline::PrimitivePipeline;
 
 /// Convert a VisualStyle into one or more PrimitiveInstances.
 ///

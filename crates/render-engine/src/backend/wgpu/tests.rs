@@ -3,7 +3,7 @@ use crate::backend::wgpu::effects;
 use crate::backend::wgpu::instance_collector;
 use crate::backend::wgpu::instance_collector::{TextFill, apply_text_fill_to_glyph};
 use crate::backend::wgpu::multipass_executor;
-use crate::backend::wgpu::pipelines::primitive_instance::FLAG_FILL_TYPE_MASK;
+use crate::primitives::FLAG_FILL_TYPE_MASK;
 use crate::{NodeContent, SceneNode, Transform2D};
 
 #[test]

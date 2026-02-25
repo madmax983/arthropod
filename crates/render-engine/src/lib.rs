@@ -43,6 +43,7 @@
 
 pub mod backend;
 pub mod node;
+pub mod primitives;
 mod scene;
 
 #[cfg(test)]

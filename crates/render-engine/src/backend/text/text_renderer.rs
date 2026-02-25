@@ -1,7 +1,7 @@
 //! Text renderer for generating GPU instances from shaped text
 
 use super::glyph_atlas::GlyphAtlas;
-use crate::backend::wgpu::PrimitiveInstance;
+use crate::primitives::PrimitiveInstance;
 use text_engine::{ShapedText, TextEngine};
 
 /// Text renderer manages glyph atlas and instance generation

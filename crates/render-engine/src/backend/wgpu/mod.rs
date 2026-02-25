@@ -17,6 +17,7 @@ use bevy_ecs::prelude::*;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use tracing::{Level, instrument, span};
 
+pub use crate::primitives::PrimitiveInstance;
 use context::WgpuContext;
 #[cfg(not(target_arch = "wasm32"))]
 use effects::RenderTargetKey;
@@ -25,7 +26,6 @@ use pipelines::blend_pipeline::BlendPipeline;
 use pipelines::blur_pipeline::BlurPipeline;
 pub use pipelines::path_pipeline::TessellationCacheStats;
 use pipelines::path_pipeline::{PathPipeline, TessellationCache};
-pub use pipelines::primitive_instance::PrimitiveInstance;
 use pipelines::primitive_pipeline::PrimitivePipeline;
 use pipelines::stencil_pipeline::ClipStack;
 

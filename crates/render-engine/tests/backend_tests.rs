@@ -1,7 +1,7 @@
 //! Tests for the wgpu rendering backend.
 
 use plat_core::{Rect, Size};
-use render_engine::backend::wgpu::PrimitiveInstance;
+use render_engine::backend::PrimitiveInstance;
 use render_engine::{Color, NodeContent, Scene, SceneNode, Transform2D, backend::WgpuBackend};
 
 #[test]

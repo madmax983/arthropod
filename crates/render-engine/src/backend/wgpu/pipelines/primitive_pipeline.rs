@@ -4,7 +4,7 @@ use style_engine::ColorStop;
 use wgpu::util::DeviceExt;
 
 use super::gradient_atlas::{GradientAtlas, GradientParams};
-use super::primitive_instance::PrimitiveInstance;
+use crate::primitives::PrimitiveInstance;
 
 /// Unified primitive rendering pipeline
 pub struct PrimitivePipeline {
