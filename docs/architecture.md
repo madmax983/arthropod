@@ -216,10 +216,25 @@ classDiagram
             +XRayConfig
             +XRayState
         }
+        class Noise {
+            +NoiseSignal
+            +perlin_2d()
+        }
+        class SignalGraph {
+            +SignalGraph
+            +SignalHistory
+        }
+        class GhostReplay {
+            +GhostRecorder
+            +GhostReplayer
+        }
     }
 
     App ..> Experimental : "nova" feature enables
     FluxRadar ..> Runtime : Inspects Graph
     StoryRuntime ..> App : Modifies World
     Particles ..> App : Adds Systems
+    Noise ..> Runtime : Creates Signals
+    SignalGraph ..> Runtime : Consumes Signals
+    GhostReplay ..> App : Intercepts Events
 ```
