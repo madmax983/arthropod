@@ -41,6 +41,7 @@ C4Container
     Container(theme, "Theme Engine", "Rust Crate", "Design tokens and system theme integration.")
     Container(anim, "Anim Graph", "Rust Crate", "Animation primitives (Springs, Tweens).")
     Container(a11y, "A11y Engine", "Rust Crate", "Accessibility tree and platform adapter.")
+    Container(input, "Input Engine", "Rust Crate", "Input and gesture recognition (Spec 005).")
     Container(macros, "Widget Macros", "Rust Crate", "Procedural macros for declarative widget definition.")
     Container(mcp, "Arthropod MCP", "Rust Crate", "Model Context Protocol server for live debugging.")
     Container(test, "Arthropod Test", "Rust Crate", "Test harness and debugging tools.")
@@ -50,9 +51,13 @@ C4Container
     Rel(app, render, "Controls", "Initiates render")
     Rel(app, anim, "Integrates", "Runs animation tick")
     Rel(app, a11y, "Syncs", "Updates accessibility tree")
+    Rel(app, input, "Integrates", "Propagates events")
     Rel(app, mcp, "Connects to", "TCP (Live Debugging)")
 
     Rel(test, app, "Wraps", "Headless testing")
+
+    Rel(input, flux, "Uses", "Reactive state")
+    Rel(input, plat, "Uses", "Raw events")
 
     Rel(widget, flux, "Uses", "Reactive state")
     Rel(widget, layout, "Uses", "Defines constraints")
