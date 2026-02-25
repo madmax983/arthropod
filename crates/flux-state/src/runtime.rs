@@ -287,7 +287,11 @@ impl RuntimeInner {
         true
     }
 
-    fn detect_deadlock(&self, target_node: NodeId, current_thread: std::thread::ThreadId) {
+    fn detect_deadlock(
+        &self,
+        target_node: NodeId,
+        current_thread: std::thread::ThreadId,
+    ) -> Result<(), String> {
         let mut current_target = target_node;
 
         // Trace the dependency chain: Me -> Node -> Owner -> WaitingFor -> Node...
@@ -297,8 +301,9 @@ impl RuntimeInner {
                 if *owner_thread == current_thread {
                     // Cycle detected!
                     // We are waiting for a node that is ultimately held by us (or a chain leading to us).
-                    panic!(
+                    return Err(
                         "Deadlock detected: Cyclic dependency in computed values across threads."
+                            .to_string(),
                     );
                 }
 
@@ -311,6 +316,7 @@ impl RuntimeInner {
             // Chain ends (owner is running but not waiting)
             break;
         }
+        Ok(())
     }
 }
 
@@ -513,7 +519,11 @@ impl Runtime {
         while inner.computing.contains_key(&id) {
             // Deadlock detection
             let current_thread = std::thread::current().id();
-            inner.detect_deadlock(id, current_thread);
+            if let Err(e) = inner.detect_deadlock(id, current_thread) {
+                // Unlock mutex before panicking to avoid poisoning other threads
+                drop(inner);
+                panic!("{}", e);
+            }
 
             // Register that we are waiting
             inner.waiting_for.insert(current_thread, id);
