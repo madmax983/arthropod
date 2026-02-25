@@ -16,7 +16,7 @@
 //! will NOT run. This "pull-based" reactivity saves resources.
 
 use crate::runtime::{NodeId, Runtime};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 /// A derived/computed value that automatically tracks dependencies.
 ///
@@ -96,7 +96,7 @@ pub struct Computed<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Computed<T> {
+impl<T: std::fmt::Debug + 'static + Send + Sync> std::fmt::Debug for Computed<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Track the dependency so that effects re-run when the computed value changes.
         self.runtime.track(self.id);
@@ -109,8 +109,8 @@ impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Computed<T> {
 
         let handle = self.runtime.get_computed_handle(self.id);
 
-        let guard = match handle.downcast_ref::<Mutex<T>>() {
-            Some(m) => m.try_lock(),
+        let guard = match handle.downcast_ref::<RwLock<T>>() {
+            Some(m) => m.try_read(),
             None => {
                 return write!(f, "Computed(id: {:?}, value: <type mismatch>)", self.id);
             }
@@ -123,7 +123,7 @@ impl<T: std::fmt::Debug + 'static + Send> std::fmt::Debug for Computed<T> {
     }
 }
 
-impl<T: 'static + Send> Computed<T> {
+impl<T: 'static + Send + Sync> Computed<T> {
     /// Create a new computed value.
     ///
     /// The `compute` closure will be called *immediately* to calculate the initial value,
@@ -155,7 +155,7 @@ impl<T: 'static + Send> Computed<T> {
         F: Fn() -> T + 'static + Send + Sync,
     {
         let id = runtime.create_computed(Arc::new(move || {
-            Arc::new(Mutex::new(compute())) as Arc<dyn std::any::Any + Send + Sync>
+            Arc::new(RwLock::new(compute())) as Arc<dyn std::any::Any + Send + Sync>
         }));
 
         // Initialize the value by computing it once
@@ -192,7 +192,7 @@ impl<T: 'static + Send> Computed<T> {
     ///
     /// # Panics
     ///
-    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T` (should not happen in safe code).
     /// - Panics if re-computation fails (e.g., dependency panic).
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
@@ -205,9 +205,9 @@ impl<T: 'static + Send> Computed<T> {
 
         let handle = self.runtime.get_computed_handle(self.id);
         let guard = handle
-            .downcast_ref::<Mutex<T>>()
+            .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
-            .lock()
+            .read()
             .unwrap();
         f(&*guard)
     }
@@ -233,7 +233,7 @@ impl<T: 'static + Send> Computed<T> {
     ///
     /// # Panics
     ///
-    /// - Panics if the internal mutex is poisoned.
+    /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         // Check if value is stale and recompute if needed
@@ -243,9 +243,9 @@ impl<T: 'static + Send> Computed<T> {
 
         let handle = self.runtime.get_computed_handle(self.id);
         let guard = handle
-            .downcast_ref::<Mutex<T>>()
+            .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
-            .lock()
+            .read()
             .unwrap();
         f(&*guard)
     }
@@ -258,7 +258,7 @@ impl<T: 'static + Send> Computed<T> {
     }
 }
 
-impl<T: Clone + 'static + Send> Computed<T> {
+impl<T: Clone + 'static + Send + Sync> Computed<T> {
     /// Get the current value.
     ///
     /// This method:

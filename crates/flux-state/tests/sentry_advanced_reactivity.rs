@@ -139,30 +139,43 @@ fn test_dynamic_dependency_pruning() {
 #[test]
 fn test_signal_poisoning() {
     let runtime = Runtime::new();
-    let signal = Signal::new(runtime.clone(), "safe");
-    let (read, _write) = signal.split();
+    let signal = Signal::new(runtime.clone(), "safe".to_string());
+    let (read, write) = signal.split();
 
-    // 1. Panic inside `with`
+    // 1. Panic inside `read` (with RwLock, this does NOT poison)
     let read_clone = read.clone();
     let _ = panic::catch_unwind(panic::AssertUnwindSafe(move || {
         read_clone.with(|_val| {
-            panic!("Poison pill");
+            panic!("Read panic");
         });
     }));
 
-    // 2. Try to access signal again.
-    // It should be poisoned.
+    // Should still be accessible
+    let read_check_1 = read.clone();
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(move || {
+        read_check_1.get();
+    }));
+    assert!(
+        result.is_ok(),
+        "Signal should NOT be poisoned after read panic"
+    );
+
+    // 2. Panic inside `write` (with RwLock, this DOES poison)
+    let write_clone = write.clone();
+    let _ = panic::catch_unwind(panic::AssertUnwindSafe(move || {
+        write_clone.update(|_val| {
+            panic!("Write panic");
+        });
+    }));
+
+    // Should be poisoned now
     let result = panic::catch_unwind(panic::AssertUnwindSafe(move || {
         read.get();
     }));
-
     assert!(
         result.is_err(),
-        "Signal should be poisoned after panic inside lock"
+        "Signal SHOULD be poisoned after write panic"
     );
-
-    // Check error message if possible? (Standard library PoisonError doesn't always have simple string)
-    // But verify it panicked is enough.
 }
 
 /// 🛡️ Sentry: Verify Recursion Limit on Computed Side-Effects.
