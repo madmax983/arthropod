@@ -65,6 +65,16 @@ async fn test_connection_flood_protection() {
         );
     }
 
+    // Elenchus: Verify availability (Happy Path).
+    // If count is 0, the server might be down or rejecting everyone, which passes the above check
+    // but fails the "functional server" requirement.
+    if count < 90 {
+        panic!(
+            "Server only accepted {} connections! Availability issue or test flake. Expected ~100.",
+            count
+        );
+    }
+
     // Cleanup
     for handle in handles {
         handle.abort();

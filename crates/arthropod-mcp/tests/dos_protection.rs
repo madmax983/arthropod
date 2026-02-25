@@ -68,3 +68,62 @@ fn test_unbounded_read_protection() {
         }
     }
 }
+
+#[test]
+fn test_large_legitimate_message() {
+    // Elenchus: Verify Happy Path (Availability).
+    // Ensure that a large message (e.g., 10MB) that is WITHIN the limit is accepted.
+    // This prevents regression where the limit is set too low (e.g., 1KB).
+
+    // 1. Start server
+    let (_app, port) = start_tcp_server_with_port(0);
+
+    // 2. Connect
+    let mut stream =
+        TcpStream::connect(format!("127.0.0.1:{}", port)).expect("Failed to connect to server");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("Failed to set timeout");
+
+    // 3. Send 10MB message (well within 64MB limit)
+    let size = 10 * 1024 * 1024;
+    // Construct a valid JSON string to be nice, though garbage would also keep connection open (just parse error)
+    // We send a partial string then fill with 'A's then close it.
+    let mut huge_string = String::with_capacity(size + 100);
+    huge_string.push_str("{\"jsonrpc\": \"2.0\", \"method\": \"ping\", \"params\": \"");
+
+    // Fill with 'A's
+    // We can't allocate 10MB 'A' string directly?
+    // String::push_str handles it.
+    // We'll do it in chunks to avoid allocating another 10MB buffer if possible, but huge_string already allocs.
+    // Just append repeatedly.
+    let chunk = "A".repeat(1024);
+    for _ in 0..(size / 1024) {
+        huge_string.push_str(&chunk);
+    }
+    huge_string.push_str("\"}\n");
+
+    // Write it
+    stream
+        .write_all(huge_string.as_bytes())
+        .expect("Failed to write legitimate message");
+
+    // 4. Assert connection is still open
+    // Attempt to read. If connection is open, we should get TimedOut (server waiting for next command).
+    // If closed, we get EOF (Ok(0)).
+    let mut buf = [0; 1];
+    match stream.read(&mut buf) {
+        Ok(0) => panic!("Connection closed by server! 10MB message was rejected (Limit too low?)."),
+        Err(e)
+            if e.kind() == std::io::ErrorKind::WouldBlock
+                || e.kind() == std::io::ErrorKind::TimedOut =>
+        {
+            // Success! Connection is open.
+            println!("Connection remains open for legitimate large message.");
+        }
+        Ok(_) => {
+            // Data received? Also implies open.
+        }
+        Err(e) => panic!("Unexpected error: {}", e),
+    }
+}

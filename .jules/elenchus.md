@@ -74,3 +74,19 @@
 
 *   Created `crates/widget-core/tests/text_input_logic_test.rs` to isolate `TextInputState` logic testing from the widget/rendering layer.
 *   Verified that `TextInputState` robustly handles external signal mutations (lazy cursor clamping).
+
+## 2026-03-01 - [Audit of arthropod-mcp Security Tests]
+**Module:** `crates/arthropod-mcp/tests`
+**Verdict:** 🔴 Critical
+
+### Findings
+
+| Test File | Verdict | Reasoning |
+| :--- | :--- | :--- |
+| `havoc_connection_flood.rs` | 🔴 Critical | Passes even if `MAX_CONNECTIONS = 0`. Asserts upper bound but fails to assert availability (that valid connections are accepted). |
+| `dos_protection.rs` | 🟡 Suspect | Passes even if `MAX_MESSAGE_SIZE = 1KB`. Asserts rejection of oversized messages but fails to assert acceptance of large-but-valid messages. |
+
+### Recommendations
+
+1.  **Strengthen `havoc_connection_flood.rs`**: Assert `active_connections > 90` to ensure availability.
+2.  **Strengthen `dos_protection.rs`**: Include a "Happy Path" test case that sends a 10MB message and asserts success.
