@@ -15,7 +15,7 @@
 
 use crate::SceneNode;
 use bevy_ecs::prelude::*;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 
@@ -41,6 +41,7 @@ pub struct Scene {
     root: NodeId,
     next_id: u64,
     dirty_nodes: Vec<NodeId>,
+    dirty_set: HashSet<NodeId>,
 }
 
 impl Default for Scene {
@@ -60,6 +61,7 @@ impl Scene {
             root: root_id,
             next_id: 1,
             dirty_nodes: Vec::new(),
+            dirty_set: HashSet::new(),
         }
     }
 
@@ -90,20 +92,20 @@ impl Scene {
     /// );
     /// ```
     pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
-        if !self.nodes.contains_key(&parent) {
-            panic!("Parent node {:?} does not exist. Cannot add child.", parent);
-        }
-
         let id = NodeId(self.next_id);
         self.next_id += 1;
 
-        // Set the parent field for O(1) lookup
-        node.parent = Some(parent);
-
-        self.nodes.insert(id, node);
+        // Optimized: Check parent existence and insert child ID first (1 lookup)
+        // We do this in a scope to drop the mutable borrow of self.nodes before inserting the new node
         if let Some(parent_node) = self.nodes.get_mut(&parent) {
             parent_node.children.push(id);
+        } else {
+            panic!("Parent node {:?} does not exist. Cannot add child.", parent);
         }
+
+        // Set the parent field for O(1) lookup
+        node.parent = Some(parent);
+        self.nodes.insert(id, node); // 2nd lookup
 
         self.mark_dirty(id);
         id
@@ -209,7 +211,7 @@ impl Scene {
 
     /// Mark a node as needing redraw.
     pub fn mark_dirty(&mut self, id: NodeId) {
-        if !self.dirty_nodes.contains(&id) {
+        if self.dirty_set.insert(id) {
             self.dirty_nodes.push(id);
         }
     }
@@ -261,6 +263,7 @@ impl Scene {
 
     /// Get dirty nodes and clear the list.
     pub fn take_dirty(&mut self) -> Vec<NodeId> {
+        self.dirty_set.clear();
         std::mem::take(&mut self.dirty_nodes)
     }
 

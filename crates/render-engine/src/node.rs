@@ -68,6 +68,14 @@ impl SceneNode {
             opacity: 1.0,
         }
     }
+
+    /// Create a new solid color node (optimization).
+    ///
+    /// This avoids allocating a `Box<VisualStyle>` on the heap, which is faster
+    /// and uses less memory than `NodeContent::Styled`.
+    pub fn solid(color: Color) -> Self {
+        Self::new(NodeContent::SolidColor { color })
+    }
 }
 
 /// The visual content a node can have.
