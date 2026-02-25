@@ -22,6 +22,9 @@ pub mod signal_graph;
 #[cfg(feature = "nova")]
 pub mod noise;
 
+#[cfg(feature = "nova")]
+pub mod reactive_particles;
+
 pub mod flux_radar;
 
 // --- Stubs for missing features ---
@@ -199,6 +202,50 @@ pub mod particles {
     pub fn register_particles(_app: &mut crate::App) {
         eprintln!(
             "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod reactive_particles {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::Component;
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `reactive_particles` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(Component, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct ReactiveParticleEmitter {
+        pub rate: Option<()>,
+        pub color: Option<()>,
+        pub size: Option<()>,
+        pub spread: Option<()>,
+        pub active: Option<()>,
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn sync_reactive_emitters(
+        _emitters: bevy_ecs::prelude::Query<(
+            &mut super::particles::ParticleEmitter,
+            &ReactiveParticleEmitter,
+        )>,
+    ) {
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_reactive_particles(_app: &mut crate::App) {
+        eprintln!(
+            "ERROR: 'register_reactive_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
         );
     }
 }
