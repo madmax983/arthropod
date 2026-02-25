@@ -205,6 +205,26 @@ impl ArthropodServer {
         }
     }
 
+    /// Execute a tool and return the result as a pretty-printed JSON string.
+    ///
+    /// This helper reduces boilerplate by handling context locking, parameter
+    /// serialization, execution, and result formatting.
+    fn execute_tool_core<T, P>(&self, tool: T, params: P) -> Result<String, McpError>
+    where
+        T: ArthropodTool,
+        P: Serialize,
+    {
+        let mut ctx = self.context.lock().unwrap();
+
+        let json_params = serde_json::to_value(params)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
     // ========================================================================
     // Scene Manipulation Tools
     // ========================================================================
@@ -250,16 +270,8 @@ impl ArthropodServer {
         }
 
         // Fallback to test harness
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::ListNodesTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        output.push_str(&serde_json::to_string_pretty(&result).unwrap());
+        let result = self.execute_tool_core(crate::tools::scene::ListNodesTool, params.0)?;
+        output.push_str(&result);
 
         Ok(CallToolResult::success(vec![Content::text(output)]))
     }
@@ -269,17 +281,10 @@ impl ArthropodServer {
         &self,
         params: Parameters<GetNodeParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::GetNodeTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let result = self.execute_tool_core(crate::tools::scene::GetNodeTool, params.0)?;
 
         let mut output = self.get_source_banner();
-        output.push_str(&serde_json::to_string_pretty(&result).unwrap());
+        output.push_str(&result);
 
         Ok(CallToolResult::success(vec![Content::text(output)]))
     }
@@ -289,18 +294,8 @@ impl ArthropodServer {
         &self,
         params: Parameters<QueryHierarchyParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::QueryHierarchyTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::scene::QueryHierarchyTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Find all nodes at a specific screen position")]
@@ -308,18 +303,9 @@ impl ArthropodServer {
         &self,
         params: Parameters<FindNodesAtPositionParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::FindNodesAtPositionTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result =
+            self.execute_tool_core(crate::tools::scene::FindNodesAtPositionTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Update properties of a scene node")]
@@ -327,18 +313,8 @@ impl ArthropodServer {
         &self,
         params: Parameters<UpdateNodeParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::UpdateNodeTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::scene::UpdateNodeTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Mark a node as dirty to trigger re-render")]
@@ -346,18 +322,8 @@ impl ArthropodServer {
         &self,
         params: Parameters<MarkDirtyParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::scene::MarkDirtyTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::scene::MarkDirtyTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     // ========================================================================
@@ -369,17 +335,10 @@ impl ArthropodServer {
         &self,
         params: Parameters<QueryEntitiesParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::ecs::QueryEntitiesTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let result = self.execute_tool_core(crate::tools::ecs::QueryEntitiesTool, params.0)?;
 
         let mut output = self.get_source_banner();
-        output.push_str(&serde_json::to_string_pretty(&result).unwrap());
+        output.push_str(&result);
 
         Ok(CallToolResult::success(vec![Content::text(output)]))
     }
@@ -389,18 +348,8 @@ impl ArthropodServer {
         &self,
         params: Parameters<GetEntityParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::ecs::GetEntityTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::ecs::GetEntityTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Count entities matching filter")]
@@ -408,44 +357,20 @@ impl ArthropodServer {
         &self,
         params: Parameters<CountEntitiesParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::ecs::CountEntitiesTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::ecs::CountEntitiesTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "List all archetypes (component combinations) in the ECS world")]
     async fn ecs_list_archetypes(&self) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::ecs::ListArchetypesTool;
-
-        let result = ArthropodTool::execute(&tool, Value::Null, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::ecs::ListArchetypesTool, Value::Null)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Verify that Scene nodes are properly linked to ECS entities")]
     async fn ecs_verify_linkage(&self) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::ecs::VerifyLinkageTool;
-
-        let result = ArthropodTool::execute(&tool, Value::Null, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::ecs::VerifyLinkageTool, Value::Null)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     // ========================================================================
@@ -491,44 +416,20 @@ impl ArthropodServer {
         &self,
         params: Parameters<GetSignalParams>,
     ) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::state::GetSignalTool;
-
-        let json_params = serde_json::to_value(&params.0)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::state::GetSignalTool, params.0)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Trigger update cycle to propagate reactive state changes")]
     async fn state_trigger_update(&self) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::state::TriggerUpdateTool;
-
-        let result = ArthropodTool::execute(&tool, Value::Null, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::state::TriggerUpdateTool, Value::Null)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     #[tool(description = "Trigger render and get render instances")]
     async fn state_trigger_render(&self) -> Result<CallToolResult, McpError> {
-        let mut ctx = self.context.lock().unwrap();
-        let tool = crate::tools::state::TriggerRenderTool;
-
-        let result = ArthropodTool::execute(&tool, Value::Null, &mut ctx)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        )]))
+        let result = self.execute_tool_core(crate::tools::state::TriggerRenderTool, Value::Null)?;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     // ========================================================================
