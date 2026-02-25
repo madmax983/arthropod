@@ -1,6 +1,9 @@
 fn main() {
     let mut opt = Some(1);
     let r = &mut opt;
-    // This should fail if the reviewer is correct
-    let _ = r.and_then(|x| Some(x + 1));
+    // Fix: Use take() to move out value, transform, and replace
+    *r = r.take().and_then(|x| Some(x + 1));
+
+    // Verify the change occurred
+    assert_eq!(opt, Some(2));
 }
