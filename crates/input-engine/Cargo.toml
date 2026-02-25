@@ -11,6 +11,9 @@ plat-core = { path = "../plat-core" }
 log.workspace = true
 thiserror.workspace = true
 
+[features]
+nova = []
+
 [dev-dependencies]
 flux-state = { path = "../flux-state" }
 plat-core = { path = "../plat-core" }

@@ -14,8 +14,12 @@
 
 pub mod gestures;
 pub mod input_manager;
+#[cfg(feature = "nova")]
+pub mod mouse_gestures;
 
 pub use gestures::{
     ChordMatcher, GestureSignal, InputPattern, SequenceMatcher, create_gesture_signal,
 };
 pub use input_manager::InputManager;
+#[cfg(feature = "nova")]
+pub use mouse_gestures::{MouseGesture, StrokeMatcher};
