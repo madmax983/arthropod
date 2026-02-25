@@ -47,7 +47,8 @@ Add `arthropod` to your `Cargo.toml`.
 use arthropod::prelude::*;
 
 fn main() -> Result<(), AppError> {
-    App::run("Hello Arthropod", 400, 300, |_ctx| {
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    return App::run("Hello Arthropod", 400, 300, |_ctx| {
         col!(
             [
                 txt!("Hello, World!", size: 24.0),
@@ -56,7 +57,13 @@ fn main() -> Result<(), AppError> {
             gap: 20.0,
             padding: 20.0
         )
-    })
+    });
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        println!("App::run requires Windows or macOS. Use App::new_headless() on Linux.");
+        Ok(())
+    }
 }
 ```
 
@@ -80,6 +87,8 @@ To access these features, you must enable the `nova` feature flag:
 [dependencies]
 arthropod = { version = "0.1", features = ["nova"] }
 ```
+
+**📚 Read the full documentation: [Nova Story Engine Guide](docs/experimental/nova-story.md)**
 
 You can run the story demo to see it in action:
 
