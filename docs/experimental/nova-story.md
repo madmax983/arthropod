@@ -22,7 +22,7 @@ Here is a minimal example of how to define a story and run it.
 use arthropod::prelude::*;
 use arthropod::experimental::story::{
     NarrativeGenerator, StoryRuntime, register_story,
-    model::{Story, Passage}
+    Story, Passage
 };
 
 fn main() -> Result<(), AppError> {

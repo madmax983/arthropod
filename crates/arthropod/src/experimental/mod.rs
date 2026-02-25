@@ -76,6 +76,17 @@ pub mod story {
     pub struct StoryRuntime;
 
     impl StoryRuntime {
+        /// Stub for `new` method
+        #[allow(clippy::new_ret_no_self)]
+        pub fn new(_story: Story) -> Self {
+            panic!("StoryRuntime requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
+        /// Stub for `current_text` method
+        pub fn current_text(&self) -> String {
+            panic!("StoryRuntime requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
         /// Stub for `choose` method
         #[allow(clippy::result_unit_err)]
         pub fn choose(&mut self, _index: usize) -> Result<(), String> {
@@ -107,6 +118,48 @@ pub mod story {
         >,
         _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
     ) {
+    }
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// You are trying to use `Story`, but the `nova` feature is not enabled.
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct Story;
+
+    impl Story {
+        /// Stub for `new` method
+        #[allow(clippy::new_ret_no_self)]
+        pub fn new(_start_node: impl Into<String>) -> Self {
+            panic!("Story requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
+        /// Stub for `add_passage` method
+        pub fn add_passage(&mut self, _passage: Passage) {
+            // No-op
+        }
+    }
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// You are trying to use `Passage`, but the `nova` feature is not enabled.
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct Passage;
+
+    impl Passage {
+        /// Stub for `new` method
+        #[allow(clippy::new_ret_no_self)]
+        pub fn new(_id: impl Into<String>, _text: impl Into<String>) -> Self {
+            panic!("Passage requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
+        /// Stub for `add_choice` method
+        pub fn add_choice(self, _text: impl Into<String>, _target: impl Into<String>) -> Self {
+            self
+        }
     }
 }
 
