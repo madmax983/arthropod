@@ -69,3 +69,7 @@
 ## 2026-02-22 - [MCP Server Unbounded Read DoS]
 **Threat:** The MCP server used `BufReader::read_line` to read incoming JSON messages. A malicious client could send an endless stream of bytes without a newline, causing the server to buffer indefinitely until Out-Of-Memory (DoS).
 **Defense:** Implemented `read_line_bounded` helper that enforces a strict `MAX_MESSAGE_SIZE` (64MB) limit. The server now validates message length and UTF-8 validity incrementally, closing the connection if the limit is exceeded. Added regression test `tests/dos_protection.rs`.
+
+## 2026-03-01 - [MCP Query Hierarchy DoS]
+**Threat:** `scene.query_hierarchy` allowed potentially infinite recursion and unbounded memory allocation via `max_depth` up to 100 on large DAGs/trees. A "Billion Laughs" style attack could exhaust server memory.
+**Defense:** Reduced `MAX_QUERY_DEPTH` to 32. Implemented `MAX_RESPONSE_NODES` limit (5000). Added cycle detection using `HashSet` to prevent infinite loops in DAGs.

@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow};
 use render_engine::{NodeContent, NodeId};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::HashSet;
 
 // ============================================================================
 // scene.list_nodes
@@ -298,7 +299,8 @@ fn default_max_depth() -> usize {
     10
 }
 
-const MAX_QUERY_DEPTH: usize = 100;
+const MAX_QUERY_DEPTH: usize = 32;
+const MAX_RESPONSE_NODES: usize = 5000;
 
 #[derive(Debug, Serialize)]
 struct HierarchyNode {
@@ -341,15 +343,30 @@ impl Tool for QueryHierarchyTool {
         let scene = ctx.scene();
         let root_id = params.root_id.map(NodeId).unwrap_or_else(|| scene.root());
 
+        let mut node_count = 0;
+        let mut visited = HashSet::new();
+
         fn build_hierarchy(
             scene: &render_engine::Scene,
             node_id: NodeId,
             depth: usize,
             max_depth: usize,
+            node_count: &mut usize,
+            visited: &mut HashSet<NodeId>,
         ) -> Option<HierarchyNode> {
             if depth >= max_depth {
                 return None;
             }
+
+            if *node_count >= MAX_RESPONSE_NODES {
+                return None;
+            }
+
+            if !visited.insert(node_id) {
+                return None;
+            }
+
+            *node_count += 1;
 
             let node = scene.get_node(node_id)?;
 
@@ -372,7 +389,9 @@ impl Tool for QueryHierarchyTool {
             let children: Vec<HierarchyNode> = node
                 .children
                 .iter()
-                .filter_map(|child_id| build_hierarchy(scene, *child_id, depth + 1, max_depth))
+                .filter_map(|child_id| {
+                    build_hierarchy(scene, *child_id, depth + 1, max_depth, node_count, visited)
+                })
                 .collect();
 
             Some(HierarchyNode {
@@ -383,8 +402,15 @@ impl Tool for QueryHierarchyTool {
             })
         }
 
-        let hierarchy = build_hierarchy(scene, root_id, 0, params.max_depth)
-            .ok_or_else(|| anyhow!("Failed to build hierarchy"))?;
+        let hierarchy = build_hierarchy(
+            scene,
+            root_id,
+            0,
+            params.max_depth,
+            &mut node_count,
+            &mut visited,
+        )
+        .ok_or_else(|| anyhow!("Failed to build hierarchy"))?;
 
         Ok(serde_json::to_value(hierarchy)?)
     }
