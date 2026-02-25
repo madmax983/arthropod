@@ -33,6 +33,7 @@ use render_engine::{Color, NodeContent, NodeId};
 /// // Reactive text via macro using the `@` syntax.
 /// // This special syntax tells the macro to treat the argument as a
 /// // `ReadSignal<String>` instead of a static string literal.
+/// // The identifier after `@` must match the variable name of the signal.
 /// let m3 = txt!(@read, size: 20.0);
 /// ```
 #[derive(Widget)]

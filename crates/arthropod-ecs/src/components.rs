@@ -94,7 +94,8 @@ impl ReactiveTransform {
 /// # use arthropod_ecs::ReactiveOpacity;
 /// # use flux_state::{Runtime, Signal};
 /// # let runtime = Runtime::new();
-/// let opacity = Signal::new(runtime, 1.0);
+/// // Note: ReactiveOpacity requires an f32 signal
+/// let opacity = Signal::new(runtime, 1.0f32);
 /// let (read, _) = opacity.split();
 ///
 /// let reactive = ReactiveOpacity::new(read);

@@ -28,9 +28,9 @@
 //! let root = scene.root();
 //!
 //! // Create a styled node (Red Rectangle)
-//! let style = VisualStyle::new().solid_fill(Color::RED.as_vec4());
-//! let mut node = SceneNode::new(NodeContent::Styled {
-//!     style: Box::new(style),
+//! // We use the optimized SolidColor variant to avoid heap allocation
+//! let mut node = SceneNode::new(NodeContent::SolidColor {
+//!     color: Color::RED,
 //! });
 //!
 //! // Set transform and bounds

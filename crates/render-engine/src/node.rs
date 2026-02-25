@@ -120,7 +120,13 @@ pub enum NodeContent {
     },
     /// Optimization for solid color rectangles (e.g. backgrounds).
     ///
-    /// Avoids heap allocation of `Box<VisualStyle>` for the most common case.
+    /// # Performance
+    ///
+    /// This variant avoids heap allocation of `Box<VisualStyle>` (~300 bytes),
+    /// making it significantly faster to create and lighter in memory.
+    /// Prefer this over `NodeContent::Styled` whenever you only need a
+    /// simple solid color fill.
+    ///
     /// This variant is equivalent to a `Styled` node with a single solid fill,
     /// no stroke, no effects, and zero corner radii.
     SolidColor {

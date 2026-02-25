@@ -88,7 +88,7 @@ impl Scene {
     ///
     /// let child = scene.add_node(
     ///     root,
-    ///     SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) })
+    ///     SceneNode::new(NodeContent::SolidColor { color: Color::RED })
     /// );
     /// ```
     pub fn add_node(&mut self, parent: NodeId, mut node: SceneNode) -> NodeId {
@@ -334,12 +334,12 @@ impl Scene {
     /// let root = scene.root();
     ///
     /// // Bottom node (added first)
-    /// let mut node1 = SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::RED.as_vec4())) });
+    /// let mut node1 = SceneNode::new(NodeContent::SolidColor { color: Color::RED });
     /// node1.bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
     /// let id1 = scene.add_node(root, node1);
     ///
     /// // Top node (added second)
-    /// let mut node2 = SceneNode::new(NodeContent::Styled { style: Box::new(VisualStyle::new().solid_fill(Color::BLUE.as_vec4())) });
+    /// let mut node2 = SceneNode::new(NodeContent::SolidColor { color: Color::BLUE });
     /// node2.bounds = Rect::new(50.0, 50.0, 100.0, 100.0);
     /// let id2 = scene.add_node(root, node2);
     ///

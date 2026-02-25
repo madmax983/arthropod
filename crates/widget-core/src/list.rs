@@ -61,6 +61,16 @@ impl<W: Widget> WidgetBoxed for W {
 /// let mut list2 = List::row();
 /// list2.extend(items2.iter().map(|s| Text::new(*s)));
 /// ```
+///
+/// # Performance
+///
+/// `List` renders all its children immediately when built. This means performance
+/// is O(N) where N is the number of items.
+///
+/// - **Small Lists (< 100 items)**: `List` is perfectly fine and simple to use.
+/// - **Large Lists (> 100 items)**: Performance may degrade (laggy scrolling, slow initial load).
+///   Consider using pagination or waiting for the upcoming "Virtual List" feature
+///   which will support O(1) rendering for infinite scrolls.
 pub struct List {
     direction: FlexDirection,
     children: Vec<Box<dyn WidgetBoxed>>,
