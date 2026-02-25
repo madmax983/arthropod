@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 /// # Example
 ///
 /// ```
-/// use render_engine::{SceneNode, NodeContent, Color, Transform2D};
-/// use plat_core::Rect;
+/// use render_engine::{SceneNode, NodeContent, Color, Transform2D, Rect};
 /// use style_engine::VisualStyle;
 ///
 /// let mut node = SceneNode::new(NodeContent::Styled {

@@ -200,7 +200,7 @@ pub use widget_macros::Widget;
 pub use widget_macros::WidgetEnum;
 
 // Re-export generated macros from this crate
-// (txt!, btn!, col!, row! are defined via #[derive] and #[macro_export])
+// (txt!, btn!, col!, row!, input!, form! are defined via #[derive] and #[macro_export])
 
 #[cfg(test)]
 mod tests {

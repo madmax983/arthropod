@@ -20,9 +20,8 @@
 //! The [`Scene`] is designed to be used as a Resource in an ECS (Entity Component System) environment.
 //!
 //! ```
-//! use render_engine::{Scene, SceneNode, NodeContent, Color, Transform2D};
+//! use render_engine::{Scene, SceneNode, NodeContent, Color, Transform2D, Rect};
 //! use style_engine::VisualStyle;
-//! use plat_core::Rect;
 //!
 //! // Create a scene
 //! let mut scene = Scene::new();
@@ -51,6 +50,9 @@ mod math_migration_tests;
 
 // Re-export glam types for math operations
 pub use glam::{Affine2, Vec2, Vec3, Vec4};
+
+// Re-export plat_core types used in public API
+pub use plat_core::Rect;
 
 // Type aliases for transitional API (will become newtype wrappers later)
 /// RGBA color represented as a 4-component vector (r, g, b, a).

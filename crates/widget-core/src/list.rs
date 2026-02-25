@@ -36,6 +36,13 @@ impl<W: Widget> WidgetBoxed for W {
 /// `Vec` storage with type erasure (`Box<dyn WidgetBoxed>`). This enables
 /// dynamic widget lists from runtime data.
 ///
+/// # Performance
+///
+/// **Warning:** This widget renders all children immediately. It does not support virtualization.
+/// For large lists (100+ items), this will cause significant performance degradation (O(N)).
+///
+/// Use this widget only for small, static lists.
+///
 /// # Example
 ///
 /// ```
