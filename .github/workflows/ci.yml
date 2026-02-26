@@ -236,7 +236,7 @@ jobs:
   phase4-desktop-visual-regression:
     name: Phase 4 Desktop Visual Regression
     runs-on: windows-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/trunk' || github.ref == 'refs/heads/main'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -1472,3 +1472,18 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
 - Verification:
   - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
   - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-24 (parity continuation: enforce desktop visual parity on PRs)
+
+- Goal:
+  - Shift visual-parity failures left by running the Windows desktop visual regression gate for pull requests, not only trunk/manual runs.
+- Implementation:
+  - Updated `.github/workflows/ci.yml`:
+    - job `phase4-desktop-visual-regression` now runs when `github.event_name == 'pull_request'` in addition to existing push/manual paths.
+  - This keeps both visual gates PR-blocking:
+    - `phase4_desktop_visual_regression`
+    - `figma_json_render_regression`
+- Verification:
+  - Local command checks remain green:
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
+    - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
