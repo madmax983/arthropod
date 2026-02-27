@@ -87,11 +87,8 @@ impl Tool for SetupReactiveChainTool {
                     .insert(ReactiveColor::new(read.clone()));
 
                 // Register signal for remote control
-                ctx.signal_registry_mut().register_color(
-                    params.signal_name.clone(),
-                    read,
-                    write,
-                )?;
+                ctx.signal_registry_mut()
+                    .register_color(params.signal_name.clone(), read, write);
 
                 Ok(json!({
                     "node_name": params.node_name,
@@ -111,7 +108,7 @@ impl Tool for SetupReactiveChainTool {
 
                 // Register signal for remote control
                 ctx.signal_registry_mut()
-                    .register_f32(params.signal_name.clone(), read, write)?;
+                    .register_f32(params.signal_name.clone(), read, write);
 
                 Ok(json!({
                     "node_name": params.node_name,
@@ -131,7 +128,7 @@ impl Tool for SetupReactiveChainTool {
 
                 // Register signal for remote control
                 ctx.signal_registry_mut()
-                    .register_bool(params.signal_name.clone(), read, write)?;
+                    .register_bool(params.signal_name.clone(), read, write);
 
                 Ok(json!({
                     "node_name": params.node_name,

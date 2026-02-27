@@ -34,9 +34,6 @@ pub struct SignalRegistry {
     entries: HashMap<String, SignalEntry>,
 }
 
-const MAX_SIGNALS: usize = 1000;
-const MAX_NAME_LEN: usize = 64;
-
 impl SignalRegistry {
     /// Create a new empty signal registry
     pub fn new() -> Self {
@@ -45,40 +42,21 @@ impl SignalRegistry {
         }
     }
 
-    fn check_limits(&self, name: &str) -> Result<()> {
-        if self.entries.len() >= MAX_SIGNALS && !self.entries.contains_key(name) {
-            return Err(anyhow!("Registry full: max {} signals", MAX_SIGNALS));
-        }
-        if name.len() > MAX_NAME_LEN {
-            return Err(anyhow!("Signal name too long: max {} chars", MAX_NAME_LEN));
-        }
-        Ok(())
-    }
-
     /// Register a color signal
     pub fn register_color(
         &mut self,
         name: String,
         read: ReadSignal<Color>,
         write: WriteSignal<Color>,
-    ) -> Result<()> {
-        self.check_limits(&name)?;
+    ) {
         self.entries
             .insert(name, SignalEntry::ColorSignal { read, write });
-        Ok(())
     }
 
     /// Register an f32 signal
-    pub fn register_f32(
-        &mut self,
-        name: String,
-        read: ReadSignal<f32>,
-        write: WriteSignal<f32>,
-    ) -> Result<()> {
-        self.check_limits(&name)?;
+    pub fn register_f32(&mut self, name: String, read: ReadSignal<f32>, write: WriteSignal<f32>) {
         self.entries
             .insert(name, SignalEntry::F32Signal { read, write });
-        Ok(())
     }
 
     /// Register a bool signal
@@ -87,11 +65,9 @@ impl SignalRegistry {
         name: String,
         read: ReadSignal<bool>,
         write: WriteSignal<bool>,
-    ) -> Result<()> {
-        self.check_limits(&name)?;
+    ) {
         self.entries
             .insert(name, SignalEntry::BoolSignal { read, write });
-        Ok(())
     }
 
     /// Set a color signal value
@@ -198,9 +174,7 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry
-            .register_color("test_color".to_string(), read.clone(), write)
-            .unwrap();
+        registry.register_color("test_color".to_string(), read.clone(), write);
 
         // Set new color
         let old = registry.set_color("test_color", Color::BLUE).unwrap();
@@ -217,9 +191,7 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry
-            .register_f32("test_f32".to_string(), read.clone(), write)
-            .unwrap();
+        registry.register_f32("test_f32".to_string(), read.clone(), write);
 
         let old = registry.set_f32("test_f32", 2.5).unwrap();
         assert_eq!(old, 1.0);
@@ -233,9 +205,7 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry
-            .register_color("test_color".to_string(), read, write)
-            .unwrap();
+        registry.register_color("test_color".to_string(), read, write);
 
         // Try to set as f32 (should fail)
         let result = registry.set_f32("test_color", 1.0);
@@ -263,12 +233,8 @@ mod tests {
         let (r1, w1) = color_sig.split();
         let (r2, w2) = f32_sig.split();
 
-        registry
-            .register_color("color1".to_string(), r1, w1)
-            .unwrap();
-        registry
-            .register_f32("opacity".to_string(), r2, w2)
-            .unwrap();
+        registry.register_color("color1".to_string(), r1, w1);
+        registry.register_f32("opacity".to_string(), r2, w2);
 
         let signals = registry.list_signals();
         assert_eq!(signals.len(), 2);
@@ -283,9 +249,7 @@ mod tests {
 
         let color_sig = Signal::new(runtime.clone(), Color::RED);
         let (read, write) = color_sig.split();
-        registry
-            .register_color("test".to_string(), read, write)
-            .unwrap();
+        registry.register_color("test".to_string(), read, write);
 
         assert_eq!(registry.get_type("test"), Some("color"));
         assert_eq!(registry.get_type("nonexistent"), None);

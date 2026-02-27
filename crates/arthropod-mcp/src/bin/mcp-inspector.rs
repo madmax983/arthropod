@@ -8,8 +8,6 @@
 //! Example:
 //!     cargo run --bin mcp-inspector -- cargo run --bin arthropod-mcp
 
-#![allow(clippy::collapsible_if)]
-
 use anyhow::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent},
