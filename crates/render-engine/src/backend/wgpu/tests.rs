@@ -996,7 +996,8 @@ fn test_collect_multipass_node_ids_preserves_visual_order() {
     blur.bounds = plat_core::Rect::new(20.0, 20.0, 30.0, 30.0);
     let blur_id = scene.add_node(root, blur);
 
-    let ids = multipass_executor::collect_multipass_node_ids(&scene);
+    let mut stack = Vec::new();
+    let ids = multipass_executor::collect_multipass_node_ids(&scene, &mut stack);
     assert_eq!(ids, vec![blend_id, blur_id]);
 }
 
@@ -1046,7 +1047,8 @@ fn test_classify_scene_effect_kinds_detects_offscreen_effects() {
     node.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
     scene.add_node(root, node);
 
-    let kinds = multipass_executor::classify_scene_effect_kinds(&scene);
+    let mut stack = Vec::new();
+    let kinds = multipass_executor::classify_scene_effect_kinds(&scene, &mut stack);
     assert!(kinds.contains(&effects::EffectPassKind::OffscreenLayer));
     assert!(kinds.contains(&effects::EffectPassKind::BlurHorizontal));
     assert!(kinds.contains(&effects::EffectPassKind::BlurVertical));

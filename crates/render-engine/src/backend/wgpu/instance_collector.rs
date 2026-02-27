@@ -217,6 +217,7 @@ pub(crate) fn collect_instances<'a>(
     pipeline: &mut PrimitivePipeline,
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
+    stack: &mut Vec<crate::NodeId>,
     scene: &'a Scene,
 ) -> (
     Vec<PrimitiveInstance>,
@@ -227,6 +228,7 @@ pub(crate) fn collect_instances<'a>(
         Some(pipeline),
         Some(tessellation_cache),
         Some(path_interner),
+        stack,
         scene,
         false,
     )
@@ -236,6 +238,7 @@ pub(crate) fn collect_instances_excluding_multipass<'a>(
     pipeline: &mut PrimitivePipeline,
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
+    stack: &mut Vec<crate::NodeId>,
     scene: &'a Scene,
 ) -> (
     Vec<PrimitiveInstance>,
@@ -246,6 +249,7 @@ pub(crate) fn collect_instances_excluding_multipass<'a>(
         Some(pipeline),
         Some(tessellation_cache),
         Some(path_interner),
+        stack,
         scene,
         true,
     )
@@ -259,7 +263,8 @@ pub(crate) fn collect_instances_for_tests<'a>(
     Vec<TextNodeData<'a>>,
     Vec<PathBatch>,
 ) {
-    collect_instances_impl(None, None, None, scene, false)
+    let mut stack = Vec::new();
+    collect_instances_impl(None, None, None, &mut stack, scene, false)
 }
 
 #[cfg(test)]
@@ -270,13 +275,15 @@ pub(crate) fn collect_instances_without_multipass_for_tests<'a>(
     Vec<TextNodeData<'a>>,
     Vec<PathBatch>,
 ) {
-    collect_instances_impl(None, None, None, scene, true)
+    let mut stack = Vec::new();
+    collect_instances_impl(None, None, None, &mut stack, scene, true)
 }
 
 fn collect_instances_impl<'a>(
     mut pipeline: Option<&mut PrimitivePipeline>,
     mut tessellation_cache: Option<&mut TessellationCache>,
     mut path_interner: Option<&mut PathInterner>,
+    stack: &mut Vec<crate::NodeId>,
     scene: &'a Scene,
     skip_multipass: bool,
 ) -> (
@@ -296,7 +303,7 @@ fn collect_instances_impl<'a>(
     let mut text_nodes_for_shaping = Vec::new();
     let mut path_batches = Vec::new();
 
-    for (node_id, node) in scene.iter_visuals() {
+    for (node_id, node) in scene.iter_visuals_custom(stack) {
         if !node.visible || node.opacity <= 0.0 {
             continue;
         }

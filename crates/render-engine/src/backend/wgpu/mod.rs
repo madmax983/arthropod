@@ -53,6 +53,7 @@ pub struct WgpuBackend {
     effect_target_pool: RenderTargetPool,
     clip_stack: ClipStack,
     effect_sampler: wgpu::Sampler,
+    traversal_stack: Vec<crate::NodeId>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -183,6 +184,7 @@ impl WgpuBackend {
             effect_target_pool: RenderTargetPool::new(256 * 1024 * 1024),
             clip_stack: ClipStack::default(),
             effect_sampler,
+            traversal_stack: Vec::with_capacity(1024),
         })
     }
 
@@ -333,10 +335,11 @@ impl WgpuBackend {
             path_interner: &mut self.path_interner,
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
+            traversal_stack: &mut self.traversal_stack,
         };
 
         executor.prepare_phase4_effect_state(scene);
-        let multipass_node_ids = collect_multipass_node_ids(scene);
+        let multipass_node_ids = collect_multipass_node_ids(scene, executor.traversal_stack);
 
         let frame_key = RenderTargetKey::new(width.max(1), height.max(1), false);
         let frame_handle = executor.acquire_effect_target(frame_key);
@@ -466,10 +469,11 @@ impl super::RenderBackend for WgpuBackend {
             path_interner: &mut self.path_interner,
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
+            traversal_stack: &mut self.traversal_stack,
         };
 
         executor.prepare_phase4_effect_state(scene);
-        let multipass_node_ids = collect_multipass_node_ids(scene);
+        let multipass_node_ids = collect_multipass_node_ids(scene, executor.traversal_stack);
         if multipass_node_ids.is_empty() {
             let (instances, path_batches) = executor.collect_frame_batches(scene);
 

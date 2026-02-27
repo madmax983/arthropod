@@ -37,6 +37,7 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) path_interner: &'a mut PathInterner,
     pub(crate) text_renderer: &'a mut TextRenderer,
     pub(crate) glyph_texture: &'a wgpu::Texture,
+    pub(crate) traversal_stack: &'a mut Vec<crate::NodeId>,
 }
 
 impl<'a> MultipassRenderer<'a> {
@@ -44,10 +45,11 @@ impl<'a> MultipassRenderer<'a> {
         // Phase 4 planner: detect effects that require offscreen multipass work.
         // Current integration reserves pooled targets and keeps the direct renderer
         // path active until full per-node effect compositing is layered in.
-        let effect_kinds = classify_scene_effect_kinds(scene);
-        let _blur_tier = select_blur_tier(max_scene_blur_radius(scene));
+        let effect_kinds = classify_scene_effect_kinds(scene, self.traversal_stack);
+        let _blur_tier = select_blur_tier(max_scene_blur_radius(scene, self.traversal_stack));
         let _background_capture_bounds = collect_background_capture_bounds(
             scene,
+            self.traversal_stack,
             self.context.config.width,
             self.context.config.height,
         );
@@ -457,6 +459,7 @@ impl<'a> MultipassRenderer<'a> {
                 self.primitive_pipeline,
                 self.tessellation_cache,
                 self.path_interner,
+                self.traversal_stack,
                 scene,
             )
         } else {
@@ -464,6 +467,7 @@ impl<'a> MultipassRenderer<'a> {
                 self.primitive_pipeline,
                 self.tessellation_cache,
                 self.path_interner,
+                self.traversal_stack,
                 scene,
             )
         };
@@ -586,11 +590,14 @@ impl<'a> MultipassRenderer<'a> {
     }
 }
 
-pub(crate) fn collect_multipass_node_ids(scene: &Scene) -> Vec<crate::NodeId> {
+pub(crate) fn collect_multipass_node_ids(
+    scene: &Scene,
+    stack: &mut Vec<crate::NodeId>,
+) -> Vec<crate::NodeId> {
     use crate::NodeContent;
 
     scene
-        .iter_visuals()
+        .iter_visuals_custom(stack)
         .filter_map(|(node_id, node)| {
             if !node.visible || node.opacity <= 0.0 {
                 return None;
@@ -603,11 +610,14 @@ pub(crate) fn collect_multipass_node_ids(scene: &Scene) -> Vec<crate::NodeId> {
         .collect()
 }
 
-pub(crate) fn classify_scene_effect_kinds(scene: &Scene) -> Vec<EffectPassKind> {
+pub(crate) fn classify_scene_effect_kinds(
+    scene: &Scene,
+    stack: &mut Vec<crate::NodeId>,
+) -> Vec<EffectPassKind> {
     use crate::NodeContent;
 
     let mut kinds = Vec::new();
-    for (_, node) in scene.iter_visuals() {
+    for (_, node) in scene.iter_visuals_custom(stack) {
         if !node.visible || node.opacity <= 0.0 {
             continue;
         }
@@ -619,12 +629,12 @@ pub(crate) fn classify_scene_effect_kinds(scene: &Scene) -> Vec<EffectPassKind> 
     kinds
 }
 
-pub(crate) fn max_scene_blur_radius(scene: &Scene) -> f32 {
+pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<crate::NodeId>) -> f32 {
     use crate::NodeContent;
     use style_engine::Effect;
 
     let mut max_radius = 0.0f32;
-    for (_, node) in scene.iter_visuals() {
+    for (_, node) in scene.iter_visuals_custom(stack) {
         if !node.visible || node.opacity <= 0.0 {
             continue;
         }
@@ -648,6 +658,7 @@ pub(crate) fn max_scene_blur_radius(scene: &Scene) -> f32 {
 
 pub(crate) fn collect_background_capture_bounds(
     scene: &Scene,
+    stack: &mut Vec<crate::NodeId>,
     frame_width: u32,
     frame_height: u32,
 ) -> Vec<[u32; 4]> {
@@ -657,7 +668,7 @@ pub(crate) fn collect_background_capture_bounds(
     let mut bounds = Vec::new();
     let frame = [0, 0, frame_width, frame_height];
 
-    for (_, node) in scene.iter_visuals() {
+    for (_, node) in scene.iter_visuals_custom(stack) {
         if !node.visible || node.opacity <= 0.0 {
             continue;
         }
