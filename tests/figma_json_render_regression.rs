@@ -152,6 +152,10 @@ enum FigmaStrokeCap {
     None,
     Round,
     Square,
+    LineArrow,
+    TriangleArrow,
+    DiamondFilled,
+    CircleFilled,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -603,6 +607,26 @@ fn figma_style_stroke_cap_join_and_dashes_map_to_stroke_style() {
 }
 
 #[test]
+fn figma_style_stroke_cap_line_arrow_maps_to_supported_fallback() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeCap": "LINE_ARROW"
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert_eq!(
+        stroke.cap,
+        StrokeCap::Butt,
+        "LINE_ARROW should map to a supported fallback cap"
+    );
+}
+
+#[test]
 fn figma_style_dash_offset_maps_to_stroke_style_dash_offset() {
     let figma_style: FigmaStyle = serde_json::from_str(
         r#"{
@@ -998,6 +1022,10 @@ impl From<FigmaStrokeCap> for StrokeCap {
             FigmaStrokeCap::None => Self::Butt,
             FigmaStrokeCap::Round => Self::Round,
             FigmaStrokeCap::Square => Self::Square,
+            FigmaStrokeCap::CircleFilled => Self::Round,
+            FigmaStrokeCap::LineArrow
+            | FigmaStrokeCap::TriangleArrow
+            | FigmaStrokeCap::DiamondFilled => Self::Butt,
         }
     }
 }

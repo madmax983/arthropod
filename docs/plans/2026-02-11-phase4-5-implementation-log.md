@@ -1779,3 +1779,28 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_none_winding_alias_maps -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (18/18)
+
+### 2026-02-27 (parity continuation: stroke cap arrow variants)
+
+- Goal:
+  - Improve compatibility with Figma vector payloads that use non-basic stroke cap variants
+    (for example `LINE_ARROW`) that were previously rejected during deserialization.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - extended `FigmaStrokeCap` to accept:
+      - `LINE_ARROW`
+      - `TRIANGLE_ARROW`
+      - `DIAMOND_FILLED`
+      - `CIRCLE_FILLED`
+    - mapped these variants to supported runtime caps:
+      - `CIRCLE_FILLED` -> `StrokeCap::Round`
+      - `LINE_ARROW` / `TRIANGLE_ARROW` / `DIAMOND_FILLED` -> `StrokeCap::Butt`
+    - added regression test:
+      - `figma_style_stroke_cap_line_arrow_maps_to_supported_fallback`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_stroke_cap_line_arrow_maps_to_supported_fallback -- --nocapture` -> FAIL (`unknown variant LINE_ARROW`)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_stroke_cap_line_arrow_maps_to_supported_fallback -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (19/19)
