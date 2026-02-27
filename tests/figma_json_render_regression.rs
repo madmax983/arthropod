@@ -245,6 +245,8 @@ enum FigmaPaint {
         #[serde(alias = "imageTransform")]
         transform: Option<FigmaImageTransform>,
     },
+    #[serde(other)]
+    Unsupported,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -302,69 +304,70 @@ const fn default_visible() -> bool {
 }
 
 impl FigmaPaint {
-    fn into_paint(self) -> Paint {
+    fn into_paint(self) -> Option<Paint> {
         match self {
             Self::Solid { color, opacity } => {
                 let mut c = vec4(color);
                 if let Some(opacity) = opacity {
                     c.w *= opacity;
                 }
-                Paint::Solid(c)
+                Some(Paint::Solid(c))
             }
-            Self::GradientLinear { start, end, stops } => Paint::Linear(LinearGradient {
+            Self::GradientLinear { start, end, stops } => Some(Paint::Linear(LinearGradient {
                 start: vec2(start),
                 end: vec2(end),
                 stops: stops
                     .into_iter()
                     .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
                     .collect(),
-            }),
+            })),
             Self::GradientRadial {
                 center,
                 radius,
                 stops,
-            } => Paint::Radial(RadialGradient {
+            } => Some(Paint::Radial(RadialGradient {
                 center: vec2(center),
                 radius,
                 stops: stops
                     .into_iter()
                     .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
                     .collect(),
-            }),
+            })),
             Self::GradientAngular {
                 center,
                 angle,
                 stops,
-            } => Paint::Angular(AngularGradient {
+            } => Some(Paint::Angular(AngularGradient {
                 center: vec2(center),
                 angle,
                 stops: stops
                     .into_iter()
                     .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
                     .collect(),
-            }),
+            })),
             Self::GradientDiamond {
                 center,
                 scale,
                 stops,
-            } => Paint::Diamond(DiamondGradient {
+            } => Some(Paint::Diamond(DiamondGradient {
                 center: vec2(center),
                 scale,
                 stops: stops
                     .into_iter()
                     .map(|stop| ColorStop::new(stop.position, vec4(stop.color)))
                     .collect(),
-            }),
+            })),
             Self::Image {
                 image_id,
                 scale_mode,
                 scaling_factor,
                 transform,
-            } => Paint::Image(ImageFill {
+            } => Some(Paint::Image(ImageFill {
                 image_id: image_id.into_image_id(),
                 scale_mode: scale_mode.into(),
                 transform: figma_image_transform(scale_mode, transform, scaling_factor),
-            }),
+            })),
+            Self::Unsupported => None,
         }
     }
 }
@@ -488,7 +491,9 @@ fn figma_image_paint_image_transform_alias_maps_to_affine_matrix() {
     )
     .expect("failed to deserialize figma image paint");
 
-    let paint = figma_paint.into_paint();
+    let paint = figma_paint
+        .into_paint()
+        .expect("image paint should map to a supported paint");
     let Paint::Image(fill) = paint else {
         panic!("expected image paint");
     };
@@ -527,13 +532,22 @@ fn figma_image_paint_image_ref_alias_maps_to_stable_image_id() {
     )
     .expect("failed to deserialize figma image paint with imageHash");
 
-    let Paint::Image(fill_ref_a) = from_ref_a.into_paint() else {
+    let Paint::Image(fill_ref_a) = from_ref_a
+        .into_paint()
+        .expect("imageRef paint should map to supported paint")
+    else {
         panic!("expected image paint from imageRef payload");
     };
-    let Paint::Image(fill_ref_b) = from_ref_b.into_paint() else {
+    let Paint::Image(fill_ref_b) = from_ref_b
+        .into_paint()
+        .expect("repeated imageRef paint should map to supported paint")
+    else {
         panic!("expected image paint from repeated imageRef payload");
     };
-    let Paint::Image(fill_hash) = from_hash.into_paint() else {
+    let Paint::Image(fill_hash) = from_hash
+        .into_paint()
+        .expect("imageHash paint should map to supported paint")
+    else {
         panic!("expected image paint from imageHash payload");
     };
 
@@ -559,7 +573,9 @@ fn figma_image_paint_tile_scaling_factor_maps_to_transform() {
     )
     .expect("failed to deserialize figma image paint with scalingFactor");
 
-    let paint = figma_paint.into_paint();
+    let paint = figma_paint
+        .into_paint()
+        .expect("tile scaling image paint should map to supported paint");
     let Paint::Image(fill) = paint else {
         panic!("expected image paint from scalingFactor payload");
     };
@@ -568,6 +584,30 @@ fn figma_image_paint_tile_scaling_factor_maps_to_transform() {
         fill.transform,
         Some([0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0]),
         "TILE scalingFactor should synthesize an inverse UV scale transform"
+    );
+}
+
+#[test]
+fn figma_style_unsupported_paint_types_are_ignored() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "fills": [
+                {"type":"VIDEO","videoHash":"video-asset-1"},
+                {"type":"SOLID","color":[0.2,0.4,0.6,1.0]}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma style with unsupported paint type");
+
+    let style = figma_style.into_visual_style();
+    assert_eq!(
+        style.fills.len(),
+        1,
+        "unsupported fill paint types should be skipped"
+    );
+    assert!(
+        matches!(style.fills[0], Paint::Solid(_)),
+        "supported solid paint should still be retained"
     );
 }
 
@@ -660,7 +700,7 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
         }"#,
     )
     .expect("failed to deserialize radial gradient paint");
-    assert!(matches!(radial.into_paint(), Paint::Radial(_)));
+    assert!(matches!(radial.into_paint(), Some(Paint::Radial(_))));
 
     let angular: FigmaPaint = serde_json::from_str(
         r#"{
@@ -674,7 +714,7 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
         }"#,
     )
     .expect("failed to deserialize angular gradient paint");
-    assert!(matches!(angular.into_paint(), Paint::Angular(_)));
+    assert!(matches!(angular.into_paint(), Some(Paint::Angular(_))));
 
     let diamond: FigmaPaint = serde_json::from_str(
         r#"{
@@ -688,7 +728,7 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
         }"#,
     )
     .expect("failed to deserialize diamond gradient paint");
-    assert!(matches!(diamond.into_paint(), Paint::Diamond(_)));
+    assert!(matches!(diamond.into_paint(), Some(Paint::Diamond(_))));
 }
 
 #[test]
@@ -1079,8 +1119,8 @@ impl From<FigmaBlendMode> for BlendMode {
 impl FigmaStyle {
     fn into_visual_style(self) -> VisualStyle {
         let mut style = VisualStyle::new();
-        for fill in self.fills {
-            style = style.fill(fill.into_paint());
+        for fill in self.fills.into_iter().filter_map(FigmaPaint::into_paint) {
+            style = style.fill(fill);
         }
         if let Some(fill_geometry) = self.fill_geometry {
             let paths: Vec<_> = fill_geometry
@@ -1113,7 +1153,7 @@ impl FigmaStyle {
                 paints: self
                     .strokes
                     .into_iter()
-                    .map(FigmaPaint::into_paint)
+                    .filter_map(FigmaPaint::into_paint)
                     .collect::<Vec<_>>(),
                 weight: self.stroke_weight.unwrap_or(1.0),
                 align: self.stroke_align.unwrap_or(FigmaStrokeAlign::Center).into(),

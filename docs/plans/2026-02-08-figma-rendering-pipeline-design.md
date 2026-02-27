@@ -1814,6 +1814,7 @@ Exit gates:
 | `fills[].type: GRADIENT_ANGULAR` | `Paint::AngularGradient { ... }` | 2 |
 | `fills[].type: GRADIENT_DIAMOND` | `Paint::DiamondGradient { ... }` | 2 |
 | `fills[].type: IMAGE` | `Paint::Image { ... }` | 5+ |
+| `fills[].type: VIDEO` / `PATTERN` | ignored (unsupported paint fallback) | 5+ |
 | `fills[].imageRef` / `fills[].imageHash` | `Paint::Image.image_id` (stable `ImageId`) | 5+ |
 | `fills[].imageTransform` | `Paint::Image.transform: Option<[f32; 9]>` | 5+ |
 | `fills[].scalingFactor` | `Paint::Image.transform` (tile UV scale) | 5+ |

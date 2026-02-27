@@ -1804,3 +1804,26 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_stroke_cap_line_arrow_maps_to_supported_fallback -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (19/19)
+
+### 2026-02-27 (parity continuation: unsupported paint types are ignored)
+
+- Goal:
+  - Prevent Figma import deserialization failures when encountering paint types
+    not yet supported by the runtime (for example `VIDEO` / `PATTERN`).
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - added `FigmaPaint::Unsupported` (`#[serde(other)]`) fallback variant.
+    - changed `FigmaPaint::into_paint` to return `Option<Paint>`.
+    - updated fill/stroke mapping paths to `filter_map(FigmaPaint::into_paint)` so unsupported paints are skipped.
+    - added regression test:
+      - `figma_style_unsupported_paint_types_are_ignored`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added row:
+      - `fills[].type: VIDEO / PATTERN` -> ignored (unsupported paint fallback)
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_unsupported_paint_types_are_ignored -- --nocapture` -> FAIL (`unknown variant VIDEO`)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_unsupported_paint_types_are_ignored -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (20/20)
