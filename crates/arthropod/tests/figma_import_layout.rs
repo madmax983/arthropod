@@ -2,9 +2,7 @@ use arthropod::figma::{
     ConstraintAxis, ImportedComponentKind, ImportedComponentPropertyType,
     ImportedComponentPropertyValue, LayoutPositioning, PrototypeTrigger, import_figma_document,
 };
-use layout_engine::{
-    FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf,
-};
+use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf};
 use render_engine::NodeContent;
 use style_engine::{
     FontStyle, LineHeight, TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextOverflow,
@@ -121,10 +119,7 @@ fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
         .get(&root_id)
         .expect("root style should exist");
     assert_eq!(root_style.wrap, FlexWrap::Wrap);
-    assert_eq!(
-        root_style.justify_content,
-        FlexJustifyContent::SpaceBetween
-    );
+    assert_eq!(root_style.justify_content, FlexJustifyContent::SpaceBetween);
     assert_eq!(root_style.align_items, FlexAlign::Center);
     assert_eq!(root_style.min_width, Some(320.0));
     assert_eq!(root_style.max_width, Some(900.0));
@@ -140,7 +135,10 @@ fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
         child_style.flex_grow >= 1.0,
         "FILL sizing should project to grow behavior"
     );
-    assert_eq!(child_style.height, None, "HUG sizing should keep auto height");
+    assert_eq!(
+        child_style.height, None,
+        "HUG sizing should keep auto height"
+    );
 }
 
 #[test]
@@ -569,7 +567,9 @@ fn figma_instance_swap_overrides_resolve_node_references() {
 
     assert_eq!(
         resolved.get("Icon"),
-        Some(&ImportedComponentPropertyValue::NodeRef("iconB".to_string()))
+        Some(&ImportedComponentPropertyValue::NodeRef(
+            "iconB".to_string()
+        ))
     );
 }
 

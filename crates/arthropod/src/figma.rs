@@ -209,7 +209,8 @@ pub struct ImportedFigmaDocument {
         HashMap<NodeId, HashMap<String, ImportedComponentPropertyDefinition>>,
     pub instance_property_overrides:
         HashMap<NodeId, HashMap<String, ImportedComponentPropertyOverride>>,
-    pub resolved_instance_properties: HashMap<NodeId, HashMap<String, ImportedComponentPropertyValue>>,
+    pub resolved_instance_properties:
+        HashMap<NodeId, HashMap<String, ImportedComponentPropertyValue>>,
 }
 
 pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
@@ -838,9 +839,7 @@ impl FigmaNode {
         definitions
     }
 
-    fn to_instance_property_overrides(
-        &self,
-    ) -> HashMap<String, ImportedComponentPropertyOverride> {
+    fn to_instance_property_overrides(&self) -> HashMap<String, ImportedComponentPropertyOverride> {
         let mut overrides = HashMap::new();
         for (name, property) in &self.component_properties {
             let Some(value) = property.value.as_ref() else {
@@ -940,9 +939,7 @@ fn duration_to_ms(value: f64) -> Option<u32> {
 fn apply_text_case(text: &str, text_case: TextCase) -> String {
     match text_case {
         TextCase::Original => text.to_string(),
-        TextCase::Upper | TextCase::SmallCaps | TextCase::SmallCapsForced => {
-            text.to_uppercase()
-        }
+        TextCase::Upper | TextCase::SmallCaps | TextCase::SmallCapsForced => text.to_uppercase(),
         TextCase::Lower => text.to_lowercase(),
         TextCase::Title => text
             .split_whitespace()

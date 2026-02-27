@@ -92,6 +92,7 @@ pub mod experimental;
 pub mod figma;
 pub mod layout;
 pub mod prelude;
+pub mod prototype_runtime;
 
 // Re-export main types
 pub use app::{App, AppError};

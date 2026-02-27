@@ -2189,3 +2189,51 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (import parity slice 4: runtime prototype execution semantics)
+
+- Goal:
+  - Add a production runtime executor for imported Figma prototype graphs so imported
+    interactions can be played back as deterministic app events:
+    - trigger dispatch (`ON_CLICK`, `ON_HOVER`, `ON_DRAG`, `ON_PRESS`, `ON_KEY_DOWN`)
+    - timeout dispatch (`AFTER_TIMEOUT`) via elapsed-time ticks
+    - navigation + history semantics
+    - overlay stack semantics (`OPEN_OVERLAY`, `SWAP_OVERLAY`, `CLOSE_OVERLAY`)
+    - `BACK` and URL side-effect behavior
+- RED:
+  - Added integration coverage in `crates/arthropod/tests/prototype_runtime.rs`:
+    - `prototype_runtime_click_navigate_updates_current_screen_and_history`
+    - `prototype_runtime_overlay_and_back_behaves_as_stack`
+    - `prototype_runtime_after_timeout_fires_on_tick_budget`
+    - `prototype_runtime_url_action_emits_effect_without_navigation`
+  - Ran:
+    - `cargo test -p arthropod --test prototype_runtime -- --nocapture`
+  - Result: FAIL (expected): missing `arthropod::prototype_runtime` module and runtime API.
+- GREEN:
+  - Added `crates/arthropod/src/prototype_runtime.rs`:
+    - new runtime API:
+      - `PrototypeRuntime`
+      - `PrototypeRuntimeEvent`
+      - `PrototypeRuntimeEffect`
+      - `OverlayState`
+      - `PrototypeRuntimeError`
+    - implemented execution semantics:
+      - event-triggered edge dispatch by source node + trigger
+      - timeout accumulation and one-shot firing per active context
+      - navigation history push/pop behavior
+      - overlay LIFO stack state transitions
+      - `BACK` behavior (close top overlay first, else pop history)
+      - URL side effects with no forced navigation
+      - timer reset when active context changes
+  - Exported module in `crates/arthropod/src/lib.rs` (`pub mod prototype_runtime;`).
+  - Ran:
+    - `cargo test -p arthropod --test prototype_runtime -- --nocapture`
+  - Result: PASS (4/4).
+- REFACTOR / verification:
+  - Ran:
+    - `cargo fmt --all` -> PASS
+    - `cargo test -p arthropod --test prototype_runtime -- --nocapture` -> PASS (4/4)
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (12/12)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
