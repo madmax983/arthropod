@@ -70,6 +70,7 @@
 
 pub mod components;
 pub mod context;
+pub mod layout_bridge;
 pub mod systems;
 
 // Re-export main types for convenience
