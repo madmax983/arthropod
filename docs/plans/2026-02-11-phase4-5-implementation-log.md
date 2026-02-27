@@ -2139,3 +2139,53 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p style-engine -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (import parity slice 3: typed instance override resolution)
+
+- Goal:
+  - Implement full component-property override resolution for imported instances (not just variant strings):
+    - component property definitions
+    - typed instance overrides
+    - resolved effective instance properties (defaults + overrides)
+    - support `INSTANCE_SWAP` node references
+- RED:
+  - Added importer regressions in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_instance_overrides_resolve_with_component_property_defaults`
+    - `figma_instance_swap_overrides_resolve_node_references`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout figma_instance_overrides_resolve_with_component_property_defaults -- --nocapture`
+  - Result: FAIL (expected): missing public typed property APIs and missing output maps on `ImportedFigmaDocument`.
+- GREEN:
+  - Extended importer public model in `crates/arthropod/src/figma.rs`:
+    - new public types:
+      - `ImportedComponentPropertyType`
+      - `ImportedComponentPropertyValue`
+      - `ImportedComponentPropertyDefinition`
+      - `ImportedComponentPropertyOverride`
+    - extended `ImportedFigmaDocument` with:
+      - `component_property_definitions`
+      - `instance_property_overrides`
+      - `resolved_instance_properties`
+  - Added Figma parsing support:
+    - `componentPropertyDefinitions`
+    - typed `componentProperties` values
+    - object node refs for instance-swap values (`{ id: ... }`, `nodeId` alias)
+  - Implemented canonical-name normalization + typed conversion pipeline for:
+    - definition defaults
+    - preferred values
+    - instance overrides
+  - Implemented runtime resolution pass:
+    - base from component defaults
+    - merge component-level variant fallback
+    - apply instance overrides
+    - apply instance variant values as final override layer
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout figma_instance_overrides_resolve_with_component_property_defaults -- --nocapture`
+    - `cargo test -p arthropod --test figma_import_layout figma_instance_swap_overrides_resolve_node_references -- --nocapture`
+  - Result: PASS.
+- REFACTOR / verification:
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (12/12)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)

@@ -1,6 +1,6 @@
 use arthropod::figma::{
-    ConstraintAxis, ImportedComponentKind, LayoutPositioning, PrototypeTrigger,
-    import_figma_document,
+    ConstraintAxis, ImportedComponentKind, ImportedComponentPropertyType,
+    ImportedComponentPropertyValue, LayoutPositioning, PrototypeTrigger, import_figma_document,
 };
 use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf,
@@ -436,6 +436,140 @@ fn figma_variant_properties_extract_from_component_properties_variant_type() {
     assert!(
         !variants.contains_key("Disabled"),
         "non-variant component properties should not be projected into variant map"
+    );
+}
+
+#[test]
+fn figma_instance_overrides_resolve_with_component_property_defaults() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "1200",
+                "type": "COMPONENT",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 160, "height": 60 },
+                "componentPropertyDefinitions": {
+                    "State#1:0": { "type": "VARIANT", "defaultValue": "Default" },
+                    "Disabled#1:1": { "type": "BOOLEAN", "defaultValue": false },
+                    "Label#1:2": { "type": "TEXT", "defaultValue": "Submit" }
+                }
+            },
+            {
+                "id": "1201",
+                "type": "INSTANCE",
+                "componentId": "1200",
+                "absoluteBoundingBox": { "x": 0, "y": 80, "width": 160, "height": 60 },
+                "componentProperties": {
+                    "State#1:0": { "type": "VARIANT", "value": "Hover" },
+                    "Disabled#1:1": { "type": "BOOLEAN", "value": true }
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let component_id = imported
+        .figma_to_scene
+        .get("1200")
+        .copied()
+        .expect("component should map");
+    let instance_id = imported
+        .figma_to_scene
+        .get("1201")
+        .copied()
+        .expect("instance should map");
+
+    let defs = imported
+        .component_property_definitions
+        .get(&component_id)
+        .expect("component property definitions should exist");
+    assert_eq!(
+        defs.get("State").map(|def| def.property_type),
+        Some(ImportedComponentPropertyType::Variant)
+    );
+    assert_eq!(
+        defs.get("Disabled").map(|def| def.property_type),
+        Some(ImportedComponentPropertyType::Boolean)
+    );
+    assert_eq!(
+        defs.get("Label").map(|def| def.property_type),
+        Some(ImportedComponentPropertyType::Text)
+    );
+
+    let overrides = imported
+        .instance_property_overrides
+        .get(&instance_id)
+        .expect("instance override map should exist");
+    assert_eq!(
+        overrides.get("State").map(|entry| &entry.value),
+        Some(&ImportedComponentPropertyValue::Text("Hover".to_string()))
+    );
+    assert_eq!(
+        overrides.get("Disabled").map(|entry| &entry.value),
+        Some(&ImportedComponentPropertyValue::Bool(true))
+    );
+
+    let resolved = imported
+        .resolved_instance_properties
+        .get(&instance_id)
+        .expect("resolved instance properties should exist");
+    assert_eq!(
+        resolved.get("State"),
+        Some(&ImportedComponentPropertyValue::Text("Hover".to_string()))
+    );
+    assert_eq!(
+        resolved.get("Disabled"),
+        Some(&ImportedComponentPropertyValue::Bool(true))
+    );
+    assert_eq!(
+        resolved.get("Label"),
+        Some(&ImportedComponentPropertyValue::Text("Submit".to_string()))
+    );
+}
+
+#[test]
+fn figma_instance_swap_overrides_resolve_node_references() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "1300",
+                "type": "COMPONENT",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 100, "height": 40 },
+                "componentPropertyDefinitions": {
+                    "Icon#2:0": {
+                        "type": "INSTANCE_SWAP",
+                        "defaultValue": { "id": "iconA" }
+                    }
+                }
+            },
+            {
+                "id": "1301",
+                "type": "INSTANCE",
+                "componentId": "1300",
+                "absoluteBoundingBox": { "x": 0, "y": 48, "width": 100, "height": 40 },
+                "componentProperties": {
+                    "Icon#2:0": {
+                        "type": "INSTANCE_SWAP",
+                        "value": { "id": "iconB" }
+                    }
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let instance_id = imported
+        .figma_to_scene
+        .get("1301")
+        .copied()
+        .expect("instance should map");
+    let resolved = imported
+        .resolved_instance_properties
+        .get(&instance_id)
+        .expect("resolved instance properties should exist");
+
+    assert_eq!(
+        resolved.get("Icon"),
+        Some(&ImportedComponentPropertyValue::NodeRef("iconB".to_string()))
     );
 }
 

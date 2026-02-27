@@ -166,6 +166,36 @@ pub struct ImportedInstanceNode {
     pub main_component_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportedComponentPropertyType {
+    Variant,
+    Boolean,
+    Text,
+    InstanceSwap,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportedComponentPropertyValue {
+    Text(String),
+    Bool(bool),
+    Number(f64),
+    NodeRef(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedComponentPropertyDefinition {
+    pub property_type: ImportedComponentPropertyType,
+    pub default_value: Option<ImportedComponentPropertyValue>,
+    pub preferred_values: Vec<ImportedComponentPropertyValue>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedComponentPropertyOverride {
+    pub property_type: ImportedComponentPropertyType,
+    pub value: ImportedComponentPropertyValue,
+}
+
 pub struct ImportedFigmaDocument {
     pub scene: Scene,
     pub layout_styles: HashMap<NodeId, FlexStyle>,
@@ -175,6 +205,11 @@ pub struct ImportedFigmaDocument {
     pub components: HashMap<NodeId, ImportedComponentNode>,
     pub instances: HashMap<NodeId, ImportedInstanceNode>,
     pub variant_properties: HashMap<NodeId, HashMap<String, String>>,
+    pub component_property_definitions:
+        HashMap<NodeId, HashMap<String, ImportedComponentPropertyDefinition>>,
+    pub instance_property_overrides:
+        HashMap<NodeId, HashMap<String, ImportedComponentPropertyOverride>>,
+    pub resolved_instance_properties: HashMap<NodeId, HashMap<String, ImportedComponentPropertyValue>>,
 }
 
 pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
@@ -188,6 +223,8 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
     let mut components = HashMap::new();
     let mut instances = HashMap::new();
     let mut variant_properties = HashMap::new();
+    let mut component_property_definitions = HashMap::new();
+    let mut instance_property_overrides = HashMap::new();
     let mut pending: Vec<usize> = (0..document.nodes.len()).collect();
 
     while !pending.is_empty() {
@@ -222,6 +259,14 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                 if !variants.is_empty() {
                     variant_properties.insert(scene_id, variants);
                 }
+                let definitions = node.to_component_property_definitions();
+                if !definitions.is_empty() {
+                    component_property_definitions.insert(scene_id, definitions);
+                }
+                let overrides = node.to_instance_property_overrides();
+                if !overrides.is_empty() {
+                    instance_property_overrides.insert(scene_id, overrides);
+                }
                 progressed = true;
             } else {
                 unresolved.push(index);
@@ -250,6 +295,14 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                 let variants = node.to_variant_properties();
                 if !variants.is_empty() {
                     variant_properties.insert(scene_id, variants);
+                }
+                let definitions = node.to_component_property_definitions();
+                if !definitions.is_empty() {
+                    component_property_definitions.insert(scene_id, definitions);
+                }
+                let overrides = node.to_instance_property_overrides();
+                if !overrides.is_empty() {
+                    instance_property_overrides.insert(scene_id, overrides);
                 }
             }
             break;
@@ -298,6 +351,53 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
         }
     }
 
+    let mut resolved_instance_properties = HashMap::new();
+    for (instance_node_id, instance_meta) in &instances {
+        let mut resolved = HashMap::new();
+
+        if let Some(component_scene_id) = instance_meta
+            .component_id
+            .as_ref()
+            .and_then(|figma_id| figma_to_scene.get(figma_id))
+            .copied()
+        {
+            if let Some(definitions) = component_property_definitions.get(&component_scene_id) {
+                for (name, definition) in definitions {
+                    if let Some(default_value) = definition.default_value.clone() {
+                        resolved.insert(name.clone(), default_value);
+                    }
+                }
+            }
+
+            if let Some(component_variants) = variant_properties.get(&component_scene_id) {
+                for (name, value) in component_variants {
+                    resolved
+                        .entry(name.clone())
+                        .or_insert_with(|| ImportedComponentPropertyValue::Text(value.clone()));
+                }
+            }
+        }
+
+        if let Some(overrides) = instance_property_overrides.get(instance_node_id) {
+            for (name, override_entry) in overrides {
+                resolved.insert(name.clone(), override_entry.value.clone());
+            }
+        }
+
+        if let Some(instance_variants) = variant_properties.get(instance_node_id) {
+            for (name, value) in instance_variants {
+                resolved.insert(
+                    name.clone(),
+                    ImportedComponentPropertyValue::Text(value.clone()),
+                );
+            }
+        }
+
+        if !resolved.is_empty() {
+            resolved_instance_properties.insert(*instance_node_id, resolved);
+        }
+    }
+
     Ok(ImportedFigmaDocument {
         scene,
         layout_styles,
@@ -309,6 +409,9 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
         components,
         instances,
         variant_properties,
+        component_property_definitions,
+        instance_property_overrides,
+        resolved_instance_properties,
     })
 }
 
@@ -338,9 +441,11 @@ struct FigmaNode {
     #[serde(default, alias = "mainComponentId")]
     main_component_id: Option<FigmaNodeKey>,
     #[serde(default)]
-    variant_properties: HashMap<String, FigmaScalarValue>,
+    variant_properties: HashMap<String, FigmaPropertyValue>,
     #[serde(default)]
     component_properties: HashMap<String, FigmaComponentProperty>,
+    #[serde(default)]
+    component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
     #[serde(default)]
     bounds: Option<[f32; 4]>,
     #[serde(default, alias = "absoluteBoundingBox")]
@@ -701,6 +806,63 @@ impl FigmaNode {
 
         variants
     }
+
+    fn to_component_property_definitions(
+        &self,
+    ) -> HashMap<String, ImportedComponentPropertyDefinition> {
+        let mut definitions = HashMap::new();
+        for (name, definition) in &self.component_property_definitions {
+            let canonical = canonical_property_name(name);
+            if canonical.is_empty() {
+                continue;
+            }
+            definitions.insert(
+                canonical,
+                ImportedComponentPropertyDefinition {
+                    property_type: definition
+                        .property_type
+                        .map(FigmaComponentPropertyType::to_public)
+                        .unwrap_or(ImportedComponentPropertyType::Unknown),
+                    default_value: definition
+                        .default_value
+                        .as_ref()
+                        .map(FigmaPropertyValue::to_imported_value),
+                    preferred_values: definition
+                        .preferred_values
+                        .iter()
+                        .map(FigmaPropertyValue::to_imported_value)
+                        .collect(),
+                },
+            );
+        }
+        definitions
+    }
+
+    fn to_instance_property_overrides(
+        &self,
+    ) -> HashMap<String, ImportedComponentPropertyOverride> {
+        let mut overrides = HashMap::new();
+        for (name, property) in &self.component_properties {
+            let Some(value) = property.value.as_ref() else {
+                continue;
+            };
+            let canonical = canonical_property_name(name);
+            if canonical.is_empty() {
+                continue;
+            }
+            overrides.insert(
+                canonical,
+                ImportedComponentPropertyOverride {
+                    property_type: property
+                        .property_type
+                        .map(FigmaComponentPropertyType::to_public)
+                        .unwrap_or(ImportedComponentPropertyType::Unknown),
+                    value: value.to_imported_value(),
+                },
+            );
+        }
+        overrides
+    }
 }
 
 fn map_font_style(style: Option<&FigmaTypeStyle>) -> FontStyle {
@@ -993,7 +1155,18 @@ struct FigmaComponentProperty {
     #[serde(default, rename = "type")]
     property_type: Option<FigmaComponentPropertyType>,
     #[serde(default)]
-    value: Option<FigmaScalarValue>,
+    value: Option<FigmaPropertyValue>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaComponentPropertyDefinition {
+    #[serde(default, rename = "type")]
+    property_type: Option<FigmaComponentPropertyType>,
+    #[serde(default, alias = "defaultValue")]
+    default_value: Option<FigmaPropertyValue>,
+    #[serde(default, alias = "preferredValues")]
+    preferred_values: Vec<FigmaPropertyValue>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -1007,24 +1180,68 @@ enum FigmaComponentPropertyType {
     Unknown,
 }
 
+impl FigmaComponentPropertyType {
+    fn to_public(self) -> ImportedComponentPropertyType {
+        match self {
+            Self::Variant => ImportedComponentPropertyType::Variant,
+            Self::Boolean => ImportedComponentPropertyType::Boolean,
+            Self::Text => ImportedComponentPropertyType::Text,
+            Self::InstanceSwap => ImportedComponentPropertyType::InstanceSwap,
+            Self::Unknown => ImportedComponentPropertyType::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaScalarValue {
+enum FigmaPropertyValue {
     Text(String),
     Bool(bool),
     Integer(i64),
     Float(f64),
+    Node(FigmaPropertyNodeRef),
 }
 
-impl FigmaScalarValue {
+impl FigmaPropertyValue {
     fn as_string(&self) -> String {
         match self {
             Self::Text(value) => value.clone(),
             Self::Bool(value) => value.to_string(),
             Self::Integer(value) => value.to_string(),
             Self::Float(value) => value.to_string(),
+            Self::Node(node) => node
+                .id
+                .as_ref()
+                .map(FigmaNodeKey::as_key)
+                .or_else(|| node.node_id.as_ref().map(FigmaNodeKey::as_key))
+                .unwrap_or_default(),
         }
     }
+
+    fn to_imported_value(&self) -> ImportedComponentPropertyValue {
+        match self {
+            Self::Text(value) => ImportedComponentPropertyValue::Text(value.clone()),
+            Self::Bool(value) => ImportedComponentPropertyValue::Bool(*value),
+            Self::Integer(value) => ImportedComponentPropertyValue::Number(*value as f64),
+            Self::Float(value) => ImportedComponentPropertyValue::Number(*value),
+            Self::Node(node) => ImportedComponentPropertyValue::NodeRef(
+                node.id
+                    .as_ref()
+                    .map(FigmaNodeKey::as_key)
+                    .or_else(|| node.node_id.as_ref().map(FigmaNodeKey::as_key))
+                    .unwrap_or_default(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPropertyNodeRef {
+    #[serde(default)]
+    id: Option<FigmaNodeKey>,
+    #[serde(default, alias = "nodeId")]
+    node_id: Option<FigmaNodeKey>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
