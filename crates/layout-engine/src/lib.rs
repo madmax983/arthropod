@@ -106,6 +106,10 @@ impl LayoutEngine {
     /// created by `create_node()` and remain valid for the engine's lifetime,
     /// so this should never panic in normal usage.
     pub fn add_child(&mut self, parent: NodeId, child: NodeId) {
+        // Taffy's `add_child` returns a Result, but it also might panic internally or return an error
+        // if the nodes are invalid. However, Taffy 0.3+ often panics on invalid SlotMap keys
+        // directly if we don't check existence first, or returns an error we unwrap.
+        // Let's rely on Taffy's return value and expect it with our custom message.
         self.taffy
             .add_child(parent.0, child.0)
             .expect("add_child: both parent and child NodeIds must be valid");
@@ -221,5 +225,146 @@ mod tests {
         let mut engine = LayoutEngine::new();
         let node = engine.create_node(FlexStyle::default());
         assert!(engine.get_layout(node).is_some());
+    }
+
+    #[test]
+    fn test_root_auto_size_promotion() {
+        let mut engine = LayoutEngine::new();
+        // Create a root node with Auto dimensions
+        let root = engine.create_node(FlexStyle {
+            width: None,
+            height: None,
+            ..Default::default()
+        });
+
+        // Compute layout with explicit constraints
+        let constraints = LayoutConstraints {
+            max_width: Some(800.0),
+            max_height: Some(600.0),
+            ..Default::default()
+        };
+        engine.compute_layout(root, constraints);
+
+        let layout = engine.get_layout(root).unwrap();
+        // Root should take the constraint size because it was Auto
+        assert_eq!(layout.width, 800.0);
+        assert_eq!(layout.height, 600.0);
+    }
+
+    #[test]
+    fn test_root_fixed_size_preservation() {
+        let mut engine = LayoutEngine::new();
+        // Create a root node with Fixed dimensions
+        let root = engine.create_node(FlexStyle {
+            width: Some(100.0),
+            height: Some(100.0),
+            ..Default::default()
+        });
+
+        // Compute layout with DIFFERENT constraints
+        let constraints = LayoutConstraints {
+            max_width: Some(800.0),
+            max_height: Some(600.0),
+            ..Default::default()
+        };
+        engine.compute_layout(root, constraints);
+
+        let layout = engine.get_layout(root).unwrap();
+        // Root should KEEP its fixed size, ignoring constraints
+        assert_eq!(layout.width, 100.0);
+        assert_eq!(layout.height, 100.0);
+    }
+
+    #[test]
+    fn test_flex_style_properties() {
+        let mut engine = LayoutEngine::new();
+
+        // Parent row with gap and padding
+        let parent = engine.create_node(FlexStyle {
+            direction: FlexDirection::Row,
+            width: Some(300.0), // 300px width
+            height: Some(100.0),
+            padding_left: 10.0,
+            padding_right: 10.0,
+            gap: 10.0,
+            ..Default::default()
+        });
+
+        // Two children sharing remaining space (300 - 20 padding - 10 gap = 270 available)
+        // Child 1: flex-grow 1
+        let child1 = engine.create_node(FlexStyle {
+            flex_grow: 1.0,
+            height: Some(50.0),
+            ..Default::default()
+        });
+
+        // Child 2: flex-grow 2 (should be twice as wide as child 1)
+        let child2 = engine.create_node(FlexStyle {
+            flex_grow: 2.0,
+            height: Some(50.0),
+            ..Default::default()
+        });
+
+        engine.add_child(parent, child1);
+        engine.add_child(parent, child2);
+
+        engine.compute_layout(parent, LayoutConstraints::default());
+
+        let l1 = engine.get_layout(child1).unwrap();
+        let l2 = engine.get_layout(child2).unwrap();
+
+        // Check widths: 270 total space. 1/3 to child1 (90), 2/3 to child2 (180).
+        assert_eq!(l1.width, 90.0);
+        assert_eq!(l2.width, 180.0);
+
+        // Check positions
+        // Child 1 x = padding_left = 10.0
+        assert_eq!(l1.x, 10.0);
+        // Child 2 x = padding_left + child1 width + gap = 10 + 90 + 10 = 110.0
+        assert_eq!(l2.x, 110.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SlotMap key used")]
+    fn test_add_child_invalid_parent() {
+        let mut engine = LayoutEngine::new();
+        let child = engine.create_node(FlexStyle::default());
+        // Fabricate an invalid NodeId (assuming 999999 is invalid for a fresh tree)
+        let invalid_parent = NodeId(taffy::NodeId::from(999999usize));
+        engine.add_child(invalid_parent, child);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SlotMap key used")]
+    fn test_compute_layout_invalid_root() {
+        let mut engine = LayoutEngine::new();
+        let invalid_root = NodeId(taffy::NodeId::from(999999usize));
+        engine.compute_layout(invalid_root, LayoutConstraints::default());
+    }
+
+    #[test]
+    fn test_deep_tree() {
+        // Ensure recursion doesn't blow up for a reasonably deep UI tree
+        let mut engine = LayoutEngine::new();
+        let mut parent = engine.create_node(FlexStyle {
+            width: Some(1000.0),
+            height: Some(1000.0),
+            ..Default::default()
+        });
+        let root = parent;
+
+        for _ in 0..100 {
+            let child = engine.create_node(FlexStyle {
+                width: Some(10.0),
+                height: Some(10.0),
+                ..Default::default()
+            });
+            engine.add_child(parent, child);
+            parent = child; // Nest deeply
+        }
+
+        engine.compute_layout(root, LayoutConstraints::default());
+        // If we get here without stack overflow, success.
+        assert!(engine.get_layout(parent).is_some());
     }
 }
