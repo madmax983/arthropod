@@ -1706,3 +1706,29 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_image_paint_image_transform_alias_maps_to_affine_matrix -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (15/15)
+
+### 2026-02-27 (parity continuation: image paint `imageRef`/`imageHash` mapping)
+
+- Goal:
+  - Improve Figma image-paint import compatibility for REST/plugin payloads that
+    identify images with string references (`imageRef`/`imageHash`) instead of numeric `imageId`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - `FigmaPaint::Image.image_id` now accepts aliases:
+      - `imageId`
+      - `imageRef`
+      - `imageHash`
+    - added `FigmaImageId` (untagged) to parse numeric IDs and string references.
+    - string references now map to stable `ImageId` values via deterministic hashing.
+    - added regression test:
+      - `figma_image_paint_image_ref_alias_maps_to_stable_image_id`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added row:
+      - `fills[].imageRef` / `fills[].imageHash` -> `Paint::Image.image_id` (stable `ImageId`)
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_image_paint_image_ref_alias_maps_to_stable_image_id -- --nocapture` -> FAIL (`missing field image_id`)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_image_paint_image_ref_alias_maps_to_stable_image_id -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (16/16)

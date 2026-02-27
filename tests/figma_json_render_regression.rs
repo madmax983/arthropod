@@ -1,6 +1,7 @@
 #![cfg(all(not(target_arch = "wasm32"), target_os = "windows"))]
 
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
@@ -229,13 +230,20 @@ enum FigmaPaint {
         stops: Vec<FigmaColorStop>,
     },
     Image {
-        #[serde(alias = "imageId")]
-        image_id: u64,
+        #[serde(alias = "imageId", alias = "imageRef", alias = "imageHash")]
+        image_id: FigmaImageId,
         #[serde(alias = "scaleMode")]
         scale_mode: FigmaImageScaleMode,
         #[serde(alias = "imageTransform")]
         transform: Option<FigmaImageTransform>,
     },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaImageId {
+    Numeric(u64),
+    Text(String),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -344,10 +352,19 @@ impl FigmaPaint {
                 scale_mode,
                 transform,
             } => Paint::Image(ImageFill {
-                image_id: ImageId(image_id),
+                image_id: image_id.into_image_id(),
                 scale_mode: scale_mode.into(),
                 transform: transform.map(FigmaImageTransform::into_matrix3x3),
             }),
+        }
+    }
+}
+
+impl FigmaImageId {
+    fn into_image_id(self) -> ImageId {
+        match self {
+            Self::Numeric(id) => ImageId(id),
+            Self::Text(reference) => ImageId(figma_image_reference_to_id(&reference)),
         }
     }
 }
@@ -362,6 +379,15 @@ impl FigmaImageTransform {
             ],
         }
     }
+}
+
+fn figma_image_reference_to_id(reference: &str) -> u64 {
+    if let Ok(parsed) = reference.parse::<u64>() {
+        return parsed;
+    }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    reference.hash(&mut hasher);
+    hasher.finish() | (1_u64 << 63)
 }
 
 impl FigmaEffect {
@@ -441,6 +467,53 @@ fn figma_image_paint_image_transform_alias_maps_to_affine_matrix() {
         fill.transform,
         Some([0.5, 0.0, 0.1, 0.0, 0.5, 0.2, 0.0, 0.0, 1.0]),
         "imageTransform 2x3 matrix should map to homogeneous 3x3"
+    );
+}
+
+#[test]
+fn figma_image_paint_image_ref_alias_maps_to_stable_image_id() {
+    let from_ref_a: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"IMAGE",
+            "imageRef":"figma-image-ref://asset-a",
+            "scaleMode":"FILL"
+        }"#,
+    )
+    .expect("failed to deserialize figma image paint with imageRef");
+    let from_ref_b: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"IMAGE",
+            "imageRef":"figma-image-ref://asset-a",
+            "scaleMode":"FILL"
+        }"#,
+    )
+    .expect("failed to deserialize repeated figma image paint with imageRef");
+    let from_hash: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"IMAGE",
+            "imageHash":"figma-image-ref://asset-b",
+            "scaleMode":"FILL"
+        }"#,
+    )
+    .expect("failed to deserialize figma image paint with imageHash");
+
+    let Paint::Image(fill_ref_a) = from_ref_a.into_paint() else {
+        panic!("expected image paint from imageRef payload");
+    };
+    let Paint::Image(fill_ref_b) = from_ref_b.into_paint() else {
+        panic!("expected image paint from repeated imageRef payload");
+    };
+    let Paint::Image(fill_hash) = from_hash.into_paint() else {
+        panic!("expected image paint from imageHash payload");
+    };
+
+    assert_eq!(
+        fill_ref_a.image_id, fill_ref_b.image_id,
+        "identical imageRef strings should produce stable image ids"
+    );
+    assert_ne!(
+        fill_ref_a.image_id, fill_hash.image_id,
+        "different image references should produce distinct image ids"
     );
 }
 
