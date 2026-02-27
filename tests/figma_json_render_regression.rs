@@ -206,6 +206,8 @@ enum FigmaBlendMode {
     LinearBurn,
     LinearDodge,
     PassThrough,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -608,6 +610,23 @@ fn figma_style_unsupported_paint_types_are_ignored() {
     assert!(
         matches!(style.fills[0], Paint::Solid(_)),
         "supported solid paint should still be retained"
+    );
+}
+
+#[test]
+fn figma_style_unknown_blend_mode_falls_back_to_normal() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "blendMode": "PLUS_DARKER"
+        }"#,
+    )
+    .expect("failed to deserialize figma style with unknown blend mode");
+
+    let style = figma_style.into_visual_style();
+    assert_eq!(
+        style.blend_mode,
+        BlendMode::Normal,
+        "unknown blend mode should map to BlendMode::Normal fallback"
     );
 }
 
@@ -1112,6 +1131,7 @@ impl From<FigmaBlendMode> for BlendMode {
             FigmaBlendMode::LinearBurn => Self::LinearBurn,
             FigmaBlendMode::LinearDodge => Self::LinearDodge,
             FigmaBlendMode::PassThrough => Self::PassThrough,
+            FigmaBlendMode::Unknown => Self::Normal,
         }
     }
 }

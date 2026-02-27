@@ -1834,7 +1834,7 @@ Exit gates:
 | `rectangleCornerRadii` | `CornerRadii { tl, tr, br, bl }` | 1 |
 | `cornerSmoothing` | `VisualStyle.corner_smoothing` | 2+ |
 | `opacity` | `VisualStyle.opacity` | Existing |
-| `blendMode` | `VisualStyle.blend_mode: BlendMode` | 2 (type) / 4 (render) |
+| `blendMode` | `VisualStyle.blend_mode: BlendMode` (unknown -> `Normal`) | 2 (type) / 4 (render) |
 | `clipsContent` | `VisualStyle.clips_content` | 4 |
 | `isMask` / `maskType` | Mask system (stencil-based) | 4 |
 | `fillGeometry` | `VisualStyle.fill_geometry` | 3 |

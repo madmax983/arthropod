@@ -1827,3 +1827,24 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_unsupported_paint_types_are_ignored -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (20/20)
+
+### 2026-02-27 (parity continuation: unknown blend mode fallback)
+
+- Goal:
+  - Avoid full-style deserialization failures when Figma introduces blend-mode
+    variants not yet mapped in our runtime enum.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - added `FigmaBlendMode::Unknown` via `#[serde(other)]`.
+    - mapped unknown blend modes to `BlendMode::Normal`.
+    - added regression test:
+      - `figma_style_unknown_blend_mode_falls_back_to_normal`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - `blendMode` row now documents unknown-value fallback to `Normal`.
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_unknown_blend_mode_falls_back_to_normal -- --nocapture` -> FAIL (`unknown variant PLUS_DARKER`)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_unknown_blend_mode_falls_back_to_normal -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (21/21)
