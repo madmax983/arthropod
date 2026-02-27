@@ -233,8 +233,17 @@ enum FigmaPaint {
         image_id: u64,
         #[serde(alias = "scaleMode")]
         scale_mode: FigmaImageScaleMode,
-        transform: Option<[f32; 9]>,
+        #[serde(alias = "imageTransform")]
+        transform: Option<FigmaImageTransform>,
     },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaImageTransform {
+    Matrix3x3([f32; 9]),
+    Rows2x3([[f32; 3]; 2]),
+    Rows3x3([[f32; 3]; 3]),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -337,8 +346,20 @@ impl FigmaPaint {
             } => Paint::Image(ImageFill {
                 image_id: ImageId(image_id),
                 scale_mode: scale_mode.into(),
-                transform,
+                transform: transform.map(FigmaImageTransform::into_matrix3x3),
             }),
+        }
+    }
+}
+
+impl FigmaImageTransform {
+    fn into_matrix3x3(self) -> [f32; 9] {
+        match self {
+            Self::Matrix3x3(matrix) => matrix,
+            Self::Rows2x3([[a, b, tx], [c, d, ty]]) => [a, b, tx, c, d, ty, 0.0, 0.0, 1.0],
+            Self::Rows3x3([row0, row1, row2]) => [
+                row0[0], row0[1], row0[2], row1[0], row1[1], row1[2], row2[0], row2[1], row2[2],
+            ],
         }
     }
 }
@@ -394,6 +415,33 @@ impl From<FigmaImageScaleMode> for ImageScaleMode {
 fn figma_image_scale_mode_stretch_maps_to_style_engine_stretch() {
     let mapped: ImageScaleMode = FigmaImageScaleMode::Stretch.into();
     assert!(matches!(mapped, ImageScaleMode::Stretch));
+}
+
+#[test]
+fn figma_image_paint_image_transform_alias_maps_to_affine_matrix() {
+    let figma_paint: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"IMAGE",
+            "imageId": 42,
+            "scaleMode": "CROP",
+            "imageTransform": [
+                [0.5, 0.0, 0.1],
+                [0.0, 0.5, 0.2]
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma image paint");
+
+    let paint = figma_paint.into_paint();
+    let Paint::Image(fill) = paint else {
+        panic!("expected image paint");
+    };
+
+    assert_eq!(
+        fill.transform,
+        Some([0.5, 0.0, 0.1, 0.0, 0.5, 0.2, 0.0, 0.0, 1.0]),
+        "imageTransform 2x3 matrix should map to homogeneous 3x3"
+    );
 }
 
 #[test]

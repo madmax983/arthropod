@@ -1683,3 +1683,26 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_fill_geometry_even_odd_winding_alias_maps -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (14/14)
+
+### 2026-02-27 (parity continuation: image paint `imageTransform` alias mapping)
+
+- Goal:
+  - Improve Figma image-paint compatibility for REST/plugin payloads that emit
+    transform data under `imageTransform` using a 2x3 affine matrix.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - `FigmaPaint::Image.transform` now accepts alias `imageTransform`.
+    - introduced `FigmaImageTransform` (untagged) to accept:
+      - flat `[f32; 9]` matrices,
+      - 2x3 row matrices (`[[a,b,tx],[c,d,ty]]`), normalized to homogeneous 3x3,
+      - 3x3 row matrices.
+    - added regression test:
+      - `figma_image_paint_image_transform_alias_maps_to_affine_matrix`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added row:
+      - `fills[].imageTransform` -> `Paint::Image.transform: Option<[f32; 9]>`
+- Verification:
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_image_paint_image_transform_alias_maps_to_affine_matrix -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (15/15)

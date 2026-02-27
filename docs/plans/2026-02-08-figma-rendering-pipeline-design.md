@@ -1814,6 +1814,7 @@ Exit gates:
 | `fills[].type: GRADIENT_ANGULAR` | `Paint::AngularGradient { ... }` | 2 |
 | `fills[].type: GRADIENT_DIAMOND` | `Paint::DiamondGradient { ... }` | 2 |
 | `fills[].type: IMAGE` | `Paint::Image { ... }` | 5+ |
+| `fills[].imageTransform` | `Paint::Image.transform: Option<[f32; 9]>` | 5+ |
 | `strokes: Paint[]` | `StrokeStyle.paints: Vec<Paint>` | 1-2 |
 | `strokeWeight` | `StrokeStyle.weight` | 1 |
 | `strokeAlign` | `StrokeStyle.align: StrokeAlign` | 1 |
