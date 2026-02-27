@@ -1760,3 +1760,22 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_image_paint_tile_scaling_factor_maps_to_transform -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (17/17)
+
+### 2026-02-27 (parity continuation: geometry `windingRule` alias `NONE`)
+
+- Goal:
+  - Improve vector-geometry import compatibility for payloads that emit
+    `windingRule: "NONE"` on path objects.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - extended `FigmaWindingRule` with alias variant `NONE`.
+    - mapped `FigmaWindingRule::None` to `WindingRule::NonZero` as a safe fallback.
+    - added regression test:
+      - `figma_style_stroke_geometry_none_winding_alias_maps`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_none_winding_alias_maps -- --nocapture` -> FAIL (`untagged enum FigmaPathGeometry` deserialize mismatch)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_none_winding_alias_maps -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (18/18)

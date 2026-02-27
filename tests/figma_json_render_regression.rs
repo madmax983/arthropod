@@ -126,6 +126,8 @@ enum FigmaWindingRule {
     NonZero,
     #[serde(rename = "EVENODD", alias = "EVEN_ODD")]
     EvenOdd,
+    #[serde(rename = "NONE")]
+    None,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -758,6 +760,39 @@ fn figma_style_fill_geometry_even_odd_winding_alias_maps() {
 }
 
 #[test]
+fn figma_style_stroke_geometry_none_winding_alias_maps() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 1.0,
+            "strokeGeometry": [
+                {
+                    "path": "M 0 0 L 12 0 L 6 8 Z",
+                    "windingRule": "NONE"
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let geometry = style
+        .stroke_geometry
+        .as_ref()
+        .expect("expected stroke geometry from NONE winding alias");
+    assert_eq!(
+        geometry.len(),
+        1,
+        "expected one mapped stroke geometry path"
+    );
+    assert_eq!(
+        geometry[0].winding_rule,
+        WindingRule::NonZero,
+        "NONE winding should safely map to NonZero fallback"
+    );
+}
+
+#[test]
 fn figma_style_stroke_geometry_maps_svg_path_strings() {
     let figma_style: FigmaStyle = serde_json::from_str(
         r#"{
@@ -952,6 +987,7 @@ impl From<FigmaWindingRule> for WindingRule {
         match value {
             FigmaWindingRule::NonZero => Self::NonZero,
             FigmaWindingRule::EvenOdd => Self::EvenOdd,
+            FigmaWindingRule::None => Self::NonZero,
         }
     }
 }
