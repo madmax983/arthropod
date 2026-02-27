@@ -133,5 +133,6 @@ fn default_style() -> FlexStyle {
         padding_right: 0.0,
         padding_top: 0.0,
         padding_bottom: 0.0,
+        ..FlexStyle::default()
     }
 }

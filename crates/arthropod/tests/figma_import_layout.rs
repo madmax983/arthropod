@@ -2,7 +2,9 @@ use arthropod::figma::{
     ConstraintAxis, ImportedComponentKind, LayoutPositioning, PrototypeTrigger,
     import_figma_document,
 };
-use layout_engine::FlexDirection;
+use layout_engine::{
+    FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf,
+};
 use render_engine::NodeContent;
 use style_engine::{FontStyle, LineHeight, TextAlign};
 
@@ -69,6 +71,74 @@ fn figma_auto_layout_maps_to_flex_style_and_hierarchy() {
         Some(root_scene_id),
         "child should be attached to mapped parent in imported scene"
     );
+}
+
+#[test]
+fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "1000",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 640, "height": 240 },
+                "layoutMode": "HORIZONTAL",
+                "layoutWrap": "WRAP",
+                "primaryAxisAlignItems": "SPACE_BETWEEN",
+                "counterAxisAlignItems": "CENTER",
+                "minWidth": 320,
+                "maxWidth": 900,
+                "minHeight": 120,
+                "maxHeight": 400
+            },
+            {
+                "id": "1001",
+                "parentId": "1000",
+                "type": "RECTANGLE",
+                "absoluteBoundingBox": { "x": 20, "y": 20, "width": 120, "height": 44 },
+                "layoutAlign": "STRETCH",
+                "layoutSizingHorizontal": "FILL",
+                "layoutSizingVertical": "HUG"
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let root_id = imported
+        .figma_to_scene
+        .get("1000")
+        .copied()
+        .expect("root node should map");
+    let child_id = imported
+        .figma_to_scene
+        .get("1001")
+        .copied()
+        .expect("child node should map");
+
+    let root_style = imported
+        .layout_styles
+        .get(&root_id)
+        .expect("root style should exist");
+    assert_eq!(root_style.wrap, FlexWrap::Wrap);
+    assert_eq!(
+        root_style.justify_content,
+        FlexJustifyContent::SpaceBetween
+    );
+    assert_eq!(root_style.align_items, FlexAlign::Center);
+    assert_eq!(root_style.min_width, Some(320.0));
+    assert_eq!(root_style.max_width, Some(900.0));
+    assert_eq!(root_style.min_height, Some(120.0));
+    assert_eq!(root_style.max_height, Some(400.0));
+
+    let child_style = imported
+        .layout_styles
+        .get(&child_id)
+        .expect("child style should exist");
+    assert_eq!(child_style.align_self, Some(ItemAlignSelf::Stretch));
+    assert!(
+        child_style.flex_grow >= 1.0,
+        "FILL sizing should project to grow behavior"
+    );
+    assert_eq!(child_style.height, None, "HUG sizing should keep auto height");
 }
 
 #[test]

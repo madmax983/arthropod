@@ -1,6 +1,9 @@
 //! Flexbox layout tests - Written FIRST following TDD
 
-use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
+use layout_engine::{
+    FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, LayoutConstraints,
+    LayoutEngine,
+};
 
 #[test]
 fn test_flex_row_distributes_space() {
@@ -155,4 +158,85 @@ fn test_flex_padding() {
     // Child should be offset by padding
     assert_eq!(layout.x, 10.0);
     assert_eq!(layout.y, 20.0);
+}
+
+#[test]
+fn test_flex_justify_space_between_distributes_children() {
+    let mut engine = LayoutEngine::new();
+
+    let root = engine.create_node(FlexStyle {
+        direction: FlexDirection::Row,
+        justify_content: FlexJustifyContent::SpaceBetween,
+        ..Default::default()
+    });
+
+    let child1 = engine.create_node(FlexStyle {
+        width: Some(50.0),
+        height: Some(20.0),
+        ..Default::default()
+    });
+    let child2 = engine.create_node(FlexStyle {
+        width: Some(50.0),
+        height: Some(20.0),
+        ..Default::default()
+    });
+
+    engine.add_child(root, child1);
+    engine.add_child(root, child2);
+    engine.compute_layout(
+        root,
+        LayoutConstraints {
+            max_width: Some(200.0),
+            max_height: Some(40.0),
+            ..Default::default()
+        },
+    );
+
+    let layout1 = engine.get_layout(child1).unwrap();
+    let layout2 = engine.get_layout(child2).unwrap();
+    assert_eq!(layout1.x, 0.0);
+    assert_eq!(layout2.x, 150.0);
+}
+
+#[test]
+fn test_flex_wrap_moves_children_to_next_line() {
+    let mut engine = LayoutEngine::new();
+
+    let root = engine.create_node(FlexStyle {
+        direction: FlexDirection::Row,
+        wrap: FlexWrap::Wrap,
+        align_items: FlexAlign::Start,
+        ..Default::default()
+    });
+
+    let child1 = engine.create_node(FlexStyle {
+        width: Some(60.0),
+        height: Some(20.0),
+        ..Default::default()
+    });
+    let child2 = engine.create_node(FlexStyle {
+        width: Some(60.0),
+        height: Some(20.0),
+        ..Default::default()
+    });
+
+    engine.add_child(root, child1);
+    engine.add_child(root, child2);
+    engine.compute_layout(
+        root,
+        LayoutConstraints {
+            max_width: Some(100.0),
+            max_height: Some(100.0),
+            ..Default::default()
+        },
+    );
+
+    let layout1 = engine.get_layout(child1).unwrap();
+    let layout2 = engine.get_layout(child2).unwrap();
+    assert_eq!(layout1.x, 0.0);
+    assert_eq!(layout2.x, 0.0);
+    assert!(
+        layout2.y >= 20.0,
+        "second child should wrap to next row when width overflows"
+    );
 }

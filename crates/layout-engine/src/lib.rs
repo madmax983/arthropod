@@ -3,12 +3,19 @@
 //! Provides flexbox layout computation with caching for Arthropod UI.
 //! Targets < 1ms for 1000 nodes with incremental updates.
 
-use taffy::prelude::*;
+use taffy::{
+    prelude::{AvailableSpace, Dimension, LengthPercentage, Rect, Style, TaffyTree},
+    style::{
+        AlignItems as TaffyAlignItems, AlignSelf as TaffyAlignSelf,
+        FlexDirection as TaffyFlexDirection, FlexWrap as TaffyFlexWrap,
+        JustifyContent as TaffyJustifyContent,
+    },
+};
 
 pub mod cache;
 
 /// Re-export common types
-pub use taffy::{geometry::Size, style::FlexDirection as TaffyFlexDirection};
+pub use taffy::geometry::Size;
 
 /// Layout engine wrapping taffy with caching
 pub struct LayoutEngine {
@@ -40,6 +47,24 @@ pub struct FlexStyle {
     pub padding_top: f32,
     /// Bottom padding in points
     pub padding_bottom: f32,
+    /// Main-axis distribution of children
+    pub justify_content: FlexJustifyContent,
+    /// Cross-axis alignment for children
+    pub align_items: FlexAlign,
+    /// Per-item cross-axis override (None = auto/inherit parent)
+    pub align_self: Option<ItemAlignSelf>,
+    /// Whether children wrap to additional lines
+    pub wrap: FlexWrap,
+    /// Preferred initial size along main axis
+    pub flex_basis: Option<f32>,
+    /// Max width in points
+    pub max_width: Option<f32>,
+    /// Max height in points
+    pub max_height: Option<f32>,
+    /// Min width in points
+    pub min_width: Option<f32>,
+    /// Min height in points
+    pub min_height: Option<f32>,
 }
 
 /// Flex direction
@@ -52,6 +77,47 @@ pub enum FlexDirection {
     Row,
     /// Children are arranged vertically (top to bottom)
     Column,
+}
+
+/// Main-axis child distribution.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FlexJustifyContent {
+    #[default]
+    Start,
+    Center,
+    End,
+    SpaceBetween,
+    SpaceAround,
+    SpaceEvenly,
+}
+
+/// Cross-axis alignment.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FlexAlign {
+    Start,
+    Center,
+    End,
+    #[default]
+    Stretch,
+}
+
+/// Child wrapping behavior.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FlexWrap {
+    #[default]
+    NoWrap,
+    Wrap,
+}
+
+/// Per-item cross-axis override.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ItemAlignSelf {
+    #[default]
+    Auto,
+    Start,
+    Center,
+    End,
+    Stretch,
 }
 
 /// Layout constraints for root nodes
@@ -196,11 +262,45 @@ fn convert_style(style: FlexStyle) -> Style {
             FlexDirection::Row => TaffyFlexDirection::Row,
             FlexDirection::Column => TaffyFlexDirection::Column,
         },
+        justify_content: Some(match style.justify_content {
+            FlexJustifyContent::Start => TaffyJustifyContent::Start,
+            FlexJustifyContent::Center => TaffyJustifyContent::Center,
+            FlexJustifyContent::End => TaffyJustifyContent::End,
+            FlexJustifyContent::SpaceBetween => TaffyJustifyContent::SpaceBetween,
+            FlexJustifyContent::SpaceAround => TaffyJustifyContent::SpaceAround,
+            FlexJustifyContent::SpaceEvenly => TaffyJustifyContent::SpaceEvenly,
+        }),
+        align_items: Some(match style.align_items {
+            FlexAlign::Start => TaffyAlignItems::Start,
+            FlexAlign::Center => TaffyAlignItems::Center,
+            FlexAlign::End => TaffyAlignItems::End,
+            FlexAlign::Stretch => TaffyAlignItems::Stretch,
+        }),
+        align_self: style.align_self.and_then(|align| match align {
+            ItemAlignSelf::Auto => None,
+            ItemAlignSelf::Start => Some(TaffyAlignSelf::Start),
+            ItemAlignSelf::Center => Some(TaffyAlignSelf::Center),
+            ItemAlignSelf::End => Some(TaffyAlignSelf::End),
+            ItemAlignSelf::Stretch => Some(TaffyAlignSelf::Stretch),
+        }),
+        flex_wrap: match style.wrap {
+            FlexWrap::NoWrap => TaffyFlexWrap::NoWrap,
+            FlexWrap::Wrap => TaffyFlexWrap::Wrap,
+        },
         flex_grow: style.flex_grow,
         flex_shrink: style.flex_shrink,
+        flex_basis: style.flex_basis.map_or(Dimension::Auto, Dimension::Length),
         size: Size {
             width: style.width.map_or(Dimension::Auto, Dimension::Length),
             height: style.height.map_or(Dimension::Auto, Dimension::Length),
+        },
+        min_size: Size {
+            width: style.min_width.map_or(Dimension::Auto, Dimension::Length),
+            height: style.min_height.map_or(Dimension::Auto, Dimension::Length),
+        },
+        max_size: Size {
+            width: style.max_width.map_or(Dimension::Auto, Dimension::Length),
+            height: style.max_height.map_or(Dimension::Auto, Dimension::Length),
         },
         gap: Size {
             width: LengthPercentage::Length(style.gap),

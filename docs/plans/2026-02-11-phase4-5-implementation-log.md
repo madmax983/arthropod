@@ -2035,3 +2035,58 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (import parity slice 1: advanced auto-layout fidelity)
+
+- Goal:
+  - Implement production-level Figma auto-layout fidelity beyond direction/gap/padding:
+    - alignment (main-axis + cross-axis)
+    - wrapping
+    - min/max size constraints
+    - child align-self override
+    - sizing mode handling (`FILL` / `HUG` / `FIXED`)
+- RED:
+  - Added importer regression in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_auto_layout_maps_alignment_wrap_and_size_constraints`
+  - Added layout-engine behavior regressions in `crates/layout-engine/tests/flex_tests.rs`:
+    - `test_flex_justify_space_between_distributes_children`
+    - `test_flex_wrap_moves_children_to_next_line`
+  - Ran:
+    - `cargo test -p layout-engine --test flex_tests -- --nocapture`
+  - Result: FAIL (expected): missing advanced `FlexStyle` fields + missing exported alignment/wrap enums.
+- GREEN:
+  - Extended `crates/layout-engine/src/lib.rs`:
+    - added advanced style enums:
+      - `FlexJustifyContent`
+      - `FlexAlign`
+      - `FlexWrap`
+      - `ItemAlignSelf`
+    - expanded `FlexStyle` with:
+      - `justify_content`, `align_items`, `align_self`, `wrap`
+      - `flex_basis`
+      - `min_width`, `max_width`, `min_height`, `max_height`
+    - updated taffy conversion to map all new fields into:
+      - `justify_content`, `align_items`, `align_self`, `flex_wrap`, `flex_basis`
+      - `min_size`, `max_size`
+  - Extended importer mapping in `crates/arthropod/src/figma.rs`:
+    - parsed Figma layout fields:
+      - `primaryAxisAlignItems`
+      - `counterAxisAlignItems`
+      - `layoutWrap`
+      - `layoutAlign`
+      - `layoutSizingHorizontal`
+      - `layoutSizingVertical`
+      - `minWidth`, `maxWidth`, `minHeight`, `maxHeight`
+    - mapped to advanced `FlexStyle` semantics (including fill/hug/fixed sizing behavior).
+  - Updated explicit style initializer in `crates/arthropod-ecs/src/layout_bridge.rs`
+    to remain valid with the expanded `FlexStyle`.
+  - Ran:
+    - `cargo test -p layout-engine --test flex_tests -- --nocapture`
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: PASS.
+- REFACTOR / verification:
+  - Ran:
+    - `cargo test -p layout-engine` -> PASS
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p layout-engine -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)

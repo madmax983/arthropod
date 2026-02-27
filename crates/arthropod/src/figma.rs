@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use layout_engine::{FlexDirection, FlexStyle};
+use layout_engine::{
+    FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, ItemAlignSelf,
+};
 use plat_core::Rect;
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use serde::Deserialize;
@@ -343,9 +345,21 @@ struct FigmaNode {
     #[serde(default)]
     layout_mode: Option<FigmaLayoutMode>,
     #[serde(default)]
+    primary_axis_align_items: Option<FigmaPrimaryAxisAlignItems>,
+    #[serde(default)]
+    counter_axis_align_items: Option<FigmaCounterAxisAlignItems>,
+    #[serde(default)]
+    layout_wrap: Option<FigmaLayoutWrap>,
+    #[serde(default)]
     primary_axis_sizing_mode: Option<FigmaAxisSizingMode>,
     #[serde(default)]
     counter_axis_sizing_mode: Option<FigmaAxisSizingMode>,
+    #[serde(default)]
+    layout_align: Option<FigmaLayoutAlign>,
+    #[serde(default)]
+    layout_sizing_horizontal: Option<FigmaLayoutSizingMode>,
+    #[serde(default)]
+    layout_sizing_vertical: Option<FigmaLayoutSizingMode>,
     #[serde(default)]
     item_spacing: Option<f32>,
     #[serde(default)]
@@ -358,6 +372,14 @@ struct FigmaNode {
     padding_bottom: Option<f32>,
     #[serde(default)]
     layout_grow: Option<f32>,
+    #[serde(default)]
+    min_width: Option<f32>,
+    #[serde(default)]
+    max_width: Option<f32>,
+    #[serde(default)]
+    min_height: Option<f32>,
+    #[serde(default)]
+    max_height: Option<f32>,
     #[serde(default)]
     constraints: Option<FigmaConstraints>,
     #[serde(default)]
@@ -394,6 +416,19 @@ impl FigmaNode {
                 FigmaLayoutMode::Vertical => FlexDirection::Column,
                 FigmaLayoutMode::None | FigmaLayoutMode::Unknown => FlexDirection::Column,
             },
+            justify_content: self
+                .primary_axis_align_items
+                .map(FigmaPrimaryAxisAlignItems::to_justify_content)
+                .unwrap_or(FlexJustifyContent::Start),
+            align_items: self
+                .counter_axis_align_items
+                .map(FigmaCounterAxisAlignItems::to_align)
+                .unwrap_or(FlexAlign::Stretch),
+            wrap: self
+                .layout_wrap
+                .map(FigmaLayoutWrap::to_wrap)
+                .unwrap_or(FlexWrap::NoWrap),
+            align_self: self.layout_align.and_then(FigmaLayoutAlign::to_align_self),
             flex_grow: self
                 .layout_grow
                 .filter(|value| value.is_finite() && *value >= 0.0)
@@ -418,6 +453,18 @@ impl FigmaNode {
                 .padding_bottom
                 .filter(|value| value.is_finite())
                 .unwrap_or(0.0),
+            min_width: self
+                .min_width
+                .filter(|value| value.is_finite() && *value >= 0.0),
+            max_width: self
+                .max_width
+                .filter(|value| value.is_finite() && *value >= 0.0),
+            min_height: self
+                .min_height
+                .filter(|value| value.is_finite() && *value >= 0.0),
+            max_height: self
+                .max_height
+                .filter(|value| value.is_finite() && *value >= 0.0),
             ..FlexStyle::default()
         };
 
@@ -436,6 +483,39 @@ impl FigmaNode {
             FigmaLayoutMode::None | FigmaLayoutMode::Unknown => {
                 style.width = Some(bounds.width);
                 style.height = Some(bounds.height);
+            }
+        }
+
+        if let Some(sizing) = self.layout_sizing_horizontal {
+            match sizing {
+                FigmaLayoutSizingMode::Fixed => {
+                    style.width = Some(bounds.width);
+                }
+                FigmaLayoutSizingMode::Hug | FigmaLayoutSizingMode::Auto => {
+                    style.width = None;
+                }
+                FigmaLayoutSizingMode::Fill => {
+                    style.width = None;
+                    style.flex_grow = style.flex_grow.max(1.0);
+                    style.align_self.get_or_insert(ItemAlignSelf::Stretch);
+                }
+                FigmaLayoutSizingMode::Unknown => {}
+            }
+        }
+        if let Some(sizing) = self.layout_sizing_vertical {
+            match sizing {
+                FigmaLayoutSizingMode::Fixed => {
+                    style.height = Some(bounds.height);
+                }
+                FigmaLayoutSizingMode::Hug | FigmaLayoutSizingMode::Auto => {
+                    style.height = None;
+                }
+                FigmaLayoutSizingMode::Fill => {
+                    style.height = None;
+                    style.flex_grow = style.flex_grow.max(1.0);
+                    style.align_self.get_or_insert(ItemAlignSelf::Stretch);
+                }
+                FigmaLayoutSizingMode::Unknown => {}
             }
         }
 
@@ -695,6 +775,112 @@ enum FigmaLayoutMode {
     None,
     Horizontal,
     Vertical,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPrimaryAxisAlignItems {
+    Min,
+    Center,
+    Max,
+    SpaceBetween,
+    SpaceAround,
+    SpaceEvenly,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaPrimaryAxisAlignItems {
+    fn to_justify_content(self) -> FlexJustifyContent {
+        match self {
+            Self::Min => FlexJustifyContent::Start,
+            Self::Center => FlexJustifyContent::Center,
+            Self::Max => FlexJustifyContent::End,
+            Self::SpaceBetween => FlexJustifyContent::SpaceBetween,
+            Self::SpaceAround => FlexJustifyContent::SpaceAround,
+            Self::SpaceEvenly => FlexJustifyContent::SpaceEvenly,
+            Self::Unknown => FlexJustifyContent::Start,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaCounterAxisAlignItems {
+    Min,
+    Center,
+    Max,
+    Baseline,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaCounterAxisAlignItems {
+    fn to_align(self) -> FlexAlign {
+        match self {
+            Self::Min => FlexAlign::Start,
+            Self::Center => FlexAlign::Center,
+            Self::Max => FlexAlign::End,
+            Self::Baseline => FlexAlign::Start,
+            Self::Unknown => FlexAlign::Stretch,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaLayoutWrap {
+    NoWrap,
+    Wrap,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaLayoutWrap {
+    fn to_wrap(self) -> FlexWrap {
+        match self {
+            Self::NoWrap => FlexWrap::NoWrap,
+            Self::Wrap => FlexWrap::Wrap,
+            Self::Unknown => FlexWrap::NoWrap,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaLayoutAlign {
+    Inherit,
+    Stretch,
+    Min,
+    Center,
+    Max,
+    #[serde(rename = "AUTO")]
+    Auto,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaLayoutAlign {
+    fn to_align_self(self) -> Option<ItemAlignSelf> {
+        match self {
+            Self::Inherit | Self::Auto | Self::Unknown => None,
+            Self::Stretch => Some(ItemAlignSelf::Stretch),
+            Self::Min => Some(ItemAlignSelf::Start),
+            Self::Center => Some(ItemAlignSelf::Center),
+            Self::Max => Some(ItemAlignSelf::End),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaLayoutSizingMode {
+    Fill,
+    Hug,
+    Fixed,
+    Auto,
     #[serde(other)]
     Unknown,
 }
