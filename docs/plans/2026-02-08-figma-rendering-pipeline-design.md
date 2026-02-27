@@ -1820,6 +1820,7 @@ Exit gates:
 | `strokeCap` | `StrokeStyle.cap: StrokeCap` | 3 |
 | `strokeJoin` | `StrokeStyle.join: StrokeJoin` | 3 |
 | `strokeDashes` | `StrokeStyle.dash_pattern: Vec<f32>` | 3 |
+| `dashOffset` | `StrokeStyle.dash_offset: f32` | 3 |
 | `individualStrokeWeights` | `StrokeStyle.individual_weights` | 2 |
 | `effects[].DROP_SHADOW` | `Effect::DropShadow { ... }` | 1 (fast) / 4 (full) |
 | `effects[].INNER_SHADOW` | `Effect::InnerShadow { ... }` | 4 |

@@ -1574,3 +1574,25 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo test --test figma_json_render_regression figma_style_stroke_miter_angle_maps_to_miter_limit -- --nocapture` -> PASS
   - `cargo test --test figma_json_render_regression figma_style_explicit_stroke_miter_limit_overrides_angle_mapping -- --nocapture` -> PASS
   - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (8/8)
+
+### 2026-02-27 (parity continuation: Figma `dashOffset` mapping)
+
+- Goal:
+  - Close an additional stroke metadata parity gap by mapping Figma `dashOffset` into `StrokeStyle.dash_offset`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - Added `FigmaStyle.dash_offset` with `strokeDashOffset` alias support.
+    - Applied mapping in `FigmaStyle::into_visual_style(...)`:
+      - finite `dashOffset` values map to `StrokeStyle.dash_offset`.
+      - non-finite values fall back to default stroke dash offset.
+    - Added regression test:
+      - `figma_style_dash_offset_maps_to_stroke_style_dash_offset`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added `dashOffset -> StrokeStyle.dash_offset`.
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_dash_offset_maps_to_stroke_style_dash_offset -- --nocapture` -> FAIL (expected, unmapped)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_dash_offset_maps_to_stroke_style_dash_offset -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (9/9)

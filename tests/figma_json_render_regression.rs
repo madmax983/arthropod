@@ -84,6 +84,8 @@ struct FigmaStyle {
     stroke_miter_angle: Option<f32>,
     stroke_miter_limit: Option<f32>,
     stroke_dashes: Option<Vec<f32>>,
+    #[serde(alias = "strokeDashOffset")]
+    dash_offset: Option<f32>,
     #[serde(alias = "individualStrokeWeights")]
     individual_stroke_weights: Option<FigmaSideWeights>,
     #[serde(default)]
@@ -405,6 +407,26 @@ fn figma_style_stroke_cap_join_and_dashes_map_to_stroke_style() {
 }
 
 #[test]
+fn figma_style_dash_offset_maps_to_stroke_style_dash_offset() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeDashes": [4.0, 2.0],
+            "dashOffset": 3.5
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert_eq!(stroke.dash_pattern, vec![4.0, 2.0]);
+    assert!(
+        (stroke.dash_offset - 3.5).abs() < 1e-6,
+        "dashOffset should map to StrokeStyle.dash_offset"
+    );
+}
+
+#[test]
 fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
     let radial: FigmaPaint = serde_json::from_str(
         r#"{
@@ -676,6 +698,10 @@ impl FigmaStyle {
                     })
                     .unwrap_or(StrokeStyle::default().miter_limit),
                 dash_pattern: self.stroke_dashes.unwrap_or_default(),
+                dash_offset: self
+                    .dash_offset
+                    .filter(|v| v.is_finite())
+                    .unwrap_or(StrokeStyle::default().dash_offset),
                 ..StrokeStyle::default()
             };
             if stroke.paints.is_empty() {
