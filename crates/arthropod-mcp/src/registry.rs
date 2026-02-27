@@ -29,45 +29,159 @@ pub enum SignalEntry {
     // More types can be added as needed
 }
 
-/// Registry for named signals that can be controlled via MCP
+/// Registry for named signals that can be controlled via MCP.
+///
+/// This registry allows external tools (like an MCP client) to read and modify
+/// specific signals in the application state. It acts as a bridge between
+/// the reactive [`flux-state`] system and the outside world.
+///
+/// # Limits
+///
+/// To prevent Denial of Service (DoS) attacks and unbounded memory usage,
+/// the registry enforces the following limits:
+///
+/// - **Maximum Signals**: 1000
+/// - **Maximum Name Length**: 64 characters
+///
+/// Attempting to exceed these limits will result in an error.
 pub struct SignalRegistry {
     entries: HashMap<String, SignalEntry>,
 }
 
 impl SignalRegistry {
-    /// Create a new empty signal registry
+    /// Create a new empty signal registry.
     pub fn new() -> Self {
         Self {
             entries: HashMap::new(),
         }
     }
 
-    /// Register a color signal
+    /// Register a color signal for remote control.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Unique identifier for the signal (max 64 chars).
+    /// * `read` - Read handle to the signal.
+    /// * `write` - Write handle to the signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The registry is full (1000 signals).
+    /// - The name is too long (> 64 chars).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod_mcp::SignalRegistry;
+    /// use flux_state::{Runtime, Signal};
+    /// use render_engine::Color;
+    ///
+    /// let runtime = Runtime::new();
+    /// let signal = Signal::new(runtime, Color::RED);
+    /// let (read, write) = signal.split();
+    ///
+    /// let mut registry = SignalRegistry::new();
+    /// registry.register_color("my_color".to_string(), read, write).unwrap();
+    /// ```
     pub fn register_color(
         &mut self,
         name: String,
         read: ReadSignal<Color>,
         write: WriteSignal<Color>,
-    ) {
+    ) -> Result<()> {
+        self.validate_registration(&name)?;
         self.entries
             .insert(name, SignalEntry::ColorSignal { read, write });
+        Ok(())
     }
 
-    /// Register an f32 signal
-    pub fn register_f32(&mut self, name: String, read: ReadSignal<f32>, write: WriteSignal<f32>) {
+    /// Register an f32 signal for remote control.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Unique identifier for the signal (max 64 chars).
+    /// * `read` - Read handle to the signal.
+    /// * `write` - Write handle to the signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The registry is full (1000 signals).
+    /// - The name is too long (> 64 chars).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod_mcp::SignalRegistry;
+    /// use flux_state::{Runtime, Signal};
+    ///
+    /// let runtime = Runtime::new();
+    /// let signal = Signal::new(runtime, 1.0f32);
+    /// let (read, write) = signal.split();
+    ///
+    /// let mut registry = SignalRegistry::new();
+    /// registry.register_f32("opacity".to_string(), read, write).unwrap();
+    /// ```
+    pub fn register_f32(
+        &mut self,
+        name: String,
+        read: ReadSignal<f32>,
+        write: WriteSignal<f32>,
+    ) -> Result<()> {
+        self.validate_registration(&name)?;
         self.entries
             .insert(name, SignalEntry::F32Signal { read, write });
+        Ok(())
     }
 
-    /// Register a bool signal
+    /// Register a bool signal for remote control.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Unique identifier for the signal (max 64 chars).
+    /// * `read` - Read handle to the signal.
+    /// * `write` - Write handle to the signal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The registry is full (1000 signals).
+    /// - The name is too long (> 64 chars).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod_mcp::SignalRegistry;
+    /// use flux_state::{Runtime, Signal};
+    ///
+    /// let runtime = Runtime::new();
+    /// let signal = Signal::new(runtime, true);
+    /// let (read, write) = signal.split();
+    ///
+    /// let mut registry = SignalRegistry::new();
+    /// registry.register_bool("is_visible".to_string(), read, write).unwrap();
+    /// ```
     pub fn register_bool(
         &mut self,
         name: String,
         read: ReadSignal<bool>,
         write: WriteSignal<bool>,
-    ) {
+    ) -> Result<()> {
+        self.validate_registration(&name)?;
         self.entries
             .insert(name, SignalEntry::BoolSignal { read, write });
+        Ok(())
+    }
+
+    fn validate_registration(&self, name: &str) -> Result<()> {
+        if self.entries.len() >= 1000 {
+            return Err(anyhow!("Signal registry limit (1000) reached"));
+        }
+        if name.len() > 64 {
+            return Err(anyhow!("Signal name too long (max 64 chars)"));
+        }
+        Ok(())
     }
 
     /// Set a color signal value
@@ -174,7 +288,9 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry.register_color("test_color".to_string(), read.clone(), write);
+        registry
+            .register_color("test_color".to_string(), read.clone(), write)
+            .unwrap();
 
         // Set new color
         let old = registry.set_color("test_color", Color::BLUE).unwrap();
@@ -191,7 +307,9 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry.register_f32("test_f32".to_string(), read.clone(), write);
+        registry
+            .register_f32("test_f32".to_string(), read.clone(), write)
+            .unwrap();
 
         let old = registry.set_f32("test_f32", 2.5).unwrap();
         assert_eq!(old, 1.0);
@@ -205,7 +323,9 @@ mod tests {
         let (read, write) = signal.split();
 
         let mut registry = SignalRegistry::new();
-        registry.register_color("test_color".to_string(), read, write);
+        registry
+            .register_color("test_color".to_string(), read, write)
+            .unwrap();
 
         // Try to set as f32 (should fail)
         let result = registry.set_f32("test_color", 1.0);
@@ -233,8 +353,12 @@ mod tests {
         let (r1, w1) = color_sig.split();
         let (r2, w2) = f32_sig.split();
 
-        registry.register_color("color1".to_string(), r1, w1);
-        registry.register_f32("opacity".to_string(), r2, w2);
+        registry
+            .register_color("color1".to_string(), r1, w1)
+            .unwrap();
+        registry
+            .register_f32("opacity".to_string(), r2, w2)
+            .unwrap();
 
         let signals = registry.list_signals();
         assert_eq!(signals.len(), 2);
@@ -249,7 +373,9 @@ mod tests {
 
         let color_sig = Signal::new(runtime.clone(), Color::RED);
         let (read, write) = color_sig.split();
-        registry.register_color("test".to_string(), read, write);
+        registry
+            .register_color("test".to_string(), read, write)
+            .unwrap();
 
         assert_eq!(registry.get_type("test"), Some("color"));
         assert_eq!(registry.get_type("nonexistent"), None);

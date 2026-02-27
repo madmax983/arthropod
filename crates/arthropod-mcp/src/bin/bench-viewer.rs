@@ -204,6 +204,7 @@ fn parse_duration(val_str: &str, unit_str: &str) -> DurationVal {
     }
 }
 
+#[allow(clippy::collapsible_if)]
 fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
     let mut benchmarks = Vec::new();
 
@@ -256,6 +257,7 @@ fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
     benchmarks
 }
 
+#[allow(clippy::collapsible_if)]
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
 where
     <B as ratatui::backend::Backend>::Error: Send + Sync + 'static,

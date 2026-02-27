@@ -13,22 +13,38 @@ use std::collections::HashSet;
 // scene.list_nodes
 // ============================================================================
 
-/// List all nodes with optional filtering
+/// List all scene nodes with optional filtering.
+///
+/// This tool returns a flat list of node summaries, which is useful for
+/// discovering elements in the UI.
+///
+/// # Returns
+///
+/// Returns a JSON object `{"nodes": [...]}` where each node summary includes:
+/// - `id`: Unique node identifier
+/// - `content_type`: String (e.g., "Text", "Rect", "RoundedRect")
+/// - `visible`: Boolean visibility status
+/// - `opacity`: Current opacity (0.0 - 1.0)
+/// - `bounds`: Screen-space bounding box
 pub struct ListNodesTool;
 
 #[derive(Debug, Deserialize)]
 struct ListNodesParams {
+    /// Optional filter criteria
     #[serde(default)]
     filter: ListNodesFilter,
 }
 
 #[derive(Debug, Default, Deserialize)]
 struct ListNodesFilter {
+    /// If true, only return nodes that are currently visible.
     #[serde(default)]
     visible_only: bool,
 
+    /// Filter by content type (e.g., "Text", "Rect").
     content_type: Option<String>,
 
+    /// Filter by parent node ID.
     parent_id: Option<u64>,
 }
 
@@ -158,11 +174,23 @@ impl Tool for ListNodesTool {
 // scene.get_node
 // ============================================================================
 
-/// Get detailed information about a specific node
+/// Get detailed information about a specific scene node.
+///
+/// This provides the full state of a node, including its content-specific data
+/// (e.g., text string, font size, fill color) and hierarchy links.
+///
+/// # Returns
+///
+/// Returns a JSON object with:
+/// - `id`, `bounds`, `visible`, `opacity`
+/// - `content`: Type-specific data (e.g., `text` string)
+/// - `parent_id`: ID of the parent node (if any)
+/// - `children`: List of child node IDs
 pub struct GetNodeTool;
 
 #[derive(Debug, Deserialize)]
 struct GetNodeParams {
+    /// The unique ID of the node to inspect.
     id: u64,
 }
 
@@ -420,12 +448,25 @@ impl Tool for QueryHierarchyTool {
 // scene.find_nodes_at_position
 // ============================================================================
 
-/// Find nodes at a specific screen position
+/// Find nodes at a specific screen position (Hit Testing).
+///
+/// Returns a list of all nodes whose bounding box contains the given point.
+///
+/// # Sorting
+///
+/// The list is returned in arbitrary order (based on internal storage iteration).
+/// It is **not** sorted by Z-index or draw order.
+///
+/// # Precision
+///
+/// This checks *bounds* (AABB), not precise pixel alpha or shape.
 pub struct FindNodesAtPositionTool;
 
 #[derive(Debug, Deserialize)]
 struct FindNodesAtPositionParams {
+    /// Screen X coordinate
     x: f32,
+    /// Screen Y coordinate
     y: f32,
 }
 

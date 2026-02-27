@@ -75,7 +75,7 @@ impl Tool for RegisterSignalTool {
                 let (read, write) = signal.split();
 
                 ctx.signal_registry_mut()
-                    .register_color(params.name.clone(), read, write);
+                    .register_color(params.name.clone(), read, write)?;
             }
             "f32" => {
                 let value: f32 = serde_json::from_value(params.initial_value)?;
@@ -85,7 +85,7 @@ impl Tool for RegisterSignalTool {
                 let (read, write) = signal.split();
 
                 ctx.signal_registry_mut()
-                    .register_f32(params.name.clone(), read, write);
+                    .register_f32(params.name.clone(), read, write)?;
             }
             "bool" => {
                 let value: bool = serde_json::from_value(params.initial_value)?;
@@ -95,7 +95,7 @@ impl Tool for RegisterSignalTool {
                 let (read, write) = signal.split();
 
                 ctx.signal_registry_mut()
-                    .register_bool(params.name.clone(), read, write);
+                    .register_bool(params.name.clone(), read, write)?;
             }
             _ => return Err(anyhow!("Unknown signal type: {}", params.signal_type)),
         }
