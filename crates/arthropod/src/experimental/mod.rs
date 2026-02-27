@@ -25,6 +25,9 @@ pub mod noise;
 #[cfg(feature = "nova")]
 pub mod reactive_particles;
 
+#[cfg(feature = "nova")]
+pub mod kinetic_text;
+
 pub mod flux_radar;
 
 // --- Stubs for missing features ---
@@ -256,6 +259,57 @@ pub mod particles {
         eprintln!(
             "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
         );
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod kinetic_text {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `kinetic_text` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub enum TextAnimation {
+        None,
+        Typewriter,
+        FadeIn,
+        Pulse,
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct KineticText;
+
+    impl KineticText {
+        /// Stub for `new` method
+        #[allow(clippy::new_ret_no_self)]
+        pub fn new<T>(_content: T) -> Self {
+            panic!("KineticText requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+
+        pub fn animation(self, _animation: TextAnimation) -> Self {
+            self
+        }
+
+        pub fn size(self, _size: f32) -> Self {
+            self
+        }
+
+        pub fn color(self, _color: render_engine::Color) -> Self {
+            self
+        }
+
+        pub fn clock<T>(self, _clock: T) -> Self {
+            self
+        }
     }
 }
 
