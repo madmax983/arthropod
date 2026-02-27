@@ -234,6 +234,8 @@ enum FigmaPaint {
         image_id: FigmaImageId,
         #[serde(alias = "scaleMode")]
         scale_mode: FigmaImageScaleMode,
+        #[serde(alias = "scalingFactor")]
+        scaling_factor: Option<f32>,
         #[serde(alias = "imageTransform")]
         transform: Option<FigmaImageTransform>,
     },
@@ -350,11 +352,12 @@ impl FigmaPaint {
             Self::Image {
                 image_id,
                 scale_mode,
+                scaling_factor,
                 transform,
             } => Paint::Image(ImageFill {
                 image_id: image_id.into_image_id(),
                 scale_mode: scale_mode.into(),
-                transform: transform.map(FigmaImageTransform::into_matrix3x3),
+                transform: figma_image_transform(scale_mode, transform, scaling_factor),
             }),
         }
     }
@@ -388,6 +391,27 @@ fn figma_image_reference_to_id(reference: &str) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     reference.hash(&mut hasher);
     hasher.finish() | (1_u64 << 63)
+}
+
+fn figma_image_transform(
+    scale_mode: FigmaImageScaleMode,
+    transform: Option<FigmaImageTransform>,
+    scaling_factor: Option<f32>,
+) -> Option<[f32; 9]> {
+    let transform = transform.map(FigmaImageTransform::into_matrix3x3);
+    if !matches!(scale_mode, FigmaImageScaleMode::Tile) {
+        return transform;
+    }
+
+    let Some(scaling_factor) = scaling_factor.filter(|v| v.is_finite() && *v > 0.0) else {
+        return transform;
+    };
+    if transform.is_some() || (scaling_factor - 1.0).abs() <= f32::EPSILON {
+        return transform;
+    }
+
+    let inverse = 1.0 / scaling_factor;
+    Some([inverse, 0.0, 0.0, 0.0, inverse, 0.0, 0.0, 0.0, 1.0])
 }
 
 impl FigmaEffect {
@@ -514,6 +538,30 @@ fn figma_image_paint_image_ref_alias_maps_to_stable_image_id() {
     assert_ne!(
         fill_ref_a.image_id, fill_hash.image_id,
         "different image references should produce distinct image ids"
+    );
+}
+
+#[test]
+fn figma_image_paint_tile_scaling_factor_maps_to_transform() {
+    let figma_paint: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"IMAGE",
+            "imageId": 99,
+            "scaleMode":"TILE",
+            "scalingFactor": 2.0
+        }"#,
+    )
+    .expect("failed to deserialize figma image paint with scalingFactor");
+
+    let paint = figma_paint.into_paint();
+    let Paint::Image(fill) = paint else {
+        panic!("expected image paint from scalingFactor payload");
+    };
+
+    assert_eq!(
+        fill.transform,
+        Some([0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0]),
+        "TILE scalingFactor should synthesize an inverse UV scale transform"
     );
 }
 

@@ -1816,6 +1816,7 @@ Exit gates:
 | `fills[].type: IMAGE` | `Paint::Image { ... }` | 5+ |
 | `fills[].imageRef` / `fills[].imageHash` | `Paint::Image.image_id` (stable `ImageId`) | 5+ |
 | `fills[].imageTransform` | `Paint::Image.transform: Option<[f32; 9]>` | 5+ |
+| `fills[].scalingFactor` | `Paint::Image.transform` (tile UV scale) | 5+ |
 | `strokes: Paint[]` | `StrokeStyle.paints: Vec<Paint>` | 1-2 |
 | `strokeWeight` | `StrokeStyle.weight` | 1 |
 | `strokeAlign` | `StrokeStyle.align: StrokeAlign` | 1 |

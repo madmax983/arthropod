@@ -1732,3 +1732,31 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_image_paint_image_ref_alias_maps_to_stable_image_id -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (16/16)
+
+### 2026-02-27 (parity continuation: image paint `scalingFactor` mapping)
+
+- Goal:
+  - Close the remaining tile-image import gap where Figma `scalingFactor` was
+    parsed but effectively ignored in parity mapping.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - extended `FigmaPaint::Image` with `scaling_factor` (`scalingFactor` alias).
+    - added helper `figma_image_transform(...)` to synthesize a transform when:
+      - paint mode is `TILE`,
+      - `scalingFactor` is finite and > 0,
+      - and no explicit transform was supplied.
+    - synthesized matrix uses inverse UV scaling:
+      - `scalingFactor = 2.0` -> `[0.5, 0, 0, 0, 0.5, 0, 0, 0, 1]`
+    - explicit `imageTransform` remains authoritative when present.
+    - added regression test:
+      - `figma_image_paint_tile_scaling_factor_maps_to_transform`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added row:
+      - `fills[].scalingFactor` -> `Paint::Image.transform` (tile UV scale)
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_image_paint_tile_scaling_factor_maps_to_transform -- --nocapture` -> FAIL (`left: None`, expected synthesized transform)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_image_paint_tile_scaling_factor_maps_to_transform -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (17/17)
