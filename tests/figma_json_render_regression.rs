@@ -123,7 +123,7 @@ struct FigmaPathGeometryObject {
 enum FigmaWindingRule {
     #[serde(rename = "NONZERO")]
     NonZero,
-    #[serde(rename = "EVENODD")]
+    #[serde(rename = "EVENODD", alias = "EVEN_ODD")]
     EvenOdd,
 }
 
@@ -557,6 +557,34 @@ fn figma_style_fill_geometry_path_data_alias_maps() {
         geometry[0].winding_rule,
         WindingRule::NonZero,
         "NONZERO winding should map to NonZero"
+    );
+}
+
+#[test]
+fn figma_style_fill_geometry_even_odd_winding_alias_maps() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "fills":[{"type":"SOLID","color":[0.7,0.6,0.9,1.0]}],
+            "fillGeometry": [
+                {
+                    "path": "M 0 0 L 10 0 L 10 10 Z",
+                    "windingRule": "EVEN_ODD"
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let geometry = style
+        .fill_geometry
+        .as_ref()
+        .expect("expected fill geometry from EVEN_ODD alias");
+    assert_eq!(geometry.len(), 1, "expected one mapped fill geometry path");
+    assert_eq!(
+        geometry[0].winding_rule,
+        WindingRule::EvenOdd,
+        "EVEN_ODD should map to EvenOdd winding rule"
     );
 }
 

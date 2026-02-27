@@ -1666,3 +1666,20 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_fill_geometry_path_data_alias_maps -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (13/13)
+
+### 2026-02-27 (parity continuation: `windingRule` alias `EVEN_ODD`)
+
+- Goal:
+  - Improve geometry import compatibility for winding-rule payloads that encode even-odd as `EVEN_ODD`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - `FigmaWindingRule::EvenOdd` now accepts alias `EVEN_ODD` in addition to `EVENODD`.
+    - added regression test:
+      - `figma_style_fill_geometry_even_odd_winding_alias_maps`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_even_odd_winding_alias_maps -- --nocapture` -> FAIL (deserialize mismatch)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_even_odd_winding_alias_maps -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (14/14)
