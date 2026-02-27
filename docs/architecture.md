@@ -233,6 +233,14 @@ classDiagram
             +GhostRecorder
             +GhostReplayer
         }
+        class ReactiveParticles {
+            +ReactiveParticleEmitter
+            +sync_reactive_emitters()
+        }
+        class MouseGestures {
+            +StrokeMatcher
+            +MouseGesture
+        }
     }
 
     App ..> Experimental : "nova" feature enables
@@ -242,4 +250,6 @@ classDiagram
     Noise ..> Runtime : Creates Signals
     SignalGraph ..> Runtime : Consumes Signals
     GhostReplay ..> App : Intercepts Events
+    ReactiveParticles ..> Particles : Extends
+    MouseGestures ..> App : Intercepts Events
 ```
