@@ -5,12 +5,13 @@ use arthropod::figma::{
 use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf};
 use render_engine::NodeContent;
 use style_engine::{
-    FontStyle, LineHeight, TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextOverflow,
+    BlendMode, Effect, FontStyle, LineHeight, MaskType, Paint, StrokeAlign, TextAlign,
+    TextAlignVertical, TextAutoResize, TextCase, TextOverflow,
 };
 
 #[test]
 fn figma_auto_layout_maps_to_flex_style_and_hierarchy() {
-    let json = r#"{
+    let json = r##"{
         "nodes": [
             {
                 "id": "10",
@@ -33,7 +34,7 @@ fn figma_auto_layout_maps_to_flex_style_and_hierarchy() {
                 "layoutGrow": 1
             }
         ]
-    }"#;
+    }"##;
 
     let imported = import_figma_document(json).expect("figma import should succeed");
     let root_scene_id = imported
@@ -75,7 +76,7 @@ fn figma_auto_layout_maps_to_flex_style_and_hierarchy() {
 
 #[test]
 fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
-    let json = r#"{
+    let json = r##"{
         "nodes": [
             {
                 "id": "1000",
@@ -100,7 +101,7 @@ fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
                 "layoutSizingVertical": "HUG"
             }
         ]
-    }"#;
+    }"##;
 
     let imported = import_figma_document(json).expect("figma import should succeed");
     let root_id = imported
@@ -143,7 +144,7 @@ fn figma_auto_layout_maps_alignment_wrap_and_size_constraints() {
 
 #[test]
 fn figma_constraints_and_positioning_map_to_imported_constraints() {
-    let json = r#"{
+    let json = r##"{
         "nodes": [
             {
                 "id": "20",
@@ -153,7 +154,7 @@ fn figma_constraints_and_positioning_map_to_imported_constraints() {
                 "layoutPositioning": "ABSOLUTE"
             }
         ]
-    }"#;
+    }"##;
 
     let imported = import_figma_document(json).expect("figma import should succeed");
     let node_id = imported
@@ -729,4 +730,154 @@ fn figma_prototype_overlay_and_back_actions_map_behavior() {
     assert_eq!(back_edge.to_figma_id, None);
     assert!(back_edge.overlay.is_none());
     assert!(back_edge.transition.is_none());
+}
+
+#[test]
+fn figma_nested_array_export_without_ids_imports_with_generated_hierarchy() {
+    let json = r#"[
+        {
+            "name": "Root Frame",
+            "type": "FRAME",
+            "x": 0,
+            "y": 0,
+            "width": 400,
+            "height": 300,
+            "layoutMode": "VERTICAL",
+            "children": [
+                {
+                    "name": "Title",
+                    "type": "TEXT",
+                    "x": 12,
+                    "y": 16,
+                    "width": 180,
+                    "height": 32,
+                    "characters": "RIOTWAVES",
+                    "fontSize": 24,
+                    "fontName": { "family": "Inter", "style": "Black" },
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "lineHeight": { "unit": "PIXELS", "value": 32 }
+                }
+            ]
+        }
+    ]"#;
+
+    let imported = import_figma_document(json).expect("nested array export should import");
+    assert_eq!(
+        imported.figma_to_scene.len(),
+        2,
+        "two generated ids should be mapped for root + child"
+    );
+
+    let text_entry = imported
+        .scene
+        .nodes()
+        .find_map(|(id, node)| match &node.content {
+            NodeContent::Styled { style } => style.text.as_ref().map(|text| (id, text.clone())),
+            _ => None,
+        })
+        .expect("text node should exist after import");
+    let (text_node_id, text) = text_entry;
+    assert_eq!(text.text, "RIOTWAVES");
+    assert!((text.font_size - 24.0).abs() < 1e-6);
+    assert_eq!(text.font_family.as_deref(), Some("Inter"));
+    assert_eq!(text.align, TextAlign::Left);
+    assert_eq!(text.align_vertical, TextAlignVertical::Top);
+    assert_eq!(text.line_height, LineHeight::Fixed(32.0));
+
+    let parent_id = imported
+        .scene
+        .parent(text_node_id)
+        .expect("generated text node should have a generated parent");
+    assert_ne!(
+        parent_id,
+        imported.scene.root(),
+        "text node should be under generated frame, not directly under scene root"
+    );
+}
+
+#[test]
+fn figma_visual_style_maps_fills_strokes_effects_and_masking() {
+    let json = r##"{
+        "nodes": [
+            {
+                "id": "v1",
+                "type": "RECTANGLE",
+                "absoluteBoundingBox": { "x": 8, "y": 12, "width": 220, "height": 140 },
+                "fills": [
+                    { "type": "SOLID", "color": { "r": 0.10, "g": 0.20, "b": 0.30 }, "opacity": 0.8 }
+                ],
+                "strokes": [
+                    { "type": "SOLID", "color": "#f6339a" }
+                ],
+                "strokeWeight": 2.5,
+                "strokeAlign": "OUTSIDE",
+                "effects": [
+                    {
+                        "type": "DROP_SHADOW",
+                        "offset": [2.0, 4.0],
+                        "radius": 6.0,
+                        "color": [0.0, 0.0, 0.0, 0.25],
+                        "visible": true
+                    }
+                ],
+                "opacity": 0.55,
+                "blendMode": "MULTIPLY",
+                "clipsContent": true,
+                "isMask": true,
+                "maskType": "LUMINANCE"
+            }
+        ]
+    }"##;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("v1")
+        .copied()
+        .expect("mapped scene id should exist");
+    let node = imported
+        .scene
+        .get_node(node_id)
+        .expect("imported node should exist");
+
+    let NodeContent::Styled { style } = &node.content else {
+        panic!("expected styled node for imported rectangle");
+    };
+
+    assert_eq!(style.fills.len(), 1, "expected one mapped fill paint");
+    let Paint::Solid(fill) = &style.fills[0] else {
+        panic!("expected solid fill");
+    };
+    assert!((fill.x - 0.10).abs() < 1e-6);
+    assert!((fill.y - 0.20).abs() < 1e-6);
+    assert!((fill.z - 0.30).abs() < 1e-6);
+    assert!((fill.w - 0.80).abs() < 1e-6);
+
+    let stroke = style.stroke.as_ref().expect("stroke should be mapped");
+    assert!((stroke.weight - 2.5).abs() < 1e-6);
+    assert_eq!(stroke.align, StrokeAlign::Outside);
+    assert_eq!(stroke.paints.len(), 1, "expected one stroke paint");
+    let Paint::Solid(stroke_color) = &stroke.paints[0] else {
+        panic!("expected solid stroke paint");
+    };
+    assert!(
+        stroke_color.x > 0.95 && stroke_color.y < 0.25 && stroke_color.z > 0.55,
+        "hex color should map to pink-like normalized RGB"
+    );
+
+    assert_eq!(style.effects.len(), 1, "expected one mapped visual effect");
+    assert!(matches!(style.effects[0], Effect::DropShadow(_)));
+    let Effect::DropShadow(shadow) = &style.effects[0] else {
+        unreachable!("validated with matches! above");
+    };
+    assert!((shadow.offset.x - 2.0).abs() < 1e-6);
+    assert!((shadow.offset.y - 4.0).abs() < 1e-6);
+    assert!((shadow.blur - 6.0).abs() < 1e-6);
+
+    assert!((style.opacity - 0.55).abs() < 1e-6);
+    assert_eq!(style.blend_mode, BlendMode::Multiply);
+    assert!(style.clips_content);
+    assert!(style.is_mask);
+    assert_eq!(style.mask_type, MaskType::Luminance);
 }

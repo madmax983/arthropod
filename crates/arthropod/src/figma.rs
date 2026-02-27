@@ -4,11 +4,15 @@ use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, ItemAlignSelf,
 };
 use plat_core::Rect;
-use render_engine::{NodeContent, NodeId, Scene, SceneNode};
+use render_engine::{NodeContent, NodeId, Scene, SceneNode, Vec2, Vec4};
 use serde::Deserialize;
+use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
 use style_engine::{
-    FontStyle, LineHeight, TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextContent,
-    TextDecoration, TextOverflow, VisualStyle,
+    BackgroundBlur, BlendMode, ColorStop, CornerRadii, DropShadow, Effect, FontStyle, ImageFill,
+    ImageId, ImageScaleMode, InnerShadow, LayerBlur, LineHeight, LinearGradient, MaskType, Paint,
+    RadialGradient, SideWeights, StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle, TextAlign,
+    TextAlignVertical, TextAutoResize, TextCase, TextContent, TextDecoration, TextOverflow,
+    VectorPath, VisualStyle, WindingRule,
 };
 use thiserror::Error;
 
@@ -16,6 +20,10 @@ use thiserror::Error;
 pub enum FigmaImportError {
     #[error("failed to parse figma json: {0}")]
     Parse(#[from] serde_json::Error),
+    #[error(
+        "invalid figma json shape: expected an array of nodes or an object with a `nodes` array"
+    )]
+    InvalidDocumentShape,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,7 +222,7 @@ pub struct ImportedFigmaDocument {
 }
 
 pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
-    let document: FigmaDocument = serde_json::from_str(json)?;
+    let document = parse_figma_document(json)?;
 
     let mut scene = Scene::new();
     let root = scene.root();
@@ -416,6 +424,383 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
     })
 }
 
+fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
+    let raw: JsonValue = serde_json::from_str(json)?;
+    let nodes = match raw {
+        JsonValue::Array(nodes) => nodes,
+        JsonValue::Object(mut object) => match object.remove("nodes") {
+            Some(JsonValue::Array(nodes)) => nodes,
+            _ => return Err(FigmaImportError::InvalidDocumentShape),
+        },
+        _ => return Err(FigmaImportError::InvalidDocumentShape),
+    };
+
+    let mut flattened = Vec::new();
+    let mut path = Vec::new();
+    flatten_document_nodes(&nodes, None, &mut path, &mut flattened);
+
+    let mut normalized = JsonMap::new();
+    normalized.insert("nodes".to_string(), JsonValue::Array(flattened));
+    Ok(serde_json::from_value(JsonValue::Object(normalized))?)
+}
+
+fn flatten_document_nodes(
+    nodes: &[JsonValue],
+    parent_id: Option<&str>,
+    path: &mut Vec<usize>,
+    flattened: &mut Vec<JsonValue>,
+) {
+    for (index, raw_node) in nodes.iter().enumerate() {
+        let JsonValue::Object(mut object) = raw_node.clone() else {
+            continue;
+        };
+        path.push(index);
+
+        let node_id = extract_node_id(&object, path);
+        object.insert("id".to_string(), JsonValue::String(node_id.clone()));
+        if let Some(parent_id) = parent_id {
+            object
+                .entry("parentId".to_string())
+                .or_insert_with(|| JsonValue::String(parent_id.to_string()));
+        }
+
+        ensure_bounds_from_xywh(&mut object);
+        normalize_text_style_fields(&mut object);
+
+        let children = object
+            .remove("children")
+            .and_then(|value| match value {
+                JsonValue::Array(children) => Some(children),
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        flattened.push(JsonValue::Object(object));
+        flatten_document_nodes(&children, Some(&node_id), path, flattened);
+        path.pop();
+    }
+}
+
+fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> String {
+    if let Some(value) = object.get("id") {
+        if let Some(text) = value.as_str() {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
+            }
+        }
+        if let Some(number) = value.as_u64() {
+            return number.to_string();
+        }
+        if let Some(number) = value.as_i64() {
+            return number.to_string();
+        }
+    }
+
+    let path_text = path
+        .iter()
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(".");
+    format!("generated:{path_text}")
+}
+
+fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
+    if object.contains_key("absoluteBoundingBox") || object.contains_key("bounds") {
+        return;
+    }
+
+    let Some(x) = json_number(object.get("x")) else {
+        return;
+    };
+    let Some(y) = json_number(object.get("y")) else {
+        return;
+    };
+    let Some(width) = json_number(object.get("width")) else {
+        return;
+    };
+    let Some(height) = json_number(object.get("height")) else {
+        return;
+    };
+
+    object.insert(
+        "bounds".to_string(),
+        JsonValue::Array(vec![
+            JsonValue::Number(x),
+            JsonValue::Number(y),
+            JsonValue::Number(width),
+            JsonValue::Number(height),
+        ]),
+    );
+}
+
+fn json_number(value: Option<&JsonValue>) -> Option<JsonNumber> {
+    let value = value.and_then(JsonValue::as_f64)?;
+    JsonNumber::from_f64(value)
+}
+
+fn normalize_text_style_fields(object: &mut JsonMap<String, JsonValue>) {
+    let is_text = object
+        .get("type")
+        .and_then(JsonValue::as_str)
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("TEXT"));
+    if !is_text {
+        return;
+    }
+
+    let had_style = object.contains_key("style");
+    let mut style = match object.remove("style") {
+        Some(JsonValue::Object(style)) => style,
+        Some(other) => {
+            object.insert("style".to_string(), other);
+            return;
+        }
+        None => JsonMap::new(),
+    };
+
+    insert_style_alias(&mut style, object, "fontSize", "fontSize");
+    insert_style_alias(&mut style, object, "fontWeight", "fontWeight");
+    insert_style_alias(
+        &mut style,
+        object,
+        "textAlignHorizontal",
+        "textAlignHorizontal",
+    );
+    insert_style_alias(&mut style, object, "textAlignVertical", "textAlignVertical");
+    insert_style_alias(&mut style, object, "letterSpacing", "letterSpacing");
+    insert_style_alias(&mut style, object, "textDecoration", "textDecoration");
+    insert_style_alias(&mut style, object, "textCase", "textCase");
+    insert_style_alias(&mut style, object, "paragraphSpacing", "paragraphSpacing");
+    insert_style_alias(&mut style, object, "paragraphIndent", "paragraphIndent");
+    insert_style_alias(&mut style, object, "textTruncation", "textTruncation");
+
+    if !style.contains_key("fontFamily")
+        && let Some(family) = object
+            .get("fontName")
+            .and_then(JsonValue::as_object)
+            .and_then(|font_name| font_name.get("family"))
+            .cloned()
+    {
+        style.insert("fontFamily".to_string(), family);
+    }
+    if !style.contains_key("fontStyle")
+        && let Some(font_style) = object
+            .get("fontName")
+            .and_then(JsonValue::as_object)
+            .and_then(|font_name| font_name.get("style"))
+            .cloned()
+    {
+        style.insert("fontStyle".to_string(), font_style);
+    }
+
+    if !style.contains_key("lineHeightPx") && !style.contains_key("lineHeightPercentFontSize") {
+        normalize_line_height_alias(&mut style, object.get("lineHeight"));
+    }
+
+    if had_style || !style.is_empty() {
+        object.insert("style".to_string(), JsonValue::Object(style));
+    }
+}
+
+fn insert_style_alias(
+    style: &mut JsonMap<String, JsonValue>,
+    object: &JsonMap<String, JsonValue>,
+    style_key: &str,
+    source_key: &str,
+) {
+    if style.contains_key(style_key) {
+        return;
+    }
+    if let Some(value) = object.get(source_key).cloned() {
+        style.insert(style_key.to_string(), value);
+    }
+}
+
+fn normalize_line_height_alias(
+    style: &mut JsonMap<String, JsonValue>,
+    line_height: Option<&JsonValue>,
+) {
+    let Some(line_height) = line_height else {
+        return;
+    };
+
+    if let Some(value) = line_height.as_f64().and_then(JsonNumber::from_f64) {
+        style.insert("lineHeightPx".to_string(), JsonValue::Number(value));
+        return;
+    }
+
+    let Some(object) = line_height.as_object() else {
+        return;
+    };
+    let Some(value) = object
+        .get("value")
+        .and_then(JsonValue::as_f64)
+        .and_then(JsonNumber::from_f64)
+    else {
+        return;
+    };
+    let unit = object
+        .get("unit")
+        .and_then(JsonValue::as_str)
+        .map(str::to_ascii_uppercase);
+
+    match unit.as_deref() {
+        Some("PERCENT") | Some("PERCENT_FONT_SIZE") => {
+            style.insert(
+                "lineHeightPercentFontSize".to_string(),
+                JsonValue::Number(value),
+            );
+        }
+        _ => {
+            style.insert("lineHeightPx".to_string(), JsonValue::Number(value));
+        }
+    }
+}
+
+fn map_color_stops(stops: &[FigmaColorStop]) -> Vec<ColorStop> {
+    stops
+        .iter()
+        .filter_map(|stop| {
+            if !stop.position.is_finite() {
+                return None;
+            }
+            stop.color
+                .to_vec4()
+                .map(|color| ColorStop::new(stop.position, color))
+        })
+        .collect()
+}
+
+fn normalize_color_component(value: f32) -> f32 {
+    if !value.is_finite() {
+        return 0.0;
+    }
+    if value > 1.0 {
+        (value / 255.0).clamp(0.0, 1.0)
+    } else {
+        value.clamp(0.0, 1.0)
+    }
+}
+
+fn normalize_alpha_component(value: f32) -> f32 {
+    if !value.is_finite() {
+        return 1.0;
+    }
+    if value > 1.0 {
+        (value / 255.0).clamp(0.0, 1.0)
+    } else {
+        value.clamp(0.0, 1.0)
+    }
+}
+
+fn parse_hex_color(hex: &str) -> Option<Vec4> {
+    let text = hex.trim();
+    let bytes = text.strip_prefix('#').unwrap_or(text);
+    match bytes.len() {
+        3 => {
+            let r = parse_hex_nibble(bytes.as_bytes()[0])? * 17;
+            let g = parse_hex_nibble(bytes.as_bytes()[1])? * 17;
+            let b = parse_hex_nibble(bytes.as_bytes()[2])? * 17;
+            Some(Vec4::new(
+                r as f32 / 255.0,
+                g as f32 / 255.0,
+                b as f32 / 255.0,
+                1.0,
+            ))
+        }
+        4 => {
+            let r = parse_hex_nibble(bytes.as_bytes()[0])? * 17;
+            let g = parse_hex_nibble(bytes.as_bytes()[1])? * 17;
+            let b = parse_hex_nibble(bytes.as_bytes()[2])? * 17;
+            let a = parse_hex_nibble(bytes.as_bytes()[3])? * 17;
+            Some(Vec4::new(
+                r as f32 / 255.0,
+                g as f32 / 255.0,
+                b as f32 / 255.0,
+                a as f32 / 255.0,
+            ))
+        }
+        6 => {
+            let bytes = bytes.as_bytes();
+            Some(Vec4::new(
+                parse_hex_byte(bytes[0], bytes[1])? as f32 / 255.0,
+                parse_hex_byte(bytes[2], bytes[3])? as f32 / 255.0,
+                parse_hex_byte(bytes[4], bytes[5])? as f32 / 255.0,
+                1.0,
+            ))
+        }
+        8 => {
+            let bytes = bytes.as_bytes();
+            Some(Vec4::new(
+                parse_hex_byte(bytes[0], bytes[1])? as f32 / 255.0,
+                parse_hex_byte(bytes[2], bytes[3])? as f32 / 255.0,
+                parse_hex_byte(bytes[4], bytes[5])? as f32 / 255.0,
+                parse_hex_byte(bytes[6], bytes[7])? as f32 / 255.0,
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn parse_hex_nibble(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn parse_hex_byte(high: u8, low: u8) -> Option<u8> {
+    let high = parse_hex_nibble(high)?;
+    let low = parse_hex_nibble(low)?;
+    Some((high << 4) | low)
+}
+
+fn figma_image_reference_to_id(reference: &str) -> u64 {
+    if let Ok(parsed) = reference.parse::<u64>() {
+        return parsed;
+    }
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in reference.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash | (1_u64 << 63)
+}
+
+fn figma_image_transform(
+    scale_mode: FigmaImageScaleMode,
+    transform: Option<&FigmaImageTransform>,
+    scaling_factor: Option<f32>,
+) -> Option<[f32; 9]> {
+    let transform = transform.map(FigmaImageTransform::to_matrix3x3);
+    if !matches!(scale_mode, FigmaImageScaleMode::Tile) {
+        return transform;
+    }
+    let Some(scaling_factor) = scaling_factor.filter(|value| value.is_finite() && *value > 0.0)
+    else {
+        return transform;
+    };
+    if transform.is_some() || (scaling_factor - 1.0).abs() <= f32::EPSILON {
+        return transform;
+    }
+    let inverse = 1.0 / scaling_factor;
+    Some([inverse, 0.0, 0.0, 0.0, inverse, 0.0, 0.0, 0.0, 1.0])
+}
+
+fn figma_stroke_miter_limit_from_angle(angle_degrees: f32) -> Option<f32> {
+    if !angle_degrees.is_finite() || angle_degrees <= 0.0 {
+        return None;
+    }
+    let half_radians = 0.5 * angle_degrees.to_radians();
+    let sin = half_radians.sin().abs();
+    if sin <= f32::EPSILON {
+        return None;
+    }
+    Some(1.0 / sin)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FigmaDocument {
@@ -447,6 +832,50 @@ struct FigmaNode {
     component_properties: HashMap<String, FigmaComponentProperty>,
     #[serde(default)]
     component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
+    #[serde(default)]
+    fills: Vec<FigmaPaint>,
+    #[serde(default)]
+    strokes: Vec<FigmaPaint>,
+    #[serde(default)]
+    stroke_weight: Option<f32>,
+    #[serde(default)]
+    stroke_align: Option<FigmaStrokeAlign>,
+    #[serde(default)]
+    stroke_cap: Option<FigmaStrokeCap>,
+    #[serde(default)]
+    stroke_join: Option<FigmaStrokeJoin>,
+    #[serde(default)]
+    stroke_miter_angle: Option<f32>,
+    #[serde(default)]
+    stroke_miter_limit: Option<f32>,
+    #[serde(default)]
+    stroke_dashes: Option<Vec<f32>>,
+    #[serde(default, alias = "strokeDashOffset")]
+    dash_offset: Option<f32>,
+    #[serde(default, alias = "individualStrokeWeights")]
+    individual_stroke_weights: Option<FigmaSideWeights>,
+    #[serde(default)]
+    effects: Vec<FigmaEffect>,
+    #[serde(default)]
+    fill_geometry: Option<Vec<FigmaPathGeometry>>,
+    #[serde(default)]
+    stroke_geometry: Option<Vec<FigmaPathGeometry>>,
+    #[serde(default)]
+    corner_radius: Option<f32>,
+    #[serde(default)]
+    rectangle_corner_radii: Option<[f32; 4]>,
+    #[serde(default)]
+    corner_smoothing: Option<f32>,
+    #[serde(default)]
+    opacity: Option<f32>,
+    #[serde(default)]
+    blend_mode: Option<FigmaBlendMode>,
+    #[serde(default)]
+    clips_content: Option<bool>,
+    #[serde(default, alias = "isMask")]
+    is_mask: Option<bool>,
+    #[serde(default, alias = "maskType")]
+    mask_type: Option<FigmaMaskType>,
     #[serde(default)]
     bounds: Option<[f32; 4]>,
     #[serde(default, alias = "absoluteBoundingBox")]
@@ -676,7 +1105,119 @@ impl FigmaNode {
             style = style.text(text);
         }
 
+        for fill in self.fills.iter().filter_map(FigmaPaint::to_paint) {
+            style = style.fill(fill);
+        }
+        if let Some(fill_geometry) = &self.fill_geometry {
+            let paths: Vec<_> = fill_geometry
+                .iter()
+                .filter_map(FigmaPathGeometry::to_vector_path)
+                .collect();
+            if !paths.is_empty() {
+                style = style.fill_geometry(paths);
+            }
+        }
+
+        if let Some(corner_radius) = self.corner_radius.filter(|value| value.is_finite()) {
+            style = style.corner_radius(corner_radius.max(0.0));
+        }
+        if let Some([tl, tr, br, bl]) = self.rectangle_corner_radii {
+            style = style.corner_radii(CornerRadii::new(
+                tl.max(0.0),
+                tr.max(0.0),
+                br.max(0.0),
+                bl.max(0.0),
+            ));
+        }
+        if let Some(corner_smoothing) = self.corner_smoothing.filter(|value| value.is_finite()) {
+            style = style.corner_smoothing(corner_smoothing);
+        }
+
+        for effect in self.effects.iter().filter_map(FigmaEffect::to_effect) {
+            style = style.effect(effect);
+        }
+
+        if let Some(stroke) = self.to_stroke_style() {
+            style = style.stroke(stroke);
+        }
+        if let Some(stroke_geometry) = &self.stroke_geometry {
+            let paths: Vec<_> = stroke_geometry
+                .iter()
+                .filter_map(FigmaPathGeometry::to_vector_path)
+                .collect();
+            if !paths.is_empty() {
+                style = style.stroke_geometry(paths);
+            }
+        }
+
+        if let Some(opacity) = self.opacity.filter(|value| value.is_finite()) {
+            style = style.opacity(opacity.clamp(0.0, 1.0));
+        }
+        if let Some(blend_mode) = self.blend_mode {
+            style = style.blend_mode(blend_mode.to_blend_mode());
+        }
+        if let Some(clips_content) = self.clips_content {
+            style = style.clips_content(clips_content);
+        }
+        if let Some(is_mask) = self.is_mask {
+            style = style.is_mask(is_mask);
+        }
+        if let Some(mask_type) = self.mask_type {
+            style = style.mask_type(mask_type.to_mask_type());
+        }
+
         style
+    }
+
+    fn to_stroke_style(&self) -> Option<StrokeStyle> {
+        if self.strokes.is_empty() && self.stroke_weight.unwrap_or_default() <= 0.0 {
+            return None;
+        }
+
+        let mut stroke = StrokeStyle {
+            paints: self
+                .strokes
+                .iter()
+                .filter_map(FigmaPaint::to_paint)
+                .collect(),
+            weight: self
+                .stroke_weight
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .unwrap_or(1.0),
+            align: self
+                .stroke_align
+                .map(FigmaStrokeAlign::to_stroke_align)
+                .unwrap_or(StrokeAlign::Center),
+            cap: self
+                .stroke_cap
+                .map(FigmaStrokeCap::to_stroke_cap)
+                .unwrap_or(StrokeCap::Butt),
+            join: self
+                .stroke_join
+                .map(FigmaStrokeJoin::to_stroke_join)
+                .unwrap_or(StrokeJoin::Miter),
+            miter_limit: self
+                .stroke_miter_limit
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .or_else(|| {
+                    self.stroke_miter_angle
+                        .and_then(figma_stroke_miter_limit_from_angle)
+                })
+                .unwrap_or(StrokeStyle::default().miter_limit),
+            dash_pattern: self.stroke_dashes.clone().unwrap_or_default(),
+            dash_offset: self
+                .dash_offset
+                .filter(|value| value.is_finite())
+                .unwrap_or(StrokeStyle::default().dash_offset),
+            ..StrokeStyle::default()
+        };
+        if stroke.paints.is_empty() {
+            stroke.paints.push(Paint::solid(Vec4::ONE));
+        }
+        if let Some(side_weights) = self.individual_stroke_weights {
+            stroke.side_weights = Some(side_weights.to_side_weights());
+        }
+        Some(stroke)
     }
 
     fn to_text_content(&self) -> Option<TextContent> {
@@ -1239,6 +1780,570 @@ struct FigmaPropertyNodeRef {
     id: Option<FigmaNodeKey>,
     #[serde(default, alias = "nodeId")]
     node_id: Option<FigmaNodeKey>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaPathGeometry {
+    SvgPathData(String),
+    PathObject(FigmaPathGeometryObject),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPathGeometryObject {
+    #[serde(alias = "pathData")]
+    path: String,
+    #[serde(default)]
+    winding_rule: Option<FigmaWindingRule>,
+}
+
+impl FigmaPathGeometry {
+    fn to_vector_path(&self) -> Option<VectorPath> {
+        let (path_data, winding_rule) = match self {
+            Self::SvgPathData(path) => (path.as_str(), None),
+            Self::PathObject(object) => (
+                object.path.as_str(),
+                object.winding_rule.map(FigmaWindingRule::to_winding_rule),
+            ),
+        };
+        let mut path = VectorPath::from_svg_path_data(path_data).ok()?;
+        if let Some(winding_rule) = winding_rule {
+            path.winding_rule = winding_rule;
+        }
+        Some(path)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+enum FigmaWindingRule {
+    #[serde(rename = "NONZERO")]
+    NonZero,
+    #[serde(rename = "EVENODD", alias = "EVEN_ODD")]
+    EvenOdd,
+    #[serde(rename = "NONE")]
+    None,
+}
+
+impl FigmaWindingRule {
+    fn to_winding_rule(self) -> WindingRule {
+        match self {
+            Self::NonZero => WindingRule::NonZero,
+            Self::EvenOdd => WindingRule::EvenOdd,
+            Self::None => WindingRule::NonZero,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaBlendMode {
+    Normal,
+    Darken,
+    Multiply,
+    ColorBurn,
+    Lighten,
+    Screen,
+    ColorDodge,
+    Overlay,
+    SoftLight,
+    HardLight,
+    Difference,
+    Exclusion,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity,
+    LinearBurn,
+    LinearDodge,
+    PassThrough,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaBlendMode {
+    fn to_blend_mode(self) -> BlendMode {
+        match self {
+            Self::Normal => BlendMode::Normal,
+            Self::Darken => BlendMode::Darken,
+            Self::Multiply => BlendMode::Multiply,
+            Self::ColorBurn => BlendMode::ColorBurn,
+            Self::Lighten => BlendMode::Lighten,
+            Self::Screen => BlendMode::Screen,
+            Self::ColorDodge => BlendMode::ColorDodge,
+            Self::Overlay => BlendMode::Overlay,
+            Self::SoftLight => BlendMode::SoftLight,
+            Self::HardLight => BlendMode::HardLight,
+            Self::Difference => BlendMode::Difference,
+            Self::Exclusion => BlendMode::Exclusion,
+            Self::Hue => BlendMode::Hue,
+            Self::Saturation => BlendMode::Saturation,
+            Self::Color => BlendMode::Color,
+            Self::Luminosity => BlendMode::Luminosity,
+            Self::LinearBurn => BlendMode::LinearBurn,
+            Self::LinearDodge => BlendMode::LinearDodge,
+            Self::PassThrough => BlendMode::PassThrough,
+            Self::Unknown => BlendMode::Normal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaColorValue {
+    Vec4([f32; 4]),
+    Vec3([f32; 3]),
+    Object(FigmaColorObject),
+    Hex(String),
+}
+
+impl FigmaColorValue {
+    fn to_vec4(&self) -> Option<Vec4> {
+        match self {
+            Self::Vec4([r, g, b, a]) => Some(Vec4::new(
+                normalize_color_component(*r),
+                normalize_color_component(*g),
+                normalize_color_component(*b),
+                normalize_alpha_component(*a),
+            )),
+            Self::Vec3([r, g, b]) => Some(Vec4::new(
+                normalize_color_component(*r),
+                normalize_color_component(*g),
+                normalize_color_component(*b),
+                1.0,
+            )),
+            Self::Object(color) => Some(Vec4::new(
+                normalize_color_component(color.r),
+                normalize_color_component(color.g),
+                normalize_color_component(color.b),
+                color
+                    .a
+                    .or(color.alpha)
+                    .map(normalize_alpha_component)
+                    .unwrap_or(1.0),
+            )),
+            Self::Hex(hex) => parse_hex_color(hex),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaColorObject {
+    r: f32,
+    g: f32,
+    b: f32,
+    #[serde(default)]
+    a: Option<f32>,
+    #[serde(default)]
+    alpha: Option<f32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct FigmaColorStop {
+    position: f32,
+    color: FigmaColorValue,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaImageScaleMode {
+    Fill,
+    Fit,
+    Crop,
+    Tile,
+    Stretch,
+}
+
+impl FigmaImageScaleMode {
+    fn to_scale_mode(self) -> ImageScaleMode {
+        match self {
+            Self::Fill => ImageScaleMode::Fill,
+            Self::Fit => ImageScaleMode::Fit,
+            Self::Crop => ImageScaleMode::Crop,
+            Self::Tile => ImageScaleMode::Tile,
+            Self::Stretch => ImageScaleMode::Stretch,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaImageIdValue {
+    Numeric(u64),
+    Text(String),
+}
+
+impl FigmaImageIdValue {
+    fn to_image_id(&self) -> ImageId {
+        match self {
+            Self::Numeric(id) => ImageId(*id),
+            Self::Text(reference) => ImageId(figma_image_reference_to_id(reference)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaImageTransform {
+    Matrix3x3([f32; 9]),
+    Rows2x3([[f32; 3]; 2]),
+    Rows3x3([[f32; 3]; 3]),
+}
+
+impl FigmaImageTransform {
+    fn to_matrix3x3(&self) -> [f32; 9] {
+        match self {
+            Self::Matrix3x3(matrix) => *matrix,
+            Self::Rows2x3([[a, b, tx], [c, d, ty]]) => [*a, *b, *tx, *c, *d, *ty, 0.0, 0.0, 1.0],
+            Self::Rows3x3([row0, row1, row2]) => [
+                row0[0], row0[1], row0[2], row1[0], row1[1], row1[2], row2[0], row2[1], row2[2],
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPaint {
+    Solid {
+        color: FigmaColorValue,
+        #[serde(default)]
+        opacity: Option<f32>,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    GradientLinear {
+        #[serde(default)]
+        start: Option<[f32; 2]>,
+        #[serde(default)]
+        end: Option<[f32; 2]>,
+        #[serde(default)]
+        stops: Vec<FigmaColorStop>,
+        #[serde(default, alias = "gradientHandlePositions")]
+        gradient_handle_positions: Option<Vec<[f32; 2]>>,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    GradientRadial {
+        #[serde(default)]
+        center: Option<[f32; 2]>,
+        #[serde(default)]
+        radius: Option<f32>,
+        #[serde(default)]
+        stops: Vec<FigmaColorStop>,
+        #[serde(default, alias = "gradientHandlePositions")]
+        gradient_handle_positions: Option<Vec<[f32; 2]>>,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    Image {
+        #[serde(alias = "imageId", alias = "imageRef", alias = "imageHash")]
+        image_id: FigmaImageIdValue,
+        #[serde(alias = "scaleMode")]
+        scale_mode: FigmaImageScaleMode,
+        #[serde(default, alias = "scalingFactor")]
+        scaling_factor: Option<f32>,
+        #[serde(default, alias = "imageTransform")]
+        transform: Option<FigmaImageTransform>,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    #[serde(other)]
+    Unsupported,
+}
+
+impl FigmaPaint {
+    fn to_paint(&self) -> Option<Paint> {
+        match self {
+            Self::Solid {
+                color,
+                opacity,
+                visible,
+            } => {
+                if !*visible {
+                    return None;
+                }
+                let mut c = color.to_vec4()?;
+                if let Some(opacity) = opacity {
+                    c.w *= normalize_alpha_component(*opacity);
+                }
+                Some(Paint::solid(c))
+            }
+            Self::GradientLinear {
+                start,
+                end,
+                stops,
+                gradient_handle_positions,
+                visible,
+            } => {
+                if !*visible {
+                    return None;
+                }
+                let (start, end) = if let (Some(start), Some(end)) = (start, end) {
+                    (*start, *end)
+                } else if let Some(handles) = gradient_handle_positions {
+                    match handles.as_slice() {
+                        [start, end, ..] => (*start, *end),
+                        _ => return None,
+                    }
+                } else {
+                    return None;
+                };
+                let stops = map_color_stops(stops);
+                if stops.is_empty() {
+                    return None;
+                }
+                Some(Paint::Linear(LinearGradient {
+                    start: Vec2::new(start[0], start[1]),
+                    end: Vec2::new(end[0], end[1]),
+                    stops,
+                }))
+            }
+            Self::GradientRadial {
+                center,
+                radius,
+                stops,
+                gradient_handle_positions,
+                visible,
+            } => {
+                if !*visible {
+                    return None;
+                }
+                let center = if let Some(center) = center {
+                    *center
+                } else if let Some(handles) = gradient_handle_positions {
+                    match handles.as_slice() {
+                        [center, ..] => *center,
+                        _ => return None,
+                    }
+                } else {
+                    return None;
+                };
+                let radius = radius
+                    .filter(|value| value.is_finite() && *value >= 0.0)
+                    .or_else(|| {
+                        gradient_handle_positions.as_ref().and_then(|handles| {
+                            if handles.len() >= 2 {
+                                let dx = handles[1][0] - center[0];
+                                let dy = handles[1][1] - center[1];
+                                Some((dx * dx + dy * dy).sqrt())
+                            } else {
+                                None
+                            }
+                        })
+                    })?;
+                let stops = map_color_stops(stops);
+                if stops.is_empty() {
+                    return None;
+                }
+                Some(Paint::Radial(RadialGradient {
+                    center: Vec2::new(center[0], center[1]),
+                    radius,
+                    stops,
+                }))
+            }
+            Self::Image {
+                image_id,
+                scale_mode,
+                scaling_factor,
+                transform,
+                visible,
+            } => {
+                if !*visible {
+                    return None;
+                }
+                Some(Paint::Image(ImageFill {
+                    image_id: image_id.to_image_id(),
+                    scale_mode: scale_mode.to_scale_mode(),
+                    transform: figma_image_transform(
+                        *scale_mode,
+                        transform.as_ref(),
+                        *scaling_factor,
+                    ),
+                }))
+            }
+            Self::Unsupported => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaStrokeAlign {
+    Inside,
+    Center,
+    Outside,
+}
+
+impl FigmaStrokeAlign {
+    fn to_stroke_align(self) -> StrokeAlign {
+        match self {
+            Self::Inside => StrokeAlign::Inside,
+            Self::Center => StrokeAlign::Center,
+            Self::Outside => StrokeAlign::Outside,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaStrokeCap {
+    None,
+    Round,
+    Square,
+    LineArrow,
+    TriangleArrow,
+    DiamondFilled,
+    CircleFilled,
+}
+
+impl FigmaStrokeCap {
+    fn to_stroke_cap(self) -> StrokeCap {
+        match self {
+            Self::None => StrokeCap::Butt,
+            Self::Round | Self::CircleFilled => StrokeCap::Round,
+            Self::Square => StrokeCap::Square,
+            Self::LineArrow | Self::TriangleArrow | Self::DiamondFilled => StrokeCap::Butt,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaStrokeJoin {
+    Miter,
+    Round,
+    Bevel,
+}
+
+impl FigmaStrokeJoin {
+    fn to_stroke_join(self) -> StrokeJoin {
+        match self {
+            Self::Miter => StrokeJoin::Miter,
+            Self::Round => StrokeJoin::Round,
+            Self::Bevel => StrokeJoin::Bevel,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaMaskType {
+    Alpha,
+    Vector,
+    Luminance,
+}
+
+impl FigmaMaskType {
+    fn to_mask_type(self) -> MaskType {
+        match self {
+            Self::Alpha => MaskType::Alpha,
+            Self::Vector => MaskType::Vector,
+            Self::Luminance => MaskType::Luminance,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaSideWeights {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+}
+
+impl FigmaSideWeights {
+    fn to_side_weights(self) -> SideWeights {
+        SideWeights {
+            top: self.top.max(0.0),
+            right: self.right.max(0.0),
+            bottom: self.bottom.max(0.0),
+            left: self.left.max(0.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaEffect {
+    DropShadow {
+        offset: [f32; 2],
+        radius: f32,
+        color: FigmaColorValue,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    InnerShadow {
+        offset: [f32; 2],
+        radius: f32,
+        color: FigmaColorValue,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    LayerBlur {
+        radius: f32,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    BackgroundBlur {
+        radius: f32,
+        #[serde(default = "default_visible")]
+        visible: bool,
+    },
+    #[serde(other)]
+    Unsupported,
+}
+
+impl FigmaEffect {
+    fn to_effect(&self) -> Option<Effect> {
+        match self {
+            Self::DropShadow {
+                offset,
+                radius,
+                color,
+                visible,
+            } => (*visible).then(|| {
+                Effect::DropShadow(DropShadow {
+                    offset: Vec2::new(offset[0], offset[1]),
+                    blur: *radius,
+                    color: color.to_vec4().unwrap_or(Vec4::ZERO),
+                    visible: true,
+                })
+            }),
+            Self::InnerShadow {
+                offset,
+                radius,
+                color,
+                visible,
+            } => (*visible).then(|| {
+                Effect::InnerShadow(InnerShadow {
+                    offset: Vec2::new(offset[0], offset[1]),
+                    blur: *radius,
+                    color: color.to_vec4().unwrap_or(Vec4::ZERO),
+                    visible: true,
+                })
+            }),
+            Self::LayerBlur { radius, visible } => {
+                (*visible).then_some(Effect::LayerBlur(LayerBlur {
+                    radius: *radius,
+                    visible: true,
+                }))
+            }
+            Self::BackgroundBlur { radius, visible } => {
+                (*visible).then_some(Effect::BackgroundBlur(BackgroundBlur {
+                    radius: *radius,
+                    visible: true,
+                }))
+            }
+            Self::Unsupported => None,
+        }
+    }
+}
+
+const fn default_visible() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]

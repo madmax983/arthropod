@@ -2237,3 +2237,49 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (import pipeline phase 2, slice 1: importer visual-style rendering parity)
+
+- Goal:
+  - Extend production importer rendering parity so imported nodes carry complete
+    `VisualStyle` semantics (not only text):
+    - fill/stroke paints
+    - blend/opacity
+    - effects
+    - masks/clipping
+    - vector geometry
+  - Preserve plugin export compatibility (`riot_waves`) while adding style mapping.
+- RED:
+  - Added regression in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_visual_style_maps_fills_strokes_effects_and_masking`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout figma_visual_style_maps_fills_strokes_effects_and_masking -- --nocapture`
+  - Result: FAIL (expected): imported styles had no mapped fills/strokes/effects.
+- GREEN:
+  - Extended importer visual parsing in `crates/arthropod/src/figma.rs`:
+    - node-level style fields:
+      - `fills`, `strokes`, stroke attributes, effects, geometry, corner params
+      - `opacity`, `blendMode`, `clipsContent`, `isMask`, `maskType`
+    - robust paint/effect parsing:
+      - solid/linear/radial/image paints
+      - visible filtering
+      - blend/mask/stroke enum mappings
+      - vector geometry + winding conversion
+    - resilient color normalization:
+      - RGBA arrays
+      - RGB objects (`r/g/b` + optional alpha)
+      - hex strings (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`)
+    - plugin gradient-shape tolerance:
+      - optional gradient fields
+      - fallback from `gradientHandlePositions`
+  - Verified plugin fixture import still succeeds:
+    - `riot_waves.json` import smoke test (temporary local test) passes.
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: PASS (14/14).
+- REFACTOR / verification:
+  - Ran:
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+    - `cargo fmt --all` -> PASS
