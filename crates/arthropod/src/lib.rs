@@ -89,12 +89,14 @@
 pub mod app;
 pub mod event_dispatcher;
 pub mod experimental;
+pub mod figma;
 pub mod layout;
 pub mod prelude;
 
 // Re-export main types
 pub use app::{App, AppError};
 pub use event_dispatcher::{DispatchResult, EventDispatcher};
+pub use figma::import_figma_document;
 pub use layout::{auto_layout, layout_widget_tree};
 
 // Re-export core crates for convenience

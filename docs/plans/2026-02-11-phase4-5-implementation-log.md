@@ -1878,3 +1878,57 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
 
 Parity status:
 - Mapping-table rows in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md` now have explicit regression coverage and/or documented fallback behavior in the harness.
+
+### 2026-02-27 (importer foundation: layout + text + prototype graph skeleton in `arthropod`)
+
+- Goal:
+  - Move beyond parity-harness-only mapping by adding a production importer surface in `crates/arthropod`
+    that can ingest Figma-like JSON into:
+    - `Scene` hierarchy
+    - `layout_styles` (`FlexStyle`)
+    - constraints metadata
+    - prototype interaction graph metadata
+    - basic text styling (`TextContent`)
+- RED:
+  - Added new integration tests first in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_auto_layout_maps_to_flex_style_and_hierarchy`
+    - `figma_constraints_and_positioning_map_to_imported_constraints`
+    - `figma_text_node_maps_characters_and_type_style`
+    - `figma_prototype_interactions_map_to_graph_edges`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: FAIL (`unresolved import arthropod::figma`)
+- GREEN:
+  - Implemented `crates/arthropod/src/figma.rs` with:
+    - `import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError>`
+    - hierarchy import with parent resolution and root fallback
+    - Figma auto-layout mapping to `FlexStyle`:
+      - `layoutMode` -> `FlexDirection`
+      - `itemSpacing` -> `gap`
+      - `padding*` -> paddings
+      - sizing modes -> fixed/auto width/height behavior
+      - `layoutGrow` -> `flex_grow`
+    - constraints mapping:
+      - horizontal/vertical constraint axes + layout positioning
+    - text import for TEXT nodes:
+      - `characters` + style fields to `TextContent`
+    - prototype metadata import:
+      - `prototypeInteractions` -> `PrototypeGraph.edges`
+  - Exported API via `crates/arthropod/src/lib.rs` (`pub mod figma`, `pub use figma::import_figma_document`)
+  - Added required deps to `crates/arthropod/Cargo.toml` (`serde`, `serde_json`)
+  - Ran:
+    - `cargo fmt --all`
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: PASS (4/4)
+- REFACTOR:
+  - Hardened constraints parsing to accept normalized tokens and common Figma aliases:
+    - `LEFT_RIGHT` / `TOP_BOTTOM` -> `ConstraintAxis::Stretch`
+  - Cleaned importer implementation per clippy feedback without behavior changes:
+    - replaced `FlexStyle::default()` + reassign pattern with direct struct initialization
+    - collapsed nested text-node conditional in `to_visual_style()`
+  - Re-ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (4/4)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+  - Cross-check regression:
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)

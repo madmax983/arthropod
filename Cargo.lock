@@ -236,6 +236,8 @@ dependencies = [
  "plat-core",
  "pollster",
  "render-engine",
+ "serde",
+ "serde_json",
  "style-engine",
  "theme-engine",
  "thiserror 2.0.18",
