@@ -2113,8 +2113,10 @@ name = "input-engine"
 version = "0.1.0"
 dependencies = [
  "flux-state",
+ "indexmap",
  "log",
  "plat-core",
+ "render-engine",
  "thiserror 2.0.18",
 ]
 
@@ -5071,6 +5073,7 @@ dependencies = [
  "flux-state",
  "glam",
  "indexmap",
+ "input-engine",
  "layout-engine",
  "plat-core",
  "render-engine",

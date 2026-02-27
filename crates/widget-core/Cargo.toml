@@ -11,6 +11,7 @@ render-engine = { path = "../render-engine" }
 text-engine = { path = "../text-engine" }
 layout-engine = { path = "../layout-engine" }
 flux-state = { path = "../flux-state" }
+input-engine = { path = "../input-engine" }
 widget-macros = { path = "../widget-macros" }
 theme-engine = { path = "../theme-engine" }
 glam = "0.29"

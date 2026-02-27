@@ -12,10 +12,14 @@
 //! It consumes `plat-core::WindowEvent`s and produces high-level gestures or updates
 //! input state components.
 
+pub mod focus;
+pub mod form;
 pub mod gestures;
 pub mod input_manager;
 #[cfg(feature = "nova")]
 pub mod mouse_gestures;
+pub mod text;
+pub mod validation;
 
 pub use gestures::{
     ChordMatcher, GestureSignal, InputPattern, SequenceMatcher, create_gesture_signal,
