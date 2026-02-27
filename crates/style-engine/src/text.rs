@@ -50,6 +50,62 @@ pub enum TextDecoration {
     LineThrough,
 }
 
+/// Text case transform
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum TextCase {
+    /// Preserve source casing
+    #[default]
+    Original,
+    /// Uppercase transform
+    Upper,
+    /// Lowercase transform
+    Lower,
+    /// Title-case transform
+    Title,
+    /// Small-caps style (renderer may fallback to upper-case)
+    SmallCaps,
+    /// Forced small-caps style
+    SmallCapsForced,
+}
+
+/// Vertical text alignment
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum TextAlignVertical {
+    /// Align to top
+    #[default]
+    Top,
+    /// Center vertically
+    Center,
+    /// Align to bottom
+    Bottom,
+}
+
+/// Text auto-resize behavior
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum TextAutoResize {
+    /// Fixed text box
+    #[default]
+    None,
+    /// Grow width and height to fit content
+    WidthAndHeight,
+    /// Grow height only
+    Height,
+    /// Grow width only
+    Width,
+    /// Truncate within fixed box
+    Truncate,
+}
+
+/// Text overflow behavior
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum TextOverflow {
+    /// Clip overflow content
+    #[default]
+    Clip,
+    /// Show ellipsis when truncated
+    Ellipsis,
+}
+
 /// Text content with styling
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TextContent {
@@ -71,6 +127,20 @@ pub struct TextContent {
     pub letter_spacing: f32,
     /// Text decoration
     pub decoration: TextDecoration,
+    /// Text case transformation semantics
+    pub text_case: TextCase,
+    /// Vertical alignment in text bounds
+    pub align_vertical: TextAlignVertical,
+    /// Auto-resize behavior for text frame
+    pub auto_resize: TextAutoResize,
+    /// Max visible lines for truncation/wrapping
+    pub max_lines: Option<u32>,
+    /// Overflow handling mode
+    pub overflow: TextOverflow,
+    /// Additional spacing after each paragraph
+    pub paragraph_spacing: f32,
+    /// Paragraph first-line indent
+    pub paragraph_indent: f32,
 }
 
 impl TextContent {
@@ -86,6 +156,13 @@ impl TextContent {
             font_family: None,
             letter_spacing: 0.0,
             decoration: TextDecoration::default(),
+            text_case: TextCase::default(),
+            align_vertical: TextAlignVertical::default(),
+            auto_resize: TextAutoResize::default(),
+            max_lines: None,
+            overflow: TextOverflow::default(),
+            paragraph_spacing: 0.0,
+            paragraph_indent: 0.0,
         }
     }
 
@@ -136,6 +213,48 @@ impl TextContent {
         self.decoration = decoration;
         self
     }
+
+    /// Set text case behavior
+    pub fn text_case(mut self, text_case: TextCase) -> Self {
+        self.text_case = text_case;
+        self
+    }
+
+    /// Set vertical text alignment
+    pub fn align_vertical(mut self, align: TextAlignVertical) -> Self {
+        self.align_vertical = align;
+        self
+    }
+
+    /// Set text auto-resize behavior
+    pub fn auto_resize(mut self, auto_resize: TextAutoResize) -> Self {
+        self.auto_resize = auto_resize;
+        self
+    }
+
+    /// Set maximum line count
+    pub fn max_lines(mut self, max_lines: Option<u32>) -> Self {
+        self.max_lines = max_lines;
+        self
+    }
+
+    /// Set overflow mode
+    pub fn overflow(mut self, overflow: TextOverflow) -> Self {
+        self.overflow = overflow;
+        self
+    }
+
+    /// Set paragraph spacing
+    pub fn paragraph_spacing(mut self, spacing: f32) -> Self {
+        self.paragraph_spacing = spacing;
+        self
+    }
+
+    /// Set paragraph indent
+    pub fn paragraph_indent(mut self, indent: f32) -> Self {
+        self.paragraph_indent = indent;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -153,6 +272,13 @@ mod tests {
         assert_eq!(text.align, TextAlign::Left);
         assert_eq!(text.line_height, LineHeight::Auto);
         assert_eq!(text.font_family, None);
+        assert_eq!(text.text_case, TextCase::Original);
+        assert_eq!(text.align_vertical, TextAlignVertical::Top);
+        assert_eq!(text.auto_resize, TextAutoResize::None);
+        assert_eq!(text.max_lines, None);
+        assert_eq!(text.overflow, TextOverflow::Clip);
+        assert_eq!(text.paragraph_spacing, 0.0);
+        assert_eq!(text.paragraph_indent, 0.0);
     }
 
     #[test]
@@ -192,7 +318,14 @@ mod tests {
         let text = TextContent::new("Hello", 16.0)
             .bold()
             .italic()
-            .align(TextAlign::Center);
+            .align(TextAlign::Center)
+            .text_case(TextCase::Upper)
+            .align_vertical(TextAlignVertical::Center)
+            .auto_resize(TextAutoResize::Height)
+            .max_lines(Some(2))
+            .overflow(TextOverflow::Ellipsis)
+            .paragraph_spacing(6.0)
+            .paragraph_indent(8.0);
 
         let json = serde_json::to_string(&text).expect("serialize failed");
         let deserialized: TextContent = serde_json::from_str(&json).expect("deserialize failed");

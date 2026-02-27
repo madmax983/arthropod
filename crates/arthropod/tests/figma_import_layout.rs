@@ -6,7 +6,9 @@ use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexWrap, ItemAlignSelf,
 };
 use render_engine::NodeContent;
-use style_engine::{FontStyle, LineHeight, TextAlign};
+use style_engine::{
+    FontStyle, LineHeight, TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextOverflow,
+};
 
 #[test]
 fn figma_auto_layout_maps_to_flex_style_and_hierarchy() {
@@ -216,6 +218,55 @@ fn figma_text_node_maps_characters_and_type_style() {
     assert_eq!(text.line_height, LineHeight::Fixed(24.0));
     assert_eq!(text.font_family.as_deref(), Some("Inter"));
     assert!((text.letter_spacing - 1.25).abs() < 1e-6);
+}
+
+#[test]
+fn figma_text_node_maps_advanced_typography_semantics() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "31",
+                "type": "TEXT",
+                "absoluteBoundingBox": { "x": 10, "y": 20, "width": 220, "height": 80 },
+                "characters": "shipped already",
+                "textAutoResize": "HEIGHT",
+                "maxLines": 2,
+                "textTruncation": "ENDING",
+                "style": {
+                    "fontFamily": "Inter",
+                    "fontSize": 16,
+                    "textCase": "UPPER",
+                    "textAlignVertical": "BOTTOM",
+                    "paragraphSpacing": 8,
+                    "paragraphIndent": 12
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("31")
+        .copied()
+        .expect("mapped scene id should exist");
+    let node = imported
+        .scene
+        .get_node(node_id)
+        .expect("imported node should exist");
+
+    let NodeContent::Styled { style } = &node.content else {
+        panic!("expected styled node for imported text");
+    };
+    let text = style.text.as_ref().expect("text style should be present");
+    assert_eq!(text.text, "SHIPPED ALREADY");
+    assert_eq!(text.text_case, TextCase::Upper);
+    assert_eq!(text.align_vertical, TextAlignVertical::Bottom);
+    assert_eq!(text.auto_resize, TextAutoResize::Height);
+    assert_eq!(text.max_lines, Some(2));
+    assert_eq!(text.overflow, TextOverflow::Ellipsis);
+    assert!((text.paragraph_spacing - 8.0).abs() < 1e-6);
+    assert!((text.paragraph_indent - 12.0).abs() < 1e-6);
 }
 
 #[test]

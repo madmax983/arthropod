@@ -2090,3 +2090,52 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p layout-engine -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (import parity slice 2: text completeness semantics)
+
+- Goal:
+  - Extend text import to include richer Figma typography semantics beyond basic font/align/decoration:
+    - text case transforms
+    - vertical alignment
+    - text auto-resize mode
+    - max lines + truncation overflow
+    - paragraph spacing + paragraph indent
+- RED:
+  - Added importer regression in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_text_node_maps_advanced_typography_semantics`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout figma_text_node_maps_advanced_typography_semantics -- --nocapture`
+  - Result: FAIL (expected): text semantics were not yet mapped (`"shipped already"` remained untransformed).
+- GREEN:
+  - Extended text model in `crates/style-engine/src/text.rs`:
+    - new enums:
+      - `TextCase`
+      - `TextAlignVertical`
+      - `TextAutoResize`
+      - `TextOverflow`
+    - new `TextContent` fields:
+      - `text_case`
+      - `align_vertical`
+      - `auto_resize`
+      - `max_lines`
+      - `overflow`
+      - `paragraph_spacing`
+      - `paragraph_indent`
+    - added builder methods and updated default/serde tests.
+  - Updated exports in `crates/style-engine/src/lib.rs` for new text enums.
+  - Extended importer parsing in `crates/arthropod/src/figma.rs`:
+    - parses Figma text fields:
+      - node-level: `textAutoResize`, `maxLines`, `textTruncation`
+      - style-level: `textCase`, `textAlignVertical`, `paragraphSpacing`, `paragraphIndent`
+    - maps semantics into `TextContent`
+    - applies deterministic text-case transform fallback (`UPPER`, `LOWER`, `TITLE`, small-caps fallback to uppercase)
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout figma_text_node_maps_advanced_typography_semantics -- --nocapture`
+  - Result: PASS.
+- REFACTOR / verification:
+  - Ran:
+    - `cargo test -p style-engine` -> PASS
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (10/10)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p style-engine -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)

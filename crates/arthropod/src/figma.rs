@@ -6,7 +6,10 @@ use layout_engine::{
 use plat_core::Rect;
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use serde::Deserialize;
-use style_engine::{FontStyle, LineHeight, TextAlign, TextContent, TextDecoration, VisualStyle};
+use style_engine::{
+    FontStyle, LineHeight, TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextContent,
+    TextDecoration, TextOverflow, VisualStyle,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -387,6 +390,12 @@ struct FigmaNode {
     #[serde(default)]
     characters: Option<String>,
     #[serde(default)]
+    text_auto_resize: Option<FigmaTextAutoResize>,
+    #[serde(default)]
+    max_lines: Option<u32>,
+    #[serde(default)]
+    text_truncation: Option<FigmaTextTruncation>,
+    #[serde(default)]
     style: Option<FigmaTypeStyle>,
     #[serde(default, alias = "interactions", alias = "prototypeInteractions")]
     prototype_interactions: Vec<FigmaPrototypeInteraction>,
@@ -567,12 +576,17 @@ impl FigmaNode {
     fn to_text_content(&self) -> Option<TextContent> {
         let characters = self.characters.as_ref()?.clone();
         let style = self.style.as_ref();
+        let text_case = style
+            .and_then(|s| s.text_case)
+            .map(FigmaTextCase::to_text_case)
+            .unwrap_or(TextCase::Original);
+        let transformed = apply_text_case(&characters, text_case);
 
         let font_size = style
             .and_then(|s| s.font_size)
             .filter(|value| value.is_finite() && *value > 0.0)
             .unwrap_or(16.0);
-        let mut text = TextContent::new(characters, font_size);
+        let mut text = TextContent::new(transformed, font_size);
 
         text.font_weight = style
             .and_then(|s| s.font_weight)
@@ -593,6 +607,29 @@ impl FigmaNode {
             .and_then(|s| s.text_decoration)
             .map(FigmaTextDecoration::to_text_decoration)
             .unwrap_or(TextDecoration::None);
+        text.text_case = text_case;
+        text.align_vertical = style
+            .and_then(|s| s.text_align_vertical)
+            .map(FigmaTextAlignVertical::to_text_align_vertical)
+            .unwrap_or(TextAlignVertical::Top);
+        text.auto_resize = self
+            .text_auto_resize
+            .map(FigmaTextAutoResize::to_text_auto_resize)
+            .unwrap_or(TextAutoResize::None);
+        text.max_lines = self.max_lines.filter(|value| *value > 0);
+        text.overflow = self
+            .text_truncation
+            .or_else(|| style.and_then(|s| s.text_truncation))
+            .map(FigmaTextTruncation::to_text_overflow)
+            .unwrap_or(TextOverflow::Clip);
+        text.paragraph_spacing = style
+            .and_then(|s| s.paragraph_spacing)
+            .filter(|value| value.is_finite())
+            .unwrap_or(0.0);
+        text.paragraph_indent = style
+            .and_then(|s| s.paragraph_indent)
+            .filter(|value| value.is_finite())
+            .unwrap_or(0.0);
 
         Some(text)
     }
@@ -736,6 +773,29 @@ fn duration_to_ms(value: f64) -> Option<u32> {
         return None;
     }
     Some(rounded as u32)
+}
+
+fn apply_text_case(text: &str, text_case: TextCase) -> String {
+    match text_case {
+        TextCase::Original => text.to_string(),
+        TextCase::Upper | TextCase::SmallCaps | TextCase::SmallCapsForced => {
+            text.to_uppercase()
+        }
+        TextCase::Lower => text.to_lowercase(),
+        TextCase::Title => text
+            .split_whitespace()
+            .map(title_case_word)
+            .collect::<Vec<_>>()
+            .join(" "),
+    }
+}
+
+fn title_case_word(word: &str) -> String {
+    let mut chars = word.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -990,6 +1050,16 @@ struct FigmaTypeStyle {
     letter_spacing: Option<f32>,
     #[serde(default)]
     text_decoration: Option<FigmaTextDecoration>,
+    #[serde(default)]
+    text_case: Option<FigmaTextCase>,
+    #[serde(default)]
+    text_align_vertical: Option<FigmaTextAlignVertical>,
+    #[serde(default)]
+    paragraph_spacing: Option<f32>,
+    #[serde(default)]
+    paragraph_indent: Option<f32>,
+    #[serde(default)]
+    text_truncation: Option<FigmaTextTruncation>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -1032,6 +1102,98 @@ impl FigmaTextDecoration {
             Self::Underline => TextDecoration::Underline,
             Self::Strikethrough => TextDecoration::LineThrough,
             Self::Unknown => TextDecoration::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaTextCase {
+    Original,
+    Upper,
+    Lower,
+    Title,
+    SmallCaps,
+    SmallCapsForced,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaTextCase {
+    fn to_text_case(self) -> TextCase {
+        match self {
+            Self::Original => TextCase::Original,
+            Self::Upper => TextCase::Upper,
+            Self::Lower => TextCase::Lower,
+            Self::Title => TextCase::Title,
+            Self::SmallCaps => TextCase::SmallCaps,
+            Self::SmallCapsForced => TextCase::SmallCapsForced,
+            Self::Unknown => TextCase::Original,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaTextAlignVertical {
+    Top,
+    Center,
+    Bottom,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaTextAlignVertical {
+    fn to_text_align_vertical(self) -> TextAlignVertical {
+        match self {
+            Self::Top => TextAlignVertical::Top,
+            Self::Center => TextAlignVertical::Center,
+            Self::Bottom => TextAlignVertical::Bottom,
+            Self::Unknown => TextAlignVertical::Top,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaTextAutoResize {
+    None,
+    WidthAndHeight,
+    Height,
+    Width,
+    Truncate,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaTextAutoResize {
+    fn to_text_auto_resize(self) -> TextAutoResize {
+        match self {
+            Self::None => TextAutoResize::None,
+            Self::WidthAndHeight => TextAutoResize::WidthAndHeight,
+            Self::Height => TextAutoResize::Height,
+            Self::Width => TextAutoResize::Width,
+            Self::Truncate => TextAutoResize::Truncate,
+            Self::Unknown => TextAutoResize::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaTextTruncation {
+    None,
+    Disabled,
+    Ending,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaTextTruncation {
+    fn to_text_overflow(self) -> TextOverflow {
+        match self {
+            Self::Ending => TextOverflow::Ellipsis,
+            Self::None | Self::Disabled | Self::Unknown => TextOverflow::Clip,
         }
     }
 }
