@@ -33,6 +33,15 @@ impl JsonRpcRequest {
             params,
         }
     }
+
+    /// Validate the request format
+    pub fn validate(&self) -> Result<(), String> {
+        if self.params.is_null() || self.params.is_array() || self.params.is_object() {
+            Ok(())
+        } else {
+            Err("Request params must be an Array, Object, or Null (omitted)".to_string())
+        }
+    }
 }
 
 /// JSON-RPC 2.0 successful response
@@ -71,6 +80,16 @@ impl JsonRpcResponse {
             id: id.into(),
             result: None,
             error: Some(error),
+        }
+    }
+
+    /// Validate the response format
+    pub fn validate(&self) -> Result<(), String> {
+        match (&self.result, &self.error) {
+            (Some(_), None) => Ok(()),
+            (None, Some(_)) => Ok(()),
+            (Some(_), Some(_)) => Err("Response cannot have both 'result' and 'error'".to_string()),
+            (None, None) => Err("Response must have either 'result' or 'error'".to_string()),
         }
     }
 }
@@ -136,11 +155,10 @@ impl JsonRpcError {
     }
 
     /// Custom application error (code >= -32000)
+    ///
+    /// The code will be clamped to the valid range [-32099, -32000] to prevent invalid codes.
     pub fn application_error(code: i32, message: impl Into<String>) -> Self {
-        assert!(
-            (-32099..=-32000).contains(&code),
-            "Application error codes must be in range [-32099, -32000]"
-        );
+        let code = code.clamp(-32099, -32000);
         Self {
             code,
             message: message.into(),

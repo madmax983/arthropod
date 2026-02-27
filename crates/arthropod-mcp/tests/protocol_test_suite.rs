@@ -62,15 +62,17 @@ fn test_error_with_data() {
 }
 
 #[test]
-#[should_panic(expected = "Application error codes must be in range [-32099, -32000]")]
-fn test_application_error_panic_low() {
-    JsonRpcError::application_error(-32100, "Too low");
+fn test_application_error_clamp_low() {
+    // Should clamp -32100 to -32099 (min valid)
+    let err = JsonRpcError::application_error(-32100, "Too low");
+    assert_eq!(err.code, -32099);
 }
 
 #[test]
-#[should_panic(expected = "Application error codes must be in range [-32099, -32000]")]
-fn test_application_error_panic_high() {
-    JsonRpcError::application_error(-31999, "Too high");
+fn test_application_error_clamp_high() {
+    // Should clamp -31999 to -32000 (max valid)
+    let err = JsonRpcError::application_error(-31999, "Too high");
+    assert_eq!(err.code, -32000);
 }
 
 #[test]
