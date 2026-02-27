@@ -506,6 +506,59 @@ impl Runtime {
             .unwrap_or_else(|| panic!("Computed value not initialized for id {:?}", id))
     }
 
+    /// Combined operation to track a dependency and get the signal handle in one lock.
+    pub(crate) fn track_and_get_signal(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(observer) = inner.current_context() {
+            inner.dependencies.entry(observer).or_default().insert(id);
+            inner.subscribers.entry(id).or_default().insert(observer);
+        }
+        inner
+            .signals
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| panic!("Signal not found for id {:?}", id))
+    }
+
+    /// Combined operation to track a dependency and get the computed handle if fresh.
+    /// Returns None if the value is stale or uninitialized, indicating recompute is needed.
+    pub(crate) fn track_and_get_computed_if_fresh(
+        &self,
+        id: NodeId,
+    ) -> Option<Arc<dyn Any + Send + Sync>> {
+        let mut inner = self.inner.lock().unwrap();
+
+        if let Some(observer) = inner.current_context() {
+            inner.dependencies.entry(observer).or_default().insert(id);
+            inner.subscribers.entry(id).or_default().insert(observer);
+        }
+
+        if inner.stale.contains(&id) {
+            return None;
+        }
+
+        let computed = inner
+            .computeds
+            .get(&id)
+            .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+        computed.value.clone()
+    }
+
+    /// Get the computed handle if fresh, without tracking.
+    pub(crate) fn get_computed_if_fresh(&self, id: NodeId) -> Option<Arc<dyn Any + Send + Sync>> {
+        let inner = self.inner.lock().unwrap();
+
+        if inner.stale.contains(&id) {
+            return None;
+        }
+
+        let computed = inner
+            .computeds
+            .get(&id)
+            .unwrap_or_else(|| panic!("Computed not found for id {:?}", id));
+        computed.value.clone()
+    }
+
     pub(crate) fn is_stale(&self, id: NodeId) -> bool {
         self.inner.lock().unwrap().stale.contains(&id)
     }

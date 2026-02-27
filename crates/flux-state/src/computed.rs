@@ -196,14 +196,15 @@ impl<T: 'static + Send + Sync> Computed<T> {
     /// - Panics if the stored type does not match `T` (should not happen in safe code).
     /// - Panics if re-computation fails (e.g., dependency panic).
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        self.runtime.track(self.id);
-
-        // Check if value is stale and recompute if needed
-        if self.runtime.is_stale(self.id) {
+        // Optimistically try to get fresh value with tracking in one go
+        let handle = if let Some(h) = self.runtime.track_and_get_computed_if_fresh(self.id) {
+            h
+        } else {
+            // Slow path: value is stale or uninitialized
             self.runtime.recompute(self.id);
-        }
+            self.runtime.get_computed_handle(self.id)
+        };
 
-        let handle = self.runtime.get_computed_handle(self.id);
         let guard = handle
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
@@ -236,12 +237,15 @@ impl<T: 'static + Send + Sync> Computed<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        // Check if value is stale and recompute if needed
-        if self.runtime.is_stale(self.id) {
+        // Optimistically try to get fresh value without tracking
+        let handle = if let Some(h) = self.runtime.get_computed_if_fresh(self.id) {
+            h
+        } else {
+            // Slow path: value is stale or uninitialized
             self.runtime.recompute(self.id);
-        }
+            self.runtime.get_computed_handle(self.id)
+        };
 
-        let handle = self.runtime.get_computed_handle(self.id);
         let guard = handle
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")

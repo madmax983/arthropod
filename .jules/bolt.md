@@ -9,3 +9,7 @@
 **[Performance] Allocation Avoidance**
 **Learning:** Avoiding `Box` allocation for solid color nodes yields significant speedup.
 **Action:** Provide specialized constructors for common, simple cases.
+
+**[Lock Contention in Reactive Primitives]**
+**Learning:** `Signal::get` and `Computed::get` are hot paths. Acquiring the `RuntimeInner` lock multiple times (once for tracking, once for handle retrieval) adds significant overhead (~20-30% of total read time).
+**Action:** Combine operations into single-lock methods on the Runtime (`track_and_get_signal`, `track_and_get_computed_if_fresh`). This reduces lock acquisitions from 2-3 to 1 in the happy path.

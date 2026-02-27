@@ -211,8 +211,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        self.runtime.track(self.id);
-        let handle = self.runtime.get_signal_handle(self.id);
+        let handle = self.runtime.track_and_get_signal(self.id);
         let guard = handle
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
@@ -349,8 +348,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        self.runtime.track(self.id);
-        let handle = self.runtime.get_signal_handle(self.id);
+        let handle = self.runtime.track_and_get_signal(self.id);
         let guard = handle
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
