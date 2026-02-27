@@ -1,5 +1,15 @@
 # Nova Story Engine
 
+> [!CAUTION]
+> **This is an EXPERIMENTAL feature.**
+>
+> You must enable the `nova` feature in your `Cargo.toml` to use this API.
+>
+> ```toml
+> [dependencies]
+> arthropod = { version = "0.1", features = ["nova"] }
+> ```
+
 > **Status:** Experimental
 > **Feature Flag:** `nova`
 
@@ -63,7 +73,7 @@ fn main() -> Result<(), AppError> {
     app.world_mut().insert_resource(StoryRuntime::new(story));
 
     // 5. Spawn the NarrativeGenerator (renders the current state to the Scene)
-    let root = app.world().resource::<render_engine::Scene>().root();
+    let root = app.world().resource::<Scene>().root();
     app.spawn(root).insert(NarrativeGenerator);
 
     // 6. Run the App (Simulation loop)
