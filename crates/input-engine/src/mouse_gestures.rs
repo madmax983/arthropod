@@ -13,11 +13,17 @@ const CIRCLE_ANGLE_TOLERANCE: f64 = 1.0;
 /// Recognized mouse gestures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MouseGesture {
+    /// A quick vertical movement upwards.
     SwipeUp,
+    /// A quick vertical movement downwards.
     SwipeDown,
+    /// A quick horizontal movement to the left.
     SwipeLeft,
+    /// A quick horizontal movement to the right.
     SwipeRight,
+    /// A full circular motion (approx. 360 degrees) in the clockwise direction.
     CircleClockwise,
+    /// A full circular motion (approx. 360 degrees) in the counter-clockwise direction.
     CircleCounterClockwise,
 }
 
@@ -30,6 +36,26 @@ struct StrokeMetrics {
 }
 
 /// Matches mouse strokes (gestures) drawn while holding a specific button.
+///
+/// Implements a geometric gesture recognizer that analyzes the path of the cursor
+/// while a specific button (the "trigger button") is held down.
+///
+/// # Detection Algorithm
+///
+/// The matcher collects points during the drag operation and analyzes the stroke upon release.
+///
+/// - **Thresholds**:
+///   - Minimum distance: **50.0 pixels**. Strokes shorter than this are ignored.
+///   - Minimum sample size: **5 points**. Very short/fast clicks are ignored.
+///
+/// - **Circle Detection**:
+///   - Requires a total path length > **100.0 pixels**.
+///   - The distance between start and end points must be < **30%** of the total path length (closed loop).
+///   - The total winding angle (sum of turn angles) must be within **1.0 radian (~60°)** of 2π (360°).
+///
+/// - **Swipe Detection**:
+///   - If not a circle, checks if the primary movement axis dominates.
+///   - The major axis delta must be significantly larger than the minor axis delta.
 pub struct StrokeMatcher {
     trigger_button: MouseButton,
     points: Vec<Point<f64>>,

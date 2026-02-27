@@ -116,9 +116,9 @@ pub enum Paint {
 pub enum GradientInterpolationMode {
     /// Interpolate directly in gamma-encoded sRGB (legacy behavior, can look muddy).
     Srgb,
-    /// Interpolate in linear-light RGB, then convert back to sRGB.
+    /// Interpolate in linear-light RGB, then convert back to sRGB (physically correct lighting).
     LinearRgb,
-    /// Interpolate in Oklab for perceptual smoothness.
+    /// Interpolate in Oklab for perceptual smoothness (prevents gray dead-zones).
     #[default]
     Oklab,
 }
@@ -242,7 +242,26 @@ impl Paint {
         Self::Solid(color)
     }
 
-    /// Interpolate between color stops at a given position
+    /// Interpolate between color stops at a given position.
+    ///
+    /// Uses the default interpolation mode (`Oklab`) for perceptually uniform blending.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use style_engine::{Paint, ColorStop, Color};
+    /// use glam::Vec4;
+    ///
+    /// let black = Color::new(0.0, 0.0, 0.0, 1.0);
+    /// let white = Color::new(1.0, 1.0, 1.0, 1.0);
+    /// let stops = vec![
+    ///     ColorStop::new(0.0, black),
+    ///     ColorStop::new(1.0, white)
+    /// ];
+    ///
+    /// // Get color at 50%
+    /// let mid = Paint::interpolate_stops(0.5, &stops);
+    /// ```
     pub fn interpolate_stops(position: f32, stops: &[ColorStop]) -> Color {
         Self::interpolate_stops_with_mode(position, stops, GradientInterpolationMode::default())
     }

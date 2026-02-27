@@ -15,6 +15,32 @@ pub trait InputPattern: Send + Sync {
 }
 
 /// A matcher that detects a specific sequence of keys.
+///
+/// Triggers the gesture only when the keys are pressed in the exact order specified.
+/// If a wrong key is pressed, the sequence resets. However, if the wrong key matches
+/// the *start* of the sequence, it immediately begins a new attempt (e.g., in "A B C",
+/// pressing "A B A" will reset but keep the last "A" as the start of a new match).
+///
+/// # Example
+///
+/// ```
+/// use input_engine::{SequenceMatcher, InputPattern};
+/// use plat_core::Key;
+///
+/// // Detect the Konami Code: Up, Up, Down, Down...
+/// let konami = vec![
+///     Key::Up, Key::Up,
+///     Key::Down, Key::Down,
+///     Key::Left, Key::Right,
+///     Key::Left, Key::Right,
+///     Key::B, Key::A
+/// ];
+///
+/// #[derive(Debug, Clone, PartialEq)]
+/// enum GameAction { CheatCode }
+///
+/// let matcher = SequenceMatcher::new(konami, GameAction::CheatCode);
+/// ```
 pub struct SequenceMatcher<G> {
     sequence: Vec<Key>,
     current_index: usize,
@@ -69,6 +95,22 @@ impl<G: Clone + Send + Sync + PartialEq + std::fmt::Debug> InputPattern for Sequ
 }
 
 /// A matcher that detects simultaneous key presses (chords).
+///
+/// Triggers the gesture when *all* required keys are currently pressed.
+/// Additional keys being pressed does not prevent the match (non-exclusive).
+///
+/// # Example
+///
+/// ```
+/// use input_engine::{ChordMatcher, InputPattern};
+/// use plat_core::Key;
+///
+/// // Detect Ctrl + S (Save)
+/// #[derive(Debug, Clone, PartialEq)]
+/// enum Action { Save }
+///
+/// let matcher = ChordMatcher::new(vec![Key::Control, Key::S], Action::Save);
+/// ```
 pub struct ChordMatcher<G> {
     required_keys: Vec<Key>,
     pressed_keys: Vec<Key>,
@@ -130,6 +172,16 @@ impl<G> std::ops::Deref for GestureSignal<G> {
 }
 
 /// Create a signal that emits gestures detected from an input stream.
+///
+/// Bridges the gap between raw window events and high-level gesture signals.
+/// This function creates an [`Effect`] that monitors the input signal and
+/// updates the output signal whenever the provided `pattern` matches.
+///
+/// # Arguments
+///
+/// * `cx` - The reactive runtime.
+/// * `input` - A signal yielding optional `WindowEvent`s (e.g. from an event loop).
+/// * `pattern` - A stateful matcher implementing [`InputPattern`].
 pub fn create_gesture_signal<P, G>(
     cx: Arc<Runtime>,
     input: ReadSignal<Option<WindowEvent>>,
