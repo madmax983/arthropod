@@ -114,6 +114,7 @@ enum FigmaPathGeometry {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FigmaPathGeometryObject {
+    #[serde(alias = "pathData")]
     path: String,
     winding_rule: Option<FigmaWindingRule>,
 }
@@ -524,6 +525,38 @@ fn figma_style_fill_geometry_maps_svg_paths_with_winding_rule() {
         geometry[0].winding_rule,
         WindingRule::EvenOdd,
         "windingRule should map from figma geometry"
+    );
+}
+
+#[test]
+fn figma_style_fill_geometry_path_data_alias_maps() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "fills":[{"type":"SOLID","color":[0.4,0.9,0.6,1.0]}],
+            "fillGeometry": [
+                {
+                    "pathData": "M 0 0 L 10 0 L 10 10 Z",
+                    "windingRule": "NONZERO"
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let geometry = style
+        .fill_geometry
+        .as_ref()
+        .expect("expected fill geometry from pathData alias");
+    assert_eq!(geometry.len(), 1, "expected one mapped fill geometry path");
+    assert!(
+        !geometry[0].commands.is_empty(),
+        "mapped fill geometry path should contain parsed commands"
+    );
+    assert_eq!(
+        geometry[0].winding_rule,
+        WindingRule::NonZero,
+        "NONZERO winding should map to NonZero"
     );
 }
 

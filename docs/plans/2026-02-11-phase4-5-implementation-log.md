@@ -1649,3 +1649,20 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `cargo test --test figma_json_render_regression figma_json_render_regression_matches_golden -- --nocapture` -> FAIL (expected golden drift, `diff_ratio=0.0259`)
   - `ARTHROPOD_UPDATE_GOLDENS=1 cargo test --test figma_json_render_regression figma_json_render_regression_matches_golden -- --nocapture` -> PASS
   - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (12/12)
+
+### 2026-02-27 (parity continuation: `fillGeometry.pathData` alias support)
+
+- Goal:
+  - Improve fixture/import compatibility for geometry object variants that encode path data as `pathData` instead of `path`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - `FigmaPathGeometryObject.path` now accepts `pathData` alias.
+    - added regression test:
+      - `figma_style_fill_geometry_path_data_alias_maps`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_path_data_alias_maps -- --nocapture` -> FAIL (`untagged enum FigmaPathGeometry` deserialize mismatch)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_path_data_alias_maps -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (13/13)
