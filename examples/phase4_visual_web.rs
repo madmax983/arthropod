@@ -10,6 +10,8 @@
 //! - `/?case=blur`
 //! - `/?case=blend`
 //! - `/?case=clipping`
+//! - `/?case=mask`
+//! - `/?case=image`
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -25,27 +27,32 @@ mod wasm_app {
     use std::rc::Rc;
 
     use plat_core::{
-        Application, ControlFlow, ElementState, Event, EventLoop, Key, Rect, Size, Window,
-        WindowConfig, WindowEvent, WindowId,
+        Application, ControlFlow, ElementState, Event, EventLoop, Key, Size, Window, WindowConfig,
+        WindowEvent, WindowId,
     };
     use render_engine::{
-        BlendMode, Color, ColorStop, Effect, NodeContent, Paint, Scene, SceneNode, StrokeStyle,
-        VisualStyle,
+        Color, Scene,
         backend::{RenderBackend, WgpuBackend},
     };
-    use style_engine::{BackgroundBlur, LayerBlur, LinearGradient, StrokeAlign};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::spawn_local;
     use web_sys::console;
 
+    #[path = "../phase4_visual_scenes.rs"]
+    mod phase4_visual_scenes;
+
     const APP_TITLE: &str = "Arthropod Phase4 Visual Fixture";
     const INTER_REGULAR_FONT: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
+    const IMAGE_FIXTURE_WIDTH: u32 = 192;
+    const IMAGE_FIXTURE_HEIGHT: u32 = 144;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum VisualCase {
         Blur,
         Blend,
         Clipping,
+        Mask,
+        Image,
     }
 
     impl VisualCase {
@@ -67,6 +74,8 @@ mod wasm_app {
                     return match value {
                         "blend" => Self::Blend,
                         "clipping" => Self::Clipping,
+                        "mask" => Self::Mask,
+                        "image" => Self::Image,
                         _ => Self::Blur,
                     };
                 }
@@ -80,7 +89,13 @@ mod wasm_app {
                 Self::Blur => "blur",
                 Self::Blend => "blend",
                 Self::Clipping => "clipping",
+                Self::Mask => "mask",
+                Self::Image => "image",
             }
+        }
+
+        fn needs_image_fixture(self) -> bool {
+            matches!(self, Self::Image)
         }
     }
 
@@ -93,6 +108,99 @@ mod wasm_app {
         scene: Scene,
         pending_size: Option<Size<u32>>,
         ready_marker_set: bool,
+    }
+
+    fn sanitize_error_marker_value(message: &str) -> String {
+        let mut output = String::with_capacity(message.len().min(1024));
+        for ch in message.chars() {
+            if ch == '\0' {
+                continue;
+            }
+
+            if ch.is_control() && !matches!(ch, '\n' | '\r' | '\t') {
+                output.push(' ');
+            } else {
+                output.push(ch);
+            }
+
+            if output.len() >= 1024 {
+                break;
+            }
+        }
+
+        if output.is_empty() {
+            "phase4_visual_web startup failed: unavailable error details".to_string()
+        } else {
+            output
+        }
+    }
+
+    fn phase4_image_bytes(width: u32, height: u32) -> Vec<u8> {
+        let mut rgba = vec![0u8; (width * height * 4) as usize];
+        let margin_x = 6u32;
+        let margin_y = 6u32;
+        let gap_x = 4u32;
+        let gap_y = 4u32;
+        let block_w = (width.saturating_sub(margin_x * 2 + gap_x)) / 2;
+        let block_h = (height.saturating_sub(margin_y * 2 + gap_y)) / 2;
+        let cx = (width / 2) as i32;
+        let cy = (height / 2) as i32;
+        let r2 = 7_i32 * 7_i32;
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = ((y * width + x) * 4) as usize;
+                let mut color = [28u8, 36u8, 52u8, 255u8];
+
+                let in_tl = x >= margin_x
+                    && x < margin_x + block_w
+                    && y >= margin_y
+                    && y < margin_y + block_h;
+                let in_tr = x >= margin_x + block_w + gap_x
+                    && x < margin_x + block_w + gap_x + block_w
+                    && y >= margin_y
+                    && y < margin_y + block_h;
+                let in_bl = x >= margin_x
+                    && x < margin_x + block_w
+                    && y >= margin_y + block_h + gap_y
+                    && y < margin_y + block_h + gap_y + block_h;
+                let in_br = x >= margin_x + block_w + gap_x
+                    && x < margin_x + block_w + gap_x + block_w
+                    && y >= margin_y + block_h + gap_y
+                    && y < margin_y + block_h + gap_y + block_h;
+
+                if in_tl {
+                    color = [224, 86, 86, 255];
+                } else if in_tr {
+                    color = [83, 188, 236, 255];
+                } else if in_bl {
+                    color = [237, 196, 85, 255];
+                } else if in_br {
+                    color = [163, 116, 229, 255];
+                }
+
+                if x == 0 || y == 0 || x + 1 == width || y + 1 == height {
+                    color = [245, 245, 245, 255];
+                }
+
+                if x.abs_diff(width / 2) <= 1 || y.abs_diff(height / 2) <= 1 {
+                    color = [22, 22, 22, 255];
+                }
+
+                let dx = x as i32 - cx;
+                let dy = y as i32 - cy;
+                if dx * dx + dy * dy <= r2 {
+                    color = [245, 245, 245, 255];
+                }
+
+                rgba[idx] = color[0];
+                rgba[idx + 1] = color[1];
+                rgba[idx + 2] = color[2];
+                rgba[idx + 3] = 255;
+            }
+        }
+
+        rgba
     }
 
     fn log_startup_failure(stage: &str, error: &str) {
@@ -127,7 +235,16 @@ mod wasm_app {
             return;
         };
         let _ = body.set_attribute("data-arthropod-ready", "0");
-        let _ = body.set_attribute("data-arthropod-error", message);
+        let sanitized = sanitize_error_marker_value(message);
+        if body
+            .set_attribute("data-arthropod-error", sanitized.as_str())
+            .is_err()
+        {
+            let _ = body.set_attribute(
+                "data-arthropod-error",
+                "phase4_visual_web startup failed: unavailable error details",
+            );
+        }
     }
 
     fn install_panic_marker_hook() {
@@ -142,195 +259,13 @@ mod wasm_app {
     }
 
     impl Phase4VisualApp {
-        fn build_blur_scene() -> Scene {
-            let mut scene = Scene::new();
-            let root = scene.root();
-
-            let mut background = SceneNode::new(NodeContent::Styled {
-                style: Box::new(VisualStyle::new().fill(Paint::Linear(LinearGradient {
-                    start: glam::Vec2::new(0.0, 0.0),
-                    end: glam::Vec2::new(1.0, 1.0),
-                    stops: vec![
-                        ColorStop::new(0.0, Color::rgba(0.05, 0.10, 0.18, 1.0).as_vec4()),
-                        ColorStop::new(1.0, Color::rgba(0.12, 0.20, 0.34, 1.0).as_vec4()),
-                    ],
-                }))),
-            });
-            background.bounds = Rect::new(0.0, 0.0, 1280.0, 720.0);
-            scene.add_node(root, background);
-
-            let mut color_bars = SceneNode::new(NodeContent::Styled {
-                style: Box::new(VisualStyle::new().fill(Paint::Linear(LinearGradient {
-                    start: glam::Vec2::new(0.0, 0.5),
-                    end: glam::Vec2::new(1.0, 0.5),
-                    stops: vec![
-                        ColorStop::new(0.00, Color::rgba(0.93, 0.29, 0.47, 1.0).as_vec4()),
-                        ColorStop::new(0.33, Color::rgba(0.96, 0.72, 0.24, 1.0).as_vec4()),
-                        ColorStop::new(0.66, Color::rgba(0.19, 0.81, 0.63, 1.0).as_vec4()),
-                        ColorStop::new(1.00, Color::rgba(0.25, 0.68, 0.94, 1.0).as_vec4()),
-                    ],
-                }))),
-            });
-            color_bars.bounds = Rect::new(120.0, 190.0, 980.0, 260.0);
-            scene.add_node(root, color_bars);
-
-            let mut layer_blur_card = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(1.0, 1.0, 1.0, 0.08).as_vec4())
-                        .stroke(StrokeStyle::solid(
-                            Paint::Solid(Color::rgba(1.0, 1.0, 1.0, 0.30).as_vec4()),
-                            1.0,
-                            StrokeAlign::Inside,
-                        ))
-                        .corner_radius(22.0)
-                        .effect(Effect::LayerBlur(LayerBlur {
-                            radius: 18.0,
-                            visible: true,
-                        })),
-                ),
-            });
-            layer_blur_card.bounds = Rect::new(180.0, 120.0, 460.0, 320.0);
-            scene.add_node(root, layer_blur_card);
-
-            let mut backdrop_blur_card = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(0.95, 0.97, 1.0, 0.10).as_vec4())
-                        .stroke(StrokeStyle::solid(
-                            Paint::Solid(Color::rgba(0.85, 0.92, 1.0, 0.32).as_vec4()),
-                            1.0,
-                            StrokeAlign::Inside,
-                        ))
-                        .corner_radius(22.0)
-                        .effect(Effect::BackgroundBlur(BackgroundBlur {
-                            radius: 16.0,
-                            visible: true,
-                        })),
-                ),
-            });
-            backdrop_blur_card.bounds = Rect::new(620.0, 220.0, 460.0, 320.0);
-            scene.add_node(root, backdrop_blur_card);
-
-            scene
-        }
-
-        fn build_blend_scene() -> Scene {
-            let mut scene = Scene::new();
-            let root = scene.root();
-
-            let mut background = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(0.07, 0.09, 0.13, 1.0).as_vec4())
-                        .corner_radius(20.0),
-                ),
-            });
-            background.bounds = Rect::new(90.0, 90.0, 1100.0, 540.0);
-            scene.add_node(root, background);
-
-            let blend_modes = [
-                BlendMode::Multiply,
-                BlendMode::Screen,
-                BlendMode::Overlay,
-                BlendMode::Darken,
-                BlendMode::Lighten,
-                BlendMode::Difference,
-                BlendMode::Exclusion,
-            ];
-
-            for (idx, mode) in blend_modes.iter().enumerate() {
-                let x = 140.0 + idx as f32 * 145.0;
-                let mut base = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(
-                        VisualStyle::new()
-                            .solid_fill(Color::rgba(0.23, 0.46, 0.94, 0.85).as_vec4())
-                            .corner_radius(16.0),
-                    ),
-                });
-                base.bounds = Rect::new(x, 210.0, 120.0, 230.0);
-                scene.add_node(root, base);
-
-                let mut top = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(
-                        VisualStyle::new()
-                            .solid_fill(Color::rgba(0.95, 0.35, 0.30, 0.78).as_vec4())
-                            .blend_mode(*mode)
-                            .corner_radius(16.0),
-                    ),
-                });
-                top.bounds = Rect::new(x + 28.0, 170.0, 120.0, 230.0);
-                scene.add_node(root, top);
-            }
-
-            scene
-        }
-
-        fn build_clipping_scene() -> Scene {
-            let mut scene = Scene::new();
-            let root = scene.root();
-
-            let mut background = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new().solid_fill(Color::rgba(0.04, 0.08, 0.12, 1.0).as_vec4()),
-                ),
-            });
-            background.bounds = Rect::new(0.0, 0.0, 1280.0, 720.0);
-            scene.add_node(root, background);
-
-            let mut outer_clip = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(0.14, 0.17, 0.23, 1.0).as_vec4())
-                        .corner_radius(18.0)
-                        .clips_content(true),
-                ),
-            });
-            outer_clip.bounds = Rect::new(160.0, 110.0, 960.0, 500.0);
-            let outer_id = scene.add_node(root, outer_clip);
-
-            let mut inner_clip = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(0.20, 0.24, 0.33, 1.0).as_vec4())
-                        .corner_radius(14.0)
-                        .clips_content(true),
-                ),
-            });
-            inner_clip.bounds = Rect::new(90.0, 70.0, 780.0, 360.0);
-            let inner_id = scene.add_node(outer_id, inner_clip);
-
-            let mut diagonal_band = SceneNode::new(NodeContent::Styled {
-                style: Box::new(VisualStyle::new().fill(Paint::Linear(LinearGradient {
-                    start: glam::Vec2::new(0.0, 0.0),
-                    end: glam::Vec2::new(1.0, 1.0),
-                    stops: vec![
-                        ColorStop::new(0.0, Color::rgba(0.97, 0.41, 0.55, 1.0).as_vec4()),
-                        ColorStop::new(1.0, Color::rgba(0.20, 0.72, 0.98, 1.0).as_vec4()),
-                    ],
-                }))),
-            });
-            diagonal_band.bounds = Rect::new(-140.0, -40.0, 1040.0, 420.0);
-            scene.add_node(inner_id, diagonal_band);
-
-            let mut escape_rect = SceneNode::new(NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .solid_fill(Color::rgba(0.97, 0.78, 0.22, 0.95).as_vec4())
-                        .corner_radius(22.0),
-                ),
-            });
-            escape_rect.bounds = Rect::new(680.0, 240.0, 300.0, 220.0);
-            scene.add_node(inner_id, escape_rect);
-
-            scene
-        }
-
         fn build_scene(case: VisualCase) -> Scene {
             match case {
-                VisualCase::Blur => Self::build_blur_scene(),
-                VisualCase::Blend => Self::build_blend_scene(),
-                VisualCase::Clipping => Self::build_clipping_scene(),
+                VisualCase::Blur => phase4_visual_scenes::build_phase4_blur_scene(),
+                VisualCase::Blend => phase4_visual_scenes::build_phase4_blend_scene(),
+                VisualCase::Clipping => phase4_visual_scenes::build_phase4_clipping_scene(),
+                VisualCase::Mask => phase4_visual_scenes::build_phase4_mask_scene(),
+                VisualCase::Image => phase4_visual_scenes::build_phase4_image_scene(),
             }
         }
 
@@ -389,9 +324,26 @@ mod wasm_app {
             match init_result {
                 Ok(mut backend) => {
                     let _ = backend.register_font_bytes(INTER_REGULAR_FONT.to_vec());
+
+                    if self.case.needs_image_fixture() {
+                        let image_bytes =
+                            phase4_image_bytes(IMAGE_FIXTURE_WIDTH, IMAGE_FIXTURE_HEIGHT);
+                        if let Err(err) = backend.register_image_rgba8(
+                            phase4_visual_scenes::PHASE4_IMAGE_TEST_ID,
+                            IMAGE_FIXTURE_WIDTH,
+                            IMAGE_FIXTURE_HEIGHT,
+                            image_bytes,
+                        ) {
+                            self.backend_init_failed = true;
+                            log_startup_failure("image fixture registration", &err.to_string());
+                            return;
+                        }
+                    }
+
                     if let Some(size) = self.pending_size.take() {
                         backend.resize(size.width.max(1), size.height.max(1));
                     }
+
                     console::log_1(
                         &format!(
                             "phase4_visual_web backend initialized [{}]",
@@ -473,9 +425,8 @@ mod wasm_app {
             };
 
             if let Err(err) = backend.render(&self.scene) {
-                web_sys::console::error_1(
-                    &format!("phase4_visual_web render failed: {err}").into(),
-                );
+                self.backend_init_failed = true;
+                log_startup_failure("render", &err.to_string());
                 return;
             }
 

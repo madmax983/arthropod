@@ -1,0 +1,53 @@
+name: WebGPU Headed Visual
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+concurrency:
+  group: webgpu-headed-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  headed-webgpu-visual:
+    name: Chromium Headed WebGPU Visual
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Trunk
+        run: cargo install trunk --locked
+
+      - name: Install npm dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: Verify headed Chromium has a WebGPU adapter
+        run: npm run visual:test:chromium:headed:adapter
+
+      - name: Run headed Chromium phase4 visual regression
+        run: npm run visual:test:chromium:headed
+
+      - name: Upload visual artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headed-webgpu-visual-artifacts
+          path: |
+            test-results
+            tests/visual/artifacts
+          if-no-files-found: ignore

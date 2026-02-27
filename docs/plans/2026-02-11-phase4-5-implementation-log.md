@@ -1487,3 +1487,56 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - Local command checks remain green:
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS
     - `cargo test --test phase4_desktop_visual_regression -- --nocapture` -> PASS
+
+### 2026-02-24 (parity continuation: dedicated headed Chromium WebGPU gate)
+
+- Goal:
+  - Add a browser parity gate that validates real WebGPU adapter availability in headed Chromium, rather than relying on headless skip behavior.
+- Implementation:
+  - Added adapter gate test:
+    - `tests/visual/webgpu-adapter.spec.mjs`
+    - asserts `navigator.gpu.requestAdapter()` resolves to a non-null adapter under headed Chromium.
+  - Added npm scripts in `package.json`:
+    - `visual:test:chromium:headed:adapter`
+    - `visual:test:webgpu:headed` (adapter gate + headed phase4 snapshots)
+  - Added dedicated workflow:
+    - `.github/workflows/webgpu-headed-visual.yml`
+    - triggers: `workflow_dispatch` + nightly schedule
+    - runs on `windows-latest`
+    - installs Trunk + Playwright Chromium
+    - executes headed adapter gate then headed phase4 visual regression
+    - uploads visual artifacts on failure
+  - Updated docs:
+    - `docs/testing/phase4-visual-regression.md` with new commands and workflow reference.
+- Verification:
+  - `npm run visual:test:chromium:headed:adapter` -> PASS
+  - `npm run visual:test:webgpu:headed` -> PASS
+
+### 2026-02-27 (parity continuation: browser fixture parity with desktop scenes + mask/image coverage)
+
+- Goal:
+  - Remove browser/desktop visual fixture drift by sharing phase4 scene definitions.
+  - Extend browser visual parity coverage from 3 cases to 5 cases (`blur`, `blend`, `clipping`, `mask`, `image`).
+- Implementation:
+  - Updated `examples/phase4_visual_web.rs`:
+    - switched scene construction to shared `examples/phase4_visual_scenes.rs` builders.
+    - extended query cases with `mask` and `image`.
+    - added deterministic image fixture registration for image-case rendering (`PHASE4_IMAGE_TEST_ID`).
+    - hardened startup/render failure signaling:
+      - sanitized `data-arthropod-error` marker values
+      - render failures now set ready/error markers instead of only logging.
+  - Updated Playwright browser visual test:
+    - `tests/visual/phase4-visual.spec.mjs` now includes `mask` and `image`.
+    - added per-test WebGPU adapter preflight (`navigator.gpu.requestAdapter()`) so unsupported runtimes skip cleanly before startup waits.
+  - Updated Chromium headed snapshots:
+    - regenerated `phase4-clipping-chromium-win32.png` (scene parity alignment)
+    - added `phase4-mask-chromium-win32.png`
+    - added `phase4-image-chromium-win32.png`
+  - Updated docs:
+    - `docs/testing/phase4-visual-regression.md` includes mask/image case coverage and adapter preflight behavior.
+- Verification:
+  - `cargo fmt --all` -> PASS
+  - `cargo check --example phase4_visual_web --target wasm32-unknown-unknown --features web` -> PASS
+  - `npm run visual:update:chromium:headed` -> PASS (5/5 snapshots)
+  - `npm run visual:test:webgpu:headed` -> PASS (adapter gate + 5/5 chromium headed snapshots)
+  - `npm run visual:test` -> PASS (15 skipped in current runtime due missing WebGPU adapters in headless/browser matrix)

@@ -7,6 +7,8 @@
     "visual:update": "playwright test tests/visual/phase4-visual.spec.mjs --update-snapshots",
     "visual:test:chromium": "playwright test tests/visual/phase4-visual.spec.mjs --project=chromium",
     "visual:test:chromium:headed": "playwright test tests/visual/phase4-visual.spec.mjs --project=chromium --headed",
+    "visual:test:chromium:headed:adapter": "playwright test tests/visual/webgpu-adapter.spec.mjs --project=chromium --headed",
+    "visual:test:webgpu:headed": "npm run visual:test:chromium:headed:adapter && npm run visual:test:chromium:headed",
     "visual:update:chromium:headed": "playwright test tests/visual/phase4-visual.spec.mjs --project=chromium --headed --update-snapshots",
     "visual:test:firefox": "playwright test tests/visual/phase4-visual.spec.mjs --project=firefox",
     "visual:test:webkit": "playwright test tests/visual/phase4-visual.spec.mjs --project=webkit"
