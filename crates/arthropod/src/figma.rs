@@ -34,23 +34,110 @@ pub enum PrototypeTrigger {
     OnHover,
     OnDrag,
     AfterTimeout,
+    OnPress,
+    OnKeyDown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeActionKind {
+    Navigate,
+    OpenOverlay,
+    SwapOverlay,
+    CloseOverlay,
+    Back,
+    Url,
+    ScrollTo,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeTransitionKind {
+    Instant,
+    Dissolve,
+    MoveIn,
+    MoveOut,
+    Push,
+    SlideIn,
+    SlideOut,
+    SmartAnimate,
+    ScrollAnimate,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeEasing {
+    Linear,
+    EaseIn,
+    EaseOut,
+    EaseInAndOut,
+    Gentle,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeDirection {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrototypeTransition {
+    pub kind: PrototypeTransitionKind,
+    pub duration_ms: Option<u32>,
+    pub easing: Option<PrototypeEasing>,
+    pub direction: Option<PrototypeDirection>,
+    pub match_layers: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeOverlayPosition {
+    Center,
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+    Manual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrototypeOverlayBackgroundInteraction {
+    None,
+    CloseOnClickOutside,
+    PassThrough,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrototypeOverlayConfig {
+    pub position: Option<PrototypeOverlayPosition>,
+    pub background_interaction: Option<PrototypeOverlayBackgroundInteraction>,
+    pub relative_position: Option<(f32, f32)>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ImportedConstraints {
     pub horizontal: ConstraintAxis,
     pub vertical: ConstraintAxis,
     pub positioning: LayoutPositioning,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PrototypeEdge {
     pub from: NodeId,
-    pub to_figma_id: String,
+    pub to_figma_id: Option<String>,
     pub trigger: PrototypeTrigger,
+    pub trigger_timeout_ms: Option<u32>,
+    pub action: PrototypeActionKind,
+    pub preserve_scroll_position: bool,
+    pub transition: Option<PrototypeTransition>,
+    pub overlay: Option<PrototypeOverlayConfig>,
+    pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct PrototypeGraph {
     pub edges: Vec<PrototypeEdge>,
 }
@@ -172,20 +259,37 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
             continue;
         };
         for interaction in &node.prototype_interactions {
-            let Some(trigger) = interaction
-                .trigger
-                .and_then(FigmaPrototypeTrigger::to_public)
-            else {
+            let Some((trigger, trigger_timeout_ms)) = interaction.trigger_spec() else {
                 continue;
             };
-            let Some(destination_id) = interaction.destination_id.as_ref() else {
+
+            let inherited_transition = interaction.transition_details();
+            let inherited_preserve_scroll = interaction.preserve_scroll_position.unwrap_or(false);
+
+            if interaction.actions.is_empty() {
+                if let Some(edge) = interaction.to_legacy_edge(
+                    from,
+                    trigger,
+                    trigger_timeout_ms,
+                    inherited_transition,
+                    inherited_preserve_scroll,
+                ) {
+                    prototype_edges.push(edge);
+                }
                 continue;
-            };
-            prototype_edges.push(PrototypeEdge {
-                from,
-                to_figma_id: destination_id.as_key(),
-                trigger,
-            });
+            }
+
+            for action in &interaction.actions {
+                if let Some(edge) = action.to_edge(
+                    from,
+                    trigger,
+                    trigger_timeout_ms,
+                    inherited_transition.clone(),
+                    inherited_preserve_scroll,
+                ) {
+                    prototype_edges.push(edge);
+                }
+            }
         }
     }
 
@@ -542,6 +646,18 @@ fn canonical_property_name(name: &str) -> String {
     canonical.to_string()
 }
 
+fn duration_to_ms(value: f64) -> Option<u32> {
+    if !value.is_finite() || value <= 0.0 {
+        return None;
+    }
+    let ms = if value <= 10.0 { value * 1000.0 } else { value };
+    let rounded = ms.round();
+    if rounded > u32::MAX as f64 {
+        return None;
+    }
+    Some(rounded as u32)
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum FigmaNodeKey {
@@ -738,9 +854,477 @@ impl FigmaTextDecoration {
 #[serde(rename_all = "camelCase")]
 struct FigmaPrototypeInteraction {
     #[serde(default)]
-    trigger: Option<FigmaPrototypeTrigger>,
-    #[serde(default, alias = "destinationId", alias = "targetId")]
+    trigger: Option<FigmaPrototypeTriggerInput>,
+    #[serde(
+        default,
+        alias = "destinationId",
+        alias = "targetId",
+        alias = "transitionNodeID",
+        alias = "transitionNodeId"
+    )]
     destination_id: Option<FigmaNodeKey>,
+    #[serde(default)]
+    actions: Vec<FigmaPrototypeAction>,
+    #[serde(default, rename = "action")]
+    action_type: Option<FigmaPrototypeActionType>,
+    #[serde(default)]
+    navigation: Option<FigmaPrototypeActionType>,
+    #[serde(default)]
+    transition: Option<FigmaPrototypeTransition>,
+    #[serde(default)]
+    preserve_scroll_position: Option<bool>,
+    #[serde(default)]
+    url: Option<String>,
+}
+
+impl FigmaPrototypeInteraction {
+    fn trigger_spec(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+        self.trigger
+            .as_ref()
+            .and_then(FigmaPrototypeTriggerInput::to_public)
+    }
+
+    fn transition_details(&self) -> Option<PrototypeTransition> {
+        self.transition
+            .as_ref()
+            .and_then(FigmaPrototypeTransition::to_public)
+    }
+
+    fn to_legacy_edge(
+        &self,
+        from: NodeId,
+        trigger: PrototypeTrigger,
+        trigger_timeout_ms: Option<u32>,
+        inherited_transition: Option<PrototypeTransition>,
+        inherited_preserve_scroll: bool,
+    ) -> Option<PrototypeEdge> {
+        let action = self.legacy_action_kind();
+        let to_figma_id = match action {
+            PrototypeActionKind::Back | PrototypeActionKind::CloseOverlay => None,
+            _ => self.destination_id.as_ref().map(FigmaNodeKey::as_key),
+        };
+        let url = self.url.clone();
+
+        if action == PrototypeActionKind::Unknown && to_figma_id.is_none() && url.is_none() {
+            return None;
+        }
+
+        Some(PrototypeEdge {
+            from,
+            to_figma_id,
+            trigger,
+            trigger_timeout_ms,
+            action,
+            preserve_scroll_position: inherited_preserve_scroll,
+            transition: inherited_transition,
+            overlay: None,
+            url,
+        })
+    }
+
+    fn legacy_action_kind(&self) -> PrototypeActionKind {
+        if let Some(action) = self
+            .action_type
+            .or(self.navigation)
+            .map(FigmaPrototypeActionType::to_public)
+        {
+            return action;
+        }
+        if self.url.is_some() {
+            return PrototypeActionKind::Url;
+        }
+        if self.destination_id.is_some() {
+            return PrototypeActionKind::Navigate;
+        }
+        PrototypeActionKind::Unknown
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPrototypeAction {
+    #[serde(default, rename = "type")]
+    action_type: Option<FigmaPrototypeActionType>,
+    #[serde(
+        default,
+        alias = "destinationId",
+        alias = "targetId",
+        alias = "nodeId",
+        alias = "transitionNodeID",
+        alias = "transitionNodeId"
+    )]
+    destination_id: Option<FigmaNodeKey>,
+    #[serde(default)]
+    transition: Option<FigmaPrototypeTransition>,
+    #[serde(default)]
+    preserve_scroll_position: Option<bool>,
+    #[serde(default)]
+    overlay_position_type: Option<FigmaOverlayPositionType>,
+    #[serde(default)]
+    overlay_background_interaction: Option<FigmaOverlayBackgroundInteraction>,
+    #[serde(default)]
+    overlay_relative_position: Option<FigmaVector2>,
+    #[serde(default)]
+    url: Option<String>,
+}
+
+impl FigmaPrototypeAction {
+    fn to_edge(
+        &self,
+        from: NodeId,
+        trigger: PrototypeTrigger,
+        trigger_timeout_ms: Option<u32>,
+        inherited_transition: Option<PrototypeTransition>,
+        inherited_preserve_scroll: bool,
+    ) -> Option<PrototypeEdge> {
+        let action = self
+            .action_type
+            .map(FigmaPrototypeActionType::to_public)
+            .unwrap_or_else(|| {
+                if self.url.is_some() {
+                    PrototypeActionKind::Url
+                } else if self.destination_id.is_some() {
+                    PrototypeActionKind::Navigate
+                } else {
+                    PrototypeActionKind::Unknown
+                }
+            });
+
+        let to_figma_id = match action {
+            PrototypeActionKind::Back
+            | PrototypeActionKind::CloseOverlay
+            | PrototypeActionKind::Url => None,
+            _ => self.destination_id.as_ref().map(FigmaNodeKey::as_key),
+        };
+        let url = self.url.clone();
+        if action == PrototypeActionKind::Unknown && to_figma_id.is_none() && url.is_none() {
+            return None;
+        }
+
+        let transition = self
+            .transition
+            .as_ref()
+            .and_then(FigmaPrototypeTransition::to_public)
+            .or(inherited_transition);
+
+        Some(PrototypeEdge {
+            from,
+            to_figma_id,
+            trigger,
+            trigger_timeout_ms,
+            action,
+            preserve_scroll_position: self
+                .preserve_scroll_position
+                .unwrap_or(inherited_preserve_scroll),
+            transition,
+            overlay: self.overlay_config(),
+            url,
+        })
+    }
+
+    fn overlay_config(&self) -> Option<PrototypeOverlayConfig> {
+        let position = self
+            .overlay_position_type
+            .and_then(FigmaOverlayPositionType::to_public);
+        let background_interaction = self
+            .overlay_background_interaction
+            .map(FigmaOverlayBackgroundInteraction::to_public);
+        let relative_position = self.overlay_relative_position.map(FigmaVector2::to_tuple);
+        if position.is_none() && background_interaction.is_none() && relative_position.is_none() {
+            return None;
+        }
+        Some(PrototypeOverlayConfig {
+            position,
+            background_interaction,
+            relative_position,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaPrototypeTriggerInput {
+    Simple(FigmaPrototypeTrigger),
+    Detailed(FigmaPrototypeTriggerDetails),
+}
+
+impl FigmaPrototypeTriggerInput {
+    fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+        match self {
+            Self::Simple(trigger) => trigger.to_public().map(|value| (value, None)),
+            Self::Detailed(details) => details.to_public(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPrototypeTriggerDetails {
+    #[serde(default, rename = "type")]
+    trigger_type: Option<FigmaPrototypeTrigger>,
+    #[serde(default)]
+    timeout: Option<f64>,
+    #[serde(default)]
+    delay: Option<f64>,
+}
+
+impl FigmaPrototypeTriggerDetails {
+    fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+        let trigger = self
+            .trigger_type
+            .and_then(FigmaPrototypeTrigger::to_public)?;
+        let timeout_ms = self.timeout.or(self.delay).and_then(duration_to_ms);
+        Some((trigger, timeout_ms))
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPrototypeTransition {
+    #[serde(default, rename = "type")]
+    transition_type: Option<FigmaPrototypeTransitionType>,
+    #[serde(default, alias = "transitionDuration")]
+    duration: Option<f64>,
+    #[serde(default, alias = "transitionEasing")]
+    easing: Option<FigmaPrototypeEasingInput>,
+    #[serde(default, alias = "transitionDirection")]
+    direction: Option<FigmaPrototypeDirection>,
+    #[serde(default)]
+    match_layers: Option<bool>,
+}
+
+impl FigmaPrototypeTransition {
+    fn to_public(&self) -> Option<PrototypeTransition> {
+        let kind = self
+            .transition_type
+            .unwrap_or(FigmaPrototypeTransitionType::Unknown)
+            .to_public();
+        let duration_ms = self.duration.and_then(duration_to_ms);
+        let easing = self
+            .easing
+            .as_ref()
+            .and_then(FigmaPrototypeEasingInput::to_public);
+        let direction = self.direction.and_then(FigmaPrototypeDirection::to_public);
+        let match_layers = self.match_layers;
+        if kind == PrototypeTransitionKind::Unknown
+            && duration_ms.is_none()
+            && easing.is_none()
+            && direction.is_none()
+            && match_layers.is_none()
+        {
+            return None;
+        }
+        Some(PrototypeTransition {
+            kind,
+            duration_ms,
+            easing,
+            direction,
+            match_layers,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPrototypeActionType {
+    #[serde(alias = "NODE")]
+    Navigate,
+    OpenOverlay,
+    SwapOverlay,
+    #[serde(alias = "CLOSE")]
+    CloseOverlay,
+    Back,
+    #[serde(alias = "OPEN_URL")]
+    Url,
+    ScrollTo,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaPrototypeActionType {
+    fn to_public(self) -> PrototypeActionKind {
+        match self {
+            Self::Navigate => PrototypeActionKind::Navigate,
+            Self::OpenOverlay => PrototypeActionKind::OpenOverlay,
+            Self::SwapOverlay => PrototypeActionKind::SwapOverlay,
+            Self::CloseOverlay => PrototypeActionKind::CloseOverlay,
+            Self::Back => PrototypeActionKind::Back,
+            Self::Url => PrototypeActionKind::Url,
+            Self::ScrollTo => PrototypeActionKind::ScrollTo,
+            Self::Unknown => PrototypeActionKind::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPrototypeTransitionType {
+    Instant,
+    Dissolve,
+    MoveIn,
+    MoveOut,
+    Push,
+    SlideIn,
+    SlideOut,
+    #[serde(alias = "MAGIC_MOVE")]
+    SmartAnimate,
+    ScrollAnimate,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaPrototypeTransitionType {
+    fn to_public(self) -> PrototypeTransitionKind {
+        match self {
+            Self::Instant => PrototypeTransitionKind::Instant,
+            Self::Dissolve => PrototypeTransitionKind::Dissolve,
+            Self::MoveIn => PrototypeTransitionKind::MoveIn,
+            Self::MoveOut => PrototypeTransitionKind::MoveOut,
+            Self::Push => PrototypeTransitionKind::Push,
+            Self::SlideIn => PrototypeTransitionKind::SlideIn,
+            Self::SlideOut => PrototypeTransitionKind::SlideOut,
+            Self::SmartAnimate => PrototypeTransitionKind::SmartAnimate,
+            Self::ScrollAnimate => PrototypeTransitionKind::ScrollAnimate,
+            Self::Unknown => PrototypeTransitionKind::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaPrototypeEasingInput {
+    Simple(FigmaPrototypeEasing),
+    Detailed(FigmaPrototypeEasingDetails),
+}
+
+impl FigmaPrototypeEasingInput {
+    fn to_public(&self) -> Option<PrototypeEasing> {
+        match self {
+            Self::Simple(easing) => Some(easing.to_public()),
+            Self::Detailed(details) => details.easing_type.map(FigmaPrototypeEasing::to_public),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPrototypeEasingDetails {
+    #[serde(default, rename = "type")]
+    easing_type: Option<FigmaPrototypeEasing>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPrototypeEasing {
+    Linear,
+    EaseIn,
+    EaseOut,
+    EaseInAndOut,
+    Gentle,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaPrototypeEasing {
+    fn to_public(self) -> PrototypeEasing {
+        match self {
+            Self::Linear => PrototypeEasing::Linear,
+            Self::EaseIn => PrototypeEasing::EaseIn,
+            Self::EaseOut => PrototypeEasing::EaseOut,
+            Self::EaseInAndOut => PrototypeEasing::EaseInAndOut,
+            Self::Gentle => PrototypeEasing::Gentle,
+            Self::Unknown => PrototypeEasing::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaPrototypeDirection {
+    Left,
+    Right,
+    Top,
+    Bottom,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaPrototypeDirection {
+    fn to_public(self) -> Option<PrototypeDirection> {
+        match self {
+            Self::Left => Some(PrototypeDirection::Left),
+            Self::Right => Some(PrototypeDirection::Right),
+            Self::Top => Some(PrototypeDirection::Top),
+            Self::Bottom => Some(PrototypeDirection::Bottom),
+            Self::Unknown => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaOverlayPositionType {
+    Center,
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+    Manual,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaOverlayPositionType {
+    fn to_public(self) -> Option<PrototypeOverlayPosition> {
+        match self {
+            Self::Center => Some(PrototypeOverlayPosition::Center),
+            Self::TopLeft => Some(PrototypeOverlayPosition::TopLeft),
+            Self::TopCenter => Some(PrototypeOverlayPosition::TopCenter),
+            Self::TopRight => Some(PrototypeOverlayPosition::TopRight),
+            Self::BottomLeft => Some(PrototypeOverlayPosition::BottomLeft),
+            Self::BottomCenter => Some(PrototypeOverlayPosition::BottomCenter),
+            Self::BottomRight => Some(PrototypeOverlayPosition::BottomRight),
+            Self::Manual => Some(PrototypeOverlayPosition::Manual),
+            Self::Unknown => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaOverlayBackgroundInteraction {
+    None,
+    CloseOnClickOutside,
+    #[serde(alias = "PASSTHROUGH", alias = "PASS_THROUGH")]
+    PassThrough,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FigmaOverlayBackgroundInteraction {
+    fn to_public(self) -> PrototypeOverlayBackgroundInteraction {
+        match self {
+            Self::None => PrototypeOverlayBackgroundInteraction::None,
+            Self::CloseOnClickOutside => PrototypeOverlayBackgroundInteraction::CloseOnClickOutside,
+            Self::PassThrough => PrototypeOverlayBackgroundInteraction::PassThrough,
+            Self::Unknown => PrototypeOverlayBackgroundInteraction::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaVector2 {
+    x: f32,
+    y: f32,
+}
+
+impl FigmaVector2 {
+    fn to_tuple(self) -> (f32, f32) {
+        (self.x, self.y)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -750,6 +1334,8 @@ enum FigmaPrototypeTrigger {
     OnHover,
     OnDrag,
     AfterTimeout,
+    OnPress,
+    OnKeyDown,
     #[serde(other)]
     Unknown,
 }
@@ -761,6 +1347,8 @@ impl FigmaPrototypeTrigger {
             Self::OnHover => Some(PrototypeTrigger::OnHover),
             Self::OnDrag => Some(PrototypeTrigger::OnDrag),
             Self::AfterTimeout => Some(PrototypeTrigger::AfterTimeout),
+            Self::OnPress => Some(PrototypeTrigger::OnPress),
+            Self::OnKeyDown => Some(PrototypeTrigger::OnKeyDown),
             Self::Unknown => None,
         }
     }

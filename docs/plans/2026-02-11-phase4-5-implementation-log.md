@@ -1975,3 +1975,63 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+
+### 2026-02-27 (importer slice 2: prototype transition/action detail mapping)
+
+- Goal:
+  - Move prototype import beyond trigger+destination by mapping transition and action semantics needed for enterprise Figma import:
+    - animation/transition kind
+    - easing + duration normalization
+    - direction + `matchLayers`
+    - overlay behavior metadata
+    - back/close/url/no-destination actions
+- RED:
+  - Added integration coverage in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_prototype_transition_details_map_animation_and_easing`
+    - `figma_prototype_overlay_and_back_actions_map_behavior`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: FAIL (expected): missing public prototype action/transition APIs and missing edge fields (`action`, transition details, overlay details, timeout metadata).
+- GREEN:
+  - Extended public prototype import model in `crates/arthropod/src/figma.rs`:
+    - new public enums/structs:
+      - `PrototypeActionKind`
+      - `PrototypeTransitionKind`
+      - `PrototypeEasing`
+      - `PrototypeDirection`
+      - `PrototypeTransition`
+      - `PrototypeOverlayPosition`
+      - `PrototypeOverlayBackgroundInteraction`
+      - `PrototypeOverlayConfig`
+    - expanded `PrototypeEdge`:
+      - `to_figma_id: Option<String>`
+      - `trigger_timeout_ms`
+      - `action`
+      - `preserve_scroll_position`
+      - `transition`
+      - `overlay`
+      - `url`
+  - Added robust Figma prototype parsing:
+    - trigger parsing supports both simple string triggers and object triggers (`{ type, timeout/delay }`)
+    - interaction parsing supports `actions[]` + legacy fallback interaction fields
+    - action parsing supports:
+      - `NAVIGATE`, `OPEN_OVERLAY`, `SWAP_OVERLAY`, `CLOSE_OVERLAY`/`CLOSE`, `BACK`, `URL`/`OPEN_URL`, `SCROLL_TO`
+    - transition parsing supports:
+      - `type`, `duration`, `easing`, `direction`, `matchLayers`
+      - legacy aliases (`transitionDuration`, `transitionEasing`, `transitionDirection`)
+    - overlay parsing supports:
+      - `overlayPositionType`
+      - `overlayBackgroundInteraction`
+      - `overlayRelativePosition`
+  - Added duration normalization helper:
+    - values `<= 10` interpreted as seconds and converted to ms
+    - larger values interpreted as ms
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: PASS (8/8)
+- REFACTOR / verification:
+  - Ran:
+    - `cargo fmt --all` -> PASS
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)

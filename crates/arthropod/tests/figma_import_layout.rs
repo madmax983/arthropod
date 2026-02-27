@@ -181,7 +181,7 @@ fn figma_prototype_interactions_map_to_graph_edges() {
         .find(|edge| edge.from == source)
         .expect("expected prototype edge from source node");
 
-    assert_eq!(edge.to_figma_id, "200");
+    assert_eq!(edge.to_figma_id.as_deref(), Some("200"));
     assert_eq!(edge.trigger, PrototypeTrigger::OnClick);
 }
 
@@ -316,4 +316,162 @@ fn figma_variant_properties_extract_from_component_properties_variant_type() {
         !variants.contains_key("Disabled"),
         "non-variant component properties should not be projected into variant map"
     );
+}
+
+#[test]
+fn figma_prototype_transition_details_map_animation_and_easing() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "900",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 320, "height": 200 },
+                "prototypeInteractions": [
+                    {
+                        "trigger": { "type": "AFTER_TIMEOUT", "timeout": 1.2 },
+                        "actions": [
+                            {
+                                "type": "NAVIGATE",
+                                "destinationId": "901",
+                                "preserveScrollPosition": true,
+                                "transition": {
+                                    "type": "SMART_ANIMATE",
+                                    "easing": "EASE_IN_AND_OUT",
+                                    "duration": 0.35,
+                                    "direction": "RIGHT",
+                                    "matchLayers": true
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "901",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 400, "y": 0, "width": 320, "height": 200 }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let source = imported
+        .figma_to_scene
+        .get("900")
+        .copied()
+        .expect("source node should be mapped");
+    let edge = imported
+        .prototype_graph
+        .edges
+        .iter()
+        .find(|edge| edge.from == source)
+        .expect("expected prototype edge from source node");
+
+    assert_eq!(edge.trigger, PrototypeTrigger::AfterTimeout);
+    assert_eq!(edge.trigger_timeout_ms, Some(1200));
+    assert_eq!(edge.to_figma_id.as_deref(), Some("901"));
+    assert!(edge.preserve_scroll_position);
+    assert_eq!(
+        edge.action,
+        arthropod::figma::PrototypeActionKind::Navigate,
+        "expected action kind to map to navigate"
+    );
+
+    let transition = edge
+        .transition
+        .as_ref()
+        .expect("transition details should be present");
+    assert_eq!(
+        transition.kind,
+        arthropod::figma::PrototypeTransitionKind::SmartAnimate
+    );
+    assert_eq!(transition.duration_ms, Some(350));
+    assert_eq!(
+        transition.easing,
+        Some(arthropod::figma::PrototypeEasing::EaseInAndOut)
+    );
+    assert_eq!(
+        transition.direction,
+        Some(arthropod::figma::PrototypeDirection::Right)
+    );
+    assert_eq!(transition.match_layers, Some(true));
+}
+
+#[test]
+fn figma_prototype_overlay_and_back_actions_map_behavior() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "910",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 320, "height": 200 },
+                "prototypeInteractions": [
+                    {
+                        "trigger": "ON_CLICK",
+                        "actions": [
+                            {
+                                "type": "OPEN_OVERLAY",
+                                "destinationId": "911",
+                                "overlayPositionType": "CENTER",
+                                "overlayBackgroundInteraction": "CLOSE_ON_CLICK_OUTSIDE",
+                                "overlayRelativePosition": { "x": 16, "y": 24 }
+                            }
+                        ]
+                    },
+                    {
+                        "trigger": "ON_CLICK",
+                        "actions": [
+                            { "type": "BACK" }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "911",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 40, "y": 40, "width": 180, "height": 120 }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let source = imported
+        .figma_to_scene
+        .get("910")
+        .copied()
+        .expect("source node should be mapped");
+    let edges: Vec<_> = imported
+        .prototype_graph
+        .edges
+        .iter()
+        .filter(|edge| edge.from == source)
+        .collect();
+    assert_eq!(edges.len(), 2, "expected two prototype actions from source");
+
+    let overlay_edge = edges
+        .iter()
+        .find(|edge| edge.action == arthropod::figma::PrototypeActionKind::OpenOverlay)
+        .expect("overlay action should be mapped");
+    assert_eq!(overlay_edge.to_figma_id.as_deref(), Some("911"));
+    let overlay = overlay_edge
+        .overlay
+        .as_ref()
+        .expect("overlay config should be present");
+    assert_eq!(
+        overlay.position,
+        Some(arthropod::figma::PrototypeOverlayPosition::Center)
+    );
+    assert_eq!(
+        overlay.background_interaction,
+        Some(arthropod::figma::PrototypeOverlayBackgroundInteraction::CloseOnClickOutside)
+    );
+    assert_eq!(overlay.relative_position, Some((16.0, 24.0)));
+
+    let back_edge = edges
+        .iter()
+        .find(|edge| edge.action == arthropod::figma::PrototypeActionKind::Back)
+        .expect("back action should be mapped");
+    assert_eq!(back_edge.to_figma_id, None);
+    assert!(back_edge.overlay.is_none());
+    assert!(back_edge.transition.is_none());
 }
