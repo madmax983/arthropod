@@ -73,3 +73,7 @@
 ## 2026-03-01 - [MCP Query Hierarchy DoS]
 **Threat:** `scene.query_hierarchy` allowed potentially infinite recursion and unbounded memory allocation via `max_depth` up to 100 on large DAGs/trees. A "Billion Laughs" style attack could exhaust server memory.
 **Defense:** Reduced `MAX_QUERY_DEPTH` to 32. Implemented `MAX_RESPONSE_NODES` limit (5000). Added cycle detection using `HashSet` to prevent infinite loops in DAGs.
+
+## 2026-03-02 - [SignalRegistry Unbounded Allocation DoS]
+**Threat:** `SignalRegistry::register_*` allowed registering an unlimited number of signals with unlimited name lengths. An attacker or buggy app could exhaust server memory (DoS) by registering millions of signals or using massive names.
+**Defense:** Implemented `MAX_SIGNALS` (1000) and `MAX_NAME_LEN` (64) limits. Changed registration methods to return `Result<()>`, forcing callers to handle allocation failures. Added `tests/registry_dos.rs` to verify limits.
