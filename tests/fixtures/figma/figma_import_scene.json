@@ -181,6 +181,37 @@
         ],
         "cornerRadius": 16.0
       }
+    },
+    {
+      "id": 80,
+      "parentId": 20,
+      "bounds": [160.0, 360.0, 240.0, 130.0],
+      "style": {
+        "fills": [
+          { "type": "SOLID", "color": [0.93, 0.48, 0.81, 0.92] }
+        ],
+        "fillGeometry": [
+          {
+            "path": "M 10 10 L 230 10 L 230 120 L 10 120 Z M 80 45 L 160 45 L 160 85 L 80 85 Z",
+            "windingRule": "EVENODD"
+          }
+        ]
+      }
+    },
+    {
+      "id": 81,
+      "parentId": 20,
+      "bounds": [430.0, 360.0, 240.0, 130.0],
+      "style": {
+        "strokes": [
+          { "type": "SOLID", "color": [0.98, 0.88, 0.36, 0.95] }
+        ],
+        "strokeWeight": 8.0,
+        "strokeAlign": "CENTER",
+        "strokeGeometry": [
+          "M 18 106 L 120 16 L 222 106"
+        ]
+      }
     }
   ]
 }

@@ -672,6 +672,41 @@ fn figma_node_parent_id_maps_to_scene_hierarchy() {
     );
 }
 
+#[test]
+fn figma_fixture_includes_vector_geometry_render_cases() {
+    let fixture = load_fixture(Path::new(FIXTURE_PATH));
+
+    let mut fill_geometry_nodes = 0usize;
+    let mut stroke_geometry_nodes = 0usize;
+
+    for node in &fixture.nodes {
+        let style = node.style.clone().into_visual_style();
+        if style
+            .fill_geometry
+            .as_ref()
+            .is_some_and(|paths| !paths.is_empty())
+        {
+            fill_geometry_nodes += 1;
+        }
+        if style
+            .stroke_geometry
+            .as_ref()
+            .is_some_and(|paths| !paths.is_empty())
+        {
+            stroke_geometry_nodes += 1;
+        }
+    }
+
+    assert!(
+        fill_geometry_nodes > 0,
+        "fixture should include at least one node with mapped fillGeometry"
+    );
+    assert!(
+        stroke_geometry_nodes > 0,
+        "fixture should include at least one node with mapped strokeGeometry"
+    );
+}
+
 impl From<FigmaStrokeAlign> for StrokeAlign {
     fn from(value: FigmaStrokeAlign) -> Self {
         match value {

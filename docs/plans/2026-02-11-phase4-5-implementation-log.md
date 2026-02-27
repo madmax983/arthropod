@@ -1629,3 +1629,23 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo test --test figma_json_render_regression figma_style_fill_geometry_maps_svg_paths_with_winding_rule -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_maps_svg_path_strings -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (11/11)
+
+### 2026-02-27 (parity continuation: fixture-level vector geometry coverage)
+
+- Goal:
+  - Ensure vector-geometry parity is exercised by the real fixture/golden path, not only isolated style-mapping tests.
+- Implementation:
+  - Updated fixture `tests/fixtures/figma/figma_import_scene.json`:
+    - added node `80` with `fillGeometry` (object form + `windingRule: EVENODD`) to exercise filled vector path import.
+    - added node `81` with `strokeGeometry` (string form) to exercise stroked vector path import.
+  - Added fixture sanity regression in `tests/figma_json_render_regression.rs`:
+    - `figma_fixture_includes_vector_geometry_render_cases`
+    - validates the fixture maps at least one node with non-empty `fill_geometry` and one with non-empty `stroke_geometry`.
+  - Regenerated figma golden to include the new fixture geometry output:
+    - `tests/visual/golden/figma/figma_import_scene.png`
+- Verification:
+  - `cargo fmt --all` -> PASS
+  - `cargo test --test figma_json_render_regression figma_fixture_includes_vector_geometry_render_cases -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression figma_json_render_regression_matches_golden -- --nocapture` -> FAIL (expected golden drift, `diff_ratio=0.0259`)
+  - `ARTHROPOD_UPDATE_GOLDENS=1 cargo test --test figma_json_render_regression figma_json_render_regression_matches_golden -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (12/12)
