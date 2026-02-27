@@ -1553,3 +1553,24 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `docs/testing/phase4-visual-regression.md` workflow note now reflects PR trigger coverage.
 - Verification:
   - `npm run visual:test:webgpu:headed` -> PASS
+
+### 2026-02-27 (parity continuation: Figma `strokeMiterAngle` / `strokeMiterLimit` mapping)
+
+- Goal:
+  - Close an additional Figma stroke metadata gap in the JSON parity harness by mapping miter settings into `StrokeStyle.miter_limit`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs` `FigmaStyle`:
+    - added `stroke_miter_angle` (`strokeMiterAngle`)
+    - added `stroke_miter_limit` (`strokeMiterLimit`)
+  - Updated style mapping in `FigmaStyle::into_visual_style(...)`:
+    - if `strokeMiterLimit` is provided and valid (`> 0`, finite), it maps directly to `StrokeStyle.miter_limit`
+    - otherwise, `strokeMiterAngle` is converted to miter limit using `1 / sin(angle/2)` (angle in degrees)
+    - otherwise defaults to existing stroke default miter limit
+  - Added regression tests:
+    - `figma_style_stroke_miter_angle_maps_to_miter_limit`
+    - `figma_style_explicit_stroke_miter_limit_overrides_angle_mapping`
+- Verification:
+  - `cargo fmt --all` -> PASS
+  - `cargo test --test figma_json_render_regression figma_style_stroke_miter_angle_maps_to_miter_limit -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression figma_style_explicit_stroke_miter_limit_overrides_angle_mapping -- --nocapture` -> PASS
+  - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (8/8)

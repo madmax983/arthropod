@@ -81,6 +81,8 @@ struct FigmaStyle {
     stroke_align: Option<FigmaStrokeAlign>,
     stroke_cap: Option<FigmaStrokeCap>,
     stroke_join: Option<FigmaStrokeJoin>,
+    stroke_miter_angle: Option<f32>,
+    stroke_miter_limit: Option<f32>,
     stroke_dashes: Option<Vec<f32>>,
     #[serde(alias = "individualStrokeWeights")]
     individual_stroke_weights: Option<FigmaSideWeights>,
@@ -448,6 +450,48 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
 }
 
 #[test]
+fn figma_style_stroke_miter_angle_maps_to_miter_limit() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeJoin": "MITER",
+            "strokeMiterAngle": 60.0
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert!(
+        (stroke.miter_limit - 2.0).abs() < 1e-3,
+        "expected strokeMiterAngle=60deg to map near miter_limit=2.0, got {}",
+        stroke.miter_limit
+    );
+}
+
+#[test]
+fn figma_style_explicit_stroke_miter_limit_overrides_angle_mapping() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeJoin": "MITER",
+            "strokeMiterAngle": 60.0,
+            "strokeMiterLimit": 6.5
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert!(
+        (stroke.miter_limit - 6.5).abs() < 1e-6,
+        "explicit strokeMiterLimit should take precedence over angle mapping"
+    );
+}
+
+#[test]
 fn figma_node_parent_id_maps_to_scene_hierarchy() {
     let fixture: FigmaSceneFixture = serde_json::from_str(
         r#"{
@@ -623,6 +667,14 @@ impl FigmaStyle {
                 align: self.stroke_align.unwrap_or(FigmaStrokeAlign::Center).into(),
                 cap: self.stroke_cap.unwrap_or(FigmaStrokeCap::None).into(),
                 join: self.stroke_join.unwrap_or(FigmaStrokeJoin::Miter).into(),
+                miter_limit: self
+                    .stroke_miter_limit
+                    .filter(|v| v.is_finite() && *v > 0.0)
+                    .or_else(|| {
+                        self.stroke_miter_angle
+                            .and_then(figma_stroke_miter_limit_from_angle)
+                    })
+                    .unwrap_or(StrokeStyle::default().miter_limit),
                 dash_pattern: self.stroke_dashes.unwrap_or_default(),
                 ..StrokeStyle::default()
             };
@@ -744,6 +796,18 @@ fn build_scene(fixture: &FigmaSceneFixture) -> Scene {
     }
 
     scene
+}
+
+fn figma_stroke_miter_limit_from_angle(angle_degrees: f32) -> Option<f32> {
+    if !angle_degrees.is_finite() || angle_degrees <= 0.0 {
+        return None;
+    }
+    let half_radians = 0.5 * angle_degrees.to_radians();
+    let sin = half_radians.sin().abs();
+    if sin <= f32::EPSILON {
+        return None;
+    }
+    Some(1.0 / sin)
 }
 
 fn register_fixture_images(fixture: &FigmaSceneFixture, backend: &mut WgpuBackend) {
