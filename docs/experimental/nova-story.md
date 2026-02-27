@@ -26,6 +26,9 @@ use arthropod::experimental::story::{
 };
 
 fn main() -> Result<(), AppError> {
+    // NOTE: This feature is EXPERIMENTAL and requires the 'nova' feature.
+    // Ensure you have `features = ["nova"]` in your Cargo.toml.
+
     // 1. Initialize the App (Headless for this example)
     let mut app = App::new_headless()?;
 

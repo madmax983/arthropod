@@ -88,7 +88,11 @@ To access these features, you must enable the `nova` feature flag:
 arthropod = { version = "0.1", features = ["nova"] }
 ```
 
-**📚 Read the full documentation: [Nova Story Engine Guide](docs/experimental/nova-story.md)**
+**📚 Read the full documentation:**
+- [Experimental Features Overview](docs/experimental/README.md)
+- [Nova Story Engine Guide](docs/experimental/nova-story.md)
+- [Particles System](docs/experimental/particles.md)
+- [Time Travel (Ghost Replay)](docs/experimental/time-travel.md)
 
 You can run the story demo to see it in action:
 
