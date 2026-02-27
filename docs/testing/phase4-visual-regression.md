@@ -89,4 +89,4 @@ Notes:
 - Playwright performs a `navigator.gpu.requestAdapter()` preflight per test and skips immediately when no adapter is available in that browser/runtime.
 - In headless Chromium, `navigator.gpu` may exist while `requestAdapter()` still returns `null`; use the headed Chromium command for true WebGPU capture.
 - If wasm panics during startup/render, the fixture panic hook now marks `data-arthropod-ready="0"` so tests skip/fail deterministically instead of timing out.
-- The workflow `.github/workflows/webgpu-headed-visual.yml` runs a dedicated headed Chromium WebGPU adapter gate plus headed phase4 visual regression on `workflow_dispatch` and nightly schedule.
+- The workflow `.github/workflows/webgpu-headed-visual.yml` runs a dedicated headed Chromium WebGPU adapter gate plus headed phase4 visual regression on pull requests to `trunk`/`main`, `workflow_dispatch`, and nightly schedule.

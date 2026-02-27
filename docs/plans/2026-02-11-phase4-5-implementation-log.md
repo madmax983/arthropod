@@ -1540,3 +1540,16 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
   - `npm run visual:update:chromium:headed` -> PASS (5/5 snapshots)
   - `npm run visual:test:webgpu:headed` -> PASS (adapter gate + 5/5 chromium headed snapshots)
   - `npm run visual:test` -> PASS (15 skipped in current runtime due missing WebGPU adapters in headless/browser matrix)
+
+### 2026-02-27 (parity continuation: enforce headed WebGPU browser gate on PRs)
+
+- Goal:
+  - Shift headed browser WebGPU visual parity failures left by running the dedicated headed Chromium gate on pull requests, not only manual/nightly paths.
+- Implementation:
+  - Updated `.github/workflows/webgpu-headed-visual.yml` triggers:
+    - added `pull_request` for branches `trunk` and `main`
+    - retained existing `workflow_dispatch` + nightly schedule
+  - Updated docs:
+    - `docs/testing/phase4-visual-regression.md` workflow note now reflects PR trigger coverage.
+- Verification:
+  - `npm run visual:test:webgpu:headed` -> PASS
