@@ -72,9 +72,9 @@ mod tui_app {
 
         loop {
             // Extract current text from Scene for rendering
-            let story_text = extract_story_text(&app);
+            let story_data = extract_story_data(&app);
 
-            terminal.draw(|f| ui(f, &state, &story_text, scroll_offset))?;
+            terminal.draw(|f| ui(f, &state, &story_data, scroll_offset))?;
 
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
@@ -127,28 +127,43 @@ mod tui_app {
         }
     }
 
-    fn extract_story_text(app: &App) -> String {
+    struct StoryData {
+        passage: String,
+        choices: Vec<String>,
+    }
+
+    fn extract_story_data(app: &App) -> StoryData {
         let scene = app.world().resource::<Scene>();
         let root = scene.root();
         let root_node = match scene.get_node(root) {
             Some(n) => n,
-            None => return String::new(),
+            None => {
+                return StoryData {
+                    passage: String::new(),
+                    choices: Vec::new(),
+                };
+            }
         };
 
-        let mut full_text = String::new();
+        let mut passage = String::new();
+        let mut choices = Vec::new();
 
         // Iterate all children (Text + Choices)
-        for &child_id in &root_node.children {
+        for (i, &child_id) in root_node.children.iter().enumerate() {
             if let Some(child) = scene.get_node(child_id)
                 && let NodeContent::Styled { style } = &child.content
                 && let Some(text_content) = &style.text
             {
-                full_text.push_str(&text_content.text);
-                full_text.push_str("\n\n");
+                if i == 0 {
+                    passage = text_content.text.clone();
+                } else {
+                    // Clean up choice text (remove leading newline if present)
+                    choices.push(text_content.text.trim().to_string());
+                }
             }
         }
 
-        full_text
+        StoryData { passage, choices }
     }
 
     fn parse_markdown(text: &str) -> Vec<Line<'_>> {
@@ -178,14 +193,17 @@ mod tui_app {
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 )]));
-            } else if line.trim().starts_with('[') {
-                // Highlight choices [1] ...
-                lines.push(Line::from(vec![Span::styled(
-                    line,
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                )]));
+            } else if let Some(rest) = line.strip_prefix("> ") {
+                // Blockquote
+                lines.push(Line::from(vec![
+                    Span::styled("▎ ", Style::default().fg(Color::Blue)),
+                    Span::styled(
+                        rest,
+                        Style::default()
+                            .fg(Color::Gray)
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+                ]));
             } else {
                 // Standard markdown body
                 let mut spans = Vec::new();
@@ -230,12 +248,12 @@ mod tui_app {
         lines
     }
 
-    fn ui(f: &mut ratatui::Frame, state: &AppState, story_text: &str, scroll_offset: u16) {
+    fn ui(f: &mut ratatui::Frame, state: &AppState, data: &StoryData, scroll_offset: u16) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Title
-                Constraint::Min(0),    // Content
+                Constraint::Min(0),    // Main Content (Passage + Choices)
                 Constraint::Length(3), // Footer
             ])
             .split(f.area());
@@ -251,8 +269,9 @@ mod tui_app {
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(title, chunks[0]);
 
-        // Content
-        let content_area = chunks[1];
+        // Main Content Area
+        let main_area = chunks[1];
+
         match state {
             AppState::Intro => {
                 let text = vec![
@@ -279,12 +298,22 @@ mod tui_app {
                         Constraint::Percentage(20),
                         Constraint::Percentage(40),
                     ])
-                    .split(content_area);
+                    .split(main_area);
 
                 f.render_widget(p, v_center[1]);
             }
             AppState::StoryLoop => {
-                let text = parse_markdown(story_text);
+                // Split Main Area into Passage (Top) and Choices (Bottom)
+                let content_chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Min(10), // Passage takes remaining space
+                        Constraint::Length(data.choices.len() as u16 + 2), // Choices take fixed space
+                    ])
+                    .split(main_area);
+
+                // 1. Passage
+                let text = parse_markdown(&data.passage);
                 let p = Paragraph::new(text)
                     .block(
                         Block::default()
@@ -295,7 +324,44 @@ mod tui_app {
                     )
                     .wrap(Wrap { trim: true })
                     .scroll((scroll_offset, 0));
-                f.render_widget(p, content_area);
+                f.render_widget(p, content_chunks[0]);
+
+                // 2. Choices
+                use ratatui::widgets::{List, ListItem};
+                let choice_items: Vec<ListItem> = data
+                    .choices
+                    .iter()
+                    .map(|c| {
+                        // Highlight the [N] part if present
+                        let spans = if let Some((prefix, rest)) = c.split_once(' ') {
+                            if prefix.starts_with('[') && prefix.ends_with(']') {
+                                vec![
+                                    Span::styled(
+                                        prefix,
+                                        Style::default()
+                                            .fg(Color::Yellow)
+                                            .add_modifier(Modifier::BOLD),
+                                    ),
+                                    Span::raw(" "),
+                                    Span::styled(rest, Style::default().fg(Color::Cyan)),
+                                ]
+                            } else {
+                                vec![Span::styled(c, Style::default().fg(Color::Cyan))]
+                            }
+                        } else {
+                            vec![Span::styled(c, Style::default().fg(Color::Cyan))]
+                        };
+                        ListItem::new(Line::from(spans))
+                    })
+                    .collect();
+
+                let choices_list = List::new(choice_items).block(
+                    Block::default()
+                        .title(" Actions ")
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded),
+                );
+                f.render_widget(choices_list, content_chunks[1]);
             }
         }
 
