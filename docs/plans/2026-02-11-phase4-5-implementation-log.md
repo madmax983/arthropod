@@ -2283,3 +2283,52 @@ Parity status:
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
     - `cargo fmt --all` -> PASS
+
+### 2026-02-27 (import pipeline phase 2, slice 2: runtime bridge for layout + prototype playback + render collection)
+
+- Goal:
+  - Add a production runtime bridge that executes imported Figma designs as an app-runtime artifact:
+    - own imported scene + layout styles
+    - run layout against viewport constraints
+    - dispatch prototype runtime events
+    - apply screen/overlay visibility semantics to scene nodes
+    - collect render instances for rendering backends or harnesses
+- RED:
+  - Added integration coverage in `crates/arthropod/tests/figma_runtime.rs`:
+    - `figma_runtime_applies_layout_and_collects_render_instances`
+    - `figma_runtime_dispatch_navigate_switches_top_level_visibility`
+    - `figma_runtime_overlay_visibility_tracks_open_and_close`
+  - Ran:
+    - `cargo test -p arthropod --test figma_runtime -- --nocapture`
+  - Result: FAIL (expected before module existed): missing runtime bridge API.
+- GREEN:
+  - Added `crates/arthropod/src/figma_runtime.rs` with:
+    - `FigmaRuntime` runtime bridge struct
+    - constructors:
+      - `from_figma_json`
+      - `from_imported`
+    - runtime APIs:
+      - `apply_layout`
+      - `dispatch`
+      - `collect_render_instances`
+      - `node_for_figma_id`
+      - `set_current_screen`
+      - `is_visible`
+      - scene accessors
+    - behavior:
+      - top-level screen visibility switching on navigation/back
+      - overlay visibility synchronization from prototype overlay stack
+      - deterministic render instance collection in scene visual order
+  - Exported bridge surface in `crates/arthropod/src/lib.rs`:
+    - `pub mod figma_runtime;`
+    - `pub use figma_runtime::FigmaRuntime;`
+  - Ran:
+    - `cargo test -p arthropod --test figma_runtime -- --nocapture`
+  - Result: PASS (3/3).
+- REFACTOR / verification:
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (14/14)
+    - `cargo test -p arthropod --test prototype_runtime -- --nocapture` -> PASS (4/4)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+    - `cargo fmt --all` -> PASS
