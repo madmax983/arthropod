@@ -4,6 +4,12 @@ use crate::gestures::InputPattern;
 use plat_core::{ElementState, MouseButton, Point, WindowEvent};
 use std::f64::consts::PI;
 
+// Gesture recognition constants
+const MIN_SWIPE_DISTANCE: f64 = 50.0;
+const MIN_PATH_LENGTH: f64 = 100.0;
+const CIRCLE_CLOSURE_RATIO: f64 = 0.3;
+const CIRCLE_ANGLE_TOLERANCE: f64 = 1.0;
+
 /// Recognized mouse gestures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MouseGesture {
@@ -13,6 +19,14 @@ pub enum MouseGesture {
     SwipeRight,
     CircleClockwise,
     CircleCounterClockwise,
+}
+
+struct StrokeMetrics {
+    path_length: f64,
+    direct_distance: f64,
+    total_angle: f64,
+    dx: f64,
+    dy: f64,
 }
 
 /// Matches mouse strokes (gestures) drawn while holding a specific button.
@@ -29,37 +43,38 @@ impl StrokeMatcher {
             trigger_button,
             points: Vec::new(),
             is_tracking: false,
-            min_distance: 50.0, // Minimum pixel distance for a valid swipe
+            min_distance: MIN_SWIPE_DISTANCE,
         }
     }
 
-    fn analyze_stroke(&self) -> Option<MouseGesture> {
-        if self.points.len() < 5 {
-            // Not enough points for a gesture
+    fn calculate_metrics(&self) -> Option<StrokeMetrics> {
+        // Filter out sequential duplicates to ensure robust angle calculation
+        let mut clean_points = self.points.clone();
+        clean_points.dedup();
+
+        if clean_points.len() < 3 {
             return None;
         }
 
-        let first = self.points.first()?;
-        let last = self.points.last()?;
+        let first = clean_points.first()?;
+        let last = clean_points.last()?;
 
         let dx = last.x - first.x;
         let dy = last.y - first.y;
-        let dist_sq = dx * dx + dy * dy;
-        let dist = dist_sq.sqrt();
+        let direct_distance = (dx * dx + dy * dy).sqrt();
 
-        // Calculate total winding number (sum of angle changes)
         let mut total_angle = 0.0;
         let mut path_length = 0.0;
 
-        for i in 0..self.points.len() - 1 {
-            let p1 = self.points[i];
-            let p2 = self.points[i + 1];
+        for i in 0..clean_points.len() - 1 {
+            let p1 = clean_points[i];
+            let p2 = clean_points[i + 1];
             let seg_dx = p2.x - p1.x;
             let seg_dy = p2.y - p1.y;
             path_length += (seg_dx * seg_dx + seg_dy * seg_dy).sqrt();
 
-            if i < self.points.len() - 2 {
-                let p3 = self.points[i + 2];
+            if i < clean_points.len() - 2 {
+                let p3 = clean_points[i + 2];
                 let v1_x = p2.x - p1.x;
                 let v1_y = p2.y - p1.y;
                 let v2_x = p3.x - p2.x;
@@ -81,41 +96,59 @@ impl StrokeMatcher {
             }
         }
 
-        // Circle Detection
-        // Criteria:
-        // 1. Total angle is close to +/- 2*PI (360 degrees)
-        // 2. Start and end points are relatively close (closed loop)
-        // 3. Path length is significant
-        if path_length > 100.0 && dist < path_length * 0.3 {
-            if (total_angle - 2.0 * PI).abs() < 1.0 {
-                // Approx 60 degrees tolerance
+        Some(StrokeMetrics {
+            path_length,
+            direct_distance,
+            total_angle,
+            dx,
+            dy,
+        })
+    }
+
+    fn detect_circle(metrics: &StrokeMetrics) -> Option<MouseGesture> {
+        if metrics.path_length > MIN_PATH_LENGTH
+            && metrics.direct_distance < metrics.path_length * CIRCLE_CLOSURE_RATIO
+        {
+            if (metrics.total_angle - 2.0 * PI).abs() < CIRCLE_ANGLE_TOLERANCE {
                 return Some(MouseGesture::CircleClockwise);
             }
-            if (total_angle + 2.0 * PI).abs() < 1.0 {
+            if (metrics.total_angle + 2.0 * PI).abs() < CIRCLE_ANGLE_TOLERANCE {
                 return Some(MouseGesture::CircleCounterClockwise);
             }
         }
+        None
+    }
 
-        // Swipe Detection
-        // Criteria:
-        // 1. Distance > Threshold
-        // 2. Not a circle (implied by previous check failing or return)
-        if dist > self.min_distance {
-            if dx.abs() > dy.abs() {
+    fn detect_swipe(metrics: &StrokeMetrics, min_distance: f64) -> Option<MouseGesture> {
+        if metrics.direct_distance > min_distance {
+            if metrics.dx.abs() > metrics.dy.abs() {
                 // Horizontal
-                if dx > 0.0 {
+                if metrics.dx > 0.0 {
                     return Some(MouseGesture::SwipeRight);
                 } else {
                     return Some(MouseGesture::SwipeLeft);
                 }
             } else {
                 // Vertical
-                if dy > 0.0 {
+                if metrics.dy > 0.0 {
                     return Some(MouseGesture::SwipeDown);
                 } else {
                     return Some(MouseGesture::SwipeUp);
                 }
             }
+        }
+        None
+    }
+
+    fn analyze_stroke(&self) -> Option<MouseGesture> {
+        let metrics = self.calculate_metrics()?;
+
+        if let Some(gesture) = Self::detect_circle(&metrics) {
+            return Some(gesture);
+        }
+
+        if let Some(gesture) = Self::detect_swipe(&metrics, self.min_distance) {
+            return Some(gesture);
         }
 
         None
@@ -244,5 +277,26 @@ mod tests {
 
         let gesture = simulate_stroke(&mut matcher, points);
         assert_eq!(gesture, None);
+    }
+
+    #[test]
+    fn test_circle_clockwise() {
+        let mut matcher = StrokeMatcher::new(MouseButton::Right);
+        let mut points = Vec::new();
+
+        let center = Point::new(100.0, 100.0);
+        let radius = 50.0;
+        let steps = 30;
+
+        for i in 0..=steps {
+            let angle = 2.0 * PI * (i as f64 / steps as f64);
+            points.push(Point::new(
+                center.x + radius * angle.cos(),
+                center.y + radius * angle.sin(),
+            ));
+        }
+
+        let gesture = simulate_stroke(&mut matcher, points);
+        assert_eq!(gesture, Some(MouseGesture::CircleClockwise));
     }
 }
