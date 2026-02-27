@@ -299,6 +299,8 @@ enum FigmaEffect {
         #[serde(default = "default_visible")]
         visible: bool,
     },
+    #[serde(other)]
+    Unsupported,
 }
 
 const fn default_visible() -> bool {
@@ -456,6 +458,7 @@ impl FigmaEffect {
             Self::BackgroundBlur { radius, visible } => {
                 visible.then_some(Effect::BackgroundBlur(BackgroundBlur { radius, visible }))
             }
+            Self::Unsupported => None,
         }
     }
 }
@@ -631,6 +634,161 @@ fn figma_style_unknown_blend_mode_falls_back_to_normal() {
 }
 
 #[test]
+fn figma_style_linear_gradient_maps_to_style_engine_gradient() {
+    let figma_paint: FigmaPaint = serde_json::from_str(
+        r#"{
+            "type":"GRADIENT_LINEAR",
+            "start":[0.0,0.0],
+            "end":[1.0,1.0],
+            "stops":[
+                {"position":0.0,"color":[1.0,0.0,0.0,1.0]},
+                {"position":1.0,"color":[0.0,0.0,1.0,1.0]}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize linear gradient paint");
+
+    let paint = figma_paint
+        .into_paint()
+        .expect("linear gradient should map to supported paint");
+    let Paint::Linear(gradient) = paint else {
+        panic!("expected linear gradient paint");
+    };
+    assert_eq!(gradient.start, Vec2::new(0.0, 0.0));
+    assert_eq!(gradient.end, Vec2::new(1.0, 1.0));
+    assert_eq!(gradient.stops.len(), 2, "expected two gradient stops");
+}
+
+#[test]
+fn figma_style_stroke_align_and_side_weights_map() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 3.25,
+            "strokeAlign": "OUTSIDE",
+            "individualStrokeWeights": {"top":1.0,"right":2.0,"bottom":3.0,"left":4.0}
+        }"#,
+    )
+    .expect("failed to deserialize figma stroke style");
+
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert!((stroke.weight - 3.25).abs() < 1e-6);
+    assert_eq!(stroke.align, StrokeAlign::Outside);
+    let side = stroke.side_weights.expect("expected side weights");
+    assert!((side.top - 1.0).abs() < 1e-6);
+    assert!((side.right - 2.0).abs() < 1e-6);
+    assert!((side.bottom - 3.0).abs() < 1e-6);
+    assert!((side.left - 4.0).abs() < 1e-6);
+}
+
+#[test]
+fn figma_style_corner_radius_and_rectangle_corner_radii_map() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "cornerRadius": 9.0,
+            "rectangleCornerRadii": [1.0, 2.0, 3.0, 4.0]
+        }"#,
+    )
+    .expect("failed to deserialize figma corner radii style");
+
+    let style = figma_style.into_visual_style();
+    assert_eq!(
+        style.corner_radii.to_array(),
+        [1.0, 2.0, 3.0, 4.0],
+        "rectangleCornerRadii should map to per-corner radii"
+    );
+}
+
+#[test]
+fn figma_style_effect_variants_map_to_visual_effects() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "effects":[
+                {
+                    "type":"DROP_SHADOW",
+                    "offset":[1.0,2.0],
+                    "radius":4.0,
+                    "color":[0.0,0.0,0.0,0.4],
+                    "visible":true
+                },
+                {
+                    "type":"INNER_SHADOW",
+                    "offset":[2.0,3.0],
+                    "radius":5.0,
+                    "color":[0.1,0.2,0.3,0.5],
+                    "visible":true
+                },
+                {
+                    "type":"LAYER_BLUR",
+                    "radius":6.0,
+                    "visible":true
+                },
+                {
+                    "type":"BACKGROUND_BLUR",
+                    "radius":7.0,
+                    "visible":true
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma effects style");
+
+    let style = figma_style.into_visual_style();
+    assert_eq!(
+        style.effects.len(),
+        4,
+        "expected all mapped effect variants"
+    );
+    assert!(matches!(style.effects[0], Effect::DropShadow(_)));
+    assert!(matches!(style.effects[1], Effect::InnerShadow(_)));
+    assert!(matches!(style.effects[2], Effect::LayerBlur(_)));
+    assert!(matches!(style.effects[3], Effect::BackgroundBlur(_)));
+}
+
+#[test]
+fn figma_style_unknown_effect_types_are_ignored() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "effects":[
+                {"type":"NOISE","visible":true},
+                {"type":"LAYER_BLUR","radius":3.0,"visible":true}
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma effects with unknown type");
+
+    let style = figma_style.into_visual_style();
+    assert_eq!(
+        style.effects.len(),
+        1,
+        "unknown effect types should be skipped"
+    );
+    assert!(matches!(style.effects[0], Effect::LayerBlur(_)));
+}
+
+#[test]
+fn figma_style_opacity_clips_and_mask_map() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "opacity": 0.42,
+            "blendMode": "MULTIPLY",
+            "clipsContent": true,
+            "isMask": true,
+            "maskType": "VECTOR"
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    assert!((style.opacity - 0.42).abs() < 1e-6);
+    assert_eq!(style.blend_mode, BlendMode::Multiply);
+    assert!(style.clips_content);
+    assert!(style.is_mask);
+    assert_eq!(style.mask_type, MaskType::Vector);
+}
+
+#[test]
 fn figma_style_corner_smoothing_maps_to_visual_style_corner_smoothing() {
     let figma_style: FigmaStyle = serde_json::from_str(
         r#"{
@@ -703,6 +861,23 @@ fn figma_style_dash_offset_maps_to_stroke_style_dash_offset() {
         (stroke.dash_offset - 3.5).abs() < 1e-6,
         "dashOffset should map to StrokeStyle.dash_offset"
     );
+}
+
+#[test]
+fn figma_style_stroke_dash_offset_alias_maps_to_stroke_style_dash_offset() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 2.0,
+            "strokeDashes": [6.0, 1.5],
+            "strokeDashOffset": 2.25
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+    let style = figma_style.into_visual_style();
+    let stroke = style.stroke.expect("expected stroke");
+    assert_eq!(stroke.dash_pattern, vec![6.0, 1.5]);
+    assert!((stroke.dash_offset - 2.25).abs() < 1e-6);
 }
 
 #[test]

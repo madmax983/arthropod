@@ -1830,6 +1830,7 @@ Exit gates:
 | `effects[].INNER_SHADOW` | `Effect::InnerShadow { ... }` | 4 |
 | `effects[].LAYER_BLUR` | `Effect::LayerBlur { ... }` | 4 |
 | `effects[].BACKGROUND_BLUR` | `Effect::BackgroundBlur { ... }` | 4 |
+| `effects[].type: unknown` | ignored (unsupported effect fallback) | 5+ |
 | `cornerRadius` | `CornerRadii::uniform(r)` | 1 |
 | `rectangleCornerRadii` | `CornerRadii { tl, tr, br, bl }` | 1 |
 | `cornerSmoothing` | `VisualStyle.corner_smoothing` | 2+ |

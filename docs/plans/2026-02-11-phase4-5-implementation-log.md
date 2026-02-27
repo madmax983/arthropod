@@ -1848,3 +1848,33 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_unknown_blend_mode_falls_back_to_normal -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (21/21)
+
+### 2026-02-27 (parity closeout: explicit coverage for remaining mapping-table rows)
+
+- Goal:
+  - Close the remaining unverified Figma mapping rows by adding direct regression tests
+    for stroke align/side weights, corner radii mapping, effect variants, mask/clip/opacity,
+    linear gradients, and dash-offset alias behavior.
+  - Harden effect parsing so unknown effect types do not fail full style deserialization.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - Added row-coverage tests:
+      - `figma_style_linear_gradient_maps_to_style_engine_gradient`
+      - `figma_style_stroke_align_and_side_weights_map`
+      - `figma_style_corner_radius_and_rectangle_corner_radii_map`
+      - `figma_style_effect_variants_map_to_visual_effects`
+      - `figma_style_opacity_clips_and_mask_map`
+      - `figma_style_stroke_dash_offset_alias_maps_to_stroke_style_dash_offset`
+    - Added unknown-effect fallback behavior:
+      - `FigmaEffect::Unsupported` (`#[serde(other)]`) + `None` mapping in `into_effect`
+      - `figma_style_unknown_effect_types_are_ignored`
+  - Updated mapping reference in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md`:
+    - added row:
+      - `effects[].type: unknown` -> ignored (unsupported effect fallback)
+- Verification:
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+
+Parity status:
+- Mapping-table rows in `docs/plans/2026-02-08-figma-rendering-pipeline-design.md` now have explicit regression coverage and/or documented fallback behavior in the harness.
