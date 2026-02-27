@@ -15,7 +15,7 @@ use serde::Deserialize;
 use style_engine::{
     AngularGradient, BackgroundBlur, DiamondGradient, DropShadow, ImageFill, ImageId,
     ImageScaleMode, InnerShadow, LayerBlur, LinearGradient, MaskType, RadialGradient, SideWeights,
-    StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle,
+    StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle, VectorPath, WindingRule,
 };
 
 const DEFAULT_CHANNEL_TOLERANCE: u8 = 2;
@@ -90,6 +90,8 @@ struct FigmaStyle {
     individual_stroke_weights: Option<FigmaSideWeights>,
     #[serde(default)]
     effects: Vec<FigmaEffect>,
+    fill_geometry: Option<Vec<FigmaPathGeometry>>,
+    stroke_geometry: Option<Vec<FigmaPathGeometry>>,
     corner_radius: Option<f32>,
     rectangle_corner_radii: Option<[f32; 4]>,
     corner_smoothing: Option<f32>,
@@ -100,6 +102,28 @@ struct FigmaStyle {
     is_mask: Option<bool>,
     #[serde(alias = "maskType")]
     mask_type: Option<FigmaMaskType>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaPathGeometry {
+    SvgPathData(String),
+    PathObject(FigmaPathGeometryObject),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaPathGeometryObject {
+    path: String,
+    winding_rule: Option<FigmaWindingRule>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+enum FigmaWindingRule {
+    #[serde(rename = "NONZERO")]
+    NonZero,
+    #[serde(rename = "EVENODD")]
+    EvenOdd,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -472,6 +496,65 @@ fn figma_gradient_variants_map_to_style_engine_gradient_paints() {
 }
 
 #[test]
+fn figma_style_fill_geometry_maps_svg_paths_with_winding_rule() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "fills":[{"type":"SOLID","color":[0.9,0.2,0.3,1.0]}],
+            "fillGeometry": [
+                {
+                    "path": "M 0 0 L 10 0 L 10 10 L 0 10 Z",
+                    "windingRule": "EVENODD"
+                }
+            ]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let geometry = style
+        .fill_geometry
+        .as_ref()
+        .expect("expected fill geometry from figma fillGeometry");
+    assert_eq!(geometry.len(), 1, "expected one mapped fill geometry path");
+    assert!(
+        !geometry[0].commands.is_empty(),
+        "mapped fill geometry path should contain parsed commands"
+    );
+    assert_eq!(
+        geometry[0].winding_rule,
+        WindingRule::EvenOdd,
+        "windingRule should map from figma geometry"
+    );
+}
+
+#[test]
+fn figma_style_stroke_geometry_maps_svg_path_strings() {
+    let figma_style: FigmaStyle = serde_json::from_str(
+        r#"{
+            "strokes":[{"type":"SOLID","color":[1.0,1.0,1.0,1.0]}],
+            "strokeWeight": 1.0,
+            "strokeGeometry": ["M 0 0 L 12 0 L 6 8 Z"]
+        }"#,
+    )
+    .expect("failed to deserialize figma style");
+
+    let style = figma_style.into_visual_style();
+    let geometry = style
+        .stroke_geometry
+        .as_ref()
+        .expect("expected stroke geometry from figma strokeGeometry");
+    assert_eq!(
+        geometry.len(),
+        1,
+        "expected one mapped stroke geometry path"
+    );
+    assert!(
+        !geometry[0].commands.is_empty(),
+        "mapped stroke geometry path should contain parsed commands"
+    );
+}
+
+#[test]
 fn figma_style_stroke_miter_angle_maps_to_miter_limit() {
     let figma_style: FigmaStyle = serde_json::from_str(
         r#"{
@@ -599,6 +682,15 @@ impl From<FigmaStrokeAlign> for StrokeAlign {
     }
 }
 
+impl From<FigmaWindingRule> for WindingRule {
+    fn from(value: FigmaWindingRule) -> Self {
+        match value {
+            FigmaWindingRule::NonZero => Self::NonZero,
+            FigmaWindingRule::EvenOdd => Self::EvenOdd,
+        }
+    }
+}
+
 impl From<FigmaStrokeCap> for StrokeCap {
     fn from(value: FigmaStrokeCap) -> Self {
         match value {
@@ -661,6 +753,15 @@ impl FigmaStyle {
         for fill in self.fills {
             style = style.fill(fill.into_paint());
         }
+        if let Some(fill_geometry) = self.fill_geometry {
+            let paths: Vec<_> = fill_geometry
+                .into_iter()
+                .filter_map(FigmaPathGeometry::into_vector_path)
+                .collect();
+            if !paths.is_empty() {
+                style = style.fill_geometry(paths);
+            }
+        }
 
         if let Some(corner_radius) = self.corner_radius {
             style = style.corner_radius(corner_radius);
@@ -717,6 +818,15 @@ impl FigmaStyle {
             }
             style = style.stroke(stroke);
         }
+        if let Some(stroke_geometry) = self.stroke_geometry {
+            let paths: Vec<_> = stroke_geometry
+                .into_iter()
+                .filter_map(FigmaPathGeometry::into_vector_path)
+                .collect();
+            if !paths.is_empty() {
+                style = style.stroke_geometry(paths);
+            }
+        }
 
         if let Some(opacity) = self.opacity {
             style = style.opacity(opacity);
@@ -735,6 +845,21 @@ impl FigmaStyle {
         }
 
         style
+    }
+}
+
+impl FigmaPathGeometry {
+    fn into_vector_path(self) -> Option<VectorPath> {
+        let (path_data, winding_rule) = match self {
+            Self::SvgPathData(path) => (path, None),
+            Self::PathObject(obj) => (obj.path, obj.winding_rule.map(Into::into)),
+        };
+
+        let mut path = VectorPath::from_svg_path_data(&path_data).ok()?;
+        if let Some(winding_rule) = winding_rule {
+            path.winding_rule = winding_rule;
+        }
+        Some(path)
     }
 }
 

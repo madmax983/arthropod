@@ -1596,3 +1596,36 @@ Scope: Implement Phase 4 (multi-pass effects) and Phase 5 (WASM/web target) from
     - `cargo fmt --all` -> PASS
     - `cargo test --test figma_json_render_regression figma_style_dash_offset_maps_to_stroke_style_dash_offset -- --nocapture` -> PASS
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (9/9)
+
+### 2026-02-27 (parity continuation: Figma `fillGeometry` / `strokeGeometry` mapping)
+
+- Goal:
+  - Close vector geometry mapping gaps by mapping Figma `fillGeometry` and `strokeGeometry` into `VisualStyle.fill_geometry` / `VisualStyle.stroke_geometry`.
+- Implementation:
+  - Updated `tests/figma_json_render_regression.rs`:
+    - extended `FigmaStyle` with:
+      - `fill_geometry`
+      - `stroke_geometry`
+    - added geometry parser types:
+      - `FigmaPathGeometry` (untagged: SVG path string or object form)
+      - `FigmaPathGeometryObject { path, winding_rule }`
+      - `FigmaWindingRule` (`NONZERO` / `EVENODD`)
+    - added conversion path:
+      - parse SVG path strings via `VectorPath::from_svg_path_data`
+      - apply optional winding-rule override when provided
+      - drop invalid path entries (non-panicking mapper behavior)
+    - mapped parsed paths in `FigmaStyle::into_visual_style(...)` to:
+      - `style.fill_geometry(...)`
+      - `style.stroke_geometry(...)`
+  - Added regression tests:
+    - `figma_style_fill_geometry_maps_svg_paths_with_winding_rule`
+    - `figma_style_stroke_geometry_maps_svg_path_strings`
+- Verification:
+  - RED:
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_maps_svg_paths_with_winding_rule -- --nocapture` -> FAIL (expected, unmapped)
+    - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_maps_svg_path_strings -- --nocapture` -> FAIL (expected, unmapped)
+  - GREEN:
+    - `cargo fmt --all` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_fill_geometry_maps_svg_paths_with_winding_rule -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression figma_style_stroke_geometry_maps_svg_path_strings -- --nocapture` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (11/11)
