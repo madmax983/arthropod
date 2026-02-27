@@ -1,5 +1,6 @@
 use arthropod::figma::{
-    ConstraintAxis, LayoutPositioning, PrototypeTrigger, import_figma_document,
+    ConstraintAxis, ImportedComponentKind, LayoutPositioning, PrototypeTrigger,
+    import_figma_document,
 };
 use layout_engine::FlexDirection;
 use render_engine::NodeContent;
@@ -182,4 +183,137 @@ fn figma_prototype_interactions_map_to_graph_edges() {
 
     assert_eq!(edge.to_figma_id, "200");
     assert_eq!(edge.trigger, PrototypeTrigger::OnClick);
+}
+
+#[test]
+fn figma_component_and_instance_nodes_map_to_metadata() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "500",
+                "type": "COMPONENT_SET",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 300, "height": 150 },
+                "key": "set-key-abc"
+            },
+            {
+                "id": "510",
+                "parentId": "500",
+                "type": "COMPONENT",
+                "componentSetId": "500",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 140, "height": 64 },
+                "key": "component-key-def",
+                "variantProperties": {
+                    "State": "Default",
+                    "Size": "M"
+                }
+            },
+            {
+                "id": "700",
+                "type": "INSTANCE",
+                "componentId": "510",
+                "mainComponent": { "id": "510" },
+                "absoluteBoundingBox": { "x": 20, "y": 20, "width": 140, "height": 64 },
+                "variantProperties": {
+                    "State": "Hover"
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let set_id = imported
+        .figma_to_scene
+        .get("500")
+        .copied()
+        .expect("component set should map");
+    let component_id = imported
+        .figma_to_scene
+        .get("510")
+        .copied()
+        .expect("component should map");
+    let instance_id = imported
+        .figma_to_scene
+        .get("700")
+        .copied()
+        .expect("instance should map");
+
+    let set_meta = imported
+        .components
+        .get(&set_id)
+        .expect("component set metadata should be present");
+    assert_eq!(set_meta.kind, ImportedComponentKind::ComponentSet);
+    assert_eq!(set_meta.key.as_deref(), Some("set-key-abc"));
+
+    let component_meta = imported
+        .components
+        .get(&component_id)
+        .expect("component metadata should be present");
+    assert_eq!(component_meta.kind, ImportedComponentKind::Component);
+    assert_eq!(component_meta.key.as_deref(), Some("component-key-def"));
+    assert_eq!(component_meta.component_set_id.as_deref(), Some("500"));
+
+    let instance_meta = imported
+        .instances
+        .get(&instance_id)
+        .expect("instance metadata should be present");
+    assert_eq!(instance_meta.component_id.as_deref(), Some("510"));
+    assert_eq!(instance_meta.main_component_id.as_deref(), Some("510"));
+
+    let component_variants = imported
+        .variant_properties
+        .get(&component_id)
+        .expect("component variants should exist");
+    assert_eq!(
+        component_variants.get("State").map(String::as_str),
+        Some("Default")
+    );
+    assert_eq!(
+        component_variants.get("Size").map(String::as_str),
+        Some("M")
+    );
+
+    let instance_variants = imported
+        .variant_properties
+        .get(&instance_id)
+        .expect("instance variants should exist");
+    assert_eq!(
+        instance_variants.get("State").map(String::as_str),
+        Some("Hover")
+    );
+}
+
+#[test]
+fn figma_variant_properties_extract_from_component_properties_variant_type() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "800",
+                "type": "INSTANCE",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 120, "height": 40 },
+                "componentProperties": {
+                    "State#12:0": { "type": "VARIANT", "value": "Pressed" },
+                    "Density#12:1": { "type": "VARIANT", "value": "Compact" },
+                    "Disabled#12:2": { "type": "BOOLEAN", "value": true }
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("800")
+        .copied()
+        .expect("instance should map");
+    let variants = imported
+        .variant_properties
+        .get(&node_id)
+        .expect("variant properties should exist");
+
+    assert_eq!(variants.get("State").map(String::as_str), Some("Pressed"));
+    assert_eq!(variants.get("Density").map(String::as_str), Some("Compact"));
+    assert!(
+        !variants.contains_key("Disabled"),
+        "non-variant component properties should not be projected into variant map"
+    );
 }

@@ -1932,3 +1932,46 @@ Parity status:
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
   - Cross-check regression:
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+
+### 2026-02-27 (importer slice: component/instance + variant property mapping)
+
+- Goal:
+  - Extend production importer output with component semantics needed for Figma design-import parity:
+    - component node metadata (`COMPONENT`, `COMPONENT_SET`)
+    - instance linkage metadata (`INSTANCE` -> `componentId` / `mainComponent`)
+    - variant property mapping from both `variantProperties` and `componentProperties` (`type: VARIANT`)
+- RED:
+  - Added integration coverage in `crates/arthropod/tests/figma_import_layout.rs`:
+    - `figma_component_and_instance_nodes_map_to_metadata`
+    - `figma_variant_properties_extract_from_component_properties_variant_type`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: FAIL (expected):
+    - missing importer API surface (`ImportedComponentKind`)
+    - missing output fields on `ImportedFigmaDocument` (`components`, `instances`, `variant_properties`)
+- GREEN:
+  - Updated `crates/arthropod/src/figma.rs`:
+    - Added public importer metadata types:
+      - `ImportedComponentKind`
+      - `ImportedComponentNode`
+      - `ImportedInstanceNode`
+    - Extended `ImportedFigmaDocument` with:
+      - `components: HashMap<NodeId, ImportedComponentNode>`
+      - `instances: HashMap<NodeId, ImportedInstanceNode>`
+      - `variant_properties: HashMap<NodeId, HashMap<String, String>>`
+    - Added Figma parsing support for:
+      - node types `COMPONENT`, `COMPONENT_SET`, `INSTANCE`
+      - `key`, `componentSetId`, `componentId`, `mainComponent`, `mainComponentId`
+      - `variantProperties`
+      - `componentProperties` with typed property parsing and variant-only projection
+    - Added canonical property-name normalization for Figma component property keys:
+      - `State#12:0` -> `State`
+  - Ran:
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture`
+  - Result: PASS (6/6)
+- REFACTOR / verification:
+  - Ran:
+    - `cargo fmt --all` -> PASS
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)

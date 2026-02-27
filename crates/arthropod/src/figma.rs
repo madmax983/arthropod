@@ -55,12 +55,34 @@ pub struct PrototypeGraph {
     pub edges: Vec<PrototypeEdge>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportedComponentKind {
+    Component,
+    ComponentSet,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedComponentNode {
+    pub kind: ImportedComponentKind,
+    pub key: Option<String>,
+    pub component_set_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportedInstanceNode {
+    pub component_id: Option<String>,
+    pub main_component_id: Option<String>,
+}
+
 pub struct ImportedFigmaDocument {
     pub scene: Scene,
     pub layout_styles: HashMap<NodeId, FlexStyle>,
     pub constraints: HashMap<NodeId, ImportedConstraints>,
     pub prototype_graph: PrototypeGraph,
     pub figma_to_scene: HashMap<String, NodeId>,
+    pub components: HashMap<NodeId, ImportedComponentNode>,
+    pub instances: HashMap<NodeId, ImportedInstanceNode>,
+    pub variant_properties: HashMap<NodeId, HashMap<String, String>>,
 }
 
 pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
@@ -71,6 +93,9 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
     let mut figma_to_scene = HashMap::new();
     let mut layout_styles = HashMap::new();
     let mut constraints_map = HashMap::new();
+    let mut components = HashMap::new();
+    let mut instances = HashMap::new();
+    let mut variant_properties = HashMap::new();
     let mut pending: Vec<usize> = (0..document.nodes.len()).collect();
 
     while !pending.is_empty() {
@@ -95,6 +120,16 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                 figma_to_scene.insert(node.id.as_key(), scene_id);
                 layout_styles.insert(scene_id, node.to_flex_style(bounds));
                 constraints_map.insert(scene_id, node.to_constraints());
+                if let Some(component) = node.to_component_node() {
+                    components.insert(scene_id, component);
+                }
+                if let Some(instance) = node.to_instance_node() {
+                    instances.insert(scene_id, instance);
+                }
+                let variants = node.to_variant_properties();
+                if !variants.is_empty() {
+                    variant_properties.insert(scene_id, variants);
+                }
                 progressed = true;
             } else {
                 unresolved.push(index);
@@ -114,6 +149,16 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                 figma_to_scene.insert(node.id.as_key(), scene_id);
                 layout_styles.insert(scene_id, node.to_flex_style(bounds));
                 constraints_map.insert(scene_id, node.to_constraints());
+                if let Some(component) = node.to_component_node() {
+                    components.insert(scene_id, component);
+                }
+                if let Some(instance) = node.to_instance_node() {
+                    instances.insert(scene_id, instance);
+                }
+                let variants = node.to_variant_properties();
+                if !variants.is_empty() {
+                    variant_properties.insert(scene_id, variants);
+                }
             }
             break;
         }
@@ -152,6 +197,9 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
             edges: prototype_edges,
         },
         figma_to_scene,
+        components,
+        instances,
+        variant_properties,
     })
 }
 
@@ -170,6 +218,20 @@ struct FigmaNode {
     parent_id: Option<FigmaNodeKey>,
     #[serde(default, rename = "type")]
     node_type: Option<FigmaNodeType>,
+    #[serde(default)]
+    key: Option<String>,
+    #[serde(default, alias = "componentSetId")]
+    component_set_id: Option<FigmaNodeKey>,
+    #[serde(default, alias = "componentId")]
+    component_id: Option<FigmaNodeKey>,
+    #[serde(default, alias = "mainComponent")]
+    main_component: Option<FigmaMainComponent>,
+    #[serde(default, alias = "mainComponentId")]
+    main_component_id: Option<FigmaNodeKey>,
+    #[serde(default)]
+    variant_properties: HashMap<String, FigmaScalarValue>,
+    #[serde(default)]
+    component_properties: HashMap<String, FigmaComponentProperty>,
     #[serde(default)]
     bounds: Option<[f32; 4]>,
     #[serde(default, alias = "absoluteBoundingBox")]
@@ -350,6 +412,74 @@ impl FigmaNode {
 
         Some(text)
     }
+
+    fn to_component_node(&self) -> Option<ImportedComponentNode> {
+        match self.node_type.unwrap_or(FigmaNodeType::Unknown) {
+            FigmaNodeType::Component => Some(ImportedComponentNode {
+                kind: ImportedComponentKind::Component,
+                key: self.key.clone(),
+                component_set_id: self.component_set_id.as_ref().map(FigmaNodeKey::as_key),
+            }),
+            FigmaNodeType::ComponentSet => Some(ImportedComponentNode {
+                kind: ImportedComponentKind::ComponentSet,
+                key: self.key.clone(),
+                component_set_id: None,
+            }),
+            _ => None,
+        }
+    }
+
+    fn to_instance_node(&self) -> Option<ImportedInstanceNode> {
+        if self.node_type != Some(FigmaNodeType::Instance) {
+            return None;
+        }
+
+        let main_component_id = self
+            .main_component_id
+            .as_ref()
+            .map(FigmaNodeKey::as_key)
+            .or_else(|| {
+                self.main_component
+                    .as_ref()
+                    .map(|component| component.id.as_key())
+            });
+        let component_id = self
+            .component_id
+            .as_ref()
+            .map(FigmaNodeKey::as_key)
+            .or_else(|| main_component_id.clone());
+
+        Some(ImportedInstanceNode {
+            component_id,
+            main_component_id,
+        })
+    }
+
+    fn to_variant_properties(&self) -> HashMap<String, String> {
+        let mut variants = HashMap::new();
+
+        for (name, value) in &self.variant_properties {
+            let canonical = canonical_property_name(name);
+            if !canonical.is_empty() {
+                variants.insert(canonical, value.as_string());
+            }
+        }
+
+        for (name, property) in &self.component_properties {
+            if property.property_type != Some(FigmaComponentPropertyType::Variant) {
+                continue;
+            }
+            let Some(value) = property.value.as_ref() else {
+                continue;
+            };
+            let canonical = canonical_property_name(name);
+            if !canonical.is_empty() {
+                variants.insert(canonical, value.as_string());
+            }
+        }
+
+        variants
+    }
 }
 
 fn map_font_style(style: Option<&FigmaTypeStyle>) -> FontStyle {
@@ -400,6 +530,18 @@ fn figma_constraint_axis(axis: &str) -> ConstraintAxis {
     }
 }
 
+fn canonical_property_name(name: &str) -> String {
+    let trimmed = name.trim();
+    let canonical = trimmed
+        .split_once('#')
+        .map_or(trimmed, |(base, _)| base)
+        .trim();
+    if canonical.is_empty() {
+        return trimmed.to_string();
+    }
+    canonical.to_string()
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum FigmaNodeKey {
@@ -416,13 +558,16 @@ impl FigmaNodeKey {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum FigmaNodeType {
     Frame,
     Group,
     Rectangle,
     Text,
+    Component,
+    ComponentSet,
+    Instance,
     #[serde(other)]
     Unknown,
 }
@@ -472,6 +617,52 @@ struct FigmaConstraints {
     horizontal: Option<String>,
     #[serde(default)]
     vertical: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaMainComponent {
+    id: FigmaNodeKey,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaComponentProperty {
+    #[serde(default, rename = "type")]
+    property_type: Option<FigmaComponentPropertyType>,
+    #[serde(default)]
+    value: Option<FigmaScalarValue>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum FigmaComponentPropertyType {
+    Variant,
+    Boolean,
+    Text,
+    InstanceSwap,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum FigmaScalarValue {
+    Text(String),
+    Bool(bool),
+    Integer(i64),
+    Float(f64),
+}
+
+impl FigmaScalarValue {
+    fn as_string(&self) -> String {
+        match self {
+            Self::Text(value) => value.clone(),
+            Self::Bool(value) => value.to_string(),
+            Self::Integer(value) => value.to_string(),
+            Self::Float(value) => value.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
