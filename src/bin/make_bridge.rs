@@ -61,7 +61,7 @@ Examples:
     --input \"C:\\Users\\markm\\Downloads\\Indie Artist Spotify App.make\" \
     --out artifacts/indie_make \
     --decode-json-out artifacts/indie_make/import_from_make.json \
-    --generate-rust-out examples/generated/indie_make_generated.rs \
+    --generate-rust-out examples/generated/indie_make_generated_module.rs \
     --module-name indie_make_generated \
     --document-fn document \
     --runtime-fn runtime"

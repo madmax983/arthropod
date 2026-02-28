@@ -1,7 +1,7 @@
 //! Indie Make generated Figma example.
 //!
 //! Regenerate the embedded module with:
-//! `cargo run --bin make_bridge -- --input "c:\Users\markm\Downloads\Indie Artist Spotify App.make" --out artifacts/indie_make --decode-json-out artifacts/indie_make/import_from_make.json --generate-rust-out examples/generated/indie_make_generated.rs --module-name indie_make_generated --document-fn document --runtime-fn runtime`
+//! `cargo run --bin make_bridge -- --input "c:\Users\markm\Downloads\Indie Artist Spotify App.make" --out artifacts/indie_make --decode-json-out artifacts/indie_make/import_from_make.json --generate-rust-out examples/generated/indie_make_generated_module.rs --module-name indie_make_generated --document-fn document --runtime-fn runtime`
 
 use std::time::Instant;
 
@@ -17,7 +17,7 @@ use render_engine::{
 };
 
 #[allow(dead_code)]
-#[path = "generated/indie_make_generated.rs"]
+#[path = "generated/indie_make_generated_module.rs"]
 mod indie_make_generated_module;
 
 const DEFAULT_WIDTH: u32 = 1280;
