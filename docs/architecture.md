@@ -260,6 +260,11 @@ classDiagram
             +StrokeMatcher
             +MouseGesture
         }
+        class KineticText {
+            +KineticText
+            +TextAnimation
+            +MotionSignal
+        }
     }
 
     App ..> Experimental : "nova" feature enables
@@ -271,4 +276,6 @@ classDiagram
     GhostReplay ..> App : Intercepts Events
     ReactiveParticles ..> Particles : Extends
     MouseGestures ..> App : Intercepts Events
+    KineticText ..> Runtime : Uses Signals
+    KineticText ..> App : Adds Motion
 ```
