@@ -33,6 +33,7 @@ C4Container
     Container(flux, "Flux State", "Rust Crate", "Reactive primitives (Signals, Effects).")
     Container(widget, "Widget Core", "Rust Crate", "High-level Widget traits and input handling.")
     Container(ecs, "Arthropod ECS", "Rust Crate", "ECS World, Components, and Systems.")
+    Container(prototype, "Prototype Runtime", "Rust Module", "Deterministic runtime executor for imported prototype graphs")
     Container(render, "Render Engine", "Rust Crate", "WGPU rendering pipeline and Scene Graph.")
 
     Container(layout, "Layout Engine", "Rust Crate", "Flexbox/Grid layout calculations (Taffy wrapper).")
@@ -68,8 +69,26 @@ C4Container
     Rel(render, text, "Uses", "Rasterizes glyphs")
     Rel(render, style, "Uses", "Tessellates paths")
 
+    Rel(app, prototype, "Delegates to", "Event dispatch & navigation")
     Rel(ecs, flux, "Polls", "Reacts to signals")
     Rel(render, ecs, "Reads", "Scene data")
+```
+
+## Prototype Runtime Execution (Sequence)
+
+The `PrototypeRuntime` orchestrates imported interactive prototype semantics, tracking states independently of the core widget hierarchy.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant PrototypeRuntime
+
+    App->>PrototypeRuntime: event dispatch
+    PrototypeRuntime->>PrototypeRuntime: timeout handling
+    PrototypeRuntime->>PrototypeRuntime: navigation history
+    PrototypeRuntime->>PrototypeRuntime: overlay stack
+    PrototypeRuntime->>PrototypeRuntime: back semantics
+    PrototypeRuntime->>App: URL effects
 ```
 
 ## Render Engine Architecture

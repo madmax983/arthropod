@@ -22,6 +22,10 @@ fn main() {
 fn main() {}
 
 #[cfg(target_arch = "wasm32")]
+#[path = "phase4_visual_scenes.rs"]
+mod phase4_visual_scenes;
+
+#[cfg(target_arch = "wasm32")]
 mod wasm_app {
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -38,8 +42,7 @@ mod wasm_app {
     use wasm_bindgen_futures::spawn_local;
     use web_sys::console;
 
-    #[path = "../phase4_visual_scenes.rs"]
-    mod phase4_visual_scenes;
+    use super::phase4_visual_scenes;
 
     const APP_TITLE: &str = "Arthropod Phase4 Visual Fixture";
     const INTER_REGULAR_FONT: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");

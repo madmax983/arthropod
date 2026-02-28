@@ -85,6 +85,7 @@ mod tests {
             padding_right: 5.0,
             padding_top: 5.0,
             padding_bottom: 5.0,
+            ..Default::default()
         }
     }
 

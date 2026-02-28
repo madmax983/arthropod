@@ -25,7 +25,11 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
-          args: ["--enable-unsafe-webgpu"]
+          args: [
+            "--enable-unsafe-webgpu",
+            "--use-angle=swiftshader",
+            "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan"
+          ]
         }
       }
     },

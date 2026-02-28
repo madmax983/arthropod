@@ -18,7 +18,7 @@ env:
 jobs:
   headed-webgpu-visual:
     name: Chromium Headed WebGPU Visual
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -39,10 +39,10 @@ jobs:
           npx playwright install chromium
 
       - name: Verify headed Chromium has a WebGPU adapter
-        run: npm run visual:test:chromium:headed:adapter
+        run: xvfb-run npm run visual:test:chromium:headed:adapter
 
       - name: Run headed Chromium phase4 visual regression
-        run: npm run visual:test:chromium:headed
+        run: xvfb-run npm run visual:test:chromium:headed
 
       - name: Upload visual artifacts on failure
         if: failure()
