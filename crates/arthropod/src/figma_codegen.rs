@@ -36,16 +36,17 @@ pub fn generate_rust_module_from_json(
     figma_json: &str,
     options: &FigmaCodegenOptions,
 ) -> Result<String, FigmaCodegenError> {
-    let imported = import_figma_document(figma_json)?;
+    let normalized_json = normalize_line_endings(figma_json);
+    let imported = import_figma_document(&normalized_json)?;
     let module_name = sanitize_identifier(&options.module_name, "generated_figma");
     let document_fn = sanitize_identifier(&options.document_fn, "imported_document");
     let runtime_fn = sanitize_identifier(&options.runtime_fn, "runtime");
 
-    let source_bytes = figma_json.len();
-    let source_fnv64 = fnv1a64(figma_json.as_bytes());
+    let source_bytes = normalized_json.len();
+    let source_fnv64 = fnv1a64(normalized_json.as_bytes());
     let node_count = imported.figma_to_scene.len();
     let prototype_edge_count = imported.prototype_graph.edges.len();
-    let raw_json = to_raw_string_literal(figma_json);
+    let raw_json = to_raw_string_literal(&normalized_json);
 
     Ok(format!(
         "pub mod {module_name} {{\n\
@@ -106,6 +107,26 @@ fn sanitize_identifier(input: &str, fallback: &str) -> String {
     }
 }
 
+fn normalize_line_endings(input: &str) -> String {
+    if !input.contains('\r') {
+        return input.to_string();
+    }
+
+    let mut normalized = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\r' {
+            if chars.peek() == Some(&'\n') {
+                chars.next();
+            }
+            normalized.push('\n');
+        } else {
+            normalized.push(ch);
+        }
+    }
+    normalized
+}
+
 fn to_raw_string_literal(value: &str) -> String {
     for hashes in 0..16 {
         let fence = "#".repeat(hashes);
@@ -161,5 +182,11 @@ mod tests {
             fallback.starts_with('"'),
             "pathological payload should still produce valid rust string literal"
         );
+    }
+
+    #[test]
+    fn normalize_line_endings_collapses_crlf_and_cr() {
+        assert_eq!(normalize_line_endings("a\r\nb\rc\n"), "a\nb\nc\n");
+        assert_eq!(normalize_line_endings("a\nb\n"), "a\nb\n");
     }
 }

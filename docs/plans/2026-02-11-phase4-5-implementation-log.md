@@ -2384,3 +2384,39 @@ Parity status:
     - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
     - `cargo fmt --all` -> PASS
+
+### 2026-02-27 (import pipeline phase 2, slice 4: golden snapshot regression for codegen + runtime)
+
+- Goal:
+  - Lock deterministic import-pipeline behavior with file-backed golden snapshots:
+    - generated Rust module output snapshot (codegen)
+    - runtime visibility/render-instance transition snapshot (prototype playback)
+  - Ensure codegen output remains stable across CRLF/LF line-ending variants.
+- RED:
+  - Added `crates/arthropod/tests/figma_pipeline_regression.rs` with:
+    - `figma_codegen_snapshot_matches_golden`
+    - `figma_runtime_visibility_and_instances_match_golden`
+    - `figma_codegen_normalizes_crlf_and_lf_to_identical_output`
+  - Added fixture:
+    - `crates/arthropod/tests/fixtures/figma/figma_pipeline_fixture.json`
+  - Ran:
+    - `cargo test -p arthropod --test figma_pipeline_regression -- --nocapture`
+  - Result: FAIL (expected): missing golden snapshots.
+- GREEN:
+  - Generated and checked in golden snapshots:
+    - `crates/arthropod/tests/fixtures/figma/figma_pipeline_codegen.golden.rs`
+    - `crates/arthropod/tests/fixtures/figma/figma_pipeline_runtime.golden.txt`
+  - Added CRLF/LF normalization in `crates/arthropod/src/figma_codegen.rs`:
+    - normalize source before import/checksum/embedding
+    - added unit test `normalize_line_endings_collapses_crlf_and_cr`
+  - Ran:
+    - `$env:ARTHROPOD_UPDATE_GOLDENS='1'; cargo test -p arthropod --test figma_pipeline_regression -- --nocapture`
+    - `cargo test -p arthropod --test figma_pipeline_regression -- --nocapture`
+  - Result: PASS (3/3).
+- REFACTOR / verification:
+  - Ran:
+    - `cargo fmt --all` -> PASS
+    - `cargo test -p arthropod --test figma_pipeline_regression -- --nocapture` -> PASS (3/3)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
