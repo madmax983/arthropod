@@ -57,10 +57,16 @@ fn get_y_lparam(lparam: LPARAM) -> f64 {
 
 /// Helper to safely retrieve WindowId from HWND user data, handling 32-bit sign extension correctly.
 #[inline]
-unsafe fn get_window_id(hwnd: HWND) -> WindowId {
+unsafe fn get_window_id(hwnd: HWND) -> Option<WindowId> {
+    // GetWindowLongPtrW returns zero on failure (or if the value is zero).
+    // We assume valid WindowIds are non-zero (initialized to 1).
+    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    if ptr == 0 {
+        return None;
+    }
     // Cast to usize first to ensure zero-extension on 32-bit systems where isize is negative
     // but the original ID was a large u32.
-    WindowId(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as usize as u64)
+    Some(WindowId(ptr as usize as u64))
 }
 
 /// Windows event loop implementation.
@@ -419,42 +425,43 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_SIZE => {
             // Retrieve WindowId from window user data
-            let window_id = unsafe { get_window_id(hwnd) };
-            // Extract new window size from lparam
-            let width = (lparam.0 & 0xFFFF) as u32;
-            let height = ((lparam.0 >> 16) & 0xFFFF) as u32;
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                // Extract new window size from lparam
+                let width = (lparam.0 & 0xFFFF) as u32;
+                let height = ((lparam.0 >> 16) & 0xFFFF) as u32;
 
-            // Queue the resize event
-            EVENT_SENDER.with(|sender| {
-                if let Some(sender) = sender.borrow().as_ref() {
-                    let _ = sender.send(Event::Window {
-                        window_id,
-                        event: WindowEvent::Resized(Size { width, height }),
-                    });
-                }
-            });
+                // Queue the resize event
+                EVENT_SENDER.with(|sender| {
+                    if let Some(sender) = sender.borrow().as_ref() {
+                        let _ = sender.send(Event::Window {
+                            window_id,
+                            event: WindowEvent::Resized(Size { width, height }),
+                        });
+                    }
+                });
+            }
 
             LRESULT(0)
         }
         WM_MOUSEMOVE => {
             // Retrieve WindowId from window user data
-            let window_id = unsafe { get_window_id(hwnd) };
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                // Extract mouse coordinates using helpers (handles negative coords on multi-monitor)
+                let x = get_x_lparam(lparam);
+                let y = get_y_lparam(lparam);
 
-            // Extract mouse coordinates using helpers (handles negative coords on multi-monitor)
-            let x = get_x_lparam(lparam);
-            let y = get_y_lparam(lparam);
-
-            // Queue the event
-            EVENT_SENDER.with(|sender| {
-                if let Some(sender) = sender.borrow().as_ref() {
-                    let _ = sender.send(Event::Window {
-                        window_id,
-                        event: WindowEvent::CursorMoved {
-                            position: Point { x, y },
-                        },
-                    });
-                }
-            });
+                // Queue the event
+                EVENT_SENDER.with(|sender| {
+                    if let Some(sender) = sender.borrow().as_ref() {
+                        let _ = sender.send(Event::Window {
+                            window_id,
+                            event: WindowEvent::CursorMoved {
+                                position: Point { x, y },
+                            },
+                        });
+                    }
+                });
+            }
 
             LRESULT(0)
         }
@@ -462,109 +469,112 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         | WM_MBUTTONUP => {
             use crate::{ElementState, MouseButton, MouseInput};
 
-            let window_id = unsafe { get_window_id(hwnd) };
-            let x = get_x_lparam(lparam);
-            let y = get_y_lparam(lparam);
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                let x = get_x_lparam(lparam);
+                let y = get_y_lparam(lparam);
 
-            let (button, state) = match msg {
-                WM_LBUTTONDOWN => (MouseButton::Left, ElementState::Pressed),
-                WM_LBUTTONUP => (MouseButton::Left, ElementState::Released),
-                WM_RBUTTONDOWN => (MouseButton::Right, ElementState::Pressed),
-                WM_RBUTTONUP => (MouseButton::Right, ElementState::Released),
-                WM_MBUTTONDOWN => (MouseButton::Middle, ElementState::Pressed),
-                WM_MBUTTONUP => (MouseButton::Middle, ElementState::Released),
-                _ => unreachable!(),
-            };
+                let (button, state) = match msg {
+                    WM_LBUTTONDOWN => (MouseButton::Left, ElementState::Pressed),
+                    WM_LBUTTONUP => (MouseButton::Left, ElementState::Released),
+                    WM_RBUTTONDOWN => (MouseButton::Right, ElementState::Pressed),
+                    WM_RBUTTONUP => (MouseButton::Right, ElementState::Released),
+                    WM_MBUTTONDOWN => (MouseButton::Middle, ElementState::Pressed),
+                    WM_MBUTTONUP => (MouseButton::Middle, ElementState::Released),
+                    _ => unreachable!(),
+                };
 
-            // TODO: Extract modifiers from wparam
-            let modifiers = crate::Modifiers::default();
+                // Note: Modifier extraction from wparam will be implemented in a future PR
+                let modifiers = crate::Modifiers::default();
 
-            EVENT_SENDER.with(|sender| {
-                if let Some(sender) = sender.borrow().as_ref() {
-                    let _ = sender.send(Event::Window {
-                        window_id,
-                        event: WindowEvent::MouseInput(MouseInput {
-                            button,
-                            state,
-                            position: Point { x, y },
-                            modifiers,
-                        }),
-                    });
-                }
-            });
+                EVENT_SENDER.with(|sender| {
+                    if let Some(sender) = sender.borrow().as_ref() {
+                        let _ = sender.send(Event::Window {
+                            window_id,
+                            event: WindowEvent::MouseInput(MouseInput {
+                                button,
+                                state,
+                                position: Point { x, y },
+                                modifiers,
+                            }),
+                        });
+                    }
+                });
+            }
 
             LRESULT(0)
         }
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
             use crate::{ElementState, Key, KeyboardInput};
 
-            let window_id = unsafe { get_window_id(hwnd) };
-            let vk = wparam.0 as u32;
-            let state = if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
-                ElementState::Pressed
-            } else {
-                ElementState::Released
-            };
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                let vk = wparam.0 as u32;
+                let state = if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
+                    ElementState::Pressed
+                } else {
+                    ElementState::Released
+                };
 
-            // Map virtual key codes to Key enum
-            let key = match vk {
-                0x41..=0x5A => {
-                    // A-Z
-                    Key::from_vk(vk)
-                }
-                0x30..=0x39 => {
-                    // 0-9
-                    Key::from_vk(vk)
-                }
-                0x08 => Key::Backspace,
-                0x09 => Key::Tab,
-                0x0D => Key::Enter,
-                0x10 => Key::Shift,
-                0x11 => Key::Control,
-                0x12 => Key::Alt,
-                0x1B => Key::Escape,
-                0x20 => Key::Space,
-                0x21 => Key::PageUp,
-                0x22 => Key::PageDown,
-                0x23 => Key::End,
-                0x24 => Key::Home,
-                0x25 => Key::Left,
-                0x26 => Key::Up,
-                0x27 => Key::Right,
-                0x28 => Key::Down,
-                0x2C => Key::PrintScreen,
-                0x2D => Key::Insert,
-                0x2E => Key::Delete,
-                0x70..=0x87 => Key::from_vk(vk), // F1-F24
-                _ => Key::Unknown,
-            };
+                // Map virtual key codes to Key enum
+                let key = match vk {
+                    0x41..=0x5A => {
+                        // A-Z
+                        Key::from_vk(vk)
+                    }
+                    0x30..=0x39 => {
+                        // 0-9
+                        Key::from_vk(vk)
+                    }
+                    0x08 => Key::Backspace,
+                    0x09 => Key::Tab,
+                    0x0D => Key::Enter,
+                    0x10 => Key::Shift,
+                    0x11 => Key::Control,
+                    0x12 => Key::Alt,
+                    0x1B => Key::Escape,
+                    0x20 => Key::Space,
+                    0x21 => Key::PageUp,
+                    0x22 => Key::PageDown,
+                    0x23 => Key::End,
+                    0x24 => Key::Home,
+                    0x25 => Key::Left,
+                    0x26 => Key::Up,
+                    0x27 => Key::Right,
+                    0x28 => Key::Down,
+                    0x2C => Key::PrintScreen,
+                    0x2D => Key::Insert,
+                    0x2E => Key::Delete,
+                    0x70..=0x87 => Key::from_vk(vk), // F1-F24
+                    _ => Key::Unknown,
+                };
 
-            // TODO: Extract modifiers from GetKeyState
-            let modifiers = crate::Modifiers::default();
-            let repeat = (lparam.0 & 0x40000000) != 0;
+                // Note: Modifier extraction from GetKeyState will be implemented in a future PR
+                let modifiers = crate::Modifiers::default();
+                let repeat = (lparam.0 & 0x40000000) != 0;
 
-            EVENT_SENDER.with(|sender| {
-                if let Some(sender) = sender.borrow().as_ref() {
-                    let _ = sender.send(Event::Window {
-                        window_id,
-                        event: WindowEvent::KeyboardInput(KeyboardInput {
-                            key,
-                            state,
-                            modifiers,
-                            repeat,
-                        }),
-                    });
-                }
-            });
+                EVENT_SENDER.with(|sender| {
+                    if let Some(sender) = sender.borrow().as_ref() {
+                        let _ = sender.send(Event::Window {
+                            window_id,
+                            event: WindowEvent::KeyboardInput(KeyboardInput {
+                                key,
+                                state,
+                                modifiers,
+                                repeat,
+                            }),
+                        });
+                    }
+                });
+            }
 
             LRESULT(0)
         }
         WM_PAINT => {
             // Mark window as needing redraw
-            let window_id = unsafe { get_window_id(hwnd) };
-            DIRTY_WINDOWS.with(|dirty| {
-                dirty.borrow_mut().insert(window_id);
-            });
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                DIRTY_WINDOWS.with(|dirty| {
+                    dirty.borrow_mut().insert(window_id);
+                });
+            }
 
             // Validate the window to prevent Windows from re-sending WM_PAINT
             unsafe {
@@ -575,15 +585,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_CLOSE => {
-            let window_id = unsafe { get_window_id(hwnd) };
-            EVENT_SENDER.with(|sender| {
-                if let Some(sender) = sender.borrow().as_ref() {
-                    let _ = sender.send(Event::Window {
-                        window_id,
-                        event: WindowEvent::CloseRequested,
-                    });
-                }
-            });
+            if let Some(window_id) = unsafe { get_window_id(hwnd) } {
+                EVENT_SENDER.with(|sender| {
+                    if let Some(sender) = sender.borrow().as_ref() {
+                        let _ = sender.send(Event::Window {
+                            window_id,
+                            event: WindowEvent::CloseRequested,
+                        });
+                    }
+                });
+            }
             // We do NOT call DestroyWindow here. We let the application decide.
             // If the app wants to close, it should drop the Window or return ControlFlow::Exit.
             LRESULT(0)

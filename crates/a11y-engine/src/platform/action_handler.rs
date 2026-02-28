@@ -64,7 +64,7 @@ impl ArthropodActionHandler {
 
 impl ActionHandler for ArthropodActionHandler {
     fn do_action(&mut self, request: ActionRequest) {
-        let node_id = self.to_a11y_id(request.target);
+        let node_id = self.to_a11y_id(request.target_node);
 
         match request.action {
             accesskit::Action::Click => {
@@ -87,8 +87,6 @@ impl ActionHandler for ArthropodActionHandler {
             | accesskit::Action::Decrement
             | accesskit::Action::ShowContextMenu
             | accesskit::Action::ScrollIntoView
-            | accesskit::Action::ScrollBackward
-            | accesskit::Action::ScrollForward
             | accesskit::Action::ScrollUp
             | accesskit::Action::ScrollDown
             | accesskit::Action::ScrollLeft
@@ -135,7 +133,8 @@ mod tests {
         // Simulate AccessKit sending a click action
         let request = ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(node_id.raw()),
+            target_node: AccessKitNodeId(node_id.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()), // Dummy
             data: None,
         };
 
@@ -162,7 +161,8 @@ mod tests {
         // Simulate AccessKit sending a focus action
         let request = ActionRequest {
             action: accesskit::Action::Focus,
-            target: AccessKitNodeId(node_id.raw()),
+            target_node: AccessKitNodeId(node_id.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()),
             data: None,
         };
 
@@ -196,19 +196,22 @@ mod tests {
         // Click node1 twice
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(node1.raw()),
+            target_node: AccessKitNodeId(node1.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()),
             data: None,
         });
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(node1.raw()),
+            target_node: AccessKitNodeId(node1.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()),
             data: None,
         });
 
         // Click node2 once
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(node2.raw()),
+            target_node: AccessKitNodeId(node2.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()),
             data: None,
         });
 
@@ -231,7 +234,8 @@ mod tests {
         // Try to click unregistered node - should not panic
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(unregistered_node.raw()),
+            target_node: AccessKitNodeId(unregistered_node.raw()),
+            target_tree: accesskit::TreeId(accesskit::Uuid::nil()),
             data: None,
         });
 

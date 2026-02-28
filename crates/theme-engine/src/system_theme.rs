@@ -75,6 +75,9 @@ impl SystemTheme {
         use windows_core::BOOL;
 
         // Query accent color from DWM
+        // SAFETY: The pointers passed to DwmGetColorizationColor are valid stack-allocated variables.
+        // The function writes to these addresses and returns an error code if it fails.
+        // We handle the error result appropriately.
         let accent_color = unsafe {
             let mut color: u32 = 0;
             let mut opaque_blend: BOOL = BOOL(0);
@@ -148,6 +151,10 @@ impl SystemTheme {
             REG_VALUE_TYPE,
         };
 
+        // SAFETY: FFI calls to Windows Registry API.
+        // - Pointers to stack variables (hkey, data, data_size) are valid.
+        // - We check return codes.
+        // - Buffer size is handled correctly.
         unsafe {
             let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows\\DWM");
             let mut hkey = Default::default();
@@ -191,6 +198,8 @@ impl SystemTheme {
             REG_VALUE_TYPE,
         };
 
+        // SAFETY: Standard Registry API usage with stack-allocated buffers.
+        // Checked against Microsoft docs for RegQueryValueExW.
         unsafe {
             let subkey =
                 HSTRING::from("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
@@ -239,6 +248,10 @@ impl SystemTheme {
             REG_VALUE_TYPE,
         };
 
+        // SAFETY: Reading CurrentBuildNumber from HKLM.
+        // Buffer `data` is 64 bytes, sufficient for a version string.
+        // `data_size` tracks buffer length.
+        // `RegQueryValueExW` writes up to `data_size` bytes.
         unsafe {
             let subkey = HSTRING::from("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
             let mut hkey = Default::default();

@@ -80,12 +80,15 @@ impl AccessKitBridge {
             })
             .collect();
 
-        // TODO: Proper root and focus handling
-        // For now, return a minimal tree update
+        // Note: Proper root and focus handling will be implemented in a future phase.
+        // For now, return a minimal tree update with a placeholder TreeId.
+        // In a real app, this TreeId should be stable and unique per window/tree.
+        // We use a nil UUID for now as a placeholder.
         TreeUpdate {
             nodes,
             tree: None,                // Will be set with root info later
             focus: AccessKitNodeId(0), // Will be set properly later
+            tree_id: accesskit::TreeId(accesskit::Uuid::nil()), // Default tree ID
         }
     }
 }

@@ -11,12 +11,12 @@ thiserror.workspace = true
 plat-core = { path = "../plat-core" }
 render-engine = { path = "../render-engine" }
 bevy_ecs = { version = "0.15", features = ["multi_threaded"] }
-accesskit = "0.17"
+accesskit = "0.24"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { workspace = true, features = ["Win32_UI_Accessibility", "Win32_System_Com", "Win32_Foundation", "Win32_System_Variant"] }
 windows-core = "0.62"
-accesskit_windows = "0.22"
+accesskit_windows = "0.32"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

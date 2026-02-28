@@ -101,7 +101,7 @@ pub fn register_action_callbacks_system(
 mod tests {
     use super::*;
     use a11y_engine::{A11yNode, A11yTree, ArthropodActionHandler, Role as A11yRole};
-    use accesskit::{ActionHandler, ActionRequest, NodeId as AccessKitNodeId};
+    use accesskit::{ActionHandler, ActionRequest, NodeId as AccessKitNodeId, TreeId};
 
     #[test]
     fn test_sync_updates_a11y_bounds_from_scene() {
@@ -247,7 +247,8 @@ mod tests {
         let mut handler = world.resource_mut::<ArthropodActionHandler>();
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(a11y_id.raw()),
+            target_node: AccessKitNodeId(a11y_id.raw()),
+            target_tree: TreeId(accesskit::Uuid::nil()),
             data: None,
         });
 
@@ -301,12 +302,14 @@ mod tests {
         let mut handler = world.resource_mut::<ArthropodActionHandler>();
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(id_a.raw()),
+            target_node: AccessKitNodeId(id_a.raw()),
+            target_tree: TreeId(accesskit::Uuid::nil()),
             data: None,
         });
         handler.do_action(ActionRequest {
             action: accesskit::Action::Click,
-            target: AccessKitNodeId(id_b.raw()),
+            target_node: AccessKitNodeId(id_b.raw()),
+            target_tree: TreeId(accesskit::Uuid::nil()),
             data: None,
         });
 
