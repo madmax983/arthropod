@@ -7,16 +7,42 @@ use std::sync::Arc;
 
 /// Reference to a node in the Scene tree
 ///
-/// This component links an ECS entity to a specific node in the custom Scene tree.
-/// Systems can query this component to find which scene node to operate on.
+/// This component is the **bridge** between the ECS world and the Scene Graph.
+/// Arthropod uses a "Hybrid Architecture":
+/// - **Scene Graph (`render-engine`)**: Specialized tree structure for layout and parent-child transforms (O(1) access, cache-friendly).
+/// - **ECS (`arthropod-ecs`)**: Flat arrays of components for cross-cutting systems like animation, physics, and reactivity.
 ///
-/// # Example
+/// `SceneNodeRef` allows ECS systems to "reach into" the scene graph and modify node properties.
+///
+/// # Example: A System that updates Scene Nodes
 ///
 /// ```
-/// # use arthropod_ecs::SceneNodeRef;
-/// # use render_engine::NodeId;
-/// // Create a reference to node with ID 42
-/// let node_ref = SceneNodeRef(NodeId(42));
+/// use bevy_ecs::prelude::*;
+/// use arthropod_ecs::SceneNodeRef;
+/// use render_engine::{Scene, NodeId, Transform2D};
+///
+/// // A simple component
+/// #[derive(Component)]
+/// struct Velocity(f32);
+///
+/// // A system that reads Velocity and updates the Scene Node position
+/// fn movement_system(
+///     mut scene: ResMut<Scene>,
+///     query: Query<(&SceneNodeRef, &Velocity)>
+/// ) {
+///     for (node_ref, velocity) in query.iter() {
+///         // 1. Get the raw NodeId from the component
+///         let node_id = node_ref.0;
+///
+///         // 2. Use it to access the Scene Graph
+///         if let Some(node) = scene.get_node_mut(node_id) {
+///             // 3. Modify the node directly
+///             // We compose the current transform with a translation
+///             let translation = Transform2D::translate(velocity.0, 0.0);
+///             node.transform = node.transform.compose(&translation);
+///         }
+///     }
+/// }
 /// ```
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SceneNodeRef(pub NodeId);

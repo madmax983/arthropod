@@ -1,4 +1,51 @@
 //! Text input state types and logic.
+//!
+//! This module provides a "headless" text editing state machine. It handles the logic
+//! for a single-line text input field, including:
+//! - UTF-8 aware cursor movement
+//! - Insertion and deletion (Backspace/Delete)
+//! - Constraints (read-only, max length)
+//! - Reactive state management via `flux-state`
+//!
+//! # The Headless Editor
+//!
+//! Because `input-engine` is decoupled from rendering, this module acts as a pure logic
+//! layer. It doesn't know about fonts, pixels, or screen coordinates. Instead, it operates
+//! on abstract character indices and string buffers.
+//!
+//! This separation allows:
+//! 1.  **Testing**: You can test complex text editing behavior without spinning up a window.
+//! 2.  **Portability**: The same logic runs on Windows, macOS, Linux, and potentially the web.
+//! 3.  **Flexibility**: You can build any visual representation (TUI, GUI, 3D) on top of this state.
+//!
+//! # Example
+//!
+//! ```
+//! use input_engine::text::TextInputState;
+//! use flux_state::{Runtime, Signal};
+//!
+//! // 1. Setup reactive state
+//! let runtime = Runtime::new();
+//! let signal = Signal::new(runtime, "Hello".to_string());
+//! let (read, write) = signal.split();
+//!
+//! // 2. Create the headless editor state
+//! let mut state = TextInputState {
+//!     read_signal: read.clone(),
+//!     write_signal: write,
+//!     cursor_position: 5, // After 'o'
+//!     readonly: false,
+//!     max_length: None,
+//! };
+//!
+//! // 3. Simulate user input
+//! state.insert_char('!');
+//! assert_eq!(read.get_untracked(), "Hello!");
+//!
+//! state.move_cursor_left();
+//! state.backspace(); // Deletes 'o'
+//! assert_eq!(read.get_untracked(), "Hell!");
+//! ```
 
 use flux_state::{ReadSignal, WriteSignal};
 

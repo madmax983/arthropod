@@ -1,6 +1,75 @@
 //! Widget build context
 //!
 //! Provides API for widgets to build scene nodes and configure components.
+//!
+//! # The Builder's Toolkit
+//!
+//! `WidgetContext` is the primary interface passed to [`crate::Widget::build`].
+//! It acts as a **temporary accumulator** during the widget tree construction phase.
+//!
+//! ## The Build Phase
+//!
+//! Arthropod constructs the UI in two phases:
+//!
+//! 1.  **Build Phase**: Widgets are traversed recursively. Each widget uses `WidgetContext` to:
+//!     - Create [`render_engine::SceneNode`]s (via [`WidgetContext::create_node`]).
+//!     - Define layout properties (via [`WidgetContext::set_layout_style`]).
+//!     - Register interactions like clicks or text input.
+//!     - Set up reactive bindings (connecting signals to node properties).
+//!
+//! 2.  **Integration Phase**: Once the build is complete, the `WidgetContext` is consumed.
+//!     Its accumulated state (layout maps, event handlers, etc.) is transferred into the
+//!     Arthropod ECS (Entity Component System) as components on entities.
+//!
+//! ## Example: Building a Custom "Counter" Widget
+//!
+//! This example demonstrates how to implement a custom widget that uses `WidgetContext`
+//! to create a visual node, handle clicks, and update layout.
+//!
+//! ```
+//! use widget_core::{Widget, WidgetContext};
+//! use render_engine::{NodeContent, NodeId, Color, VisualStyle};
+//! use layout_engine::FlexStyle;
+//! use std::sync::Arc;
+//!
+//! struct Counter {
+//!     count: i32,
+//!     on_increment: Arc<dyn Fn() + Send + Sync>,
+//! }
+//!
+//! impl Widget for Counter {
+//!     fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+//!         // 1. Create the visual node (a blue square)
+//!         let node_id = ctx.create_node(
+//!             ctx.root(),
+//!             NodeContent::Styled {
+//!                 style: Box::new(
+//!                     VisualStyle::new()
+//!                         .solid_fill(Color::BLUE.as_vec4())
+//!                         .text(render_engine::TextContent::new(
+//!                             format!("Count: {}", self.count),
+//!                             16.0
+//!                         ))
+//!                 )
+//!             }
+//!         );
+//!
+//!         // 2. Configure Layout (Fixed size, centered)
+//!         ctx.set_layout_style(node_id, FlexStyle {
+//!             width: Some(100.0),
+//!             height: Some(50.0),
+//!             ..Default::default()
+//!         });
+//!
+//!         // 3. Add Interaction (Click handler)
+//!         let callback = self.on_increment.clone();
+//!         ctx.add_clickable(node_id, callback);
+//!
+//!         // 4. Return the node ID so parents can layout this widget
+//!         node_id
+//!     }
+//! }
+//! ```
 
 use crate::form_state::{FormState, SubmitCallback};
 use crate::input_state::{
