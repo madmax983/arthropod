@@ -305,4 +305,117 @@ mod tests {
         state.move_cursor_right(); // No-op
         assert_eq!(state.cursor_position, 3);
     }
+
+    // --- Sentry Additional Tests ---
+
+    #[test]
+    fn test_boundary_conditions() {
+        // Empty string
+        let mut state = create_state("");
+        state.move_cursor_left();
+        assert_eq!(state.cursor_position, 0);
+        state.move_cursor_right();
+        assert_eq!(state.cursor_position, 0);
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "");
+        state.delete();
+        assert_eq!(state.read_signal.get(), "");
+
+        // Insert at start
+        state.insert_char('a');
+        assert_eq!(state.read_signal.get(), "a");
+        assert_eq!(state.cursor_position, 1);
+
+        // Delete at end
+        state.delete(); // No-op at end
+        assert_eq!(state.read_signal.get(), "a");
+
+        // Backspace to empty
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "");
+        assert_eq!(state.cursor_position, 0);
+    }
+
+    #[test]
+    fn test_mixed_utf8_mutations() {
+        // "a" (1 byte) + "😀" (4 bytes) + "中" (3 bytes)
+        // Total chars: 3. Total bytes: 1 + 4 + 3 = 8.
+        let mut state = create_state("a😀中");
+
+        // Cursor at start
+        state.cursor_position = 0;
+        state.delete(); // delete 'a'
+        assert_eq!(state.read_signal.get(), "😀中");
+        assert_eq!(state.cursor_position, 0);
+
+        state.move_cursor_right(); // skip '😀'
+        assert_eq!(state.cursor_position, 1);
+
+        state.insert_char('x'); // insert 'x' after emoji: "😀x中"
+        assert_eq!(state.read_signal.get(), "😀x中");
+        assert_eq!(state.cursor_position, 2);
+
+        state.move_cursor_right(); // skip '中'
+        assert_eq!(state.cursor_position, 3);
+
+        state.backspace(); // delete '中'
+        assert_eq!(state.read_signal.get(), "😀x");
+        assert_eq!(state.cursor_position, 2);
+    }
+
+    #[test]
+    fn test_external_signal_truncation() {
+        let mut state = create_state("hello world");
+        state.cursor_position = 11; // End
+
+        // External truncation
+        state.write_signal.set("hi".to_string());
+
+        // Next operation should clamp
+        state.insert_char('!');
+        // Logic: ensure_cursor_valid() clamps 11 -> 2 ("hi").
+        // Then insert '!' at 2 -> "hi!"
+        // Cursor becomes 3.
+
+        assert_eq!(state.read_signal.get(), "hi!");
+        assert_eq!(state.cursor_position, 3);
+    }
+
+    #[test]
+    fn test_readonly_mutations_extended() {
+        let mut state = create_state("test");
+        state.readonly = true;
+
+        state.cursor_position = 2; // "te|st"
+
+        state.insert_char('x');
+        assert_eq!(state.read_signal.get(), "test");
+        assert_eq!(state.cursor_position, 2);
+
+        state.backspace();
+        assert_eq!(state.read_signal.get(), "test");
+        assert_eq!(state.cursor_position, 2);
+
+        state.delete();
+        assert_eq!(state.read_signal.get(), "test");
+        assert_eq!(state.cursor_position, 2);
+
+        // Navigation should still work? The original code doesn't check readonly for nav
+        state.move_cursor_left();
+        assert_eq!(state.cursor_position, 1);
+    }
+
+    #[test]
+    fn test_max_length_boundary() {
+        let mut state = create_state("abc");
+        state.max_length = Some(4);
+
+        // Current len 3. Max 4. Can insert 1.
+        state.insert_char('d'); // "abcd"
+        assert_eq!(state.read_signal.get(), "abcd");
+
+        // Current len 4. Max 4. Cannot insert.
+        state.insert_char('e'); // Ignored
+        assert_eq!(state.read_signal.get(), "abcd");
+    }
 }
