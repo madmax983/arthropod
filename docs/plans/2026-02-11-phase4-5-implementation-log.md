@@ -2332,3 +2332,55 @@ Parity status:
     - `cargo test -p arthropod` -> PASS
     - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
     - `cargo fmt --all` -> PASS
+
+### 2026-02-27 (import pipeline phase 2, slice 3: deterministic Rust codegen for imported documents)
+
+- Goal:
+  - Add production codegen that turns Figma JSON into deterministic Rust modules,
+    with entrypoints for both imported-document and runtime execution:
+    - stable embedded JSON literal generation
+    - deterministic source metadata constants
+    - module/function identifier sanitization
+    - write-to-disk API for build pipelines
+- RED:
+  - Added integration coverage in `crates/arthropod/tests/figma_codegen.rs`:
+    - `figma_codegen_generates_runtime_and_document_entrypoints`
+    - `figma_codegen_is_deterministic_for_same_input`
+    - `figma_codegen_writes_module_file`
+  - Ran:
+    - `cargo test -p arthropod --test figma_codegen -- --nocapture`
+  - Result: FAIL (expected before module existed).
+- GREEN:
+  - Added `crates/arthropod/src/figma_codegen.rs`:
+    - `FigmaCodegenOptions`
+    - `FigmaCodegenError`
+    - `generate_rust_module_from_json(...)`
+    - `write_rust_module_from_json(...)`
+    - deterministic metadata:
+      - `SOURCE_BYTES`
+      - `SOURCE_FNV64`
+      - `NODE_COUNT`
+      - `PROTOTYPE_EDGE_COUNT`
+    - robust literal/identifier helpers:
+      - `to_raw_string_literal(...)`
+      - `sanitize_identifier(...)`
+      - `fnv1a64(...)`
+  - Exported codegen surface in `crates/arthropod/src/lib.rs`:
+    - `pub mod figma_codegen;`
+    - `pub use figma_codegen::{generate_rust_module_from_json, write_rust_module_from_json};`
+  - Ran:
+    - `cargo test -p arthropod --test figma_codegen -- --nocapture`
+  - Result: PASS (3/3).
+- REFACTOR / verification:
+  - Hardened raw-string fallback unit coverage to force escaped-string fallback when
+    all raw-string delimiter variants are exhausted.
+  - Ran:
+    - `cargo test -p arthropod --lib` -> PASS
+    - `cargo test -p arthropod --test figma_codegen -- --nocapture` -> PASS (3/3)
+    - `cargo test -p arthropod --test figma_runtime -- --nocapture` -> PASS (3/3)
+    - `cargo test -p arthropod --test figma_import_layout -- --nocapture` -> PASS (14/14)
+    - `cargo test -p arthropod --test prototype_runtime -- --nocapture` -> PASS (4/4)
+    - `cargo test -p arthropod` -> PASS
+    - `cargo test --test figma_json_render_regression -- --nocapture` -> PASS (28/28)
+    - `cargo clippy -p arthropod --tests` -> PASS (warnings remain in unrelated existing modules)
+    - `cargo fmt --all` -> PASS

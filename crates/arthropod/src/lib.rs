@@ -90,6 +90,7 @@ pub mod app;
 pub mod event_dispatcher;
 pub mod experimental;
 pub mod figma;
+pub mod figma_codegen;
 pub mod figma_runtime;
 pub mod layout;
 pub mod prelude;
@@ -99,6 +100,7 @@ pub mod prototype_runtime;
 pub use app::{App, AppError};
 pub use event_dispatcher::{DispatchResult, EventDispatcher};
 pub use figma::import_figma_document;
+pub use figma_codegen::{generate_rust_module_from_json, write_rust_module_from_json};
 pub use figma_runtime::FigmaRuntime;
 pub use layout::{auto_layout, layout_widget_tree};
 
