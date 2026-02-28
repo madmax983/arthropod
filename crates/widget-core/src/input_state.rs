@@ -10,28 +10,10 @@
 //! - [`ComputedTextState`]: Manages text content derived from a computed value.
 //! - [`ReactiveColorState`]: Manages color updates from a signal.
 
-use flux_state::{Computed, ReadSignal};
+use flux_state::ReadSignal;
 use render_engine::Color;
 
-pub use input_engine::text::TextInputState;
-
-/// Reactive text state for a node.
-///
-/// Used by widgets that display text which can change over time based on a `Signal`.
-#[derive(Clone)]
-pub struct ReactiveTextState {
-    /// The source signal for the text.
-    pub read_signal: ReadSignal<String>,
-}
-
-/// Computed text state for a node.
-///
-/// Used by widgets that display text derived from other state via a `Computed` value.
-#[derive(Clone)]
-pub struct ComputedTextState {
-    /// The computed value source.
-    pub computed: Computed<String>,
-}
+pub use input_engine::text::{ComputedTextState, ReactiveTextState, TextInputState};
 
 /// Reactive color state for a node.
 ///
