@@ -425,7 +425,8 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
 }
 
 fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
-    let raw: JsonValue = serde_json::from_str(json)?;
+    let mut raw: JsonValue = serde_json::from_str(json)?;
+    normalize_enum_wrappers(&mut raw);
     let nodes = match raw {
         JsonValue::Array(nodes) => nodes,
         JsonValue::Object(mut object) => match object.remove("nodes") {
@@ -442,6 +443,29 @@ fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
     let mut normalized = JsonMap::new();
     normalized.insert("nodes".to_string(), JsonValue::Array(flattened));
     Ok(serde_json::from_value(JsonValue::Object(normalized))?)
+}
+
+fn normalize_enum_wrappers(value: &mut JsonValue) {
+    match value {
+        JsonValue::Array(items) => {
+            for item in items {
+                normalize_enum_wrappers(item);
+            }
+        }
+        JsonValue::Object(map) => {
+            if map.len() == 2 && map.contains_key("__enum__") && map.contains_key("value") {
+                if let Some(mut enum_value) = map.remove("value") {
+                    normalize_enum_wrappers(&mut enum_value);
+                    *value = enum_value;
+                }
+                return;
+            }
+            for child in map.values_mut() {
+                normalize_enum_wrappers(child);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn flatten_document_nodes(
@@ -1787,6 +1811,7 @@ struct FigmaPropertyNodeRef {
 enum FigmaPathGeometry {
     SvgPathData(String),
     PathObject(FigmaPathGeometryObject),
+    Unsupported(JsonValue),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1806,6 +1831,10 @@ impl FigmaPathGeometry {
                 object.path.as_str(),
                 object.winding_rule.map(FigmaWindingRule::to_winding_rule),
             ),
+            Self::Unsupported(value) => {
+                let _ = value;
+                return None;
+            }
         };
         let mut path = VectorPath::from_svg_path_data(path_data).ok()?;
         if let Some(winding_rule) = winding_rule {
@@ -2038,10 +2067,10 @@ enum FigmaPaint {
         visible: bool,
     },
     Image {
-        #[serde(alias = "imageId", alias = "imageRef", alias = "imageHash")]
-        image_id: FigmaImageIdValue,
-        #[serde(alias = "scaleMode")]
-        scale_mode: FigmaImageScaleMode,
+        #[serde(default, alias = "imageId", alias = "imageRef", alias = "imageHash")]
+        image_id: Option<FigmaImageIdValue>,
+        #[serde(default, alias = "scaleMode", alias = "imageScaleMode")]
+        scale_mode: Option<FigmaImageScaleMode>,
         #[serde(default, alias = "scalingFactor")]
         scaling_factor: Option<f32>,
         #[serde(default, alias = "imageTransform")]
@@ -2153,11 +2182,13 @@ impl FigmaPaint {
                 if !*visible {
                     return None;
                 }
+                let image_id = image_id.as_ref()?;
+                let scale_mode = scale_mode.unwrap_or(FigmaImageScaleMode::Fill);
                 Some(Paint::Image(ImageFill {
                     image_id: image_id.to_image_id(),
                     scale_mode: scale_mode.to_scale_mode(),
                     transform: figma_image_transform(
-                        *scale_mode,
+                        scale_mode,
                         transform.as_ref(),
                         *scaling_factor,
                     ),

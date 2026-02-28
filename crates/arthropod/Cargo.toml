@@ -25,6 +25,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json.workspace = true
 bevy_ecs = { version = "0.15", features = ["multi_threaded"] }
 indexmap = "2.13.0"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+fig2json = "0.3.0"
 
 [dev-dependencies]
 glam = "0.29"

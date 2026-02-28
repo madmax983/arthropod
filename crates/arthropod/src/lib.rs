@@ -93,6 +93,7 @@ pub mod figma;
 pub mod figma_codegen;
 pub mod figma_runtime;
 pub mod layout;
+pub mod make_bridge;
 pub mod prelude;
 pub mod prototype_runtime;
 
@@ -103,6 +104,11 @@ pub use figma::import_figma_document;
 pub use figma_codegen::{generate_rust_module_from_json, write_rust_module_from_json};
 pub use figma_runtime::FigmaRuntime;
 pub use layout::{auto_layout, layout_widget_tree};
+pub use make_bridge::{
+    MakeArchiveInfo, MakeBridgeError, MakeExtractionOptions, MakeExtractionReport,
+    decode_make_archive_to_import_json, extract_make_archive, inspect_make_archive,
+    read_canonical_figma_json,
+};
 
 // Re-export core crates for convenience
 pub use arthropod_ecs;

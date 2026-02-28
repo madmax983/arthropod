@@ -171,6 +171,14 @@ path = "examples/visual_test_phase4_clipping.rs"
 name = "form_syntax_demo"
 path = "examples/form_syntax_demo.rs"
 
+[[example]]
+name = "riot_waves_generated"
+path = "examples/riot_waves_generated.rs"
+
+[[example]]
+name = "indie_make_generated"
+path = "examples/indie_make_generated.rs"
+
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]
