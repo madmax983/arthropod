@@ -9,6 +9,7 @@ const MIN_SWIPE_DISTANCE: f64 = 50.0;
 const MIN_PATH_LENGTH: f64 = 100.0;
 const CIRCLE_CLOSURE_RATIO: f64 = 0.3;
 const CIRCLE_ANGLE_TOLERANCE: f64 = 1.0;
+const MAX_STROKE_POINTS: usize = 1024;
 
 /// Recognized mouse gestures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -198,7 +199,9 @@ impl InputPattern for StrokeMatcher {
                         ElementState::Released => {
                             if self.is_tracking {
                                 self.is_tracking = false;
-                                self.points.push(input.position);
+                                if self.points.len() < MAX_STROKE_POINTS {
+                                    self.points.push(input.position);
+                                }
                                 self.analyze_stroke()
                             } else {
                                 None
@@ -210,7 +213,7 @@ impl InputPattern for StrokeMatcher {
                 }
             }
             WindowEvent::CursorMoved { position } => {
-                if self.is_tracking {
+                if self.is_tracking && self.points.len() < MAX_STROKE_POINTS {
                     // Simple sampling: add point
                     self.points.push(*position);
                 }
@@ -324,5 +327,28 @@ mod tests {
 
         let gesture = simulate_stroke(&mut matcher, points);
         assert_eq!(gesture, Some(MouseGesture::CircleClockwise));
+    }
+
+    #[test]
+    fn test_stroke_limit_dos() {
+        let mut matcher = StrokeMatcher::new(MouseButton::Right);
+        let points: Vec<Point<f64>> = (0..2000).map(|i| Point::new(i as f64, 0.0)).collect();
+
+        // This should not panic or cause OOM, but we want to assert the internal buffer limit
+        simulate_stroke(&mut matcher, points);
+
+        // We expect the buffer to be clamped at 1024 points
+        // NOTE: We need to access the internal state or infer it.
+        // Since `points` is private, we can't check it directly without modifying the code.
+        // But for the purpose of this reproduction step, we will assert that the *test fails* if we could check it.
+        // However, I cannot check private fields from integration tests.
+        // So I will implement the check inside `simulate_stroke` if possible, or assume I'm writing a unit test (which can access private fields if in the same module).
+        // Since this `mod tests` is inside the file, it can access private fields.
+
+        assert!(
+            matcher.points.len() <= 1024,
+            "Stroke points exceeded 1024 limit: {}",
+            matcher.points.len()
+        );
     }
 }
