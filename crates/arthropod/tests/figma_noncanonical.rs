@@ -1,4 +1,5 @@
 use arthropod::figma_codegen::{FigmaCodegenOptions, generate_rust_module_from_json};
+use arthropod::figma_runtime::FigmaRuntime;
 
 #[test]
 fn codegen_accepts_enum_wrapped_values() {
@@ -68,4 +69,39 @@ fn codegen_tolerates_unrecognized_path_geometry_and_image_payloads() {
     let generated = generate_rust_module_from_json(non_canonical, &options)
         .expect("unsupported geometry/image payloads should be skipped without parse failure");
     assert!(generated.contains("pub mod noncanonical_shapes"));
+}
+
+#[test]
+fn runtime_renders_fill_paints_with_transform_and_size_bounds() {
+    let non_canonical = r#"{
+  "nodes": [
+    {
+      "id": "hero",
+      "type": { "__enum__": "NodeType", "value": "FRAME" },
+      "size": { "x": 320, "y": 180 },
+      "transform": { "m00": 1, "m01": 0, "m02": 24, "m10": 0, "m11": 1, "m12": 32 },
+      "fillPaints": [
+        {
+          "type": { "__enum__": "PaintType", "value": "SOLID" },
+          "color": { "r": 0.2, "g": 0.6, "b": 0.9, "a": 1.0 }
+        }
+      ]
+    }
+  ]
+}"#;
+    let mut runtime = FigmaRuntime::from_figma_json(non_canonical)
+        .expect("runtime should parse non-canonical fillPaints payload");
+    runtime.apply_layout(1280.0, 720.0);
+
+    let instances = runtime.collect_render_instances();
+    assert!(
+        !instances.is_empty(),
+        "non-canonical fillPaints + transform/size payload should produce render instances"
+    );
+    assert!(
+        instances
+            .iter()
+            .any(|instance| instance.size[0] > 100.0 && instance.size[1] > 100.0),
+        "expected a visible large instance from size/transform-derived bounds"
+    );
 }

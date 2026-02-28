@@ -534,16 +534,9 @@ fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
         return;
     }
 
-    let Some(x) = json_number(object.get("x")) else {
-        return;
-    };
-    let Some(y) = json_number(object.get("y")) else {
-        return;
-    };
-    let Some(width) = json_number(object.get("width")) else {
-        return;
-    };
-    let Some(height) = json_number(object.get("height")) else {
+    let Some([x, y, width, height]) =
+        bounds_from_xywh(object).or_else(|| bounds_from_size_and_transform(object))
+    else {
         return;
     };
 
@@ -556,6 +549,59 @@ fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
             JsonValue::Number(height),
         ]),
     );
+}
+
+fn bounds_from_xywh(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 4]> {
+    let x = json_number(object.get("x"))?;
+    let y = json_number(object.get("y"))?;
+    let width = json_number(object.get("width"))?;
+    let height = json_number(object.get("height"))?;
+    Some([x, y, width, height])
+}
+
+fn bounds_from_size_and_transform(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 4]> {
+    let size = object.get("size")?.as_object()?;
+    let width = json_number(size.get("x").or_else(|| size.get("width")))?;
+    let height = json_number(size.get("y").or_else(|| size.get("height")))?;
+    let x = json_number(object.get("x"))
+        .or_else(|| transform_translation_component(object.get("transform"), true))
+        .or_else(|| JsonNumber::from_f64(0.0))?;
+    let y = json_number(object.get("y"))
+        .or_else(|| transform_translation_component(object.get("transform"), false))
+        .or_else(|| JsonNumber::from_f64(0.0))?;
+    Some([x, y, width, height])
+}
+
+fn transform_translation_component(
+    transform: Option<&JsonValue>,
+    horizontal: bool,
+) -> Option<JsonNumber> {
+    match transform? {
+        JsonValue::Object(map) => {
+            let key = if horizontal { "m02" } else { "m12" };
+            json_number(map.get(key))
+        }
+        JsonValue::Array(values) => {
+            // Flat affine matrix form: [m00, m01, m02, m10, m11, m12]
+            if values.len() >= 6 {
+                let index = if horizontal { 2 } else { 5 };
+                return json_number(values.get(index));
+            }
+            // Row matrix form: [[m00,m01,m02],[m10,m11,m12],...]
+            if values.len() >= 2
+                && let (Some(JsonValue::Array(row0)), Some(JsonValue::Array(row1))) =
+                    (values.first(), values.get(1))
+            {
+                return if horizontal {
+                    json_number(row0.get(2))
+                } else {
+                    json_number(row1.get(2))
+                };
+            }
+            None
+        }
+        _ => None,
+    }
 }
 
 fn json_number(value: Option<&JsonValue>) -> Option<JsonNumber> {
@@ -856,9 +902,9 @@ struct FigmaNode {
     component_properties: HashMap<String, FigmaComponentProperty>,
     #[serde(default)]
     component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
-    #[serde(default)]
+    #[serde(default, alias = "fillPaints")]
     fills: Vec<FigmaPaint>,
-    #[serde(default)]
+    #[serde(default, alias = "strokePaints")]
     strokes: Vec<FigmaPaint>,
     #[serde(default)]
     stroke_weight: Option<f32>,

@@ -1,14 +1,14 @@
 pub mod indie_make_generated {
 
-    use arthropod::figma::{FigmaImportError, ImportedFigmaDocument, import_figma_document};
-    use arthropod::figma_runtime::{FigmaRuntime, FigmaRuntimeError};
+use arthropod::figma::{FigmaImportError, ImportedFigmaDocument, import_figma_document};
+use arthropod::figma_runtime::{FigmaRuntime, FigmaRuntimeError};
 
-    pub const SOURCE_BYTES: usize = 7429641;
-    pub const SOURCE_FNV64: u64 = 0x6e75e919fc7ac531;
-    pub const NODE_COUNT: usize = 82;
-    pub const PROTOTYPE_EDGE_COUNT: usize = 0;
+pub const SOURCE_BYTES: usize = 7429641;
+pub const SOURCE_FNV64: u64 = 0x6e75e919fc7ac531;
+pub const NODE_COUNT: usize = 82;
+pub const PROTOTYPE_EDGE_COUNT: usize = 0;
 
-    pub const FIGMA_JSON: &str = r##"{
+pub const FIGMA_JSON: &str = r##"{
   "nodes": [
     {
       "backgroundColor": {
@@ -374012,11 +374012,11 @@ pub mod indie_make_generated {
   ]
 }"##;
 
-    pub fn document() -> Result<ImportedFigmaDocument, FigmaImportError> {
-        import_figma_document(FIGMA_JSON)
-    }
+pub fn document() -> Result<ImportedFigmaDocument, FigmaImportError> {
+import_figma_document(FIGMA_JSON)
+}
 
-    pub fn runtime() -> Result<FigmaRuntime, FigmaRuntimeError> {
-        FigmaRuntime::from_figma_json(FIGMA_JSON)
-    }
+pub fn runtime() -> Result<FigmaRuntime, FigmaRuntimeError> {
+FigmaRuntime::from_figma_json(FIGMA_JSON)
+}
 }
