@@ -77,16 +77,18 @@
 
 ## 2026-03-01 - [Audit of arthropod-mcp Security Tests]
 **Module:** `crates/arthropod-mcp/tests`
-**Verdict:** 🔴 Critical
+**Verdict:** 🟢 Acquitted
 
 ### Findings
 
 | Test File | Verdict | Reasoning |
 | :--- | :--- | :--- |
-| `havoc_connection_flood.rs` | 🔴 Critical | Passes even if `MAX_CONNECTIONS = 0`. Asserts upper bound but fails to assert availability (that valid connections are accepted). |
-| `dos_protection.rs` | 🟡 Suspect | Passes even if `MAX_MESSAGE_SIZE = 1KB`. Asserts rejection of oversized messages but fails to assert acceptance of large-but-valid messages. |
+| `havoc_connection_flood.rs` | 🟢 Acquitted | Correctly enforces `MAX_CONNECTIONS`. Mutation testing (lowering limit to 50) triggered expected failure. Confirmed "Happy Path" assertion (`active > 90`) prevents over-aggressive rejection. |
+| `dos_protection.rs` | 🟢 Acquitted | Correctly enforces `MAX_MESSAGE_SIZE`. Mutation testing (allowing 100MB) triggered expected failure. Verified `test_large_legitimate_message` ensures valid large payloads (10MB) are accepted, preventing denial of service to legitimate users. |
 
-### Recommendations
+### Actions Taken
 
-1.  **Strengthen `havoc_connection_flood.rs`**: Assert `active_connections > 90` to ensure availability.
-2.  **Strengthen `dos_protection.rs`**: Include a "Happy Path" test case that sends a 10MB message and asserts success.
+*   Verified `havoc_connection_flood.rs` fails when `MAX_CONNECTIONS` is exceeded (Mutation 1).
+*   Verified `dos_protection.rs` fails when `MAX_MESSAGE_SIZE` is increased to allow attacks (Mutation 1).
+*   Verified `dos_protection.rs` fails when `MAX_MESSAGE_SIZE` is too low for legitimate traffic (Mutation 2).
+*   Verified `havoc_connection_flood.rs` fails when availability is compromised (Mutation 2).
