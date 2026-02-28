@@ -4,6 +4,7 @@
 //! `cargo run --bin make_bridge -- --input "c:\Users\markm\Downloads\Indie Artist Spotify App.make" --out artifacts/indie_make --decode-json-out artifacts/indie_make/import_from_make.json --generate-rust-out examples/generated/indie_make_generated_module.rs --module-name indie_make_generated --document-fn document --runtime-fn runtime`
 
 use std::time::Instant;
+use std::{fs, path::PathBuf};
 
 use arthropod::figma_runtime::FigmaRuntime;
 use arthropod::prototype_runtime::PrototypeRuntimeEvent;
@@ -15,6 +16,7 @@ use render_engine::{
     NodeId,
     backend::{RenderBackend, WgpuBackend},
 };
+use style_engine::ImageId;
 
 #[allow(dead_code)]
 #[path = "generated/indie_make_generated_module.rs"]
@@ -22,6 +24,7 @@ mod indie_make_generated_module;
 
 const DEFAULT_WIDTH: u32 = 1280;
 const DEFAULT_HEIGHT: u32 = 720;
+const MAKE_IMAGE_DIR: &str = "artifacts/indie_make/images";
 
 struct IndieMakeApp {
     backend: WgpuBackend,
@@ -47,8 +50,9 @@ impl Application for IndieMakeApp {
         let size = window.inner_size();
 
         // SAFETY: backend is dropped before window based on struct field order.
-        let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
+        let mut backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .expect("failed to create backend");
+        register_make_images(&mut backend);
 
         let mut runtime = indie_make_generated_module::indie_make_generated::runtime()
             .expect("failed to initialize generated indie runtime");
@@ -156,4 +160,66 @@ impl Application for IndieMakeApp {
 fn main() {
     env_logger::init();
     plat_core::run::<IndieMakeApp>().expect("failed to run indie generated example");
+}
+
+fn register_make_images(backend: &mut WgpuBackend) {
+    let mut pending = vec![PathBuf::from(MAKE_IMAGE_DIR)];
+    let mut registered = 0usize;
+
+    while let Some(dir) = pending.pop() {
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+
+            let bytes = match fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    eprintln!("failed to read image asset {}: {err}", path.display());
+                    continue;
+                }
+            };
+            let image = match image::load_from_memory(&bytes) {
+                Ok(image) => image.to_rgba8(),
+                Err(err) => {
+                    eprintln!("failed to decode image asset {}: {err}", path.display());
+                    continue;
+                }
+            };
+            let (width, height) = image.dimensions();
+            let image_id = ImageId(figma_image_reference_to_id(name));
+            if let Err(err) =
+                backend.register_image_rgba8(image_id, width, height, image.into_raw())
+            {
+                eprintln!("failed to register image asset {}: {err}", path.display());
+                continue;
+            }
+            registered += 1;
+        }
+    }
+
+    if registered > 0 {
+        eprintln!("registered {registered} make image assets from {MAKE_IMAGE_DIR}");
+    }
+}
+
+fn figma_image_reference_to_id(reference: &str) -> u64 {
+    if let Ok(parsed) = reference.parse::<u64>() {
+        return parsed;
+    }
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in reference.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash | (1_u64 << 63)
 }

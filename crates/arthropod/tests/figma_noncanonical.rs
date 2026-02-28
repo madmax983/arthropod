@@ -105,3 +105,35 @@ fn runtime_renders_fill_paints_with_transform_and_size_bounds() {
         "expected a visible large instance from size/transform-derived bounds"
     );
 }
+
+#[test]
+fn codegen_accepts_code_snapshot_image_paints() {
+    let non_canonical = r#"{
+  "nodes": [
+    {
+      "id": "code-node",
+      "type": { "__enum__": "NodeType", "value": "CODE_INSTANCE" },
+      "size": { "x": 320, "y": 200 },
+      "transform": { "m00": 1, "m01": 0, "m02": 10, "m10": 0, "m11": 1, "m12": 20 },
+      "codeSnapshot": {
+        "paints": [
+          {
+            "type": { "__enum__": "PaintType", "value": "IMAGE" },
+            "image": { "hash": [239, 155, 77, 97], "name": "preview" },
+            "imageScaleMode": { "__enum__": "ImageScaleMode", "value": "STRETCH" }
+          }
+        ]
+      }
+    }
+  ]
+}"#;
+    let options = FigmaCodegenOptions {
+        module_name: "code_snapshot_generated".to_string(),
+        document_fn: "document".to_string(),
+        runtime_fn: "runtime".to_string(),
+    };
+
+    let generated = generate_rust_module_from_json(non_canonical, &options)
+        .expect("codeSnapshot image paints should be accepted in codegen import path");
+    assert!(generated.contains("pub mod code_snapshot_generated"));
+}

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, ItemAlignSelf,
@@ -490,6 +491,7 @@ fn flatten_document_nodes(
 
         ensure_bounds_from_xywh(&mut object);
         normalize_text_style_fields(&mut object);
+        normalize_paint_fields(&mut object);
 
         let children = object
             .remove("children")
@@ -669,6 +671,44 @@ fn normalize_text_style_fields(object: &mut JsonMap<String, JsonValue>) {
 
     if had_style || !style.is_empty() {
         object.insert("style".to_string(), JsonValue::Object(style));
+    }
+}
+
+fn normalize_paint_fields(object: &mut JsonMap<String, JsonValue>) {
+    if !object.contains_key("fills") {
+        if let Some(paints) = object.get("fillPaints").cloned() {
+            object.insert("fills".to_string(), paints);
+        } else if let Some(paints) = object
+            .get("codeSnapshot")
+            .and_then(JsonValue::as_object)
+            .and_then(|snapshot| snapshot.get("paints"))
+            .cloned()
+        {
+            object.insert("fills".to_string(), paints);
+        } else if let Some(color) = object
+            .get("backgroundColor")
+            .cloned()
+            .filter(|_| object.get("backgroundEnabled").and_then(JsonValue::as_bool) != Some(false))
+        {
+            let opacity = object
+                .get("backgroundOpacity")
+                .and_then(JsonValue::as_f64)
+                .and_then(JsonNumber::from_f64)
+                .unwrap_or_else(|| JsonNumber::from(1));
+            let paint = serde_json::json!({
+                "type": "SOLID",
+                "color": color,
+                "opacity": opacity,
+                "visible": true
+            });
+            object.insert("fills".to_string(), JsonValue::Array(vec![paint]));
+        }
+    }
+
+    if !object.contains_key("strokes")
+        && let Some(paints) = object.get("strokePaints").cloned()
+    {
+        object.insert("strokes".to_string(), paints);
     }
 }
 
@@ -902,9 +942,9 @@ struct FigmaNode {
     component_properties: HashMap<String, FigmaComponentProperty>,
     #[serde(default)]
     component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
-    #[serde(default, alias = "fillPaints")]
+    #[serde(default)]
     fills: Vec<FigmaPaint>,
-    #[serde(default, alias = "strokePaints")]
+    #[serde(default)]
     strokes: Vec<FigmaPaint>,
     #[serde(default)]
     stroke_weight: Option<f32>,
@@ -2047,6 +2087,7 @@ impl FigmaImageScaleMode {
 enum FigmaImageIdValue {
     Numeric(u64),
     Text(String),
+    HashBytes(Vec<u8>),
 }
 
 impl FigmaImageIdValue {
@@ -2054,21 +2095,64 @@ impl FigmaImageIdValue {
         match self {
             Self::Numeric(id) => ImageId(*id),
             Self::Text(reference) => ImageId(figma_image_reference_to_id(reference)),
+            Self::HashBytes(bytes) => {
+                let mut hash = String::with_capacity(bytes.len() * 2);
+                for byte in bytes {
+                    let _ = write!(&mut hash, "{byte:02x}");
+                }
+                ImageId(figma_image_reference_to_id(&hash))
+            }
         }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaImageDescriptor {
+    #[serde(default)]
+    hash: Option<Vec<u8>>,
+    #[serde(default, alias = "filename", alias = "name")]
+    reference: Option<String>,
+}
+
+impl FigmaImageDescriptor {
+    fn to_image_id_value(&self) -> Option<FigmaImageIdValue> {
+        if let Some(hash) = self.hash.as_ref().filter(|hash| !hash.is_empty()) {
+            return Some(FigmaImageIdValue::HashBytes(hash.clone()));
+        }
+        self.reference
+            .as_ref()
+            .map(|reference| FigmaImageIdValue::Text(reference.clone()))
     }
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum FigmaImageTransform {
+    Object(FigmaImageTransformObject),
     Matrix3x3([f32; 9]),
     Rows2x3([[f32; 3]; 2]),
     Rows3x3([[f32; 3]; 3]),
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaImageTransformObject {
+    m00: f32,
+    m01: f32,
+    m02: f32,
+    m10: f32,
+    m11: f32,
+    m12: f32,
+}
+
 impl FigmaImageTransform {
     fn to_matrix3x3(&self) -> [f32; 9] {
         match self {
+            Self::Object(object) => [
+                object.m00, object.m01, object.m02, object.m10, object.m11, object.m12, 0.0, 0.0,
+                1.0,
+            ],
             Self::Matrix3x3(matrix) => *matrix,
             Self::Rows2x3([[a, b, tx], [c, d, ty]]) => [*a, *b, *tx, *c, *d, *ty, 0.0, 0.0, 1.0],
             Self::Rows3x3([row0, row1, row2]) => [
@@ -2115,6 +2199,8 @@ enum FigmaPaint {
     Image {
         #[serde(default, alias = "imageId", alias = "imageRef", alias = "imageHash")]
         image_id: Option<FigmaImageIdValue>,
+        #[serde(default)]
+        image: Option<FigmaImageDescriptor>,
         #[serde(default, alias = "scaleMode", alias = "imageScaleMode")]
         scale_mode: Option<FigmaImageScaleMode>,
         #[serde(default, alias = "scalingFactor")]
@@ -2220,6 +2306,7 @@ impl FigmaPaint {
             }
             Self::Image {
                 image_id,
+                image,
                 scale_mode,
                 scaling_factor,
                 transform,
@@ -2228,7 +2315,11 @@ impl FigmaPaint {
                 if !*visible {
                     return None;
                 }
-                let image_id = image_id.as_ref()?;
+                let image_id = image_id.as_ref().cloned().or_else(|| {
+                    image
+                        .as_ref()
+                        .and_then(FigmaImageDescriptor::to_image_id_value)
+                })?;
                 let scale_mode = scale_mode.unwrap_or(FigmaImageScaleMode::Fill);
                 Some(Paint::Image(ImageFill {
                     image_id: image_id.to_image_id(),
