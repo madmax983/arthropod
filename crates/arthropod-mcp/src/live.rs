@@ -72,7 +72,7 @@ pub struct ConnectedApp {
 
 /// Start the TCP server that listens for app connections
 ///
-/// Returns an Arc<Mutex<Option<ConnectedApp>>> that MCP tools can use
+/// Returns an `Arc<Mutex<Option<ConnectedApp>>>` that MCP tools can use
 pub fn start_tcp_server() -> Arc<Mutex<Option<ConnectedApp>>> {
     let (app, _) = start_tcp_server_with_port(MCP_PORT);
     app

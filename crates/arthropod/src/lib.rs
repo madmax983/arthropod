@@ -75,7 +75,7 @@
 //!
 //! ## The Integration Loop
 //!
-//! 1. **Build Phase**: Widgets build a temporary scene graph in a [`WidgetContext`] (re-exported in prelude).
+//! 1. **Build Phase**: Widgets build a temporary scene graph in a [`prelude::WidgetContext`] (re-exported in prelude).
 //! 2. **Integration**: [`App::integrate_widgets`] bridges this state into the ECS, creating entities with components like `Clickable` or `ReactiveColor`.
 //! 3. **Update Loop**: The application loop processes events, updates signals via `flux-state`, and triggers re-renders.
 //!

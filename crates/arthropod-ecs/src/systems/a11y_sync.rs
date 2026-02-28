@@ -4,8 +4,8 @@
 //! ensuring screen readers have up-to-date information.
 //!
 //! Uses gather-apply pattern for parallelization:
-//! - Gather: reads Scene bounds (Res<Scene>) — can overlap with render collection
-//! - Apply: writes A11yTree (ResMut<A11yTree>) — runs after gather
+//! - Gather: reads Scene bounds (`Res<Scene>`) — can overlap with render collection
+//! - Apply: writes A11yTree (`ResMut<A11yTree>`) — runs after gather
 
 use crate::components::{AccessibleNode, OnA11yClick, SceneNodeRef};
 use a11y_engine::{A11yId, A11yTree, ArthropodActionHandler};

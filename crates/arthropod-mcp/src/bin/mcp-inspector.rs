@@ -3,7 +3,7 @@
 //! A tool to inspect and interact with the Arthropod MCP server.
 //!
 //! Usage:
-//!     cargo run --bin mcp-inspector -- [SERVER_CMD] [SERVER_ARGS]...
+//!     cargo run --bin mcp-inspector -- \[SERVER_CMD\] \[SERVER_ARGS\]...
 //!
 //! Example:
 //!     cargo run --bin mcp-inspector -- cargo run --bin arthropod-mcp

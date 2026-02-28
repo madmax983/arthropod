@@ -33,7 +33,7 @@ pub enum SignalEntry {
 ///
 /// This registry allows external tools (like an MCP client) to read and modify
 /// specific signals in the application state. It acts as a bridge between
-/// the reactive [`flux-state`] system and the outside world.
+/// the reactive `flux-state` system and the outside world.
 ///
 /// # Limits
 ///
