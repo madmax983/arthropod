@@ -10,6 +10,66 @@ use serde_json::{Value, json};
 use std::collections::HashSet;
 
 // ============================================================================
+// Shared Helpers
+// ============================================================================
+
+/// Helper to determine the content type of a node as a string.
+/// This encapsulates the logic for distinguishing between Text, RoundedRect, Rect, and Empty.
+fn get_node_content_type(content: &NodeContent) -> &'static str {
+    match content {
+        NodeContent::Styled { style } => {
+            if style.text.is_some() {
+                "Text"
+            } else if !style.corner_radii.is_zero() {
+                "RoundedRect"
+            } else if !style.fills.is_empty() {
+                "Rect"
+            } else {
+                "Empty"
+            }
+        }
+        NodeContent::SolidColor { .. } => "Rect",
+        NodeContent::Empty => "Empty",
+    }
+}
+
+/// Helper to extract detailed content data from a node.
+/// This encapsulates the logic for extracting color, text, and other properties.
+fn extract_node_content_data(content: &NodeContent) -> NodeContentData {
+    match content {
+        NodeContent::Styled { style } => {
+            // Extract color from first fill if present
+            let color = if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
+                [c.x, c.y, c.z, c.w]
+            } else {
+                [0.0, 0.0, 0.0, 1.0]
+            };
+
+            if let Some(ref text_content) = style.text {
+                NodeContentData::Text {
+                    text: text_content.text.clone(),
+                    font_size: text_content.font_size,
+                    color,
+                }
+            } else if !style.corner_radii.is_zero() {
+                NodeContentData::RoundedRect {
+                    color,
+                    corner_radius: style.corner_radii.top_left, // Use top_left as representative
+                }
+            } else if !style.fills.is_empty() {
+                NodeContentData::Rect { color }
+            } else {
+                NodeContentData::Empty
+            }
+        }
+        NodeContent::SolidColor { color } => NodeContentData::Rect {
+            color: color.to_array(),
+        },
+        NodeContent::Empty => NodeContentData::Empty,
+    }
+}
+
+// ============================================================================
 // scene.list_nodes
 // ============================================================================
 
@@ -104,21 +164,7 @@ impl Tool for ListNodesTool {
             }
 
             if let Some(ref content_type) = params.filter.content_type {
-                let node_type = match &node.content {
-                    NodeContent::Styled { style } => {
-                        if style.text.is_some() {
-                            "Text"
-                        } else if !style.corner_radii.is_zero() {
-                            "RoundedRect"
-                        } else if !style.fills.is_empty() {
-                            "Rect"
-                        } else {
-                            "Empty"
-                        }
-                    }
-                    NodeContent::SolidColor { .. } => "Rect",
-                    NodeContent::Empty => "Empty",
-                };
+                let node_type = get_node_content_type(&node.content);
                 if node_type != content_type {
                     continue;
                 }
@@ -136,21 +182,7 @@ impl Tool for ListNodesTool {
                 }
             }
 
-            let content_type = match &node.content {
-                NodeContent::Styled { style } => {
-                    if style.text.is_some() {
-                        "Text"
-                    } else if !style.corner_radii.is_zero() {
-                        "RoundedRect"
-                    } else if !style.fills.is_empty() {
-                        "Rect"
-                    } else {
-                        "Empty"
-                    }
-                }
-                NodeContent::SolidColor { .. } => "Rect",
-                NodeContent::Empty => "Empty",
-            };
+            let content_type = get_node_content_type(&node.content);
 
             nodes.push(NodeSummary {
                 id: node_id.0,
@@ -251,37 +283,7 @@ impl Tool for GetNodeTool {
             .get_node(node_id)
             .ok_or_else(|| anyhow!("Node {} not found", params.id))?;
 
-        let content = match &node.content {
-            NodeContent::Styled { style } => {
-                // Extract color from first fill if present
-                let color = if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
-                    [c.x, c.y, c.z, c.w]
-                } else {
-                    [0.0, 0.0, 0.0, 1.0]
-                };
-
-                if let Some(ref text_content) = style.text {
-                    NodeContentData::Text {
-                        text: text_content.text.clone(),
-                        font_size: text_content.font_size,
-                        color,
-                    }
-                } else if !style.corner_radii.is_zero() {
-                    NodeContentData::RoundedRect {
-                        color,
-                        corner_radius: style.corner_radii.top_left, // Use top_left as representative
-                    }
-                } else if !style.fills.is_empty() {
-                    NodeContentData::Rect { color }
-                } else {
-                    NodeContentData::Empty
-                }
-            }
-            NodeContent::SolidColor { color } => NodeContentData::Rect {
-                color: color.to_array(),
-            },
-            NodeContent::Empty => NodeContentData::Empty,
-        };
+        let content = extract_node_content_data(&node.content);
 
         // Find parent by checking which node has this as a child
         let parent_id = scene
@@ -397,22 +399,7 @@ impl Tool for QueryHierarchyTool {
             *node_count += 1;
 
             let node = scene.get_node(node_id)?;
-
-            let content_type = match &node.content {
-                NodeContent::Styled { style } => {
-                    if style.text.is_some() {
-                        "Text"
-                    } else if !style.corner_radii.is_zero() {
-                        "RoundedRect"
-                    } else if !style.fills.is_empty() {
-                        "Rect"
-                    } else {
-                        "Empty"
-                    }
-                }
-                NodeContent::SolidColor { .. } => "Rect",
-                NodeContent::Empty => "Empty",
-            };
+            let content_type = get_node_content_type(&node.content);
 
             let children: Vec<HierarchyNode> = node
                 .children
