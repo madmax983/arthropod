@@ -28,9 +28,40 @@ pub mod reactive_particles;
 #[cfg(feature = "nova")]
 pub mod kinetic_text;
 
+#[cfg(feature = "nova")]
+pub mod command_palette;
+
 pub mod flux_radar;
 
 // --- Stubs for missing features ---
+
+#[cfg(not(feature = "nova"))]
+pub mod command_palette {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::Component;
+    use std::marker::PhantomData;
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `command_palette` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct CommandPalette;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct CommandRegistry;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct Command;
+}
 
 #[cfg(not(feature = "nova"))]
 pub mod ghost_replay {
