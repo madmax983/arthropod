@@ -32,6 +32,7 @@ use std::sync::{Arc, RwLock};
 pub struct Signal<T> {
     id: NodeId,
     runtime: Arc<Runtime>,
+    handle: Arc<RwLock<T>>,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -43,6 +44,7 @@ pub struct Signal<T> {
 pub struct ReadSignal<T> {
     id: NodeId,
     runtime: Arc<Runtime>,
+    handle: Arc<RwLock<T>>,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -54,6 +56,7 @@ pub struct ReadSignal<T> {
 pub struct WriteSignal<T> {
     id: NodeId,
     runtime: Arc<Runtime>,
+    handle: Arc<RwLock<T>>,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -66,16 +69,7 @@ impl<T: std::fmt::Debug + 'static + Send + Sync> std::fmt::Debug for Signal<T> {
         // Track the dependency so that effects re-run when the signal changes.
         self.runtime.track(self.id);
 
-        let handle = self.runtime.get_signal_handle(self.id);
-
-        let guard = match handle.downcast_ref::<RwLock<T>>() {
-            Some(m) => m.try_read(),
-            None => {
-                return write!(f, "Signal(id: {:?}, value: <type mismatch>)", self.id);
-            }
-        };
-
-        match guard {
+        match self.handle.try_read() {
             Ok(val) => write!(f, "Signal(id: {:?}, value: {:?})", self.id, *val),
             Err(_) => write!(f, "Signal(id: {:?}, value: <locked>)", self.id),
         }
@@ -87,16 +81,7 @@ impl<T: std::fmt::Debug + 'static + Send + Sync> std::fmt::Debug for ReadSignal<
         // Track the dependency so that effects re-run when the signal changes.
         self.runtime.track(self.id);
 
-        let handle = self.runtime.get_signal_handle(self.id);
-
-        let guard = match handle.downcast_ref::<RwLock<T>>() {
-            Some(m) => m.try_read(),
-            None => {
-                return write!(f, "ReadSignal(id: {:?}, value: <type mismatch>)", self.id);
-            }
-        };
-
-        match guard {
+        match self.handle.try_read() {
             Ok(val) => write!(f, "ReadSignal(id: {:?}, value: {:?})", self.id, *val),
             Err(_) => write!(f, "ReadSignal(id: {:?}, value: <locked>)", self.id),
         }
@@ -108,16 +93,7 @@ impl<T: std::fmt::Debug + 'static + Send + Sync> std::fmt::Debug for WriteSignal
         // Track the dependency so that effects re-run when the signal changes.
         self.runtime.track(self.id);
 
-        let handle = self.runtime.get_signal_handle(self.id);
-
-        let guard = match handle.downcast_ref::<RwLock<T>>() {
-            Some(m) => m.try_read(),
-            None => {
-                return write!(f, "WriteSignal(id: {:?}, value: <type mismatch>)", self.id);
-            }
-        };
-
-        match guard {
+        match self.handle.try_read() {
             Ok(val) => write!(f, "WriteSignal(id: {:?}, value: {:?})", self.id, *val),
             Err(_) => write!(f, "WriteSignal(id: {:?}, value: <locked>)", self.id),
         }
@@ -139,10 +115,12 @@ impl<T: 'static + Send + Sync> Signal<T> {
     ///
     /// Panics if the runtime fails to allocate a new signal ID (unlikely).
     pub fn new(runtime: Arc<Runtime>, value: T) -> Self {
-        let id = runtime.create_signal(Arc::new(RwLock::new(value)));
+        let handle = Arc::new(RwLock::new(value));
+        let id = runtime.create_signal(handle.clone());
         Self {
             id,
             runtime,
+            handle,
             _marker: std::marker::PhantomData,
         }
     }
@@ -179,11 +157,13 @@ impl<T: 'static + Send + Sync> Signal<T> {
             ReadSignal {
                 id: self.id,
                 runtime: Arc::clone(&self.runtime),
+                handle: Arc::clone(&self.handle),
                 _marker: std::marker::PhantomData,
             },
             WriteSignal {
                 id: self.id,
                 runtime: Arc::clone(&self.runtime),
+                handle: Arc::clone(&self.handle),
                 _marker: std::marker::PhantomData,
             },
         )
@@ -211,12 +191,8 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let handle = self.runtime.track_and_get_signal(self.id);
-        let guard = handle
-            .downcast_ref::<RwLock<T>>()
-            .expect("Type mismatch")
-            .read()
-            .unwrap();
+        self.runtime.track(self.id);
+        let guard = self.handle.read().unwrap();
         f(&*guard)
     }
 
@@ -238,12 +214,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let handle = self.runtime.get_signal_handle(self.id);
-        let guard = handle
-            .downcast_ref::<RwLock<T>>()
-            .expect("Type mismatch")
-            .read()
-            .unwrap();
+        let guard = self.handle.read().unwrap();
         f(&*guard)
     }
 
@@ -348,12 +319,8 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let handle = self.runtime.track_and_get_signal(self.id);
-        let guard = handle
-            .downcast_ref::<RwLock<T>>()
-            .expect("Type mismatch")
-            .read()
-            .unwrap();
+        self.runtime.track(self.id);
+        let guard = self.handle.read().unwrap();
         f(&*guard)
     }
 
@@ -376,12 +343,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let handle = self.runtime.get_signal_handle(self.id);
-        let guard = handle
-            .downcast_ref::<RwLock<T>>()
-            .expect("Type mismatch")
-            .read()
-            .unwrap();
+        let guard = self.handle.read().unwrap();
         f(&*guard)
     }
 
@@ -415,13 +377,8 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn set(&self, value: T) {
-        let handle = self.runtime.get_signal_handle(self.id);
         {
-            let mut guard = handle
-                .downcast_ref::<RwLock<T>>()
-                .expect("Type mismatch")
-                .write()
-                .unwrap();
+            let mut guard = self.handle.write().unwrap();
             *guard = value;
         }
         self.runtime.notify(self.id);
@@ -453,13 +410,8 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     /// - Panics if the internal lock is poisoned.
     /// - Panics if the stored type does not match `T`.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
-        let handle = self.runtime.get_signal_handle(self.id);
         {
-            let mut guard = handle
-                .downcast_ref::<RwLock<T>>()
-                .expect("Type mismatch")
-                .write()
-                .unwrap();
+            let mut guard = self.handle.write().unwrap();
             f(&mut *guard);
         }
         self.runtime.notify(self.id);

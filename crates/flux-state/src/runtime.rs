@@ -480,6 +480,7 @@ impl Runtime {
     /// # Panics
     ///
     /// Panics if the signal does not exist.
+    #[allow(dead_code)]
     pub(crate) fn get_signal_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let inner = self.inner.lock().unwrap();
         inner
@@ -507,6 +508,7 @@ impl Runtime {
     }
 
     /// Combined operation to track a dependency and get the signal handle in one lock.
+    #[allow(dead_code)]
     pub(crate) fn track_and_get_signal(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
         let mut inner = self.inner.lock().unwrap();
         if let Some(observer) = inner.current_context() {
