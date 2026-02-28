@@ -678,13 +678,6 @@ fn normalize_paint_fields(object: &mut JsonMap<String, JsonValue>) {
     if !object.contains_key("fills") {
         if let Some(paints) = object.get("fillPaints").cloned() {
             object.insert("fills".to_string(), paints);
-        } else if let Some(paints) = object
-            .get("codeSnapshot")
-            .and_then(JsonValue::as_object)
-            .and_then(|snapshot| snapshot.get("paints"))
-            .cloned()
-        {
-            object.insert("fills".to_string(), paints);
         } else if let Some(color) = object
             .get("backgroundColor")
             .cloned()

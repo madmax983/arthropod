@@ -175,10 +175,6 @@ path = "examples/form_syntax_demo.rs"
 name = "riot_waves_generated"
 path = "examples/riot_waves_generated.rs"
 
-[[example]]
-name = "indie_make_generated"
-path = "examples/indie_make_generated.rs"
-
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]
@@ -207,7 +203,6 @@ arthropod = { path = "crates/arthropod" }
 render-engine = { path = "crates/render-engine", features = ["renderdoc"] }
 arthropod-mcp = { path = "crates/arthropod-mcp" }
 arthropod-test = { path = "crates/arthropod-test" }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
