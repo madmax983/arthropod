@@ -20,8 +20,37 @@ use std::sync::Arc;
 /// Below this count, sequential shaping is faster due to thread overhead
 pub(crate) const TEXT_PARALLEL_THRESHOLD: usize = 8;
 
-/// Text node data for shaping: (node, text, font_size, style)
-pub(crate) type TextNodeData<'a> = (&'a SceneNode, &'a str, f32, &'a style_engine::VisualStyle);
+/// Text node data for shaping: (node, text, font_size, effective_opacity, style)
+pub(crate) type TextNodeData<'a> = (
+    &'a SceneNode,
+    &'a str,
+    f32,
+    f32,
+    &'a style_engine::VisualStyle,
+);
+
+/// Compute cumulative node opacity by traversing ancestor chain to the root.
+///
+/// This models group/frame opacity semantics where ancestor opacity attenuates
+/// all descendant rendering.
+pub(crate) fn inherited_node_opacity(scene: &Scene, node_id: crate::NodeId) -> f32 {
+    let mut opacity = 1.0_f32;
+    let mut current = Some(node_id);
+    while let Some(id) = current {
+        let Some(node) = scene.get_node(id) else {
+            break;
+        };
+        if !node.visible {
+            return 0.0;
+        }
+        opacity *= node.opacity.clamp(0.0, 1.0);
+        if opacity <= 0.0 {
+            return 0.0;
+        }
+        current = node.parent;
+    }
+    opacity
+}
 
 #[derive(Clone, Copy)]
 pub(crate) enum TextFill {
@@ -107,7 +136,7 @@ pub(crate) fn resolve_text_fill(
     opacity: f32,
     text_bounds: [f32; 4],
 ) -> TextFill {
-    let Some(fill) = style.fills.first() else {
+    let Some(fill) = pick_text_fill_paint(style) else {
         return TextFill::Solid(glam::Vec4::new(0.0, 0.0, 0.0, opacity));
     };
 
@@ -183,6 +212,34 @@ pub(crate) fn resolve_text_fill(
         }
         style_engine::Paint::Image(_) => TextFill::Solid(glam::Vec4::new(0.0, 0.0, 0.0, opacity)),
     }
+}
+
+fn paint_has_visible_alpha(paint: &style_engine::Paint) -> bool {
+    match paint {
+        style_engine::Paint::Solid(color) => color.w > f32::EPSILON,
+        style_engine::Paint::Linear(gradient) => {
+            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
+        }
+        style_engine::Paint::Radial(gradient) => {
+            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
+        }
+        style_engine::Paint::Angular(gradient) => {
+            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
+        }
+        style_engine::Paint::Diamond(gradient) => {
+            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
+        }
+        style_engine::Paint::Image(_) => true,
+    }
+}
+
+fn pick_text_fill_paint(style: &style_engine::VisualStyle) -> Option<&style_engine::Paint> {
+    style
+        .fills
+        .iter()
+        .rev()
+        .find(|paint| paint_has_visible_alpha(paint))
+        .or_else(|| style.fills.first())
 }
 
 pub(crate) fn resolve_path_fill_paints(
@@ -304,7 +361,11 @@ fn collect_instances_impl<'a>(
     let mut path_batches = Vec::new();
 
     for (node_id, node) in scene.iter_visuals_custom(stack) {
-        if !node.visible || node.opacity <= 0.0 {
+        if !node.visible {
+            continue;
+        }
+        let inherited_opacity = inherited_node_opacity(scene, node_id);
+        if inherited_opacity <= 0.0 {
             continue;
         }
 
@@ -313,7 +374,7 @@ fn collect_instances_impl<'a>(
                 if skip_multipass && style_requires_multipass(style) {
                     continue;
                 }
-                let effective_opacity = node.opacity * style.opacity;
+                let effective_opacity = inherited_opacity * style.opacity;
                 let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds)
                 else {
                     continue;
@@ -469,6 +530,7 @@ fn collect_instances_impl<'a>(
                         node,
                         text_content.text.as_str(),
                         text_content.font_size,
+                        effective_opacity,
                         style.as_ref(),
                     ));
                 }
@@ -492,7 +554,7 @@ fn collect_instances_impl<'a>(
             NodeContent::SolidColor { color } => {
                 if let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) {
                     let mut final_color = color.to_array();
-                    final_color[3] *= node.opacity;
+                    final_color[3] *= inherited_opacity;
 
                     instances.push(PrimitiveInstance::solid(
                         [render_bounds.x, render_bounds.y],
@@ -682,4 +744,37 @@ pub(crate) fn collect_style_batches_for_bounds(
     }
 
     (instances, path_batches)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_text_fill_paint;
+    use glam::Vec4;
+    use style_engine::{Paint, VisualStyle};
+
+    #[test]
+    fn pick_text_fill_prefers_topmost_non_transparent_solid() {
+        let style = VisualStyle::new()
+            .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)));
+
+        let paint = pick_text_fill_paint(&style).expect("expected a text fill");
+        let Paint::Solid(color) = paint else {
+            panic!("expected top text fill to be solid");
+        };
+        assert_eq!(*color, Vec4::new(1.0, 1.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn pick_text_fill_skips_fully_transparent_top_solid() {
+        let style = VisualStyle::new()
+            .fill(Paint::solid(Vec4::new(0.2, 0.3, 0.4, 1.0)))
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 0.0)));
+
+        let paint = pick_text_fill_paint(&style).expect("expected fallback text fill");
+        let Paint::Solid(color) = paint else {
+            panic!("expected fallback text fill to be solid");
+        };
+        assert_eq!(*color, Vec4::new(0.2, 0.3, 0.4, 1.0));
+    }
 }

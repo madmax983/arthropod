@@ -24,11 +24,13 @@ fn create_primitive_instances_impl(
 ) -> Vec<PrimitiveInstance> {
     let mut instances = Vec::new();
 
-    // Skip rendering background for text nodes (Phase 2+ will render actual glyphs)
-    // Text nodes use fills for text color, not background
-    if style.text.is_some() {
-        return instances;
-    }
+    // Text node fills are glyph paints, not rectangular background paints.
+    // Glyph rendering consumes these fills in `instance_collector`.
+    let fills_to_render: &[Paint] = if style.text.is_some() {
+        &[]
+    } else {
+        &style.fills
+    };
 
     // 1. Render shadows FIRST (behind everything)
     for effect in &style.effects {
@@ -65,7 +67,7 @@ fn create_primitive_instances_impl(
     }
 
     // 2. Render fills (solid or gradient backgrounds)
-    for fill in &style.fills {
+    for fill in fills_to_render {
         let fill_instance = if let Some(pipeline) = pipeline.as_mut() {
             create_fill_instance(
                 pipeline,
@@ -622,6 +624,23 @@ mod tests {
         assert_eq!(instances[0].size, [100.0, 50.0]);
         assert_eq!(instances[0].color, [1.0, 0.0, 0.0, 1.0]);
         assert_eq!(instances[0].corner_radii, [12.0, 12.0, 12.0, 12.0]);
+    }
+
+    #[test]
+    fn test_text_nodes_do_not_emit_background_fill_instances() {
+        let style = VisualStyle::new()
+            .text(style_engine::TextContent::new("SCUM".to_string(), 72.0))
+            .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)));
+
+        let instances =
+            create_primitive_instances(&style, Vec2::new(10.0, 20.0), Vec2::new(100.0, 50.0), 1.0);
+
+        assert_eq!(
+            instances.len(),
+            0,
+            "text-node fills should be consumed by glyph rendering, not rectangle instances"
+        );
     }
 
     #[test]
