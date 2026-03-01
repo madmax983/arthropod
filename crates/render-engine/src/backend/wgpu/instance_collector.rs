@@ -237,7 +237,6 @@ fn pick_text_fill_paint(style: &style_engine::VisualStyle) -> Option<&style_engi
     style
         .fills
         .iter()
-        .rev()
         .find(|paint| paint_has_visible_alpha(paint))
         .or_else(|| style.fills.first())
 }
@@ -753,27 +752,27 @@ mod tests {
     use style_engine::{Paint, VisualStyle};
 
     #[test]
-    fn pick_text_fill_prefers_topmost_non_transparent_solid() {
+    fn pick_text_fill_prefers_first_non_transparent_solid() {
         let style = VisualStyle::new()
             .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
             .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)));
 
         let paint = pick_text_fill_paint(&style).expect("expected a text fill");
         let Paint::Solid(color) = paint else {
-            panic!("expected top text fill to be solid");
+            panic!("expected selected text fill to be solid");
         };
-        assert_eq!(*color, Vec4::new(1.0, 1.0, 1.0, 1.0));
+        assert_eq!(*color, Vec4::new(0.0, 0.0, 0.0, 1.0));
     }
 
     #[test]
-    fn pick_text_fill_skips_fully_transparent_top_solid() {
+    fn pick_text_fill_skips_fully_transparent_first_solid() {
         let style = VisualStyle::new()
-            .fill(Paint::solid(Vec4::new(0.2, 0.3, 0.4, 1.0)))
-            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 0.0)));
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 0.0)))
+            .fill(Paint::solid(Vec4::new(0.2, 0.3, 0.4, 1.0)));
 
-        let paint = pick_text_fill_paint(&style).expect("expected fallback text fill");
+        let paint = pick_text_fill_paint(&style).expect("expected selected text fill");
         let Paint::Solid(color) = paint else {
-            panic!("expected fallback text fill to be solid");
+            panic!("expected selected text fill to be solid");
         };
         assert_eq!(*color, Vec4::new(0.2, 0.3, 0.4, 1.0));
     }

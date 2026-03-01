@@ -193,6 +193,38 @@ fn apply_blend(mode: u32, src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
     }
 }
 
+fn linear_to_srgb_channel(channel: f32) -> f32 {
+    let c = clamp(channel, 0.0, 1.0);
+    if c <= 0.0031308 {
+        return c * 12.92;
+    }
+    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+}
+
+fn srgb_to_linear_channel(channel: f32) -> f32 {
+    let c = clamp(channel, 0.0, 1.0);
+    if c <= 0.04045 {
+        return c / 12.92;
+    }
+    return pow((c + 0.055) / 1.055, 2.4);
+}
+
+fn linear_to_srgb(rgb: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        linear_to_srgb_channel(rgb.x),
+        linear_to_srgb_channel(rgb.y),
+        linear_to_srgb_channel(rgb.z),
+    );
+}
+
+fn srgb_to_linear(rgb: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        srgb_to_linear_channel(rgb.x),
+        srgb_to_linear_channel(rgb.y),
+        srgb_to_linear_channel(rgb.z),
+    );
+}
+
 fn unpremultiply(color: vec4<f32>) -> vec3<f32> {
     if color.a <= 1e-6 {
         return vec3<f32>(0.0);
@@ -224,7 +256,12 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     // blend-mode math, then re-premultiply in the final output.
     let src_rgb = unpremultiply(src);
     let dst_rgb = unpremultiply(dst);
-    let blended_rgb = apply_blend(blend.blend_mode, src_rgb, dst_rgb);
+    let blended_srgb = apply_blend(
+        blend.blend_mode,
+        linear_to_srgb(src_rgb),
+        linear_to_srgb(dst_rgb),
+    );
+    let blended_rgb = srgb_to_linear(blended_srgb);
 
     // Porter-Duff source-over with blend-mode color function:
     // Co = as*(1-ab)*Cs + as*ab*B(Cb,Cs) + (1-as)*ab*Cb
