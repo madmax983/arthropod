@@ -14,7 +14,7 @@ pub mod visual;
 
 pub use blend::BlendMode;
 pub use corner::CornerRadii;
-pub use effect::{BackgroundBlur, DropShadow, Effect, InnerShadow, LayerBlur};
+pub use effect::{BackgroundBlur, ColorFilter, DropShadow, Effect, InnerShadow, LayerBlur};
 pub use paint::{
     AngularGradient, Color, ColorStop, DiamondGradient, GradientInterpolationMode, ImageFill,
     ImageId, ImageScaleMode, LinearGradient, Paint, RadialGradient,

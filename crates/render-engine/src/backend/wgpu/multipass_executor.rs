@@ -4,16 +4,21 @@ use crate::backend::wgpu::GLYPH_ATLAS_SIZE;
 use crate::backend::wgpu::clipping::{clipped_bounds_for_node, rect_to_scissor_bounds};
 use crate::backend::wgpu::context::WgpuContext;
 use crate::backend::wgpu::effects::{
-    EffectPassKind, backdrop_capture_bounds, classify_effect_passes, style_requires_multipass,
+    EffectPassKind, backdrop_capture_bounds, classify_effect_passes, color_filter_is_identity,
+    style_requires_multipass,
 };
 use crate::backend::wgpu::instance_collector::{
     BatchCollectionContext, TEXT_PARALLEL_THRESHOLD, apply_text_fill_to_glyph, collect_instances,
-    collect_instances_excluding_multipass, collect_style_batches_for_bounds, resolve_text_fill,
+    collect_instances_excluding_multipass, collect_style_batches_for_bounds,
+    inherited_node_opacity, resolve_text_fill,
 };
 use crate::backend::wgpu::path_interner::PathInterner;
 use crate::backend::wgpu::pipelines::blend_pipeline::{BlendParams, BlendPipeline};
 use crate::backend::wgpu::pipelines::blur_pipeline::{
     BlurDirection, BlurParams, BlurPipeline, select_blur_tier,
+};
+use crate::backend::wgpu::pipelines::color_filter_pipeline::{
+    ColorFilterParams, ColorFilterPipeline,
 };
 use crate::backend::wgpu::pipelines::path_pipeline::{PathBatch, PathPipeline, TessellationCache};
 use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
@@ -31,6 +36,7 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) path_pipeline: &'a mut PathPipeline,
     pub(crate) blur_pipeline: &'a mut BlurPipeline,
     pub(crate) blend_pipeline: &'a mut BlendPipeline,
+    pub(crate) color_filter_pipeline: &'a mut ColorFilterPipeline,
     pub(crate) effect_target_pool: &'a mut RenderTargetPool,
     pub(crate) effect_sampler: &'a wgpu::Sampler,
     pub(crate) tessellation_cache: &'a mut TessellationCache,
@@ -68,6 +74,7 @@ impl<'a> MultipassRenderer<'a> {
                     | EffectPassKind::BackgroundCapture
                     | EffectPassKind::BlurHorizontal
                     | EffectPassKind::BlurVertical
+                    | EffectPassKind::ColorFilter
                     | EffectPassKind::BlendComposite
                     | EffectPassKind::InnerShadow
             )
@@ -108,12 +115,19 @@ impl<'a> MultipassRenderer<'a> {
             let crate::NodeContent::Styled { style } = &node.content else {
                 continue;
             };
-            if !node.visible || node.opacity <= 0.0 {
+            if !node.visible {
+                continue;
+            }
+            let inherited_opacity = inherited_node_opacity(scene, node_id);
+            if inherited_opacity <= 0.0 {
                 continue;
             }
 
             let style = style.as_ref().clone();
-            let effective_opacity = node.opacity * style.opacity;
+            let effective_opacity = inherited_opacity * style.opacity;
+            if effective_opacity <= 0.0 {
+                continue;
+            }
             let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) else {
                 continue;
             };
@@ -132,6 +146,14 @@ impl<'a> MultipassRenderer<'a> {
             let background_blur_radius = style.effects.iter().find_map(|effect| match effect {
                 style_engine::Effect::BackgroundBlur(blur) if blur.visible && blur.radius > 0.0 => {
                     Some(blur.radius)
+                }
+                _ => None,
+            });
+            let color_filter = style.effects.iter().find_map(|effect| match effect {
+                style_engine::Effect::ColorFilter(filter)
+                    if filter.visible && !color_filter_is_identity(*filter) =>
+                {
+                    Some(*filter)
                 }
                 _ => None,
             });
@@ -162,6 +184,12 @@ impl<'a> MultipassRenderer<'a> {
                 .context
                 .get_render_target(src_handle)
                 .expect("missing src render target texture")
+                .color_texture
+                .clone();
+            let tmp_texture = self
+                .context
+                .get_render_target(tmp_handle)
+                .expect("missing temp render target texture")
                 .color_texture
                 .clone();
             let dst_texture = self
@@ -203,6 +231,11 @@ impl<'a> MultipassRenderer<'a> {
                 let _ = select_blur_tier(radius);
                 self.run_blur_pass(&src_view, &tmp_view, radius, BlurDirection::Horizontal);
                 self.run_blur_pass(&tmp_view, &src_view, radius, BlurDirection::Vertical);
+            }
+
+            if let Some(filter) = color_filter {
+                self.run_color_filter_pass(&src_view, &tmp_view, filter);
+                self.copy_texture_full_frame(&tmp_texture, &src_texture);
             }
 
             self.copy_texture_full_frame(surface_texture, &dst_texture);
@@ -417,6 +450,51 @@ impl<'a> MultipassRenderer<'a> {
         self.context.queue.submit(std::iter::once(encoder.finish()));
     }
 
+    pub(crate) fn run_color_filter_pass(
+        &mut self,
+        source_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+        filter: style_engine::ColorFilter,
+    ) {
+        self.color_filter_pipeline
+            .update_params(&self.context.queue, ColorFilterParams::new(filter));
+        let bind_group = self.color_filter_pipeline.create_bind_group(
+            &self.context.device,
+            source_view,
+            self.effect_sampler,
+        );
+
+        let mut encoder =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Multipass Color Filter Encoder"),
+                });
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Multipass Color Filter Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+
+        self.color_filter_pipeline
+            .render(&mut render_pass, &bind_group);
+
+        drop(render_pass);
+        self.context.queue.submit(std::iter::once(encoder.finish()));
+    }
+
     pub(crate) fn copy_texture_full_frame(&self, src: &wgpu::Texture, dst: &wgpu::Texture) {
         let mut encoder =
             self.context
@@ -486,8 +564,8 @@ impl<'a> MultipassRenderer<'a> {
                 // Parallel shaping
                 raw_text_nodes
                     .par_iter()
-                    .filter(|(_, text, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, style)| {
+                    .filter(|(_, text, _, _, _)| !text.is_empty())
+                    .map(|(node, text, font_size, effective_opacity, style)| {
                         let shaped = shape_text_parallel(text, *font_size);
                         let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
                         let text_bounds = [
@@ -496,21 +574,15 @@ impl<'a> MultipassRenderer<'a> {
                             node.bounds.width,
                             node.bounds.height,
                         ];
-                        (
-                            position,
-                            node.opacity * style.opacity,
-                            text_bounds,
-                            *style,
-                            shaped,
-                        )
+                        (position, *effective_opacity, text_bounds, *style, shaped)
                     })
                     .collect()
             } else {
                 // Sequential shaping for small counts
                 raw_text_nodes
                     .iter()
-                    .filter(|(_, text, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, style)| {
+                    .filter(|(_, text, _, _, _)| !text.is_empty())
+                    .map(|(node, text, font_size, effective_opacity, style)| {
                         let shaped = self
                             .text_renderer
                             .text_engine_mut()
@@ -522,13 +594,7 @@ impl<'a> MultipassRenderer<'a> {
                             node.bounds.width,
                             node.bounds.height,
                         ];
-                        (
-                            position,
-                            node.opacity * style.opacity,
-                            text_bounds,
-                            *style,
-                            shaped,
-                        )
+                        (position, *effective_opacity, text_bounds, *style, shaped)
                     })
                     .collect()
             };
@@ -599,7 +665,10 @@ pub(crate) fn collect_multipass_node_ids(
     scene
         .iter_visuals_custom(stack)
         .filter_map(|(node_id, node)| {
-            if !node.visible || node.opacity <= 0.0 {
+            if !node.visible {
+                return None;
+            }
+            if inherited_node_opacity(scene, node_id) <= 0.0 {
                 return None;
             }
             match &node.content {
@@ -617,8 +686,11 @@ pub(crate) fn classify_scene_effect_kinds(
     use crate::NodeContent;
 
     let mut kinds = Vec::new();
-    for (_, node) in scene.iter_visuals_custom(stack) {
-        if !node.visible || node.opacity <= 0.0 {
+    for (node_id, node) in scene.iter_visuals_custom(stack) {
+        if !node.visible {
+            continue;
+        }
+        if inherited_node_opacity(scene, node_id) <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {
@@ -634,8 +706,11 @@ pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<crate::NodeId
     use style_engine::Effect;
 
     let mut max_radius = 0.0f32;
-    for (_, node) in scene.iter_visuals_custom(stack) {
-        if !node.visible || node.opacity <= 0.0 {
+    for (node_id, node) in scene.iter_visuals_custom(stack) {
+        if !node.visible {
+            continue;
+        }
+        if inherited_node_opacity(scene, node_id) <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {
@@ -668,8 +743,11 @@ pub(crate) fn collect_background_capture_bounds(
     let mut bounds = Vec::new();
     let frame = [0, 0, frame_width, frame_height];
 
-    for (_, node) in scene.iter_visuals_custom(stack) {
-        if !node.visible || node.opacity <= 0.0 {
+    for (node_id, node) in scene.iter_visuals_custom(stack) {
+        if !node.visible {
+            continue;
+        }
+        if inherited_node_opacity(scene, node_id) <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {

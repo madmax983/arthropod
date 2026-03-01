@@ -1,5 +1,6 @@
 pub mod blend_pipeline;
 pub mod blur_pipeline;
+pub mod color_filter_pipeline;
 pub mod gradient_atlas;
 pub mod path_pipeline;
 pub mod primitive_builder;

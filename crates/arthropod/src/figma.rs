@@ -9,11 +9,11 @@ use render_engine::{NodeContent, NodeId, Scene, SceneNode, Vec2, Vec4};
 use serde::Deserialize;
 use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
 use style_engine::{
-    BackgroundBlur, BlendMode, ColorStop, CornerRadii, DropShadow, Effect, FontStyle, ImageFill,
-    ImageId, ImageScaleMode, InnerShadow, LayerBlur, LineHeight, LinearGradient, MaskType, Paint,
-    RadialGradient, SideWeights, StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle, TextAlign,
-    TextAlignVertical, TextAutoResize, TextCase, TextContent, TextDecoration, TextOverflow,
-    VectorPath, VisualStyle, WindingRule,
+    BackgroundBlur, BlendMode, ColorFilter, ColorStop, CornerRadii, DropShadow, Effect, FontStyle,
+    ImageFill, ImageId, ImageScaleMode, InnerShadow, LayerBlur, LineHeight, LinearGradient,
+    MaskType, Paint, RadialGradient, SideWeights, StrokeAlign, StrokeCap, StrokeJoin, StrokeStyle,
+    TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextContent, TextDecoration,
+    TextOverflow, VectorPath, VisualStyle, WindingRule,
 };
 use thiserror::Error;
 
@@ -1211,6 +1211,13 @@ impl FigmaNode {
         for fill in self.fills.iter().filter_map(FigmaPaint::to_paint) {
             style = style.fill(fill);
         }
+        for filter_effect in self
+            .fills
+            .iter()
+            .filter_map(FigmaPaint::to_color_filter_effect)
+        {
+            style = style.effect(filter_effect);
+        }
         if let Some(fill_geometry) = &self.fill_geometry {
             let paths: Vec<_> = fill_geometry
                 .iter()
@@ -2155,6 +2162,48 @@ impl FigmaImageTransform {
     }
 }
 
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigmaImageFilter {
+    #[serde(default)]
+    grayscale: Option<f32>,
+    #[serde(default)]
+    contrast: Option<f32>,
+    #[serde(default)]
+    invert: Option<f32>,
+}
+
+impl FigmaImageFilter {
+    fn to_color_filter(self) -> Option<ColorFilter> {
+        let grayscale = self
+            .grayscale
+            .filter(|value| value.is_finite())
+            .map_or(0.0, |value| value.clamp(0.0, 1.0));
+        let contrast = self
+            .contrast
+            .filter(|value| value.is_finite())
+            .map_or(1.0, |value| value.max(0.0));
+        let invert = self
+            .invert
+            .filter(|value| value.is_finite())
+            .map_or(0.0, |value| value.clamp(0.0, 1.0));
+
+        let is_identity = grayscale <= f32::EPSILON
+            && (contrast - 1.0).abs() <= f32::EPSILON
+            && invert <= f32::EPSILON;
+        if is_identity {
+            return None;
+        }
+
+        Some(ColorFilter {
+            grayscale,
+            contrast,
+            invert,
+            visible: true,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 enum FigmaPaint {
@@ -2200,6 +2249,8 @@ enum FigmaPaint {
         scaling_factor: Option<f32>,
         #[serde(default, alias = "imageTransform")]
         transform: Option<FigmaImageTransform>,
+        #[serde(default, alias = "imageFilter")]
+        image_filter: Option<FigmaImageFilter>,
         #[serde(default = "default_visible")]
         visible: bool,
     },
@@ -2303,6 +2354,7 @@ impl FigmaPaint {
                 scale_mode,
                 scaling_factor,
                 transform,
+                image_filter: _,
                 visible,
             } => {
                 if !*visible {
@@ -2326,6 +2378,23 @@ impl FigmaPaint {
             }
             Self::Unsupported => None,
         }
+    }
+
+    fn to_color_filter_effect(&self) -> Option<Effect> {
+        let Self::Image {
+            image_filter,
+            visible,
+            ..
+        } = self
+        else {
+            return None;
+        };
+        if !*visible {
+            return None;
+        }
+        image_filter
+            .and_then(|filter| filter.to_color_filter())
+            .map(Effect::ColorFilter)
     }
 }
 

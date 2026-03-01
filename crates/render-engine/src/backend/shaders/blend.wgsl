@@ -193,11 +193,11 @@ fn apply_blend(mode: u32, src: vec3<f32>, dst: vec3<f32>) -> vec3<f32> {
     }
 }
 
-fn unpremultiply(rgba: vec4<f32>) -> vec3<f32> {
-    if rgba.a <= 1e-6 {
+fn unpremultiply(color: vec4<f32>) -> vec3<f32> {
+    if color.a <= 1e-6 {
         return vec3<f32>(0.0);
     }
-    return rgba.rgb / rgba.a;
+    return color.rgb / color.a;
 }
 
 @vertex
@@ -219,6 +219,9 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let src = textureSample(src_tex, tex_smp, input.uv);
     let dst = textureSample(dst_tex, tex_smp, input.uv);
 
+    // Offscreen targets are stored as premultiplied color due fixed-function alpha
+    // blending in primitive/path passes. Convert back to straight color for
+    // blend-mode math, then re-premultiply in the final output.
     let src_rgb = unpremultiply(src);
     let dst_rgb = unpremultiply(dst);
     let blended_rgb = apply_blend(blend.blend_mode, src_rgb, dst_rgb);

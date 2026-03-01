@@ -3,10 +3,13 @@
 //! Regenerate the embedded module with:
 //! `cargo run --bin figma_codegen -- --input riot_waves.json --output examples/generated/riot_waves_generated_module.rs --module-name riot_waves_generated --document-fn document --runtime-fn runtime`
 
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use arthropod::figma_runtime::FigmaRuntime;
 use arthropod::prototype_runtime::PrototypeRuntimeEvent;
+use arthropod_test::visual_test::load_image;
 use plat_core::{
     Application, ControlFlow, ElementState, Event, EventLoop, MouseButton, Size, Window,
     WindowConfig, WindowEvent, WindowId,
@@ -15,13 +18,30 @@ use render_engine::{
     NodeId,
     backend::{RenderBackend, WgpuBackend},
 };
+use serde_json::Value as JsonValue;
+use style_engine::ImageId;
 
 #[allow(dead_code)]
 #[path = "generated/riot_waves_generated_module.rs"]
 mod riot_waves_generated_module;
 
-const DEFAULT_WIDTH: u32 = 1280;
-const DEFAULT_HEIGHT: u32 = 720;
+const DEFAULT_WIDTH: u32 = 1366;
+const DEFAULT_HEIGHT: u32 = 884;
+const APPLY_RUNTIME_LAYOUT: bool = false;
+
+#[derive(Debug, Clone, PartialEq)]
+struct GeneratedImageAsset {
+    image_ref: String,
+    source_ref: String,
+    filter: Option<ImageFilterSpec>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+struct ImageFilterSpec {
+    grayscale: Option<f32>,
+    contrast: Option<f32>,
+    invert: Option<f32>,
+}
 
 struct RiotWavesApp {
     backend: WgpuBackend,
@@ -49,10 +69,14 @@ impl Application for RiotWavesApp {
         // SAFETY: backend is dropped before window based on struct field order.
         let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .expect("failed to create backend");
+        let mut backend = backend;
+        register_generated_images(&mut backend);
 
         let mut runtime = riot_waves_generated_module::riot_waves_generated::runtime()
             .expect("failed to initialize generated riot_waves runtime");
-        runtime.apply_layout(size.width as f32, size.height as f32);
+        if APPLY_RUNTIME_LAYOUT {
+            runtime.apply_layout(size.width as f32, size.height as f32);
+        }
 
         window.request_redraw();
 
@@ -78,8 +102,10 @@ impl Application for RiotWavesApp {
                 ..
             } => {
                 self.backend.resize(size.width, size.height);
-                self.runtime
-                    .apply_layout(size.width as f32, size.height as f32);
+                if APPLY_RUNTIME_LAYOUT {
+                    self.runtime
+                        .apply_layout(size.width as f32, size.height as f32);
+                }
                 self.window.request_redraw();
             }
             Event::Window {
@@ -153,7 +179,565 @@ impl Application for RiotWavesApp {
     }
 }
 
+fn register_generated_images(backend: &mut WgpuBackend) {
+    let assets =
+        collect_image_assets(riot_waves_generated_module::riot_waves_generated::FIGMA_JSON);
+    if assets.is_empty() {
+        return;
+    }
+
+    let roots = image_search_roots();
+    let mut loaded = 0usize;
+    let mut missing = Vec::new();
+    let mut failed = 0usize;
+
+    for asset in assets {
+        let has_image_filter = asset.filter.is_some();
+        let image_id = ImageId(figma_image_reference_to_id(&asset.image_ref));
+        if let Some((rgba, width, height)) = load_procedural_image(&asset.source_ref, &roots) {
+            if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
+                eprintln!(
+                    "warning: failed to register procedural image `{}` for `{}`: {err}",
+                    asset.source_ref, asset.image_ref
+                );
+                failed += 1;
+            } else {
+                loaded += 1;
+            }
+            continue;
+        }
+
+        let Some(path) = resolve_image_path_with_roots(&asset.source_ref, &roots) else {
+            missing.push(asset.source_ref.clone());
+            continue;
+        };
+
+        match load_image(&path) {
+            Ok((rgba, width, height)) => {
+                if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
+                    eprintln!(
+                        "warning: failed to register image `{}` for `{}`: {err}",
+                        path.display(),
+                        asset.image_ref
+                    );
+                    failed += 1;
+                } else {
+                    if has_image_filter {
+                        // `imageFilter` now maps to a renderer-side color-filter multipass effect.
+                    }
+                    loaded += 1;
+                }
+            }
+            Err(err) => {
+                eprintln!(
+                    "warning: failed to decode image `{}` for `{}`: {err}",
+                    path.display(),
+                    asset.source_ref
+                );
+                failed += 1;
+            }
+        }
+    }
+
+    if !missing.is_empty() {
+        for source_ref in &missing {
+            eprintln!("warning: image source `{source_ref}` not found on disk");
+        }
+    }
+
+    eprintln!(
+        "riot_waves_generated: loaded {loaded} image(s), {} missing, {failed} failed",
+        missing.len()
+    );
+}
+
+fn collect_image_assets(figma_json: &str) -> Vec<GeneratedImageAsset> {
+    let Ok(root) = serde_json::from_str::<JsonValue>(figma_json) else {
+        return Vec::new();
+    };
+    let mut dedupe = BTreeSet::new();
+    let mut assets = Vec::new();
+    collect_image_assets_recursive(&root, &mut dedupe, &mut assets);
+    assets
+}
+
+fn collect_image_assets_recursive(
+    value: &JsonValue,
+    dedupe: &mut BTreeSet<String>,
+    assets: &mut Vec<GeneratedImageAsset>,
+) {
+    match value {
+        JsonValue::Object(object) => {
+            if object
+                .get("type")
+                .and_then(JsonValue::as_str)
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("IMAGE"))
+                && let Some(image_ref) = object.get("imageRef").and_then(JsonValue::as_str)
+            {
+                let source_ref = object
+                    .get("imageSourceRef")
+                    .and_then(JsonValue::as_str)
+                    .unwrap_or(image_ref);
+                if likely_path_reference(source_ref) && dedupe.insert(image_ref.to_string()) {
+                    assets.push(GeneratedImageAsset {
+                        image_ref: image_ref.to_string(),
+                        source_ref: source_ref.to_string(),
+                        filter: object.get("imageFilter").and_then(parse_image_filter_spec),
+                    });
+                }
+            }
+            for child in object.values() {
+                collect_image_assets_recursive(child, dedupe, assets);
+            }
+        }
+        JsonValue::Array(items) => {
+            for child in items {
+                collect_image_assets_recursive(child, dedupe, assets);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn parse_image_filter_spec(value: &JsonValue) -> Option<ImageFilterSpec> {
+    let JsonValue::Object(object) = value else {
+        return None;
+    };
+    let spec = ImageFilterSpec {
+        grayscale: object
+            .get("grayscale")
+            .and_then(JsonValue::as_f64)
+            .map(|v| v as f32),
+        contrast: object
+            .get("contrast")
+            .and_then(JsonValue::as_f64)
+            .map(|v| v as f32),
+        invert: object
+            .get("invert")
+            .and_then(JsonValue::as_f64)
+            .map(|v| v as f32),
+    };
+    if spec == ImageFilterSpec::default() {
+        None
+    } else {
+        Some(spec)
+    }
+}
+
+fn likely_path_reference(value: &str) -> bool {
+    value.contains('/') || value.contains('\\')
+}
+
+#[cfg(test)]
+fn apply_image_filter(mut rgba: Vec<u8>, filter: ImageFilterSpec) -> Vec<u8> {
+    for pixel in rgba.chunks_exact_mut(4) {
+        let mut r = pixel[0] as f32 / 255.0;
+        let mut g = pixel[1] as f32 / 255.0;
+        let mut b = pixel[2] as f32 / 255.0;
+
+        if let Some(amount) = filter.grayscale {
+            let a = amount.clamp(0.0, 1.0);
+            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            r = r * (1.0 - a) + luma * a;
+            g = g * (1.0 - a) + luma * a;
+            b = b * (1.0 - a) + luma * a;
+        }
+
+        if let Some(contrast) = filter.contrast {
+            let c = contrast.max(0.0);
+            r = ((r - 0.5) * c + 0.5).clamp(0.0, 1.0);
+            g = ((g - 0.5) * c + 0.5).clamp(0.0, 1.0);
+            b = ((b - 0.5) * c + 0.5).clamp(0.0, 1.0);
+        }
+
+        if let Some(invert) = filter.invert {
+            let a = invert.clamp(0.0, 1.0);
+            r = r * (1.0 - a) + (1.0 - r) * a;
+            g = g * (1.0 - a) + (1.0 - g) * a;
+            b = b * (1.0 - a) + (1.0 - b) * a;
+        }
+
+        pixel[0] = (r * 255.0).round().clamp(0.0, 255.0) as u8;
+        pixel[1] = (g * 255.0).round().clamp(0.0, 255.0) as u8;
+        pixel[2] = (b * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+    rgba
+}
+
+fn load_procedural_image(source_ref: &str, roots: &[PathBuf]) -> Option<(Vec<u8>, u32, u32)> {
+    if let Some(raw_source_ref) = source_ref.strip_prefix("composite://halftone/") {
+        let path = resolve_image_path_with_roots(raw_source_ref, roots)?;
+        let (mut rgba, width, height) = load_image(&path).ok()?;
+        let halftone = generate_halftone_texture(width, height);
+        apply_overlay_halftone(&mut rgba, &halftone, 0.15);
+        return Some((rgba, width, height));
+    }
+
+    if let Some(noise_key) = source_ref.strip_prefix("procedural://noise") {
+        let seed = figma_image_reference_to_id(noise_key);
+        let width = 128_u32;
+        let height = 128_u32;
+        return Some((generate_noise_texture(width, height, seed), width, height));
+    }
+
+    if source_ref.strip_prefix("procedural://halftone").is_some() {
+        let width = 96_u32;
+        let height = 96_u32;
+        return Some((generate_halftone_texture(width, height), width, height));
+    }
+
+    None
+}
+
+fn overlay_blend_channel(src: f32, dst: f32) -> f32 {
+    if dst <= 0.5 {
+        2.0 * src * dst
+    } else {
+        1.0 - (2.0 * (1.0 - src) * (1.0 - dst))
+    }
+}
+
+fn apply_overlay_halftone(base_rgba: &mut [u8], halftone_rgba: &[u8], opacity: f32) {
+    let opacity = opacity.clamp(0.0, 1.0);
+    if base_rgba.len() != halftone_rgba.len() {
+        return;
+    }
+
+    for (dst_px, src_px) in base_rgba
+        .chunks_exact_mut(4)
+        .zip(halftone_rgba.chunks_exact(4))
+    {
+        let dst_a = dst_px[3] as f32 / 255.0;
+        let src_a = (src_px[3] as f32 / 255.0) * opacity;
+        if src_a <= f32::EPSILON {
+            continue;
+        }
+
+        let dst_rgb = [
+            dst_px[0] as f32 / 255.0,
+            dst_px[1] as f32 / 255.0,
+            dst_px[2] as f32 / 255.0,
+        ];
+        let src_rgb = [
+            src_px[0] as f32 / 255.0,
+            src_px[1] as f32 / 255.0,
+            src_px[2] as f32 / 255.0,
+        ];
+        let blended_rgb = [
+            overlay_blend_channel(src_rgb[0], dst_rgb[0]),
+            overlay_blend_channel(src_rgb[1], dst_rgb[1]),
+            overlay_blend_channel(src_rgb[2], dst_rgb[2]),
+        ];
+
+        // Porter-Duff source-over with blend-mode color function.
+        let out_rgb_premul = [
+            (src_a * (1.0 - dst_a) * src_rgb[0])
+                + (src_a * dst_a * blended_rgb[0])
+                + ((1.0 - src_a) * dst_a * dst_rgb[0]),
+            (src_a * (1.0 - dst_a) * src_rgb[1])
+                + (src_a * dst_a * blended_rgb[1])
+                + ((1.0 - src_a) * dst_a * dst_rgb[1]),
+            (src_a * (1.0 - dst_a) * src_rgb[2])
+                + (src_a * dst_a * blended_rgb[2])
+                + ((1.0 - src_a) * dst_a * dst_rgb[2]),
+        ];
+        let out_a = src_a + dst_a - src_a * dst_a;
+        if out_a <= f32::EPSILON {
+            dst_px[0] = 0;
+            dst_px[1] = 0;
+            dst_px[2] = 0;
+            dst_px[3] = 0;
+            continue;
+        }
+
+        dst_px[0] = ((out_rgb_premul[0] / out_a) * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        dst_px[1] = ((out_rgb_premul[1] / out_a) * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        dst_px[2] = ((out_rgb_premul[2] / out_a) * 255.0)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        dst_px[3] = (out_a * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+}
+
+fn generate_noise_texture(width: u32, height: u32, seed: u64) -> Vec<u8> {
+    let mut out = vec![0_u8; width as usize * height as usize * 4];
+    let mut state = seed.wrapping_add(0x9E3779B97F4A7C15_u64);
+    // Match exported SVG noise overlay baseline translucency (roughly 45%).
+    const NOISE_ALPHA: u8 = 115;
+    for pixel in out.chunks_exact_mut(4) {
+        // xorshift* variant for deterministic lightweight procedural noise.
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        let noise = state.wrapping_mul(0x2545F4914F6CDD1D_u64);
+        let value = (noise >> 56) as u8;
+        pixel[0] = value;
+        pixel[1] = value;
+        pixel[2] = value;
+        pixel[3] = NOISE_ALPHA;
+    }
+    out
+}
+
+fn generate_halftone_texture(width: u32, height: u32) -> Vec<u8> {
+    let mut out = vec![0_u8; width as usize * height as usize * 4];
+    let spacing = 6_u32;
+    let hard_radius = 2.0_f32;
+    let feather_radius = 2.5_f32;
+    for y in 0..height {
+        for x in 0..width {
+            let idx = ((y * width + x) * 4) as usize;
+            let fx = ((x % spacing) as f32 + 0.5) - spacing as f32 * 0.5;
+            let fy = ((y % spacing) as f32 + 0.5) - spacing as f32 * 0.5;
+            let dist = (fx * fx + fy * fy).sqrt();
+            let alpha = if dist <= hard_radius {
+                255_u8
+            } else if dist <= feather_radius {
+                let t = ((feather_radius - dist) / (feather_radius - hard_radius)).clamp(0.0, 1.0);
+                (t * 255.0).round() as u8
+            } else {
+                0
+            };
+            out[idx] = 255;
+            out[idx + 1] = 255;
+            out[idx + 2] = 255;
+            out[idx + 3] = alpha;
+        }
+    }
+    out
+}
+
+fn resolve_image_path_with_roots(reference: &str, roots: &[PathBuf]) -> Option<PathBuf> {
+    let as_path = PathBuf::from(reference);
+    if as_path.is_absolute() && as_path.exists() {
+        return Some(as_path);
+    }
+
+    for root in roots {
+        let candidate = root.join(reference);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn image_search_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(path) = std::env::var("ARTHROPOD_FIGMA_ASSET_ROOT") {
+        roots.push(PathBuf::from(path));
+    }
+
+    roots.push(PathBuf::from("."));
+    roots.push(PathBuf::from("artifacts"));
+    roots.extend(artifact_subdirectories(Path::new("artifacts")));
+
+    let mut deduped = Vec::new();
+    roots
+        .into_iter()
+        .filter(|path| path.as_path() == Path::new(".") || path.exists())
+        .for_each(|path| {
+            if !deduped.iter().any(|existing| existing == &path) {
+                deduped.push(path);
+            }
+        });
+    deduped
+}
+
+fn artifact_subdirectories(root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.is_dir())
+        .collect()
+}
+
+fn figma_image_reference_to_id(reference: &str) -> u64 {
+    if let Ok(parsed) = reference.parse::<u64>() {
+        return parsed;
+    }
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in reference.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash | (1_u64 << 63)
+}
+
 fn main() {
     env_logger::init();
     plat_core::run::<RiotWavesApp>().expect("failed to run riot waves example");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn figma_image_reference_to_id_is_stable() {
+        assert_eq!(
+            figma_image_reference_to_id("assets/foo.png"),
+            figma_image_reference_to_id("assets/foo.png")
+        );
+        assert_ne!(
+            figma_image_reference_to_id("assets/foo.png"),
+            figma_image_reference_to_id("assets/bar.png")
+        );
+    }
+
+    #[test]
+    fn collect_image_assets_extracts_filtered_variants() {
+        let json = r#"{
+          "nodes": [
+            {
+              "fills": [
+                { "type": "IMAGE", "imageRef": "assets/a.png" },
+                {
+                  "type": "IMAGE",
+                  "imageRef": "filtered://assets/a.png#abc",
+                  "imageSourceRef": "assets/a.png",
+                  "imageFilter": { "grayscale": 1.0, "contrast": 1.5, "invert": 1.0 }
+                }
+              ]
+            },
+            { "fills": [ { "type": "IMAGE", "imageRef": "assets/b.png" } ] },
+            { "fills": [ { "type": "IMAGE", "imageRef": "procedural://noise/1234" } ] },
+            { "fills": [ { "type": "IMAGE", "imageRef": "assets/a.png" } ] },
+            { "fills": [ { "type": "IMAGE", "imageRef": "12345" } ] }
+          ]
+        }"#;
+        let refs = collect_image_assets(json);
+        assert_eq!(
+            refs,
+            vec![
+                GeneratedImageAsset {
+                    image_ref: "assets/a.png".to_string(),
+                    source_ref: "assets/a.png".to_string(),
+                    filter: None
+                },
+                GeneratedImageAsset {
+                    image_ref: "filtered://assets/a.png#abc".to_string(),
+                    source_ref: "assets/a.png".to_string(),
+                    filter: Some(ImageFilterSpec {
+                        grayscale: Some(1.0),
+                        contrast: Some(1.5),
+                        invert: Some(1.0)
+                    })
+                },
+                GeneratedImageAsset {
+                    image_ref: "assets/b.png".to_string(),
+                    source_ref: "assets/b.png".to_string(),
+                    filter: None
+                },
+                GeneratedImageAsset {
+                    image_ref: "procedural://noise/1234".to_string(),
+                    source_ref: "procedural://noise/1234".to_string(),
+                    filter: None
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn load_procedural_image_generates_deterministic_noise() {
+        let (a, w1, h1) = load_procedural_image("procedural://noise/abcd", &[])
+            .expect("procedural image should load");
+        let (b, w2, h2) = load_procedural_image("procedural://noise/abcd", &[])
+            .expect("procedural image should load");
+        assert_eq!((w1, h1), (128, 128));
+        assert_eq!((w2, h2), (128, 128));
+        assert_eq!(a, b);
+        assert_eq!(a.len(), (128 * 128 * 4) as usize);
+        assert!(a.chunks_exact(4).all(|px| px[3] == 115));
+    }
+
+    #[test]
+    fn load_procedural_image_supports_halftone_patterns() {
+        let (rgba, width, height) = load_procedural_image("procedural://halftone/abcd", &[])
+            .expect("halftone procedural image should load");
+        assert_eq!((width, height), (96, 96));
+        assert_eq!(rgba.len(), (96 * 96 * 4) as usize);
+        assert!(
+            rgba.chunks_exact(4).any(|px| px[3] > 0),
+            "halftone texture should contain visible dots"
+        );
+        assert!(
+            rgba.chunks_exact(4)
+                .filter(|px| px[3] > 0)
+                .all(|px| px[0] == 255 && px[1] == 255 && px[2] == 255),
+            "halftone dots should be white before blend/filter composition"
+        );
+    }
+
+    #[test]
+    fn apply_image_filter_supports_invert_contrast_grayscale() {
+        let input = vec![10_u8, 30_u8, 200_u8, 255_u8];
+        let filtered = apply_image_filter(
+            input,
+            ImageFilterSpec {
+                grayscale: Some(1.0),
+                contrast: Some(1.5),
+                invert: Some(1.0),
+            },
+        );
+        assert_eq!(filtered.len(), 4);
+        assert!(filtered[0] > 100, "expected high-contrast inversion");
+        assert_eq!(filtered[0], filtered[1]);
+        assert_eq!(filtered[1], filtered[2]);
+    }
+
+    #[test]
+    fn apply_overlay_halftone_keeps_midtones_visible() {
+        let mut base = vec![128_u8, 128_u8, 128_u8, 255_u8];
+        let halftone = vec![255_u8, 255_u8, 255_u8, 255_u8];
+        apply_overlay_halftone(&mut base, &halftone, 0.15);
+        assert!(
+            base[0] > 128 && base[0] < 200,
+            "overlay blend should brighten midtone without clipping, got {}",
+            base[0]
+        );
+        assert_eq!(base[0], base[1]);
+        assert_eq!(base[1], base[2]);
+        assert_eq!(base[3], 255);
+    }
+
+    #[test]
+    fn image_search_roots_includes_artifact_subdirectories() {
+        let stitch_run = PathBuf::from("artifacts/stitch_import_run");
+        if stitch_run.exists() {
+            let roots = image_search_roots();
+            assert!(roots.iter().any(|root| root == &stitch_run));
+        }
+    }
+
+    #[test]
+    fn resolve_image_path_uses_any_configured_root() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before unix epoch")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("arthropod_riot_waves_paths_{unique}"));
+        let root_a = base.join("a");
+        let root_b = base.join("b");
+        let target = root_b.join("assets").join("cover.png");
+        std::fs::create_dir_all(target.parent().expect("target has parent"))
+            .expect("create test directories");
+        std::fs::write(&target, b"placeholder").expect("write placeholder file");
+
+        let roots = vec![root_a, root_b];
+        let resolved =
+            resolve_image_path_with_roots("assets/cover.png", &roots).expect("path should resolve");
+        assert_eq!(resolved, target);
+
+        std::fs::remove_dir_all(base).expect("cleanup test directory");
+    }
 }

@@ -4,7 +4,7 @@
 //! and CPU-side helpers shared by blur/blend pipelines.
 
 use crate::{NodeContent, NodeId, SceneNode};
-use style_engine::{BlendMode, Effect, VisualStyle};
+use style_engine::{BlendMode, ColorFilter, Effect, VisualStyle};
 
 pub use super::render_target_pool::{RenderTargetHandle, RenderTargetKey, RenderTargetPool};
 
@@ -23,6 +23,8 @@ pub enum EffectPassKind {
     BlurVertical,
     /// Inner shadow pass.
     InnerShadow,
+    /// Color filter pass (grayscale/contrast/invert).
+    ColorFilter,
     /// Composite with non-normal blend mode.
     BlendComposite,
     /// Push clip mask into stencil.
@@ -415,6 +417,10 @@ pub fn classify_effect_passes(style: &VisualStyle, has_children: bool) -> Vec<Ef
                 needs_offscreen = true;
                 passes.push(EffectPassKind::InnerShadow);
             }
+            Effect::ColorFilter(filter) if filter.visible && !color_filter_is_identity(*filter) => {
+                needs_offscreen = true;
+                passes.push(EffectPassKind::ColorFilter);
+            }
             _ => {}
         }
     }
@@ -429,8 +435,13 @@ pub fn classify_effect_passes(style: &VisualStyle, has_children: bool) -> Vec<Ef
         passes.push(EffectPassKind::BlurVertical);
     }
 
-    if !matches!(style.blend_mode, BlendMode::Normal | BlendMode::PassThrough) {
+    let needs_non_normal_blend =
+        !matches!(style.blend_mode, BlendMode::Normal | BlendMode::PassThrough);
+    if needs_non_normal_blend {
         needs_offscreen = true;
+    }
+
+    if needs_offscreen {
         passes.push(EffectPassKind::BlendComposite);
     }
 
@@ -553,8 +564,18 @@ pub fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
         style_engine::Effect::LayerBlur(blur) => blur.visible && blur.radius > 0.0,
         style_engine::Effect::BackgroundBlur(blur) => blur.visible && blur.radius > 0.0,
         style_engine::Effect::InnerShadow(shadow) => shadow.visible,
+        style_engine::Effect::ColorFilter(filter) => {
+            filter.visible && !color_filter_is_identity(*filter)
+        }
         _ => false,
     })
+}
+
+#[must_use]
+pub fn color_filter_is_identity(filter: ColorFilter) -> bool {
+    filter.grayscale <= f32::EPSILON
+        && (filter.contrast - 1.0).abs() <= f32::EPSILON
+        && filter.invert <= f32::EPSILON
 }
 
 #[cfg(test)]
@@ -591,6 +612,19 @@ mod tests {
         assert!(passes.contains(&EffectPassKind::BackgroundCapture));
         assert!(passes.contains(&EffectPassKind::BlurHorizontal));
         assert!(passes.contains(&EffectPassKind::BlurVertical));
+    }
+
+    #[test]
+    fn test_classify_color_filter_effects() {
+        let style = VisualStyle::new().effect(Effect::ColorFilter(ColorFilter {
+            grayscale: 1.0,
+            contrast: 1.5,
+            invert: 1.0,
+            visible: true,
+        }));
+        let passes = classify_effect_passes(&style, false);
+        assert!(passes.contains(&EffectPassKind::ColorFilter));
+        assert!(passes.contains(&EffectPassKind::BlendComposite));
     }
 
     #[test]

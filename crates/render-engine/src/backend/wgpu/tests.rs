@@ -145,6 +145,48 @@ fn test_style_opacity_multiplies_node_opacity_for_primitive_instances() {
 }
 
 #[test]
+fn test_ancestor_opacity_multiplies_descendant_primitive_opacity() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut parent = SceneNode::new(NodeContent::Empty);
+    parent.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
+    parent.opacity = 0.5;
+    let parent_id = scene.add_node(root, parent);
+
+    let node = SceneNode {
+        content: NodeContent::Styled {
+            style: Box::new(
+                style_engine::VisualStyle::new()
+                    .solid_fill(Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4())
+                    .opacity(0.4),
+            ),
+        },
+        transform: Transform2D::identity(),
+        bounds: plat_core::Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        },
+        children: vec![],
+        parent: None,
+        visible: true,
+        opacity: 0.5,
+    };
+    scene.add_node(parent_id, node);
+
+    let (instances, _text_nodes, _path_batches) =
+        instance_collector::collect_instances_for_tests(&scene);
+    assert_eq!(instances.len(), 1);
+    assert!(
+        (instances[0].color[3] - 0.1).abs() < 1e-6,
+        "expected fill alpha 0.1 from parent.opacity(0.5) * node.opacity(0.5) * style.opacity(0.4), got {}",
+        instances[0].color[3]
+    );
+}
+
+#[test]
 fn test_rounded_rect_preserves_corner_radius() {
     let mut scene = Scene::new();
     let root = scene.root();
@@ -959,6 +1001,16 @@ fn test_style_requires_multipass_detects_blend_and_blur() {
     let normal =
         style_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 0.0, 0.0, 1.0).as_vec4());
     assert!(!effects::style_requires_multipass(&normal));
+
+    let color_filter = style_engine::VisualStyle::new().effect(style_engine::Effect::ColorFilter(
+        style_engine::ColorFilter {
+            grayscale: 1.0,
+            contrast: 1.5,
+            invert: 1.0,
+            visible: true,
+        },
+    ));
+    assert!(effects::style_requires_multipass(&color_filter));
 }
 
 #[test]
@@ -999,6 +1051,34 @@ fn test_collect_multipass_node_ids_preserves_visual_order() {
     let mut stack = Vec::new();
     let ids = multipass_executor::collect_multipass_node_ids(&scene, &mut stack);
     assert_eq!(ids, vec![blend_id, blur_id]);
+}
+
+#[test]
+fn test_collect_multipass_node_ids_skips_nodes_under_zero_opacity_ancestor() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut transparent_parent = SceneNode::new(NodeContent::Empty);
+    transparent_parent.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
+    transparent_parent.opacity = 0.0;
+    let parent_id = scene.add_node(root, transparent_parent);
+
+    let mut blend = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            style_engine::VisualStyle::new()
+                .solid_fill(Color::rgba(1.0, 0.0, 0.0, 0.8).as_vec4())
+                .blend_mode(style_engine::BlendMode::Screen),
+        ),
+    });
+    blend.bounds = plat_core::Rect::new(10.0, 10.0, 40.0, 40.0);
+    scene.add_node(parent_id, blend);
+
+    let mut stack = Vec::new();
+    let ids = multipass_executor::collect_multipass_node_ids(&scene, &mut stack);
+    assert!(
+        ids.is_empty(),
+        "expected no multipass nodes under transparent ancestor"
+    );
 }
 
 #[test]
@@ -1052,6 +1132,7 @@ fn test_classify_scene_effect_kinds_detects_offscreen_effects() {
     assert!(kinds.contains(&effects::EffectPassKind::OffscreenLayer));
     assert!(kinds.contains(&effects::EffectPassKind::BlurHorizontal));
     assert!(kinds.contains(&effects::EffectPassKind::BlurVertical));
+    assert!(kinds.contains(&effects::EffectPassKind::BlendComposite));
 }
 
 #[test]

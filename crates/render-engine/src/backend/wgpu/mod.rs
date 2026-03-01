@@ -24,6 +24,7 @@ use effects::RenderTargetKey;
 use effects::RenderTargetPool;
 use pipelines::blend_pipeline::BlendPipeline;
 use pipelines::blur_pipeline::BlurPipeline;
+use pipelines::color_filter_pipeline::ColorFilterPipeline;
 pub use pipelines::path_pipeline::TessellationCacheStats;
 use pipelines::path_pipeline::{PathPipeline, TessellationCache};
 use pipelines::primitive_pipeline::PrimitivePipeline;
@@ -46,6 +47,8 @@ pub struct WgpuBackend {
     blur_pipeline: BlurPipeline,
     #[allow(dead_code)]
     blend_pipeline: BlendPipeline,
+    #[allow(dead_code)]
+    color_filter_pipeline: ColorFilterPipeline,
     tessellation_cache: TessellationCache,
     path_interner: PathInterner,
     text_renderer: TextRenderer,
@@ -160,6 +163,8 @@ impl WgpuBackend {
         );
         let blur_pipeline = BlurPipeline::new(&context.device, context.config.format);
         let blend_pipeline = BlendPipeline::new(&context.device, context.config.format);
+        let color_filter_pipeline =
+            ColorFilterPipeline::new(&context.device, context.config.format);
         let effect_sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Effect Pipeline Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -177,6 +182,7 @@ impl WgpuBackend {
             path_pipeline,
             blur_pipeline,
             blend_pipeline,
+            color_filter_pipeline,
             tessellation_cache: TessellationCache::new(2048),
             path_interner: PathInterner::default(),
             text_renderer,
@@ -329,6 +335,7 @@ impl WgpuBackend {
             path_pipeline: &mut self.path_pipeline,
             blur_pipeline: &mut self.blur_pipeline,
             blend_pipeline: &mut self.blend_pipeline,
+            color_filter_pipeline: &mut self.color_filter_pipeline,
             effect_target_pool: &mut self.effect_target_pool,
             effect_sampler: &self.effect_sampler,
             tessellation_cache: &mut self.tessellation_cache,
@@ -463,6 +470,7 @@ impl super::RenderBackend for WgpuBackend {
             path_pipeline: &mut self.path_pipeline,
             blur_pipeline: &mut self.blur_pipeline,
             blend_pipeline: &mut self.blend_pipeline,
+            color_filter_pipeline: &mut self.color_filter_pipeline,
             effect_target_pool: &mut self.effect_target_pool,
             effect_sampler: &self.effect_sampler,
             tessellation_cache: &mut self.tessellation_cache,

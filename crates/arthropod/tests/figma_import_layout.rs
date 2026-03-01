@@ -881,3 +881,67 @@ fn figma_visual_style_maps_fills_strokes_effects_and_masking() {
     assert!(style.is_mask);
     assert_eq!(style.mask_type, MaskType::Luminance);
 }
+
+#[test]
+fn figma_image_filter_maps_to_color_filter_effect() {
+    let json = r##"{
+        "nodes": [
+            {
+                "id": "img1",
+                "type": "RECTANGLE",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 320, "height": 180 },
+                "fills": [
+                    {
+                        "type": "IMAGE",
+                        "imageRef": "filtered://assets/cover.png#abc",
+                        "imageSourceRef": "assets/cover.png",
+                        "scaleMode": "FILL",
+                        "imageFilter": {
+                            "grayscale": 1.0,
+                            "contrast": 1.5,
+                            "invert": 1.0
+                        },
+                        "visible": true
+                    }
+                ]
+            }
+        ]
+    }"##;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("img1")
+        .copied()
+        .expect("mapped scene id should exist");
+    let node = imported
+        .scene
+        .get_node(node_id)
+        .expect("imported node should exist");
+
+    let NodeContent::Styled { style } = &node.content else {
+        panic!("expected styled node for imported image");
+    };
+    assert_eq!(style.fills.len(), 1, "expected one image fill");
+    assert!(
+        style
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::ColorFilter(_))),
+        "expected imageFilter to map into ColorFilter effect"
+    );
+    let filter = style
+        .effects
+        .iter()
+        .find_map(|effect| {
+            if let Effect::ColorFilter(filter) = effect {
+                Some(*filter)
+            } else {
+                None
+            }
+        })
+        .expect("color filter effect should exist");
+    assert!((filter.grayscale - 1.0).abs() < 1e-6);
+    assert!((filter.contrast - 1.5).abs() < 1e-6);
+    assert!((filter.invert - 1.0).abs() < 1e-6);
+}

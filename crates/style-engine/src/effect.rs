@@ -90,6 +90,31 @@ impl BackgroundBlur {
     }
 }
 
+/// Color filter effect applied to the rendered layer output.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ColorFilter {
+    /// Grayscale amount (0.0 = original, 1.0 = fully grayscale).
+    pub grayscale: f32,
+    /// Contrast multiplier (1.0 = unchanged).
+    pub contrast: f32,
+    /// Invert amount (0.0 = original, 1.0 = fully inverted).
+    pub invert: f32,
+    /// Whether filter is visible.
+    pub visible: bool,
+}
+
+impl ColorFilter {
+    /// Create a color filter with default visibility.
+    pub fn new(grayscale: f32, contrast: f32, invert: f32) -> Self {
+        Self {
+            grayscale: grayscale.clamp(0.0, 1.0),
+            contrast: contrast.max(0.0),
+            invert: invert.clamp(0.0, 1.0),
+            visible: true,
+        }
+    }
+}
+
 /// Visual effect (shadow, blur, etc.)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Effect {
@@ -101,6 +126,8 @@ pub enum Effect {
     LayerBlur(LayerBlur),
     /// Background blur effect
     BackgroundBlur(BackgroundBlur),
+    /// Color filter effect
+    ColorFilter(ColorFilter),
 }
 
 impl Effect {
@@ -122,6 +149,11 @@ impl Effect {
     /// Create a background blur effect
     pub fn background_blur(radius: f32) -> Self {
         Self::BackgroundBlur(BackgroundBlur::new(radius))
+    }
+
+    /// Create a color filter effect.
+    pub fn color_filter(grayscale: f32, contrast: f32, invert: f32) -> Self {
+        Self::ColorFilter(ColorFilter::new(grayscale, contrast, invert))
     }
 }
 
@@ -191,6 +223,21 @@ mod tests {
                 assert!(blur.visible);
             }
             _ => panic!("Expected background blur"),
+        }
+    }
+
+    #[test]
+    fn test_color_filter_construction() {
+        let effect = Effect::color_filter(1.0, 1.5, 1.0);
+
+        match effect {
+            Effect::ColorFilter(filter) => {
+                assert_eq!(filter.grayscale, 1.0);
+                assert_eq!(filter.contrast, 1.5);
+                assert_eq!(filter.invert, 1.0);
+                assert!(filter.visible);
+            }
+            _ => panic!("Expected color filter"),
         }
     }
 
