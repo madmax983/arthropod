@@ -813,6 +813,7 @@ fn class_selector_name(selector: &str) -> Option<&str> {
     Some(base)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn measure_tree(
     node: &HtmlNode,
     path: &mut Vec<usize>,
@@ -1381,6 +1382,7 @@ fn absolute_rect_for_child(
     }
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn node_to_figma_json(
     node: &HtmlNode,
@@ -1529,11 +1531,11 @@ fn node_to_figma_json_with_inherited_effects(
                 "scaleMode": image_scale_mode,
                 "visible": true
             });
-            if let Some(spec) = filter {
-                if let JsonValue::Object(fill_object) = &mut fill {
-                    fill_object.insert("imageSourceRef".to_string(), JsonValue::String(source_ref));
-                    fill_object.insert("imageFilter".to_string(), image_filter_to_json(spec));
-                }
+            if let Some(spec) = filter
+                && let JsonValue::Object(fill_object) = &mut fill
+            {
+                fill_object.insert("imageSourceRef".to_string(), JsonValue::String(source_ref));
+                fill_object.insert("imageFilter".to_string(), image_filter_to_json(spec));
             }
             fills.push(fill);
         }
@@ -1844,9 +1846,7 @@ fn figma_layout_mode(classes: &[String]) -> Option<&'static str> {
 }
 
 fn flow_direction(classes: &[String]) -> FlowDirection {
-    if !is_flex_container(classes) {
-        FlowDirection::Column
-    } else if has_class(classes, "flex-col") {
+    if !is_flex_container(classes) || has_class(classes, "flex-col") {
         FlowDirection::Column
     } else {
         FlowDirection::Row
@@ -2121,10 +2121,10 @@ fn resolve_offset(
         return Some(-value);
     }
 
-    if let Some(style_value) = node.styles.get(property) {
-        if let Some(value) = parse_css_length(style_value, parent_axis, viewport_axis) {
-            return Some(value);
-        }
+    if let Some(style_value) = node.styles.get(property)
+        && let Some(value) = parse_css_length(style_value, parent_axis, viewport_axis)
+    {
+        return Some(value);
     }
 
     None
@@ -2486,7 +2486,7 @@ fn resolve_font_size(classes: &[String], styles: &HashMap<String, String>) -> Op
     None
 }
 
-fn static_responsive_utility<'a>(class_name: &'a str) -> &'a str {
+fn static_responsive_utility(class_name: &str) -> &str {
     const PREFIXES: [&str; 7] = ["sm:", "md:", "lg:", "xl:", "2xl:", "3xl:", "4xl:"];
     for prefix in PREFIXES {
         if let Some(rest) = class_name.strip_prefix(prefix) {
@@ -2752,7 +2752,7 @@ fn estimate_text_size(
             height: font_size * line_height_factor,
         };
     }
-    let advance_factor = 0.56_f32;
+    let advance_factor = 0.60_f32;
     let mut max_line_width = 0.0_f32;
     let mut line_count = 0usize;
     for line in text.split('\n') {
@@ -3094,7 +3094,7 @@ fn resolve_background_gradient_paint(
     let via = class_value(classes, "via-").and_then(|token| resolve_color_token(token, theme));
     let to = class_value(classes, "to-")
         .and_then(|token| resolve_color_token(token, theme))
-        .or_else(|| Some([0.0, 0.0, 0.0, 0.0]));
+        .or(Some([0.0, 0.0, 0.0, 0.0]));
 
     let mut stops = Vec::new();
     if let Some(color) = from {
@@ -3256,10 +3256,10 @@ fn resolve_effects(
         append_box_shadow_effects(box_shadow, theme, &mut effects);
     }
 
-    if !styles.contains_key("box-shadow") {
-        if let Some(shadow_value) = resolve_tailwind_shadow(classes) {
-            append_box_shadow_effects(&shadow_value, theme, &mut effects);
-        }
+    if !styles.contains_key("box-shadow")
+        && let Some(shadow_value) = resolve_tailwind_shadow(classes)
+    {
+        append_box_shadow_effects(&shadow_value, theme, &mut effects);
     }
 
     if let Some(radius) = resolve_layer_blur_radius(classes, styles) {
@@ -4740,7 +4740,7 @@ tailwind.config = { theme: { extend: {
     #[test]
     fn resolve_rotation_degrees_supports_tailwind_and_inline_transform() {
         let class_rotation = resolve_rotation_degrees(
-            &vec!["transform".to_string(), "-rotate-3".to_string()],
+            &["transform".to_string(), "-rotate-3".to_string()],
             &HashMap::new(),
         )
         .expect("class rotation should parse");

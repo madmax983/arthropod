@@ -60,7 +60,7 @@ fn get_y_lparam(lparam: LPARAM) -> f64 {
 unsafe fn get_window_id(hwnd: HWND) -> Option<WindowId> {
     // GetWindowLongPtrW returns zero on failure (or if the value is zero).
     // We assume valid WindowIds are non-zero (initialized to 1).
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
     if ptr == 0 {
         return None;
     }

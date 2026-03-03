@@ -3,8 +3,8 @@ pub mod riot_waves_generated {
 use arthropod::figma::{FigmaImportError, ImportedFigmaDocument, import_figma_document};
 use arthropod::figma_runtime::{FigmaRuntime, FigmaRuntimeError};
 
-pub const SOURCE_BYTES: usize = 50228;
-pub const SOURCE_FNV64: u64 = 0x034a2d4662a53c1f;
+pub const SOURCE_BYTES: usize = 50038;
+pub const SOURCE_FNV64: u64 = 0xa794d13089c5185c;
 pub const NODE_COUNT: usize = 74;
 pub const PROTOTYPE_EDGE_COUNT: usize = 0;
 
@@ -220,9 +220,9 @@ pub const FIGMA_JSON: &str = r#"{
     {
       "blendMode": "SCREEN",
       "bounds": [
-        1266.4000244140625,
+        1265.0,
         126.5,
-        39.20000076293945,
+        42.0,
         35.0
       ],
       "characters": "TODAY\nONLY",
@@ -303,7 +303,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         431.10003662109375,
-        177.27999877929688,
+        188.8000030517578,
         72.0
       ],
       "characters": "SCUM",
@@ -362,7 +362,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         56.0,
         503.10003662109375,
-        217.60000610351562,
+        232.00001525878906,
         72.0
       ],
       "characters": "FUCKS",
@@ -421,7 +421,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         599.1000366210938,
-        200.75999450683594,
+        209.40000915527344,
         40.30000305175781
       ],
       "id": "stitch:0.1.0.1.2",
@@ -434,7 +434,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         599.1000366210938,
-        200.75999450683594,
+        209.40000915527344,
         40.30000305175781
       ],
       "counterAxisAlignItems": "CENTER",
@@ -538,7 +538,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         68.0,
         607.1000366210938,
-        140.75999450683594,
+        149.40000915527344,
         24.30000114440918
       ],
       "characters": "\"RAT POISON\"",
@@ -577,9 +577,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        1185.199951171875,
+        1178.0,
         516.4000244140625,
-        132.8000030517578,
+        140.0,
         43.0
       ],
       "id": "stitch:0.1.0.1.3",
@@ -589,9 +589,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        1185.199951171875,
+        1178.0,
         516.4000244140625,
-        132.8000030517578,
+        140.0,
         43.0
       ],
       "characters": "PLAY LOUD",
@@ -840,9 +840,9 @@ pub const FIGMA_JSON: &str = r#"{
     {
       "blendMode": "LINEAR_DODGE",
       "bounds": [
-        74.55999755859375,
+        73.5999984741211,
         896.9000244140625,
-        26.880001068115234,
+        28.80000114440918,
         45.0
       ],
       "characters": "LIVE\nFROM\nHELL",
@@ -895,7 +895,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         1187.800048828125,
-        302.3999938964844,
+        324.0,
         120.0
       ],
       "characters": "NOISE\nCOMPLAINT",
@@ -952,7 +952,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         1323.800048828125,
-        204.8000030517578,
+        216.0,
         51.0
       ],
       "id": "stitch:0.1.1.1.2",
@@ -965,7 +965,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         1323.800048828125,
-        204.8000030517578,
+        216.0,
         51.0
       ],
       "effects": [
@@ -1023,7 +1023,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         48.0,
         1335.800048828125,
-        156.8000030517578,
+        168.0,
         27.0
       ],
       "characters": "SIDE A: STATIC",
@@ -1210,9 +1210,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        584.6799926757812,
+        578.7999877929688,
         1781.550048828125,
-        196.63999938964844,
+        208.40000915527344,
         113.9000015258789
       ],
       "effects": [
@@ -1269,9 +1269,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        600.6799926757812,
+        594.7999877929688,
         1797.550048828125,
-        60.47999954223633,
+        64.80000305175781,
         45.0
       ],
       "characters": "THE",
@@ -1309,9 +1309,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        600.6799926757812,
+        594.7999877929688,
         1797.550048828125,
-        141.1199951171875,
+        151.20001220703125,
         45.0
       ],
       "characters": "REJECTS",
@@ -1349,7 +1349,7 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        600.6799926757812,
+        594.7999877929688,
         1850.550048828125,
         1.0,
         2.0
@@ -1372,9 +1372,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        600.6799926757812,
+        594.7999877929688,
         1860.550048828125,
-        164.63999938964844,
+        176.40000915527344,
         18.899999618530273
       ],
       "characters": "NEW DEMO TAPE OUT NOW",
@@ -1483,7 +1483,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         575.0,
         1911.4500732421875,
-        86.4000015258789,
+        92.0,
         27.0
       ],
       "characters": "Listen!",
@@ -1524,9 +1524,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        620.280029296875,
+        615.7999877929688,
         1940.6500244140625,
-        125.44000244140625,
+        134.40000915527344,
         21.600000381469727
       ],
       "characters": "\"BASEMENT ROT\"",
@@ -1593,9 +1593,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        582.2000122070312,
+        575.0,
         2357.400146484375,
-        201.60000610351562,
+        216.00001525878906,
         32.400001525878906
       ],
       "characters": "GO START A BAND",
@@ -1656,9 +1656,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        632.5999755859375,
+        629.0,
         2390.80029296875,
-        100.80000305175781,
+        108.00000762939453,
         16.200000762939453
       ],
       "characters": "END OF THE ROLL",
@@ -1814,9 +1814,9 @@ pub const FIGMA_JSON: &str = r#"{
     },
     {
       "bounds": [
-        218.3466796875,
+        216.6666717529297,
         843.7999877929688,
-        50.63999938964844,
+        54.0,
         16.200000762939453
       ],
       "characters": "The Pit",
@@ -2169,7 +2169,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         16.0,
         16.0,
-        88.4000015258789,
+        94.0,
         35.0
       ],
       "effects": [
@@ -2215,7 +2215,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         24.0,
         20.0,
-        72.4000015258789,
+        78.0,
         27.0
       ],
       "characters": "THE PIT",
@@ -2339,7 +2339,7 @@ pub const FIGMA_JSON: &str = r#"{
       "bounds": [
         1306.0,
         28.0,
-        40.31999969482422,
+        43.20000076293945,
         24.0
       ],
       "characters": "SEARCH\nHERE",

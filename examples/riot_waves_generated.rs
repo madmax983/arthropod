@@ -328,7 +328,11 @@ fn register_generated_images(backend: &mut WgpuBackend) {
     for asset in assets {
         let image_id = ImageId(figma_image_reference_to_id(&asset.image_ref));
         if let Some((rgba, width, height)) = load_procedural_image(&asset.source_ref, &roots) {
-            let rgba = rgba;
+            let rgba = if let Some(filter) = asset.filter {
+                apply_image_filter(rgba, filter)
+            } else {
+                rgba
+            };
             if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
                 eprintln!(
                     "warning: failed to register procedural image `{}` for `{}`: {err}",
@@ -348,6 +352,11 @@ fn register_generated_images(backend: &mut WgpuBackend) {
 
         match load_image(&path) {
             Ok((rgba, width, height)) => {
+                let rgba = if let Some(filter) = asset.filter {
+                    apply_image_filter(rgba, filter)
+                } else {
+                    rgba
+                };
                 if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
                     eprintln!(
                         "warning: failed to register image `{}` for `{}`: {err}",

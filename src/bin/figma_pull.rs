@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use reqwest::blocking::Client;
@@ -369,7 +369,7 @@ fn figma_image_reference_to_id(reference: &str) -> u64 {
     hash | (1_u64 << 63)
 }
 
-fn ensure_parent_dir(path: &std::path::Path) -> Result<(), String> {
+fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
             .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
@@ -389,7 +389,7 @@ fn download_image(
     token: &str,
     image_ref: &str,
     url: &str,
-    assets_dir: &std::path::Path,
+    assets_dir: &Path,
 ) -> JsonValue {
     let mut entry = JsonMap::new();
     entry.insert(

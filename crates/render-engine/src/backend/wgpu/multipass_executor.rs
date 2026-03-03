@@ -31,6 +31,15 @@ use crate::primitives::PrimitiveInstance;
 use rayon::prelude::*;
 use text_engine::{ShapedText, shape_text_parallel_with_options};
 
+type ShapedTextResult<'a> = (
+    glam::Vec2,
+    f32,
+    [f32; 4],
+    &'a style_engine::VisualStyle,
+    ShapedText,
+    crate::Transform2D,
+);
+
 pub(crate) struct MultipassRenderer<'a> {
     pub(crate) context: &'a mut WgpuContext,
     pub(crate) primitive_pipeline: &'a mut PrimitivePipeline,
@@ -689,14 +698,8 @@ impl<'a> MultipassRenderer<'a> {
         if !raw_text_nodes.is_empty() {
             // Step 1: Shape text in parallel if above threshold
             // Shaping is CPU-intensive and read-only (uses thread-local FontSystem)
-            let shaped_results: Vec<(
-                glam::Vec2,
-                f32,
-                [f32; 4],
-                &style_engine::VisualStyle,
-                ShapedText,
-                crate::Transform2D,
-            )> = if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
+            let shaped_results: Vec<ShapedTextResult<'_>> =
+                if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
                 // Parallel shaping
                 raw_text_nodes
                     .par_iter()
