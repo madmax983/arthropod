@@ -27,7 +27,7 @@ mod riot_waves_generated_module;
 
 const DEFAULT_WIDTH: u32 = 1366;
 const DEFAULT_HEIGHT: u32 = 884;
-const APPLY_RUNTIME_LAYOUT: bool = false;
+const APPLY_RUNTIME_LAYOUT_ON_SIZE_MISMATCH: bool = false;
 
 #[derive(Debug, Clone, PartialEq)]
 struct GeneratedImageAsset {
@@ -70,11 +70,13 @@ impl Application for RiotWavesApp {
         let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .expect("failed to create backend");
         let mut backend = backend;
+        backend.set_design_space(DEFAULT_WIDTH as f32, DEFAULT_HEIGHT as f32);
+        register_generated_fonts(&mut backend);
         register_generated_images(&mut backend);
 
         let mut runtime = riot_waves_generated_module::riot_waves_generated::runtime()
             .expect("failed to initialize generated riot_waves runtime");
-        if APPLY_RUNTIME_LAYOUT {
+        if should_apply_runtime_layout(size) {
             runtime.apply_layout(size.width as f32, size.height as f32);
         }
 
@@ -102,7 +104,7 @@ impl Application for RiotWavesApp {
                 ..
             } => {
                 self.backend.resize(size.width, size.height);
-                if APPLY_RUNTIME_LAYOUT {
+                if should_apply_runtime_layout(size) {
                     self.runtime
                         .apply_layout(size.width as f32, size.height as f32);
                 }
@@ -112,10 +114,10 @@ impl Application for RiotWavesApp {
                 event: WindowEvent::CursorMoved { position },
                 ..
             } => {
-                let hovered = self
-                    .runtime
-                    .scene()
-                    .hit_test(position.x as f32, position.y as f32);
+                let window_size = self.window.inner_size();
+                let hovered =
+                    map_window_to_design_point(window_size, position.x as f32, position.y as f32)
+                        .and_then(|(x, y)| self.runtime.scene().hit_test(x, y));
                 if hovered != self.hovered_node {
                     self.hovered_node = hovered;
                     if let Some(node) = hovered {
@@ -129,10 +131,13 @@ impl Application for RiotWavesApp {
                 ..
             } => {
                 if input.button == MouseButton::Left && input.state == ElementState::Pressed {
-                    let target = self
-                        .runtime
-                        .scene()
-                        .hit_test(input.position.x as f32, input.position.y as f32);
+                    let window_size = self.window.inner_size();
+                    let target = map_window_to_design_point(
+                        window_size,
+                        input.position.x as f32,
+                        input.position.y as f32,
+                    )
+                    .and_then(|(x, y)| self.runtime.scene().hit_test(x, y));
                     if let Some(node) = target {
                         self.hovered_node = Some(node);
                         let _ = self.runtime.dispatch(PrototypeRuntimeEvent::Press { node });
@@ -179,6 +184,136 @@ impl Application for RiotWavesApp {
     }
 }
 
+fn register_generated_fonts(backend: &mut WgpuBackend) {
+    let roots = image_search_roots();
+    let font_paths = collect_font_assets(&roots);
+    if font_paths.is_empty() {
+        return;
+    }
+
+    let mut loaded_files = 0usize;
+    let mut loaded_faces = 0usize;
+    let mut failed = 0usize;
+    for path in font_paths {
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                let faces = backend.register_font_bytes(bytes);
+                if faces > 0 {
+                    loaded_files += 1;
+                    loaded_faces += faces;
+                } else {
+                    eprintln!(
+                        "warning: font asset `{}` contained no registerable faces",
+                        path.display()
+                    );
+                    failed += 1;
+                }
+            }
+            Err(err) => {
+                eprintln!(
+                    "warning: failed to read font asset `{}`: {err}",
+                    path.display()
+                );
+                failed += 1;
+            }
+        }
+    }
+
+    eprintln!(
+        "riot_waves_generated: loaded {loaded_files} font file(s), {loaded_faces} face(s), {failed} failed"
+    );
+}
+
+fn collect_font_assets(roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut search_dirs = Vec::new();
+    let mut seen_dirs = BTreeSet::new();
+    for root in roots {
+        let root_assets = root.join("assets");
+        if root_assets.is_dir() && seen_dirs.insert(root_assets.to_string_lossy().to_string()) {
+            search_dirs.push(root_assets);
+        }
+
+        if root.is_dir()
+            && root
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("assets"))
+            && seen_dirs.insert(root.to_string_lossy().to_string())
+        {
+            search_dirs.push(root.clone());
+        }
+    }
+
+    let mut fonts = Vec::new();
+    let mut seen_files = BTreeSet::new();
+    let mut visited_dirs = BTreeSet::new();
+    let mut pending_dirs = search_dirs;
+    while let Some(dir) = pending_dirs.pop() {
+        let dir_key = dir.to_string_lossy().to_string();
+        if !visited_dirs.insert(dir_key) {
+            continue;
+        }
+
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending_dirs.push(path);
+                continue;
+            }
+            if !path.is_file() || !is_font_asset_path(&path) {
+                continue;
+            }
+            let key = path.to_string_lossy().to_string();
+            if seen_files.insert(key) {
+                fonts.push(path);
+            }
+        }
+    }
+    fonts
+}
+
+fn is_font_asset_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .is_some_and(|ext| matches!(ext.as_str(), "ttf" | "otf" | "ttc" | "woff" | "woff2"))
+}
+
+fn should_apply_runtime_layout(size: Size<u32>) -> bool {
+    APPLY_RUNTIME_LAYOUT_ON_SIZE_MISMATCH
+        && (size.width != DEFAULT_WIDTH || size.height != DEFAULT_HEIGHT)
+}
+
+fn map_window_to_design_point(size: Size<u32>, x: f32, y: f32) -> Option<(f32, f32)> {
+    if size.width == 0 || size.height == 0 {
+        return None;
+    }
+
+    let window_w = size.width as f32;
+    let window_h = size.height as f32;
+    let design_w = DEFAULT_WIDTH as f32;
+    let design_h = DEFAULT_HEIGHT as f32;
+    let scale = (window_w / design_w).min(window_h / design_h);
+    if !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+
+    let fitted_w = design_w * scale;
+    let fitted_h = design_h * scale;
+    let offset_x = (window_w - fitted_w) * 0.5;
+    let offset_y = (window_h - fitted_h) * 0.5;
+    let design_x = (x - offset_x) / scale;
+    let design_y = (y - offset_y) / scale;
+    if !(0.0..=design_w).contains(&design_x) || !(0.0..=design_h).contains(&design_y) {
+        return None;
+    }
+
+    Some((design_x, design_y))
+}
+
 fn register_generated_images(backend: &mut WgpuBackend) {
     let assets =
         collect_image_assets(riot_waves_generated_module::riot_waves_generated::FIGMA_JSON);
@@ -190,11 +325,10 @@ fn register_generated_images(backend: &mut WgpuBackend) {
     let mut loaded = 0usize;
     let mut missing = Vec::new();
     let mut failed = 0usize;
-
     for asset in assets {
-        let has_image_filter = asset.filter.is_some();
         let image_id = ImageId(figma_image_reference_to_id(&asset.image_ref));
         if let Some((rgba, width, height)) = load_procedural_image(&asset.source_ref, &roots) {
+            let rgba = rgba;
             if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
                 eprintln!(
                     "warning: failed to register procedural image `{}` for `{}`: {err}",
@@ -222,9 +356,6 @@ fn register_generated_images(backend: &mut WgpuBackend) {
                     );
                     failed += 1;
                 } else {
-                    if has_image_filter {
-                        // `imageFilter` now maps to a renderer-side color-filter multipass effect.
-                    }
                     loaded += 1;
                 }
             }
@@ -328,7 +459,6 @@ fn likely_path_reference(value: &str) -> bool {
     value.contains('/') || value.contains('\\')
 }
 
-#[cfg(test)]
 fn apply_image_filter(mut rgba: Vec<u8>, filter: ImageFilterSpec) -> Vec<u8> {
     for pixel in rgba.chunks_exact_mut(4) {
         let mut r = pixel[0] as f32 / 255.0;
@@ -466,15 +596,22 @@ fn apply_overlay_halftone(base_rgba: &mut [u8], halftone_rgba: &[u8], opacity: f
 fn generate_noise_texture(width: u32, height: u32, seed: u64) -> Vec<u8> {
     let mut out = vec![0_u8; width as usize * height as usize * 4];
     let mut state = seed.wrapping_add(0x9E3779B97F4A7C15_u64);
-    // Match exported SVG noise overlay baseline translucency (roughly 45%).
-    const NOISE_ALPHA: u8 = 115;
+    // The exported SVG turbulence texture is centered around mid-gray.
+    // Keep procedural fallback low-contrast so overlay/screen blends don't
+    // wash out the entire composition.
+    const NOISE_ALPHA: u8 = 96;
+    const NOISE_BASE: u8 = 128;
+    const NOISE_AMPLITUDE: u8 = 32;
     for pixel in out.chunks_exact_mut(4) {
         // xorshift* variant for deterministic lightweight procedural noise.
         state ^= state >> 12;
         state ^= state << 25;
         state ^= state >> 27;
         let noise = state.wrapping_mul(0x2545F4914F6CDD1D_u64);
-        let value = (noise >> 56) as u8;
+        let centered = ((noise >> 56) & 0xFF) as i16;
+        let value = (NOISE_BASE as i16 - NOISE_AMPLITUDE as i16)
+            + ((centered * (NOISE_AMPLITUDE as i16 * 2 + 1)) / 256);
+        let value = value.clamp(0, 255) as u8;
         pixel[0] = value;
         pixel[1] = value;
         pixel[2] = value;
@@ -583,6 +720,44 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    fn should_apply_runtime_layout_is_disabled_for_design_viewport() {
+        assert!(!should_apply_runtime_layout(Size::new(
+            DEFAULT_WIDTH,
+            DEFAULT_HEIGHT
+        )));
+    }
+
+    #[test]
+    fn should_apply_runtime_layout_is_disabled_for_clamped_viewport_by_default() {
+        assert!(!should_apply_runtime_layout(Size::new(1366, 768)));
+        assert!(!should_apply_runtime_layout(Size::new(
+            1280,
+            DEFAULT_HEIGHT
+        )));
+    }
+
+    #[test]
+    fn map_window_to_design_point_is_identity_for_design_size() {
+        let size = Size::new(DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        let mapped = map_window_to_design_point(size, 683.0, 442.0).expect("point should map");
+        assert!((mapped.0 - 683.0).abs() < 1e-3);
+        assert!((mapped.1 - 442.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn map_window_to_design_point_handles_letterbox_side_margins() {
+        let size = Size::new(1366, 768);
+
+        // Left side letterbox should not map to design space.
+        assert!(map_window_to_design_point(size, 20.0, 200.0).is_none());
+
+        // Center point should map to center of design.
+        let mapped = map_window_to_design_point(size, 683.0, 384.0).expect("center should map");
+        assert!((mapped.0 - 683.0).abs() < 1.0);
+        assert!((mapped.1 - 442.0).abs() < 1.0);
+    }
+
+    #[test]
     fn figma_image_reference_to_id_is_stable() {
         assert_eq!(
             figma_image_reference_to_id("assets/foo.png"),
@@ -657,7 +832,32 @@ mod tests {
         assert_eq!((w2, h2), (128, 128));
         assert_eq!(a, b);
         assert_eq!(a.len(), (128 * 128 * 4) as usize);
-        assert!(a.chunks_exact(4).all(|px| px[3] == 115));
+        assert!(a.chunks_exact(4).all(|px| px[3] == 96));
+    }
+
+    #[test]
+    fn load_procedural_image_noise_stays_in_low_contrast_band() {
+        let (rgba, _, _) =
+            load_procedural_image("procedural://noise/abcd", &[]).expect("noise should load");
+
+        let mut min_value = u8::MAX;
+        let mut max_value = u8::MIN;
+        for px in rgba.chunks_exact(4) {
+            min_value = min_value.min(px[0]);
+            max_value = max_value.max(px[0]);
+            assert_eq!(px[0], px[1]);
+            assert_eq!(px[1], px[2]);
+            assert_eq!(px[3], 96);
+        }
+
+        assert!(
+            min_value >= 96,
+            "noise floor should stay near middle gray, got {min_value}"
+        );
+        assert!(
+            max_value <= 160,
+            "noise ceiling should stay near middle gray, got {max_value}"
+        );
     }
 
     #[test]
@@ -711,6 +911,38 @@ mod tests {
     }
 
     #[test]
+    fn riot_waves_runtime_preserves_hero_stack_node_opacity() {
+        let runtime = riot_waves_generated_module::riot_waves_generated::runtime()
+            .expect("runtime should initialize");
+        let scene = runtime.scene();
+
+        let hero_image = runtime
+            .node_for_figma_id("stitch:0.1.0.0.0")
+            .expect("hero image node should exist");
+        let overlay_noise = runtime
+            .node_for_figma_id("stitch:0.1.0.0.1")
+            .expect("overlay noise node should exist");
+
+        let hero_node = scene
+            .get_node(hero_image)
+            .expect("hero node should resolve");
+        let overlay_node = scene
+            .get_node(overlay_noise)
+            .expect("overlay node should resolve");
+
+        assert!(
+            (hero_node.opacity - 0.8).abs() < 1e-3,
+            "hero image opacity should stay authored at 0.8, got {}",
+            hero_node.opacity
+        );
+        assert!(
+            (overlay_node.opacity - 0.4).abs() < 1e-3,
+            "overlay noise opacity should stay authored at 0.4, got {}",
+            overlay_node.opacity
+        );
+    }
+
+    #[test]
     fn image_search_roots_includes_artifact_subdirectories() {
         let stitch_run = PathBuf::from("artifacts/stitch_import_run");
         if stitch_run.exists() {
@@ -739,5 +971,40 @@ mod tests {
         assert_eq!(resolved, target);
 
         std::fs::remove_dir_all(base).expect("cleanup test directory");
+    }
+
+    #[test]
+    fn collect_font_assets_reads_assets_directories() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before unix epoch")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("arthropod_riot_waves_fonts_{unique}"));
+        let asset_root = base.join("stitch").join("assets");
+        std::fs::create_dir_all(&asset_root).expect("create font asset directory");
+        let nested = asset_root.join("fonts");
+        std::fs::create_dir_all(&nested).expect("create nested font directory");
+        let font_file = nested.join("material_symbols.ttf");
+        let non_font = asset_root.join("readme.txt");
+        std::fs::write(&font_file, b"font-bytes").expect("write font file");
+        std::fs::write(&non_font, b"not-font").expect("write non-font file");
+
+        let roots = vec![base.join("stitch"), asset_root.clone()];
+        let fonts = collect_font_assets(&roots);
+        assert_eq!(fonts.len(), 1);
+        assert_eq!(fonts[0], font_file);
+
+        std::fs::remove_dir_all(base).expect("cleanup test directory");
+    }
+
+    #[test]
+    fn is_font_asset_path_matches_supported_extensions() {
+        assert!(is_font_asset_path(Path::new("x.ttf")));
+        assert!(is_font_asset_path(Path::new("x.otf")));
+        assert!(is_font_asset_path(Path::new("x.ttc")));
+        assert!(is_font_asset_path(Path::new("x.woff")));
+        assert!(is_font_asset_path(Path::new("x.woff2")));
+        assert!(!is_font_asset_path(Path::new("x.png")));
+        assert!(!is_font_asset_path(Path::new("x.css")));
     }
 }

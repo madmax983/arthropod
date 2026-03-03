@@ -266,6 +266,11 @@ impl Transform2D {
     }
 
     #[inline]
+    pub fn rotate_radians(angle: f32) -> Self {
+        Self(glam::Affine2::from_angle(angle))
+    }
+
+    #[inline]
     pub fn as_affine2(&self) -> glam::Affine2 {
         self.0
     }
@@ -285,6 +290,14 @@ impl Transform2D {
     #[inline]
     pub fn translation(&self) -> glam::Vec2 {
         self.0.translation
+    }
+
+    /// Extract the approximate in-plane rotation in radians.
+    ///
+    /// This is robust for the common UI transform case (rotation +/- scale).
+    #[inline]
+    pub fn rotation_radians(&self) -> f32 {
+        self.0.matrix2.x_axis.y.atan2(self.0.matrix2.x_axis.x)
     }
 
     /// Compose transforms (self * other).
@@ -309,5 +322,13 @@ mod tests {
         // sizeof(NodeContent) should be around 24-32 bytes.
         // If it's > 64 bytes, something is wrong.
         assert!(std::mem::size_of::<NodeContent>() <= 32);
+    }
+
+    #[test]
+    fn test_transform_rotation_radians_roundtrip() {
+        let angle = 15.0_f32.to_radians();
+        let transform = Transform2D::rotate_radians(angle);
+        let extracted = transform.rotation_radians();
+        assert!((extracted - angle).abs() < 1e-5);
     }
 }

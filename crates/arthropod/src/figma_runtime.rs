@@ -46,10 +46,11 @@ impl FigmaRuntime {
     }
 
     pub fn from_imported(imported: ImportedFigmaDocument) -> Result<Self, FigmaRuntimeError> {
-        let mut runtime = if imported.figma_to_scene.is_empty() {
-            None
-        } else {
+        let has_prototype_edges = !imported.prototype_graph.edges.is_empty();
+        let mut runtime = if has_prototype_edges && !imported.figma_to_scene.is_empty() {
             Some(PrototypeRuntime::new(&imported)?)
+        } else {
+            None
         };
 
         let root_children = imported
@@ -67,13 +68,15 @@ impl FigmaRuntime {
             prototype_runtime: runtime.take(),
         };
 
-        let current_screen = state
-            .prototype_runtime
-            .as_ref()
-            .and_then(PrototypeRuntime::current_screen)
-            .or_else(|| state.top_level_screens.first().copied());
-        if let Some(screen) = current_screen {
-            state.show_screen(screen);
+        if state.prototype_runtime.is_some() {
+            let current_screen = state
+                .prototype_runtime
+                .as_ref()
+                .and_then(PrototypeRuntime::current_screen)
+                .or_else(|| state.top_level_screens.first().copied());
+            if let Some(screen) = current_screen {
+                state.show_screen(screen);
+            }
         }
         state.sync_overlay_visibility_from_runtime();
 
@@ -106,8 +109,8 @@ impl FigmaRuntime {
     pub fn set_current_screen(&mut self, node: NodeId) {
         if let Some(runtime) = &mut self.prototype_runtime {
             runtime.set_current_screen(node);
+            self.show_screen(node);
         }
-        self.show_screen(node);
     }
 
     pub fn is_visible(&self, node: NodeId) -> bool {

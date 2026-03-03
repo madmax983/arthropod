@@ -110,6 +110,20 @@ impl PrimitiveInstance {
             _padding: 0,
         }
     }
+
+    /// Set the per-instance rotation in radians.
+    ///
+    /// Stored as f32 bits in `_padding` to preserve the 96-byte payload layout.
+    #[inline]
+    pub fn set_rotation_radians(&mut self, radians: f32) {
+        self._padding = radians.to_bits();
+    }
+
+    /// Get the per-instance rotation in radians.
+    #[inline]
+    pub fn rotation_radians(&self) -> f32 {
+        f32::from_bits(self._padding)
+    }
 }
 
 #[cfg(test)]
@@ -184,5 +198,13 @@ mod tests {
 
         // Bits 0-3 (fill_type) should be 0
         assert_eq!(instance.flags & 0xF, 0);
+    }
+
+    #[test]
+    fn test_rotation_radians_roundtrip() {
+        let mut instance = PrimitiveInstance::solid([0.0, 0.0], [1.0, 1.0], [1.0; 4]);
+        let angle = -12.5_f32.to_radians();
+        instance.set_rotation_radians(angle);
+        assert!((instance.rotation_radians() - angle).abs() < 1e-6);
     }
 }

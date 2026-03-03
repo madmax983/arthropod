@@ -632,6 +632,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 }
 
 /// Run the application.
+#[inline]
+fn should_render_dirty_windows(control_flow: ControlFlow) -> bool {
+    control_flow != ControlFlow::Exit
+}
+
 pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
     let event_loop = crate::EventLoop::new()?;
     let mut app = A::new(&event_loop);
@@ -687,6 +692,13 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
             // Drain all events from channel (won't panic even if wndproc fires during app.on_event)
             while let Ok(event) = event_receiver.try_recv() {
                 app.on_event(event, &mut control_flow);
+                if !should_render_dirty_windows(control_flow) {
+                    break;
+                }
+            }
+
+            if !should_render_dirty_windows(control_flow) {
+                break;
             }
 
             // Only redraw windows that are actually dirty
@@ -701,4 +713,20 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_render_dirty_windows_is_false_for_exit() {
+        assert!(!should_render_dirty_windows(ControlFlow::Exit));
+    }
+
+    #[test]
+    fn should_render_dirty_windows_is_true_for_active_modes() {
+        assert!(should_render_dirty_windows(ControlFlow::Poll));
+        assert!(should_render_dirty_windows(ControlFlow::Wait));
+    }
 }

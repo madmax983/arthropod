@@ -8,6 +8,29 @@ use crate::primitives::{
     with_stroke_cap_join,
 };
 
+fn paint_has_visible_alpha(paint: &Paint) -> bool {
+    match paint {
+        Paint::Solid(color) => color.w > f32::EPSILON,
+        Paint::Linear(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        Paint::Radial(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        Paint::Angular(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        Paint::Diamond(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        Paint::Image(_) => true,
+    }
+}
+
 /// Convert a VisualStyle into one or more PrimitiveInstances.
 ///
 /// A single styled node may generate multiple instances:
@@ -24,16 +47,27 @@ fn create_primitive_instances_impl(
 ) -> Vec<PrimitiveInstance> {
     let mut instances = Vec::new();
 
-    // Text node fills are glyph paints, not rectangular background paints.
-    // Glyph rendering consumes these fills in `instance_collector`.
+    // For text styles, fill[0] is treated as the glyph paint.
+    // Any additional visible paints are treated as sticker/background surfaces.
+    let text_has_background_surface =
+        style.text.is_some() && style.fills.iter().skip(1).any(paint_has_visible_alpha);
     let fills_to_render: &[Paint] = if style.text.is_some() {
-        &[]
+        if style.fills.len() > 1 {
+            &style.fills[1..]
+        } else {
+            &[]
+        }
     } else {
         &style.fills
     };
 
     // 1. Render shadows FIRST (behind everything)
     for effect in &style.effects {
+        if style.text.is_some() && !text_has_background_surface {
+            // Text-only drop shadows should be handled in glyph space, not as
+            // rectangular bounds shadows.
+            continue;
+        }
         if let style_engine::Effect::DropShadow(shadow) = effect
             && shadow.visible
         {
@@ -627,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    fn test_text_nodes_do_not_emit_background_fill_instances() {
+    fn test_text_nodes_emit_background_fill_instances_from_secondary_paints() {
         let style = VisualStyle::new()
             .text(style_engine::TextContent::new("SCUM".to_string(), 72.0))
             .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
@@ -638,8 +672,25 @@ mod tests {
 
         assert_eq!(
             instances.len(),
-            0,
-            "text-node fills should be consumed by glyph rendering, not rectangle instances"
+            1,
+            "text-node secondary fills should render as background sticker surfaces"
+        );
+        assert_eq!(instances[0].color, [1.0, 1.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn test_text_only_drop_shadow_does_not_emit_rect_shadow_instance() {
+        let style = VisualStyle::new()
+            .text(style_engine::TextContent::new("TODAY".to_string(), 20.0))
+            .fill(Paint::solid(Vec4::new(0.8, 1.0, 0.0, 1.0)))
+            .drop_shadow(Vec2::new(4.0, 4.0), 0.0, Vec4::new(0.8, 1.0, 0.0, 1.0));
+
+        let instances =
+            create_primitive_instances(&style, Vec2::new(10.0, 20.0), Vec2::new(100.0, 40.0), 1.0);
+
+        assert!(
+            instances.is_empty(),
+            "text-only styles should not emit rectangular drop-shadow instances"
         );
     }
 

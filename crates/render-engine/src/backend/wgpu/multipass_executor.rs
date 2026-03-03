@@ -8,9 +8,10 @@ use crate::backend::wgpu::effects::{
     style_requires_multipass,
 };
 use crate::backend::wgpu::instance_collector::{
-    BatchCollectionContext, TEXT_PARALLEL_THRESHOLD, apply_text_fill_to_glyph, collect_instances,
-    collect_instances_excluding_multipass, collect_style_batches_for_bounds,
-    inherited_node_opacity, resolve_text_fill,
+    BatchCollectionContext, TEXT_PARALLEL_THRESHOLD, apply_node_transform_to_instances,
+    apply_text_fill_to_glyph, collect_instances, collect_instances_excluding_multipass,
+    collect_style_batches_for_bounds, inherited_node_opacity, resolve_text_fill,
+    text_shape_options,
 };
 use crate::backend::wgpu::path_interner::PathInterner;
 use crate::backend::wgpu::pipelines::blend_pipeline::{BlendParams, BlendPipeline};
@@ -28,7 +29,7 @@ use crate::backend::wgpu::render_target_pool::{
 };
 use crate::primitives::PrimitiveInstance;
 use rayon::prelude::*;
-use text_engine::{ShapedText, shape_text_parallel};
+use text_engine::{ShapedText, shape_text_parallel_with_options};
 
 pub(crate) struct MultipassRenderer<'a> {
     pub(crate) context: &'a mut WgpuContext,
@@ -44,6 +45,18 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) text_renderer: &'a mut TextRenderer,
     pub(crate) glyph_texture: &'a wgpu::Texture,
     pub(crate) traversal_stack: &'a mut Vec<crate::NodeId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OrderedRenderNodeKind {
+    Direct,
+    Multipass,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OrderedRenderNode {
+    pub node_id: crate::NodeId,
+    pub kind: OrderedRenderNodeKind,
 }
 
 impl<'a> MultipassRenderer<'a> {
@@ -131,8 +144,9 @@ impl<'a> MultipassRenderer<'a> {
             let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) else {
                 continue;
             };
+            let scissor_bounds = self.context.map_scene_rect_to_surface(render_bounds);
             let scissor = rect_to_scissor_bounds(
-                render_bounds,
+                scissor_bounds,
                 self.context.config.width,
                 self.context.config.height,
             );
@@ -213,6 +227,7 @@ impl<'a> MultipassRenderer<'a> {
                 &style,
                 effective_opacity,
                 render_bounds,
+                node.transform,
             );
 
             if background_blur_radius.is_none() {
@@ -264,6 +279,126 @@ impl<'a> MultipassRenderer<'a> {
             self.release_effect_target(src_handle);
             self.release_effect_target(tmp_handle);
             self.release_effect_target(dst_handle);
+        }
+    }
+
+    pub(crate) fn render_scene_in_visual_order(
+        &mut self,
+        scene: &Scene,
+        surface_texture: &wgpu::Texture,
+        surface_view: &wgpu::TextureView,
+    ) {
+        self.draw_batches_to_view(
+            surface_view,
+            wgpu::LoadOp::Clear(wgpu::Color {
+                r: self.context.clear_color.r() as f64,
+                g: self.context.clear_color.g() as f64,
+                b: self.context.clear_color.b() as f64,
+                a: self.context.clear_color.a() as f64,
+            }),
+            &[],
+            &[],
+            None,
+        );
+
+        let ordered_nodes = collect_ordered_render_nodes(scene, self.traversal_stack);
+        for entry in ordered_nodes {
+            match entry.kind {
+                OrderedRenderNodeKind::Direct => {
+                    self.render_direct_node(scene, entry.node_id, surface_view);
+                }
+                OrderedRenderNodeKind::Multipass => {
+                    self.render_multipass_effect_nodes(
+                        scene,
+                        std::slice::from_ref(&entry.node_id),
+                        surface_texture,
+                        surface_view,
+                    );
+                }
+            }
+        }
+    }
+
+    fn render_direct_node(
+        &mut self,
+        scene: &Scene,
+        node_id: crate::NodeId,
+        surface_view: &wgpu::TextureView,
+    ) {
+        let Some(node) = scene.get_node(node_id) else {
+            return;
+        };
+        if !node.visible {
+            return;
+        }
+        let inherited_opacity = inherited_node_opacity(scene, node_id);
+        if inherited_opacity <= 0.0 {
+            return;
+        }
+        let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) else {
+            return;
+        };
+        let scissor_bounds = self.context.map_scene_rect_to_surface(render_bounds);
+        let scissor = rect_to_scissor_bounds(
+            scissor_bounds,
+            self.context.config.width,
+            self.context.config.height,
+        );
+
+        match &node.content {
+            crate::NodeContent::Styled { style } => {
+                let effective_opacity = inherited_opacity * style.opacity;
+                if effective_opacity <= 0.0 {
+                    return;
+                }
+                let mut batch_ctx = BatchCollectionContext {
+                    pipeline: self.primitive_pipeline,
+                    tessellation_cache: self.tessellation_cache,
+                    path_interner: self.path_interner,
+                    text_renderer: self.text_renderer,
+                    glyph_texture: self.glyph_texture,
+                    queue: &self.context.queue,
+                };
+                let (instances, path_batches) = collect_style_batches_for_bounds(
+                    &mut batch_ctx,
+                    style,
+                    effective_opacity,
+                    render_bounds,
+                    node.transform,
+                );
+                self.draw_batches_to_view(
+                    surface_view,
+                    wgpu::LoadOp::Load,
+                    &instances,
+                    &path_batches,
+                    scissor,
+                );
+            }
+            crate::NodeContent::SolidColor { color } => {
+                let mut final_color = color.to_array();
+                final_color[3] *= inherited_opacity;
+                if final_color[3] <= 0.0 {
+                    return;
+                }
+                let mut instance = PrimitiveInstance::solid(
+                    [render_bounds.x, render_bounds.y],
+                    [render_bounds.width, render_bounds.height],
+                    final_color,
+                );
+                apply_node_transform_to_instances(
+                    std::slice::from_mut(&mut instance),
+                    node.transform,
+                );
+                let instances = [instance];
+                self.draw_batches_to_view(
+                    surface_view,
+                    wgpu::LoadOp::Load,
+                    &instances,
+                    &[],
+                    scissor,
+                );
+            }
+            crate::NodeContent::Empty => {}
         }
     }
 
@@ -560,51 +695,79 @@ impl<'a> MultipassRenderer<'a> {
                 [f32; 4],
                 &style_engine::VisualStyle,
                 ShapedText,
+                crate::Transform2D,
             )> = if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
                 // Parallel shaping
                 raw_text_nodes
                     .par_iter()
-                    .filter(|(_, text, _, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, effective_opacity, style)| {
-                        let shaped = shape_text_parallel(text, *font_size);
-                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
+                    .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
+                    .map(|(_, node, text_content, effective_opacity, style)| {
+                        let options = text_shape_options(text_content);
+                        let shaped = shape_text_parallel_with_options(
+                            &text_content.text,
+                            text_content.font_size,
+                            options,
+                        );
+                        let position =
+                            glam::Vec2::new(node.bounds.x, node.bounds.y + text_content.font_size);
                         let text_bounds = [
                             node.bounds.x,
                             node.bounds.y,
                             node.bounds.width,
                             node.bounds.height,
                         ];
-                        (position, *effective_opacity, text_bounds, *style, shaped)
+                        (
+                            position,
+                            *effective_opacity,
+                            text_bounds,
+                            *style,
+                            shaped,
+                            node.transform,
+                        )
                     })
                     .collect()
             } else {
                 // Sequential shaping for small counts
                 raw_text_nodes
                     .iter()
-                    .filter(|(_, text, _, _, _)| !text.is_empty())
-                    .map(|(node, text, font_size, effective_opacity, style)| {
+                    .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
+                    .map(|(_, node, text_content, effective_opacity, style)| {
+                        let options = text_shape_options(text_content);
                         let shaped = self
                             .text_renderer
                             .text_engine_mut()
-                            .shape_text(text, *font_size);
-                        let position = glam::Vec2::new(node.bounds.x, node.bounds.y + font_size);
+                            .shape_text_with_options(
+                                &text_content.text,
+                                text_content.font_size,
+                                options,
+                            );
+                        let position =
+                            glam::Vec2::new(node.bounds.x, node.bounds.y + text_content.font_size);
                         let text_bounds = [
                             node.bounds.x,
                             node.bounds.y,
                             node.bounds.width,
                             node.bounds.height,
                         ];
-                        (position, *effective_opacity, text_bounds, *style, shaped)
+                        (
+                            position,
+                            *effective_opacity,
+                            text_bounds,
+                            *style,
+                            shaped,
+                            node.transform,
+                        )
                     })
                     .collect()
             };
 
             // Step 2: Generate glyph instances and add to primitives
-            for (position, opacity, text_bounds, style, shaped) in shaped_results {
+            for (position, opacity, text_bounds, style, shaped, node_transform) in shaped_results {
                 let fill = resolve_text_fill(self.primitive_pipeline, style, opacity, text_bounds);
-                let glyph_instances =
+                let mut glyph_instances =
                     self.text_renderer
                         .generate_instances(&shaped, position, glam::Vec4::ONE);
+                apply_node_transform_to_instances(&mut glyph_instances, node_transform);
 
                 // Apply text fill metadata to generated glyph primitive instances
                 for mut instance in glyph_instances {
@@ -640,13 +803,6 @@ impl<'a> MultipassRenderer<'a> {
         self.collect_frame_batches_internal(scene, false)
     }
 
-    pub(crate) fn collect_frame_batches_without_multipass(
-        &mut self,
-        scene: &Scene,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-        self.collect_frame_batches_internal(scene, true)
-    }
-
     pub(crate) fn end_frame(&mut self) {
         let pool = &mut self.effect_target_pool;
         let context = &mut self.context;
@@ -660,6 +816,22 @@ pub(crate) fn collect_multipass_node_ids(
     scene: &Scene,
     stack: &mut Vec<crate::NodeId>,
 ) -> Vec<crate::NodeId> {
+    collect_ordered_render_nodes(scene, stack)
+        .into_iter()
+        .filter_map(|entry| {
+            if matches!(entry.kind, OrderedRenderNodeKind::Multipass) {
+                Some(entry.node_id)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub(crate) fn collect_ordered_render_nodes(
+    scene: &Scene,
+    stack: &mut Vec<crate::NodeId>,
+) -> Vec<OrderedRenderNode> {
     use crate::NodeContent;
 
     scene
@@ -672,8 +844,19 @@ pub(crate) fn collect_multipass_node_ids(
                 return None;
             }
             match &node.content {
-                NodeContent::Styled { style } if style_requires_multipass(style) => Some(node_id),
-                _ => None,
+                NodeContent::Styled { style } => Some(OrderedRenderNode {
+                    node_id,
+                    kind: if style_requires_multipass(style) {
+                        OrderedRenderNodeKind::Multipass
+                    } else {
+                        OrderedRenderNodeKind::Direct
+                    },
+                }),
+                NodeContent::SolidColor { .. } => Some(OrderedRenderNode {
+                    node_id,
+                    kind: OrderedRenderNodeKind::Direct,
+                }),
+                NodeContent::Empty => None,
             }
         })
         .collect()

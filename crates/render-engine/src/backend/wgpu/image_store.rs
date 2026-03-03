@@ -73,7 +73,7 @@ pub fn sample_image_fill(fill: &ImageFill, uv: Vec2, target_size: Vec2) -> Optio
 
     let mapped =
         map_uv_for_scale_mode(uv, fill.scale_mode, target_size, image.width, image.height)?;
-    Some(sample_nearest(image, mapped))
+    Some(sample_bilinear(image, mapped))
 }
 
 fn apply_transform(uv: Vec2, m: [f32; 9]) -> Vec2 {
@@ -140,21 +140,52 @@ fn map_uv_for_scale_mode(
     }
 }
 
-fn sample_nearest(image: &CpuImage, uv: Vec2) -> Vec4 {
+fn sample_texel(image: &CpuImage, x: u32, y: u32) -> Vec4 {
+    let idx = ((y * image.width + x) * 4) as usize;
+    // Decode stored sRGB texels to linear space before shading.
+    let r = srgb_to_linear(image.rgba8[idx] as f32 / 255.0);
+    let g = srgb_to_linear(image.rgba8[idx + 1] as f32 / 255.0);
+    let b = srgb_to_linear(image.rgba8[idx + 2] as f32 / 255.0);
+    let a = image.rgba8[idx + 3] as f32 / 255.0;
+    Vec4::new(r, g, b, a)
+}
+
+fn srgb_to_linear(channel: f32) -> f32 {
+    let c = channel.clamp(0.0, 1.0);
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn sample_bilinear(image: &CpuImage, uv: Vec2) -> Vec4 {
     if uv.x < 0.0 || uv.y < 0.0 {
         return Vec4::ZERO;
     }
 
     let u = uv.x.clamp(0.0, 1.0);
     let v = uv.y.clamp(0.0, 1.0);
-    let x = (u * (image.width.saturating_sub(1)) as f32).round() as u32;
-    let y = (v * (image.height.saturating_sub(1)) as f32).round() as u32;
-    let idx = ((y * image.width + x) * 4) as usize;
-    let r = image.rgba8[idx] as f32 / 255.0;
-    let g = image.rgba8[idx + 1] as f32 / 255.0;
-    let b = image.rgba8[idx + 2] as f32 / 255.0;
-    let a = image.rgba8[idx + 3] as f32 / 255.0;
-    Vec4::new(r, g, b, a)
+    let max_x = image.width.saturating_sub(1);
+    let max_y = image.height.saturating_sub(1);
+    let fx = u * max_x as f32;
+    let fy = v * max_y as f32;
+
+    let x0 = fx.floor() as u32;
+    let y0 = fy.floor() as u32;
+    let x1 = (x0 + 1).min(max_x);
+    let y1 = (y0 + 1).min(max_y);
+    let tx = fx - x0 as f32;
+    let ty = fy - y0 as f32;
+
+    let c00 = sample_texel(image, x0, y0);
+    let c10 = sample_texel(image, x1, y0);
+    let c01 = sample_texel(image, x0, y1);
+    let c11 = sample_texel(image, x1, y1);
+
+    let top = c00.lerp(c10, tx);
+    let bottom = c01.lerp(c11, tx);
+    top.lerp(bottom, ty)
 }
 
 #[cfg(test)]
@@ -205,8 +236,8 @@ mod tests {
         };
         let c = sample_image_fill(&fill, Vec2::new(2.25, -1.75), Vec2::new(30.0, 10.0))
             .expect("sample should exist");
-        assert!((c.x - 64.0 / 255.0).abs() < 1e-6);
-        assert!((c.y - 128.0 / 255.0).abs() < 1e-6);
+        assert!((c.x - srgb_to_linear(64.0 / 255.0)).abs() < 1e-6);
+        assert!((c.y - srgb_to_linear(128.0 / 255.0)).abs() < 1e-6);
         assert!((c.z - 1.0).abs() < 1e-6);
     }
 
@@ -237,7 +268,51 @@ mod tests {
         let right = sample_image_fill(&fill, Vec2::new(0.9, 0.5), Vec2::new(100.0, 100.0))
             .expect("sample should exist");
 
-        assert!(left.x > 0.9 && left.y < 0.1 && left.z < 0.1);
-        assert!(right.x > 0.9 && right.y > 0.9 && right.z < 0.1);
+        assert!(
+            left.x > left.y && left.x > left.z,
+            "left sample should remain red-dominant under stretch, got {:?}",
+            left
+        );
+        assert!(
+            right.x > 0.6 && right.y > 0.6 && right.z < 0.4,
+            "right sample should approach yellow under stretch, got {:?}",
+            right
+        );
+    }
+
+    #[test]
+    fn test_sample_image_fill_blends_texels_for_smoother_sampling() {
+        register_image_rgba8(
+            ImageId(14),
+            2,
+            2,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, // row 0
+                0, 0, 255, 255, 255, 255, 255, 255, // row 1
+            ],
+        )
+        .expect("register image");
+
+        let fill = ImageFill {
+            image_id: ImageId(14),
+            scale_mode: ImageScaleMode::Stretch,
+            transform: None,
+        };
+
+        let center = sample_image_fill(&fill, Vec2::new(0.5, 0.5), Vec2::new(128.0, 128.0))
+            .expect("sample should exist");
+
+        // Bilinear center sample should roughly average the 4 texels.
+        assert!((center.x - 0.5).abs() < 0.1, "unexpected red: {}", center.x);
+        assert!(
+            (center.y - 0.5).abs() < 0.1,
+            "unexpected green: {}",
+            center.y
+        );
+        assert!(
+            (center.z - 0.5).abs() < 0.1,
+            "unexpected blue: {}",
+            center.z
+        );
     }
 }

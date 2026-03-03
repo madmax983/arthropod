@@ -313,6 +313,19 @@ impl WgpuBackend {
 }
 
 impl WgpuBackend {
+    /// Configure an authored design-space for uniform fit scaling with centered letterboxing.
+    ///
+    /// When set, all scene coordinates are projected from design-space into the current
+    /// render target while preserving aspect ratio.
+    pub fn set_design_space(&mut self, width: f32, height: f32) {
+        self.context.set_design_space(width, height);
+    }
+
+    /// Clear any configured design-space override and project directly in surface pixels.
+    pub fn clear_design_space(&mut self) {
+        self.context.clear_design_space();
+    }
+
     /// Register font bytes for text shaping/rasterization.
     ///
     /// Returns number of newly visible faces in the backing text engine database.
@@ -420,32 +433,22 @@ impl WgpuBackend {
 
         // I'll assume I add `collect_frame_batches` to `MultipassRenderer`.
 
-        let (base_instances, base_path_batches) = if multipass_node_ids.is_empty() {
-            executor.collect_frame_batches(scene)
-        } else {
-            executor.collect_frame_batches_without_multipass(scene)
-        };
-
-        executor.draw_batches_to_view(
-            &frame_view,
-            wgpu::LoadOp::Clear(wgpu::Color {
-                r: executor.context.clear_color.r() as f64,
-                g: executor.context.clear_color.g() as f64,
-                b: executor.context.clear_color.b() as f64,
-                a: executor.context.clear_color.a() as f64,
-            }),
-            &base_instances,
-            &base_path_batches,
-            None,
-        );
-
-        if !multipass_node_ids.is_empty() {
-            executor.render_multipass_effect_nodes(
-                scene,
-                &multipass_node_ids,
-                &frame_texture,
+        if multipass_node_ids.is_empty() {
+            let (base_instances, base_path_batches) = executor.collect_frame_batches(scene);
+            executor.draw_batches_to_view(
                 &frame_view,
+                wgpu::LoadOp::Clear(wgpu::Color {
+                    r: executor.context.clear_color.r() as f64,
+                    g: executor.context.clear_color.g() as f64,
+                    b: executor.context.clear_color.b() as f64,
+                    a: executor.context.clear_color.a() as f64,
+                }),
+                &base_instances,
+                &base_path_batches,
+                None,
             );
+        } else {
+            executor.render_scene_in_visual_order(scene, &frame_texture, &frame_view);
         }
 
         let rgba = executor
@@ -542,32 +545,11 @@ impl super::RenderBackend for WgpuBackend {
             });
         }
 
-        let (base_instances, base_path_batches) =
-            executor.collect_frame_batches_without_multipass(scene);
-
         let output = executor.context.surface.get_current_texture()?;
         let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        executor.draw_batches_to_view(
-            &surface_view,
-            wgpu::LoadOp::Clear(wgpu::Color {
-                r: executor.context.clear_color.r() as f64,
-                g: executor.context.clear_color.g() as f64,
-                b: executor.context.clear_color.b() as f64,
-                a: executor.context.clear_color.a() as f64,
-            }),
-            &base_instances,
-            &base_path_batches,
-            None,
-        );
-
-        executor.render_multipass_effect_nodes(
-            scene,
-            &multipass_node_ids,
-            &output.texture,
-            &surface_view,
-        );
+        executor.render_scene_in_visual_order(scene, &output.texture, &surface_view);
 
         executor.end_frame();
 

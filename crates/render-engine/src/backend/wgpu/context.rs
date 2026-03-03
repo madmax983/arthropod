@@ -95,6 +95,7 @@ pub struct WgpuContext {
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) globals_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) clear_color: crate::Color,
+    design_space: Option<(f32, f32)>,
     next_render_target_handle: RenderTargetHandle,
     render_targets: HashMap<RenderTargetHandle, RenderTarget>,
 }
@@ -354,7 +355,7 @@ impl WgpuContext {
             });
 
         // Create projection matrix
-        let projection = create_projection_matrix(width, height);
+        let projection = create_projection_matrix_with_design_space(width, height, None);
 
         let globals = Globals {
             transform: projection,
@@ -400,6 +401,7 @@ impl WgpuContext {
             globals_bind_group,
             globals_bind_group_layout,
             clear_color,
+            design_space: None,
             next_render_target_handle: 1,
             render_targets: HashMap::new(),
         })
@@ -730,20 +732,86 @@ impl WgpuContext {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
-
-            let projection = create_projection_matrix(width, height);
-
-            let globals = Globals {
-                transform: projection,
-            };
-
-            self.queue
-                .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
+            self.update_globals_transform();
         }
+    }
+
+    pub fn set_design_space(&mut self, width: f32, height: f32) {
+        self.design_space =
+            if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 {
+                Some((width, height))
+            } else {
+                None
+            };
+        self.update_globals_transform();
+    }
+
+    pub fn clear_design_space(&mut self) {
+        self.design_space = None;
+        self.update_globals_transform();
+    }
+
+    fn update_globals_transform(&mut self) {
+        let projection = create_projection_matrix_with_design_space(
+            self.config.width,
+            self.config.height,
+            self.design_space,
+        );
+        let globals = Globals {
+            transform: projection,
+        };
+        self.queue
+            .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
+    }
+
+    pub fn map_scene_rect_to_surface(&self, rect: plat_core::Rect) -> plat_core::Rect {
+        map_scene_rect_to_surface_with_design_space(
+            rect,
+            self.config.width,
+            self.config.height,
+            self.design_space,
+        )
     }
 }
 
-fn create_projection_matrix(width: u32, height: u32) -> [[f32; 4]; 4] {
+fn map_scene_rect_to_surface_with_design_space(
+    rect: plat_core::Rect,
+    frame_width: u32,
+    frame_height: u32,
+    design_space: Option<(f32, f32)>,
+) -> plat_core::Rect {
+    let Some((design_width, design_height)) = design_space else {
+        return rect;
+    };
+    let width_f = frame_width as f32;
+    let height_f = frame_height as f32;
+    if width_f <= 0.0 || height_f <= 0.0 || design_width <= 0.0 || design_height <= 0.0 {
+        return rect;
+    }
+
+    let scale = (width_f / design_width).min(height_f / design_height);
+    if !scale.is_finite() || scale <= 0.0 {
+        return rect;
+    }
+
+    let fitted_width = design_width * scale;
+    let fitted_height = design_height * scale;
+    let offset_x = (width_f - fitted_width) * 0.5;
+    let offset_y = (height_f - fitted_height) * 0.5;
+
+    plat_core::Rect::new(
+        rect.x * scale + offset_x,
+        rect.y * scale + offset_y,
+        rect.width * scale,
+        rect.height * scale,
+    )
+}
+
+fn create_projection_matrix_with_design_space(
+    width: u32,
+    height: u32,
+    design_space: Option<(f32, f32)>,
+) -> [[f32; 4]; 4] {
     if width == 0 || height == 0 {
         return [
             [1.0, 0.0, 0.0, 0.0],
@@ -752,11 +820,34 @@ fn create_projection_matrix(width: u32, height: u32) -> [[f32; 4]; 4] {
             [0.0, 0.0, 0.0, 1.0],
         ];
     }
+
+    let width_f = width as f32;
+    let height_f = height as f32;
+    let (sx, sy, tx, ty) = if let Some((design_width, design_height)) = design_space {
+        if design_width > 0.0 && design_height > 0.0 {
+            let scale = (width_f / design_width).min(height_f / design_height);
+            let fitted_width = design_width * scale;
+            let fitted_height = design_height * scale;
+            let offset_x = (width_f - fitted_width) * 0.5;
+            let offset_y = (height_f - fitted_height) * 0.5;
+            (scale, scale, offset_x, offset_y)
+        } else {
+            (1.0, 1.0, 0.0, 0.0)
+        }
+    } else {
+        (1.0, 1.0, 0.0, 0.0)
+    };
+
     [
-        [2.0 / width as f32, 0.0, 0.0, 0.0],
-        [0.0, -2.0 / height as f32, 0.0, 0.0],
+        [2.0 * sx / width_f, 0.0, 0.0, 0.0],
+        [0.0, -2.0 * sy / height_f, 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
-        [-1.0, 1.0, 0.0, 1.0],
+        [
+            2.0 * tx / width_f - 1.0,
+            1.0 - 2.0 * ty / height_f,
+            0.0,
+            1.0,
+        ],
     ]
 }
 
@@ -873,7 +964,8 @@ mod tests {
         let width = 800.0f32;
         let height = 600.0f32;
 
-        let projection = create_projection_matrix(width as u32, height as u32);
+        let projection =
+            create_projection_matrix_with_design_space(width as u32, height as u32, None);
 
         // Top-left corner (0, 0) should map to (-1, 1) in NDC
         let x = 0.0;
@@ -902,7 +994,7 @@ mod tests {
 
     #[test]
     fn test_projection_matrix_handles_zero_dimensions() {
-        let matrix = create_projection_matrix(0, 0);
+        let matrix = create_projection_matrix_with_design_space(0, 0, None);
         // Should return identity matrix (no NaNs or Infs)
         assert_eq!(matrix[0][0], 1.0);
         assert_eq!(matrix[1][1], 1.0);
@@ -917,12 +1009,14 @@ mod tests {
         let width1 = 800.0f32;
         let height1 = 600.0f32;
 
-        let projection1 = create_projection_matrix(width1 as u32, height1 as u32);
+        let projection1 =
+            create_projection_matrix_with_design_space(width1 as u32, height1 as u32, None);
 
         let width2 = 1024.0f32;
         let height2 = 768.0f32;
 
-        let projection2 = create_projection_matrix(width2 as u32, height2 as u32);
+        let projection2 =
+            create_projection_matrix_with_design_space(width2 as u32, height2 as u32, None);
 
         // Matrices should be different
         assert_ne!(projection1[0][0], projection2[0][0]);
@@ -935,6 +1029,57 @@ mod tests {
         let ndc_y = projection2[1][1] * y + projection2[3][1];
         assert!((ndc_x - 1.0).abs() < 0.001);
         assert!((ndc_y - (-1.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_projection_matrix_with_design_space_letterboxes_to_center() {
+        let projection =
+            create_projection_matrix_with_design_space(1366, 768, Some((1366.0, 884.0)));
+
+        // Top of authored design should still land at top of viewport.
+        let top_left_x = 0.0f32;
+        let top_left_y = 0.0f32;
+        let ndc_x = projection[0][0] * top_left_x + projection[3][0];
+        let ndc_y = projection[1][1] * top_left_y + projection[3][1];
+        assert!(ndc_x > -1.0, "expected horizontal letterbox inset");
+        assert!((ndc_y - 1.0).abs() < 0.001);
+
+        // Bottom of authored design should map to viewport bottom exactly.
+        let bottom_y = 884.0f32;
+        let ndc_bottom_y = projection[1][1] * bottom_y + projection[3][1];
+        assert!((ndc_bottom_y - (-1.0)).abs() < 0.001);
+
+        // Authored design center should remain screen center.
+        let center_x = 1366.0f32 * 0.5;
+        let center_y = 884.0f32 * 0.5;
+        let ndc_center_x = projection[0][0] * center_x + projection[3][0];
+        let ndc_center_y = projection[1][1] * center_y + projection[3][1];
+        assert!(ndc_center_x.abs() < 0.001);
+        assert!(ndc_center_y.abs() < 0.001);
+    }
+
+    #[test]
+    fn test_map_scene_rect_to_surface_applies_design_space_scale_and_offset() {
+        let mapped = map_scene_rect_to_surface_with_design_space(
+            plat_core::Rect::new(1185.2, 516.4, 132.8, 43.0),
+            1366,
+            768,
+            Some((1366.0, 884.0)),
+        );
+        let scale = 768.0 / 884.0;
+        let offset_x = (1366.0 - 1366.0 * scale) * 0.5;
+        assert!((mapped.x - (1185.2 * scale + offset_x)).abs() < 1e-3);
+        assert!((mapped.y - (516.4 * scale)).abs() < 1e-3);
+        assert!((mapped.width - (132.8 * scale)).abs() < 1e-3);
+        assert!((mapped.height - (43.0 * scale)).abs() < 1e-3);
+
+        let same = map_scene_rect_to_surface_with_design_space(
+            plat_core::Rect::new(1.0, 2.0, 3.0, 4.0),
+            1366,
+            768,
+            None,
+        );
+        assert_eq!(same, plat_core::Rect::new(1.0, 2.0, 3.0, 4.0));
     }
 
     #[test]

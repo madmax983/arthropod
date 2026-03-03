@@ -118,9 +118,9 @@ pub struct PathPipeline {
 const INITIAL_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_INDEX_CAPACITY: usize = 8192;
 const INITIAL_GRADIENT_CAPACITY: usize = 256;
-const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 4.0;
-const IMAGE_SUBDIVISION_MAX: u32 = 128;
-const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 16_384;
+const IMAGE_SUBDIVISION_TARGET_PIXELS: f32 = 2.0;
+const IMAGE_SUBDIVISION_MAX: u32 = 768;
+const IMAGE_SUBDIVISION_TRIANGLE_BUDGET: u32 = 600_000;
 
 #[inline]
 fn mix_u64(mut state: u64, value: u64) -> u64 {
@@ -1406,6 +1406,15 @@ mod tests {
         assert!(
             steps >= 64,
             "image batches should use dense subdivision for large scaled content, got {steps}"
+        );
+    }
+
+    #[test]
+    fn test_image_subdivision_steps_keeps_hero_images_high_detail_with_budget_guard() {
+        let steps = image_subdivision_steps(glam::Vec2::new(920.0, 620.0), 2);
+        assert!(
+            (400..=768).contains(&steps),
+            "hero-sized image batches should keep high detail while remaining bounded, got {steps}"
         );
     }
 

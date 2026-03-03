@@ -340,6 +340,18 @@ fn rewrite_html_urls(html: &str, replacements: &HashMap<String, String>) -> Stri
     out
 }
 
+fn queue_discovered_urls(
+    source: &str,
+    pending: &mut Vec<DiscoveredUrl>,
+    seen_resolved: &mut HashSet<String>,
+) {
+    for discovered in discover_http_urls(source) {
+        if seen_resolved.insert(discovered.resolved.clone()) {
+            pending.push(discovered);
+        }
+    }
+}
+
 fn write_text_file(path: &Path, contents: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
@@ -370,7 +382,9 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
             html_source_path.display()
         )
     })?;
-    let discovered_urls = discover_http_urls(&html_source);
+    let mut pending_urls = Vec::new();
+    let mut seen_resolved = HashSet::new();
+    queue_discovered_urls(&html_source, &mut pending_urls, &mut seen_resolved);
 
     let html_out_path = options
         .html_out
@@ -388,11 +402,15 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
 
     let mut replacements = HashMap::new();
     let mut manifest_entries = Vec::new();
+    let mut downloaded_css_files = Vec::<PathBuf>::new();
     let mut downloaded = 0usize;
     let mut skipped = 0usize;
     let mut failed = 0usize;
 
-    for url in &discovered_urls {
+    let mut queue_index = 0usize;
+    while queue_index < pending_urls.len() {
+        let url = pending_urls[queue_index].clone();
+        queue_index += 1;
         let mut local_ref = None;
         let result = if options.skip_download {
             skipped += 1;
@@ -483,12 +501,25 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
 
         if let Some(local) = &local_ref {
             replacements.insert(url.original.clone(), local.clone());
+            replacements.insert(url.resolved.clone(), local.clone());
         }
 
         let local_path = result
             .local_file_name
             .as_ref()
             .map(|name| assets_dir.join(name).to_string_lossy().to_string());
+        if result.status == "downloaded"
+            && result
+                .local_file_name
+                .as_ref()
+                .is_some_and(|name| name.to_ascii_lowercase().ends_with(".css"))
+            && let Some(local_path) = local_path.as_ref().map(PathBuf::from)
+        {
+            if let Ok(css_source) = fs::read_to_string(&local_path) {
+                queue_discovered_urls(&css_source, &mut pending_urls, &mut seen_resolved);
+            }
+            downloaded_css_files.push(local_path);
+        }
         manifest_entries.push(json!({
             "original_url": url.original,
             "resolved_url": url.resolved,
@@ -500,6 +531,16 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
             "local_path": local_path,
             "error": result.error,
         }));
+    }
+
+    for css_path in &downloaded_css_files {
+        if let Ok(css_source) = fs::read_to_string(css_path) {
+            let rewritten_css = rewrite_html_urls(&css_source, &replacements);
+            if rewritten_css != css_source {
+                fs::write(css_path, rewritten_css)
+                    .map_err(|err| format!("failed to rewrite {}: {err}", css_path.display()))?;
+            }
+        }
     }
 
     let rewritten_html = rewrite_html_urls(&html_source, &replacements);
@@ -524,7 +565,7 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
         "timeout_secs": options.timeout_secs,
         "skip_download": options.skip_download,
         "extracted_files": extracted_listing,
-        "url_count": discovered_urls.len(),
+        "url_count": pending_urls.len(),
         "downloaded_count": downloaded,
         "skipped_count": skipped,
         "failed_count": failed,
@@ -539,7 +580,7 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
     println!("Primary html: {}", html_source_path.display());
     println!("Normalized html: {}", html_out_path.display());
     println!("Manifest: {}", manifest_out_path.display());
-    println!("Discovered URLs: {}", discovered_urls.len());
+    println!("Discovered URLs: {}", pending_urls.len());
     println!("Downloaded: {downloaded}, skipped: {skipped}, failed: {failed}");
 
     Ok(())
@@ -636,6 +677,46 @@ mod tests {
         );
         assert!(original.contains(&"https://cdn.tailwindcss.com?plugins=forms"));
         assert!(original.contains(&"https://lh3.googleusercontent.com/abc123"));
+    }
+
+    #[test]
+    fn queue_discovered_urls_finds_nested_css_font_urls() {
+        let mut pending = Vec::new();
+        let mut seen = HashSet::new();
+        let html = r#"<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk&display=swap" rel="stylesheet"/>"#;
+        let css = r#"
+@font-face {
+  src: url(https://fonts.gstatic.com/s/spacegrotesk/v22/font.ttf) format('truetype');
+}
+"#;
+        queue_discovered_urls(html, &mut pending, &mut seen);
+        queue_discovered_urls(css, &mut pending, &mut seen);
+
+        let urls = pending
+            .iter()
+            .map(|entry| entry.resolved.clone())
+            .collect::<HashSet<_>>();
+        assert!(
+            urls.contains("https://fonts.googleapis.com/css2?family=Space+Grotesk&display=swap")
+        );
+        assert!(urls.contains("https://fonts.gstatic.com/s/spacegrotesk/v22/font.ttf"));
+    }
+
+    #[test]
+    fn rewrite_html_urls_rewrites_nested_css_references() {
+        let css = r#"
+@font-face {
+  src: url(https://fonts.gstatic.com/s/spacegrotesk/v22/font.ttf) format('truetype');
+}
+"#;
+        let mut replacements = HashMap::new();
+        replacements.insert(
+            "https://fonts.gstatic.com/s/spacegrotesk/v22/font.ttf".to_string(),
+            "assets/fonts_gstatic_spacegrotesk.ttf".to_string(),
+        );
+        let rewritten = rewrite_html_urls(css, &replacements);
+        assert!(rewritten.contains("assets/fonts_gstatic_spacegrotesk.ttf"));
+        assert!(!rewritten.contains("https://fonts.gstatic.com/s/spacegrotesk/v22/font.ttf"));
     }
 
     #[test]

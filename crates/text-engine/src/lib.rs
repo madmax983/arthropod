@@ -5,7 +5,10 @@
 
 mod web_loader;
 
-use cosmic_text::{Attrs, Buffer, CacheKeyFlags, FontSystem, Metrics, Shaping};
+use cosmic_text::{
+    Attrs, Buffer, CacheKeyFlags, Family, FontSystem, Metrics, Shaping, Style as CosmicStyle,
+    Weight,
+};
 use std::cell::RefCell;
 use std::sync::{Mutex, OnceLock};
 pub use web_loader::{
@@ -100,6 +103,46 @@ pub struct TextBounds {
     pub height: f32,
 }
 
+/// Font style override for text shaping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextFontStyle {
+    #[default]
+    Normal,
+    Italic,
+    Oblique,
+}
+
+/// Optional text shaping overrides used to select a specific font face.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TextShapeOptions<'a> {
+    pub family: Option<&'a str>,
+    pub weight: Option<u16>,
+    pub style: TextFontStyle,
+}
+
+fn attrs_from_options(options: TextShapeOptions<'_>) -> Attrs<'_> {
+    let mut attrs = Attrs::new();
+
+    if let Some(family) = options
+        .family
+        .map(str::trim)
+        .filter(|family| !family.is_empty())
+    {
+        attrs = attrs.family(Family::Name(family));
+    }
+
+    if let Some(weight) = options.weight {
+        attrs = attrs.weight(Weight(weight.clamp(1, 1000)));
+    }
+
+    let style = match options.style {
+        TextFontStyle::Normal => CosmicStyle::Normal,
+        TextFontStyle::Italic => CosmicStyle::Italic,
+        TextFontStyle::Oblique => CosmicStyle::Oblique,
+    };
+    attrs.style(style)
+}
+
 impl TextEngine {
     /// Create a new text engine with system fonts
     pub fn new() -> Self {
@@ -161,6 +204,16 @@ impl TextEngine {
     /// println!("Glyphs: {}", shaped.glyphs.len());
     /// ```
     pub fn shape_text(&mut self, text: &str, font_size: f32) -> ShapedText {
+        self.shape_text_with_options(text, font_size, TextShapeOptions::default())
+    }
+
+    /// Shape text while honoring optional font family/weight/style overrides.
+    pub fn shape_text_with_options(
+        &mut self,
+        text: &str,
+        font_size: f32,
+        options: TextShapeOptions<'_>,
+    ) -> ShapedText {
         self.sync_global_fonts();
 
         if text.is_empty() {
@@ -189,8 +242,9 @@ impl TextEngine {
         self.buffer.set_metrics(&mut self.font_system, metrics);
 
         // Set text and shape
+        let attrs = attrs_from_options(options);
         self.buffer
-            .set_text(&mut self.font_system, text, Attrs::new(), Shaping::Advanced);
+            .set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
         // Collect runs to avoid double-iterating the potentially expensive layout calculation
@@ -279,6 +333,15 @@ impl Default for TextEngine {
 ///     .collect();
 /// ```
 pub fn shape_text_parallel(text: &str, font_size: f32) -> ShapedText {
+    shape_text_parallel_with_options(text, font_size, TextShapeOptions::default())
+}
+
+/// Shape text in parallel-safe context while honoring optional font overrides.
+pub fn shape_text_parallel_with_options(
+    text: &str,
+    font_size: f32,
+    options: TextShapeOptions<'_>,
+) -> ShapedText {
     if text.is_empty() {
         return ShapedText {
             glyphs: Vec::new(),
@@ -304,7 +367,8 @@ pub fn shape_text_parallel(text: &str, font_size: f32) -> ShapedText {
         buffer.set_metrics(font_system, metrics);
 
         // Set text and shape
-        buffer.set_text(font_system, text, Attrs::new(), Shaping::Advanced);
+        let attrs = attrs_from_options(options);
+        buffer.set_text(font_system, text, attrs, Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
         let runs: Vec<_> = buffer.layout_runs().collect();
@@ -371,6 +435,18 @@ mod tests {
         let shaped = engine.shape_text("Hello", 16.0);
         assert!(!shaped.glyphs.is_empty());
         assert!(shaped.bounds.width > 0.0);
+    }
+
+    #[test]
+    fn test_attrs_from_options_maps_family_weight_and_style() {
+        let attrs = attrs_from_options(TextShapeOptions {
+            family: Some("Inter"),
+            weight: Some(700),
+            style: TextFontStyle::Italic,
+        });
+        assert_eq!(attrs.family, Family::Name("Inter"));
+        assert_eq!(attrs.weight, Weight(700));
+        assert_eq!(attrs.style, CosmicStyle::Italic);
     }
 
     #[test]

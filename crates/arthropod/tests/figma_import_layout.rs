@@ -269,6 +269,85 @@ fn figma_text_node_maps_advanced_typography_semantics() {
 }
 
 #[test]
+fn figma_text_material_symbol_ligature_maps_to_single_icon_codepoint() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "32",
+                "type": "TEXT",
+                "absoluteBoundingBox": { "x": 10, "y": 20, "width": 180, "height": 40 },
+                "characters": "skull",
+                "style": {
+                    "fontFamily": "Material Symbols Outlined",
+                    "fontSize": 24,
+                    "fontWeight": 400
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("32")
+        .copied()
+        .expect("mapped scene id should exist");
+    let node = imported
+        .scene
+        .get_node(node_id)
+        .expect("imported node should exist");
+
+    let NodeContent::Styled { style } = &node.content else {
+        panic!("expected styled node for imported text");
+    };
+    let text = style.text.as_ref().expect("text style should be present");
+    assert_eq!(
+        text.text, "\u{f89a}",
+        "icon ligature should map to Material Symbols codepoint"
+    );
+}
+
+#[test]
+fn figma_text_material_symbol_ligature_ignores_text_case_transforms() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "33",
+                "type": "TEXT",
+                "absoluteBoundingBox": { "x": 10, "y": 20, "width": 180, "height": 40 },
+                "characters": "graphic_eq",
+                "style": {
+                    "fontFamily": "Material Symbols Outlined",
+                    "fontSize": 24,
+                    "fontWeight": 400,
+                    "textCase": "UPPER"
+                }
+            }
+        ]
+    }"#;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let node_id = imported
+        .figma_to_scene
+        .get("33")
+        .copied()
+        .expect("mapped scene id should exist");
+    let node = imported
+        .scene
+        .get_node(node_id)
+        .expect("imported node should exist");
+
+    let NodeContent::Styled { style } = &node.content else {
+        panic!("expected styled node for imported text");
+    };
+    let text = style.text.as_ref().expect("text style should be present");
+    assert_eq!(
+        text.text, "\u{e1b8}",
+        "icon ligatures should stay in source token form before mapping and skip case transforms"
+    );
+}
+
+#[test]
 fn figma_prototype_interactions_map_to_graph_edges() {
     let json = r#"{
         "nodes": [
@@ -875,11 +954,87 @@ fn figma_visual_style_maps_fills_strokes_effects_and_masking() {
     assert!((shadow.offset.y - 4.0).abs() < 1e-6);
     assert!((shadow.blur - 6.0).abs() < 1e-6);
 
-    assert!((style.opacity - 0.55).abs() < 1e-6);
+    assert!(
+        (style.opacity - 1.0).abs() < 1e-6,
+        "imported node opacity should live on SceneNode opacity, not VisualStyle opacity"
+    );
+    assert!(
+        (node.opacity - 0.55).abs() < 1e-6,
+        "SceneNode opacity should carry imported node opacity for descendant propagation"
+    );
     assert_eq!(style.blend_mode, BlendMode::Multiply);
     assert!(style.clips_content);
     assert!(style.is_mask);
     assert_eq!(style.mask_type, MaskType::Luminance);
+}
+
+#[test]
+fn figma_parent_opacity_maps_to_scene_node_for_descendant_cascade() {
+    let json = r##"{
+        "nodes": [
+            {
+                "id": "parent",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 200, "height": 100 },
+                "opacity": 0.2
+            },
+            {
+                "id": "child",
+                "parentId": "parent",
+                "type": "RECTANGLE",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 200, "height": 100 },
+                "fills": [
+                    {
+                        "type": "SOLID",
+                        "color": { "r": 1.0, "g": 1.0, "b": 1.0 },
+                        "visible": true
+                    }
+                ]
+            }
+        ]
+    }"##;
+
+    let imported = import_figma_document(json).expect("figma import should succeed");
+    let parent_id = imported
+        .figma_to_scene
+        .get("parent")
+        .copied()
+        .expect("parent should map");
+    let child_id = imported
+        .figma_to_scene
+        .get("child")
+        .copied()
+        .expect("child should map");
+
+    let parent = imported
+        .scene
+        .get_node(parent_id)
+        .expect("parent should exist");
+    let child = imported
+        .scene
+        .get_node(child_id)
+        .expect("child should exist");
+
+    assert!(
+        (parent.opacity - 0.2).abs() < 1e-6,
+        "parent scene node should carry imported opacity"
+    );
+
+    let NodeContent::Styled { style } = &parent.content else {
+        panic!("expected styled parent");
+    };
+    assert!(
+        (style.opacity - 1.0).abs() < 1e-6,
+        "style opacity must remain neutral for correct inherited opacity multiplication"
+    );
+
+    let NodeContent::Styled { style } = &child.content else {
+        panic!("expected styled child");
+    };
+    assert!(
+        (style.opacity - 1.0).abs() < 1e-6,
+        "child style opacity should default to 1.0 when no node opacity was authored"
+    );
 }
 
 #[test]

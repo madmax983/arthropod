@@ -13,21 +13,39 @@ use crate::backend::wgpu::pipelines::primitive_builder::{
 };
 use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
 use crate::primitives::{FLAG_FILL_TYPE_MASK, PrimitiveInstance};
-use crate::{NodeContent, Scene, SceneNode};
+use crate::{NodeContent, NodeId, Scene, SceneNode, Transform2D};
 use std::sync::Arc;
+use text_engine::{ShapedText, TextFontStyle, TextShapeOptions};
 
 /// Threshold for parallelizing text shaping
 /// Below this count, sequential shaping is faster due to thread overhead
 pub(crate) const TEXT_PARALLEL_THRESHOLD: usize = 8;
 
-/// Text node data for shaping: (node, text, font_size, effective_opacity, style)
+/// Text node data for shaping: (node id, node, text content, effective_opacity, style)
 pub(crate) type TextNodeData<'a> = (
+    NodeId,
     &'a SceneNode,
-    &'a str,
-    f32,
+    &'a style_engine::TextContent,
     f32,
     &'a style_engine::VisualStyle,
 );
+
+pub(crate) fn text_shape_options(text_content: &style_engine::TextContent) -> TextShapeOptions<'_> {
+    let style = match text_content.font_style {
+        style_engine::FontStyle::Normal => TextFontStyle::Normal,
+        style_engine::FontStyle::Italic => TextFontStyle::Italic,
+        style_engine::FontStyle::Oblique => TextFontStyle::Oblique,
+    };
+    TextShapeOptions {
+        family: text_content
+            .font_family
+            .as_deref()
+            .map(str::trim)
+            .filter(|family| !family.is_empty()),
+        weight: Some(text_content.font_weight),
+        style,
+    }
+}
 
 /// Compute cumulative node opacity by traversing ancestor chain to the root.
 ///
@@ -50,6 +68,29 @@ pub(crate) fn inherited_node_opacity(scene: &Scene, node_id: crate::NodeId) -> f
         current = node.parent;
     }
     opacity
+}
+
+/// Apply a scene-node transform to collected primitive instances.
+///
+/// The primitive shader rotates each instance around its local center using
+/// the per-instance packed angle, so here we only need to transform centers.
+pub(crate) fn apply_node_transform_to_instances(
+    instances: &mut [PrimitiveInstance],
+    transform: Transform2D,
+) {
+    if transform == Transform2D::IDENTITY {
+        return;
+    }
+
+    let rotation = transform.rotation_radians();
+    for instance in instances {
+        let half_w = instance.size[0] * 0.5;
+        let half_h = instance.size[1] * 0.5;
+        let center = glam::Vec2::new(instance.pos[0] + half_w, instance.pos[1] + half_h);
+        let transformed_center = transform.transform_point(center);
+        instance.pos = [transformed_center.x - half_w, transformed_center.y - half_h];
+        instance.set_rotation_radians(rotation);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -98,13 +139,79 @@ pub(crate) fn apply_text_fill_to_glyph(instance: &mut PrimitiveInstance, fill: T
     }
 }
 
+fn apply_text_letter_spacing(shaped: &mut ShapedText, letter_spacing: f32) {
+    if letter_spacing.abs() <= f32::EPSILON {
+        return;
+    }
+    let glyph_count = shaped.glyphs.len();
+    if glyph_count <= 1 {
+        return;
+    }
+
+    let mut accumulated_shift = 0.0_f32;
+    for (index, glyph) in shaped.glyphs.iter_mut().enumerate() {
+        glyph.x_offset += accumulated_shift;
+        if index + 1 < glyph_count {
+            accumulated_shift += letter_spacing;
+        }
+    }
+    shaped.bounds.width = (shaped.bounds.width + accumulated_shift).max(0.0);
+}
+
+fn text_shadow_layers(
+    style: &style_engine::VisualStyle,
+    effective_opacity: f32,
+) -> Vec<(glam::Vec2, TextFill)> {
+    let mut layers = Vec::new();
+    for effect in &style.effects {
+        let style_engine::Effect::DropShadow(shadow) = effect else {
+            continue;
+        };
+        if !shadow.visible {
+            continue;
+        }
+
+        let mut core_color = shadow.color;
+        core_color.w *= effective_opacity;
+        if core_color.w <= f32::EPSILON {
+            continue;
+        }
+
+        if shadow.blur > f32::EPSILON {
+            let spread = shadow.blur.min(16.0) * 0.35;
+            if spread > f32::EPSILON {
+                let mut halo_color = core_color;
+                halo_color.w *= 0.22;
+                if halo_color.w > f32::EPSILON {
+                    for extra in [
+                        glam::Vec2::new(-spread, 0.0),
+                        glam::Vec2::new(spread, 0.0),
+                        glam::Vec2::new(0.0, -spread),
+                        glam::Vec2::new(0.0, spread),
+                    ] {
+                        layers.push((shadow.offset + extra, TextFill::Solid(halo_color)));
+                    }
+                }
+            }
+        }
+
+        layers.push((shadow.offset, TextFill::Solid(core_color)));
+    }
+    layers
+}
+
+fn text_has_background_surface(style: &style_engine::VisualStyle) -> bool {
+    style.text.is_some() && style.fills.iter().skip(1).any(paint_has_visible_alpha)
+}
+
 /// Helper to create PrimitiveInstances from a SceneNode (ECS compatibility).
 ///
 /// Uses the no-pipeline fallback path:
 /// - solid fills are emitted directly
 /// - gradients are approximated to a representative color
 /// - strokes and drop shadows are emitted
-/// - text is skipped (text shaping requires backend-owned text/glyph resources)
+/// - text glyphs are skipped (text shaping requires backend-owned text/glyph resources)
+///   but text background fills/effects may still emit primitive instances
 ///
 /// Returns empty vec if the node is invisible or has no styled content.
 pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
@@ -112,7 +219,7 @@ pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
         return Vec::new();
     }
 
-    match &node.content {
+    let mut instances = match &node.content {
         NodeContent::Styled { style } => {
             let pos = glam::Vec2::new(node.bounds.x, node.bounds.y);
             let size = glam::Vec2::new(node.bounds.width, node.bounds.height);
@@ -127,7 +234,13 @@ pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
             vec![PrimitiveInstance::solid(pos, size, final_color)]
         }
         NodeContent::Empty => Vec::new(),
+    };
+
+    if node.transform != Transform2D::IDENTITY {
+        apply_node_transform_to_instances(&mut instances, node.transform);
     }
+
+    instances
 }
 
 pub(crate) fn resolve_text_fill(
@@ -217,18 +330,22 @@ pub(crate) fn resolve_text_fill(
 fn paint_has_visible_alpha(paint: &style_engine::Paint) -> bool {
     match paint {
         style_engine::Paint::Solid(color) => color.w > f32::EPSILON,
-        style_engine::Paint::Linear(gradient) => {
-            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
-        }
-        style_engine::Paint::Radial(gradient) => {
-            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
-        }
-        style_engine::Paint::Angular(gradient) => {
-            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
-        }
-        style_engine::Paint::Diamond(gradient) => {
-            gradient.stops.iter().any(|stop| stop.color.w > f32::EPSILON)
-        }
+        style_engine::Paint::Linear(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        style_engine::Paint::Radial(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        style_engine::Paint::Angular(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
+        style_engine::Paint::Diamond(gradient) => gradient
+            .stops
+            .iter()
+            .any(|stop| stop.color.w > f32::EPSILON),
         style_engine::Paint::Image(_) => true,
     }
 }
@@ -526,9 +643,9 @@ fn collect_instances_impl<'a>(
                 // Check if this style has text that needs shaping
                 if let Some(text_content) = &style.text {
                     text_nodes_for_shaping.push((
+                        node_id,
                         node,
-                        text_content.text.as_str(),
-                        text_content.font_size,
+                        text_content,
                         effective_opacity,
                         style.as_ref(),
                     ));
@@ -537,7 +654,7 @@ fn collect_instances_impl<'a>(
                 // Create primitive instances for this style
                 let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
                 let size = glam::Vec2::new(render_bounds.width, render_bounds.height);
-                let node_instances = if let Some(pipeline) = pipeline.as_deref_mut() {
+                let mut node_instances = if let Some(pipeline) = pipeline.as_deref_mut() {
                     create_primitive_instances_with_pipeline(
                         pipeline,
                         style,
@@ -548,6 +665,7 @@ fn collect_instances_impl<'a>(
                 } else {
                     create_primitive_instances(style, pos, size, effective_opacity)
                 };
+                apply_node_transform_to_instances(&mut node_instances, node.transform);
                 instances.extend(node_instances);
             }
             NodeContent::SolidColor { color } => {
@@ -555,11 +673,16 @@ fn collect_instances_impl<'a>(
                     let mut final_color = color.to_array();
                     final_color[3] *= inherited_opacity;
 
-                    instances.push(PrimitiveInstance::solid(
+                    let mut solid = PrimitiveInstance::solid(
                         [render_bounds.x, render_bounds.y],
                         [render_bounds.width, render_bounds.height],
                         final_color,
-                    ));
+                    );
+                    apply_node_transform_to_instances(
+                        std::slice::from_mut(&mut solid),
+                        node.transform,
+                    );
+                    instances.push(solid);
                 }
             }
             NodeContent::Empty => {}
@@ -573,6 +696,7 @@ pub(crate) fn collect_style_batches_for_bounds(
     style: &style_engine::VisualStyle,
     effective_opacity: f32,
     render_bounds: plat_core::Rect,
+    node_transform: Transform2D,
 ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
     let mut instances = Vec::new();
     let mut path_batches = Vec::new();
@@ -706,10 +830,13 @@ pub(crate) fn collect_style_batches_for_bounds(
     if let Some(text_content) = &style.text
         && !text_content.text.is_empty()
     {
-        let shaped = ctx
-            .text_renderer
-            .text_engine_mut()
-            .shape_text(&text_content.text, text_content.font_size);
+        let options = text_shape_options(text_content);
+        let mut shaped = ctx.text_renderer.text_engine_mut().shape_text_with_options(
+            &text_content.text,
+            text_content.font_size,
+            options,
+        );
+        apply_text_letter_spacing(&mut shaped, text_content.letter_spacing);
         let position = glam::Vec2::new(render_bounds.x, render_bounds.y + text_content.font_size);
         let text_bounds = [
             render_bounds.x,
@@ -718,6 +845,19 @@ pub(crate) fn collect_style_batches_for_bounds(
             render_bounds.height,
         ];
         let fill = resolve_text_fill(ctx.pipeline, style, effective_opacity, text_bounds);
+        if !text_has_background_surface(style) {
+            let shadow_layers = text_shadow_layers(style, effective_opacity);
+            for (offset, shadow_fill) in shadow_layers {
+                let shadow_position = position + offset;
+                let shadow_instances =
+                    ctx.text_renderer
+                        .generate_instances(&shaped, shadow_position, glam::Vec4::ONE);
+                for mut instance in shadow_instances {
+                    apply_text_fill_to_glyph(&mut instance, shadow_fill);
+                    instances.push(instance);
+                }
+            }
+        }
         let glyph_instances =
             ctx.text_renderer
                 .generate_instances(&shaped, position, glam::Vec4::ONE);
@@ -742,14 +882,24 @@ pub(crate) fn collect_style_batches_for_bounds(
         );
     }
 
+    apply_node_transform_to_instances(&mut instances, node_transform);
+
     (instances, path_batches)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::pick_text_fill_paint;
+    use super::{
+        TextFill, apply_node_transform_to_instances, apply_text_letter_spacing,
+        pick_text_fill_paint, text_has_background_surface, text_shadow_layers, text_shape_options,
+    };
+    use crate::Transform2D;
+    use crate::primitives::PrimitiveInstance;
+    use glam::Vec2;
     use glam::Vec4;
-    use style_engine::{Paint, VisualStyle};
+    use style_engine::{Paint, TextContent, VisualStyle};
+    use text_engine::TextEngine;
+    use text_engine::TextFontStyle;
 
     #[test]
     fn pick_text_fill_prefers_first_non_transparent_solid() {
@@ -775,5 +925,109 @@ mod tests {
             panic!("expected selected text fill to be solid");
         };
         assert_eq!(*color, Vec4::new(0.2, 0.3, 0.4, 1.0));
+    }
+
+    #[test]
+    fn text_shape_options_maps_family_weight_and_style() {
+        let mut text = TextContent::new("icon", 24.0)
+            .family("  Material Symbols Outlined  ")
+            .weight(700);
+        text.font_style = style_engine::FontStyle::Italic;
+
+        let options = text_shape_options(&text);
+        assert_eq!(options.family, Some("Material Symbols Outlined"));
+        assert_eq!(options.weight, Some(700));
+        assert_eq!(options.style, TextFontStyle::Italic);
+    }
+
+    #[test]
+    fn apply_node_transform_to_instances_rotates_centers_and_sets_angle() {
+        let mut instances = vec![PrimitiveInstance::solid(
+            [10.0, 10.0],
+            [20.0, 10.0],
+            [1.0, 0.0, 0.0, 1.0],
+        )];
+        let transform = Transform2D::translate(20.0, 15.0)
+            .compose(&Transform2D::rotate_radians(10.0_f32.to_radians()))
+            .compose(&Transform2D::translate(-20.0, -15.0));
+
+        let original_center = glam::Vec2::new(20.0, 15.0);
+        apply_node_transform_to_instances(&mut instances, transform);
+
+        let instance = &instances[0];
+        let transformed_center = glam::Vec2::new(
+            instance.pos[0] + instance.size[0] * 0.5,
+            instance.pos[1] + instance.size[1] * 0.5,
+        );
+        assert!((transformed_center - transform.transform_point(original_center)).length() < 1e-4);
+        assert!((instance.rotation_radians() - 10.0_f32.to_radians()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn text_shadow_layers_emits_core_and_blur_halo_layers() {
+        let style = VisualStyle::new()
+            .text(TextContent::new("THE PIT", 20.0))
+            .drop_shadow(Vec2::new(4.0, 4.0), 5.0, Vec4::new(0.8, 1.0, 0.0, 1.0));
+
+        let layers = text_shadow_layers(&style, 0.5);
+        assert_eq!(layers.len(), 5, "expected 4 halo layers plus core layer");
+
+        let core = layers
+            .iter()
+            .find(|(offset, _)| (*offset - Vec2::new(4.0, 4.0)).length() < 1e-4)
+            .expect("missing core shadow layer");
+        let TextFill::Solid(core_color) = core.1 else {
+            panic!("core shadow layer should be solid");
+        };
+        assert!((core_color.w - 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn text_has_background_surface_only_when_secondary_fill_is_visible() {
+        let with_surface = VisualStyle::new()
+            .text(TextContent::new("SCUM", 72.0))
+            .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)));
+        assert!(
+            text_has_background_surface(&with_surface),
+            "second visible fill should be treated as text background surface"
+        );
+
+        let transparent_secondary = VisualStyle::new()
+            .text(TextContent::new("SCUM", 72.0))
+            .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
+            .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 0.0)));
+        assert!(
+            !text_has_background_surface(&transparent_secondary),
+            "fully transparent secondary fill should not count as a text background surface"
+        );
+
+        let no_secondary = VisualStyle::new()
+            .text(TextContent::new("SCUM", 72.0))
+            .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)));
+        assert!(
+            !text_has_background_surface(&no_secondary),
+            "single fill text should render glyph-space shadows"
+        );
+    }
+
+    #[test]
+    fn apply_text_letter_spacing_offsets_following_glyphs() {
+        let mut engine = TextEngine::new();
+        let mut shaped = engine.shape_text("TEST", 24.0);
+        assert!(
+            shaped.glyphs.len() >= 2,
+            "expected at least two glyphs in shaped text"
+        );
+        let second_before = shaped.glyphs[1].x_offset;
+        let width_before = shaped.bounds.width;
+
+        apply_text_letter_spacing(&mut shaped, 2.0);
+
+        assert!(
+            shaped.glyphs[1].x_offset > second_before + 1.5,
+            "second glyph should shift by letter spacing"
+        );
+        assert!(shaped.bounds.width > width_before + 5.0);
     }
 }

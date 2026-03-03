@@ -108,6 +108,29 @@ fn test_instance_collection_from_scene() {
 }
 
 #[test]
+fn test_instance_collection_packs_node_rotation_into_instances() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            style_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 1.0, 1.0, 1.0).as_vec4()),
+        ),
+    });
+    node.bounds = plat_core::Rect::new(10.0, 20.0, 100.0, 50.0);
+    let center_x = node.bounds.x + node.bounds.width * 0.5;
+    let center_y = node.bounds.y + node.bounds.height * 0.5;
+    node.transform = Transform2D::translate(center_x, center_y)
+        .compose(&Transform2D::rotate_radians(12.0_f32.to_radians()))
+        .compose(&Transform2D::translate(-center_x, -center_y));
+    scene.add_node(root, node);
+
+    let (instances, _, _) = instance_collector::collect_instances_for_tests(&scene);
+    assert_eq!(instances.len(), 1);
+    assert!((instances[0].rotation_radians() - 12.0_f32.to_radians()).abs() < 1e-6);
+}
+
+#[test]
 fn test_style_opacity_multiplies_node_opacity_for_primitive_instances() {
     let mut scene = Scene::new();
     let root = scene.root();
@@ -1108,6 +1131,63 @@ fn test_collect_instances_without_multipass_skips_effect_nodes() {
         instance_collector::collect_instances_without_multipass_for_tests(&scene);
     assert_eq!(instances.len(), 1);
     assert!((instances[0].color[1] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_collect_ordered_render_nodes_preserves_interleaved_z_order() {
+    let mut scene = Scene::new();
+    let root = scene.root();
+
+    let mut background = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            style_engine::VisualStyle::new().solid_fill(Color::rgba(0.0, 0.0, 0.0, 1.0).as_vec4()),
+        ),
+    });
+    background.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
+    let background_id = scene.add_node(root, background);
+
+    let mut filtered = SceneNode::new(NodeContent::Styled {
+        style: Box::new(style_engine::VisualStyle::new().effect(
+            style_engine::Effect::ColorFilter(style_engine::ColorFilter {
+                grayscale: 1.0,
+                contrast: 1.5,
+                invert: 1.0,
+                visible: true,
+            }),
+        )),
+    });
+    filtered.bounds = plat_core::Rect::new(0.0, 0.0, 100.0, 100.0);
+    let filtered_id = scene.add_node(root, filtered);
+
+    let mut foreground = SceneNode::new(NodeContent::Styled {
+        style: Box::new(
+            style_engine::VisualStyle::new().solid_fill(Color::rgba(1.0, 1.0, 1.0, 1.0).as_vec4()),
+        ),
+    });
+    foreground.bounds = plat_core::Rect::new(10.0, 10.0, 20.0, 20.0);
+    let foreground_id = scene.add_node(root, foreground);
+
+    let mut stack = Vec::new();
+    let ordered = multipass_executor::collect_ordered_render_nodes(&scene, &mut stack);
+    let actual: Vec<_> = ordered
+        .iter()
+        .map(|entry| (entry.node_id, entry.kind))
+        .collect();
+    let expected = vec![
+        (
+            background_id,
+            multipass_executor::OrderedRenderNodeKind::Direct,
+        ),
+        (
+            filtered_id,
+            multipass_executor::OrderedRenderNodeKind::Multipass,
+        ),
+        (
+            foreground_id,
+            multipass_executor::OrderedRenderNodeKind::Direct,
+        ),
+    ];
+    assert_eq!(actual, expected);
 }
 
 #[test]

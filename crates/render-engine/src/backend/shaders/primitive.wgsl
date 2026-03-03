@@ -147,6 +147,10 @@ fn get_gradient_index(gradient_params: vec4<f32>) -> u32 {
     return u32(gradient_params.x);
 }
 
+fn instance_rotation_radians(packed: u32) -> f32 {
+    return bitcast<f32>(packed);
+}
+
 // ============================================================================
 // Shadow Rendering
 // ============================================================================
@@ -241,19 +245,33 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     // Get unit quad vertex position (0-1 range)
     let unit_pos = vertex_position(input.vertex_index);
 
-    // Scale to primitive size and offset to position
-    let screen_pos = input.pos + unit_pos * input.size;
+    // Scale to primitive size.
+    let local_pos = unit_pos * input.size;
+
+    // Apply per-instance rotation around local center.
+    let rotation = instance_rotation_radians(input._padding);
+    let half_size = input.size * 0.5;
+    let centered = local_pos - half_size;
+    let cs = cos(rotation);
+    let sn = sin(rotation);
+    let rotated = vec2<f32>(
+        centered.x * cs - centered.y * sn,
+        centered.x * sn + centered.y * cs
+    );
+
+    // Offset into scene space.
+    let screen_pos = input.pos + half_size + rotated;
 
     // Convert to clip space using projection matrix
     out.position = globals.transform * vec4<f32>(screen_pos, 0.0, 1.0);
     out.color = input.color;
-    out.local_pos = unit_pos * input.size;
+    out.local_pos = local_pos;
     out.prim_size = input.size;
     out.corner_radii = input.corner_radii;
     out.gradient_params = input.gradient_params;
     out.stroke_params = input.stroke_params;
     out.flags = input.flags;
-    out.world_pos = input.pos + unit_pos * input.size;
+    out.world_pos = screen_pos;
 
     // Interpolate texture coordinates for glyphs
     let u = mix(input.tex_coords.x, input.tex_coords.z, unit_pos.x);

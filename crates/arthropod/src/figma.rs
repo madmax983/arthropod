@@ -5,7 +5,7 @@ use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, ItemAlignSelf,
 };
 use plat_core::Rect;
-use render_engine::{NodeContent, NodeId, Scene, SceneNode, Vec2, Vec4};
+use render_engine::{NodeContent, NodeId, Scene, SceneNode, Transform2D, Vec2, Vec4};
 use serde::Deserialize;
 use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
 use style_engine::{
@@ -254,6 +254,10 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                     style: Box::new(node.to_visual_style()),
                 });
                 scene_node.bounds = bounds;
+                scene_node.opacity = node.to_node_opacity();
+                if let Some(transform) = node.to_node_transform(bounds) {
+                    scene_node.transform = transform;
+                }
                 let scene_id = scene.add_node(parent_id, scene_node);
 
                 figma_to_scene.insert(node.id.as_key(), scene_id);
@@ -291,6 +295,10 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
                     style: Box::new(node.to_visual_style()),
                 });
                 scene_node.bounds = bounds;
+                scene_node.opacity = node.to_node_opacity();
+                if let Some(transform) = node.to_node_transform(bounds) {
+                    scene_node.transform = transform;
+                }
                 let scene_id = scene.add_node(root, scene_node);
 
                 figma_to_scene.insert(node.id.as_key(), scene_id);
@@ -972,6 +980,8 @@ struct FigmaNode {
     #[serde(default)]
     opacity: Option<f32>,
     #[serde(default)]
+    rotation: Option<f32>,
+    #[serde(default)]
     blend_mode: Option<FigmaBlendMode>,
     #[serde(default)]
     clips_content: Option<bool>,
@@ -1040,6 +1050,28 @@ struct FigmaNode {
 }
 
 impl FigmaNode {
+    fn to_node_opacity(&self) -> f32 {
+        self.opacity
+            .filter(|value| value.is_finite())
+            .map(|value| value.clamp(0.0, 1.0))
+            .unwrap_or(1.0)
+    }
+
+    fn to_node_transform(&self, bounds: Rect) -> Option<Transform2D> {
+        let rotation_radians = self
+            .rotation
+            .filter(|value| value.is_finite())
+            .map(f32::to_radians)
+            .filter(|value| value.abs() > f32::EPSILON)?;
+
+        let center_x = bounds.x + bounds.width * 0.5;
+        let center_y = bounds.y + bounds.height * 0.5;
+        let to_center = Transform2D::translate(center_x, center_y);
+        let rotate = Transform2D::rotate_radians(rotation_radians);
+        let from_center = Transform2D::translate(-center_x, -center_y);
+        Some(to_center.compose(&rotate).compose(&from_center))
+    }
+
     fn resolved_bounds(&self) -> Rect {
         if let Some(bounds) = self.absolute_bounding_box {
             return Rect::new(
@@ -1260,9 +1292,6 @@ impl FigmaNode {
             }
         }
 
-        if let Some(opacity) = self.opacity.filter(|value| value.is_finite()) {
-            style = style.opacity(opacity.clamp(0.0, 1.0));
-        }
         if let Some(blend_mode) = self.blend_mode {
             style = style.blend_mode(blend_mode.to_blend_mode());
         }
@@ -1333,11 +1362,20 @@ impl FigmaNode {
     fn to_text_content(&self) -> Option<TextContent> {
         let characters = self.characters.as_ref()?.clone();
         let style = self.style.as_ref();
+        let is_icon_ligature_font = style
+            .and_then(|s| s.font_family.as_deref())
+            .is_some_and(is_ligature_icon_font_family);
+        let source_text = if is_icon_ligature_font {
+            material_icon_ligature_to_codepoint(&characters).unwrap_or_else(|| characters.clone())
+        } else {
+            characters.clone()
+        };
         let text_case = style
+            .and_then(|s| (!is_icon_ligature_font).then_some(s))
             .and_then(|s| s.text_case)
             .map(FigmaTextCase::to_text_case)
             .unwrap_or(TextCase::Original);
-        let transformed = apply_text_case(&characters, text_case);
+        let transformed = apply_text_case(&source_text, text_case);
 
         let font_size = style
             .and_then(|s| s.font_size)
@@ -2160,6 +2198,28 @@ impl FigmaImageTransform {
             ],
         }
     }
+}
+
+fn is_ligature_icon_font_family(font_family: &str) -> bool {
+    let normalized = font_family.trim().to_ascii_lowercase();
+    normalized.contains("material symbols") || normalized.contains("material icons")
+}
+
+fn material_icon_ligature_to_codepoint(text: &str) -> Option<String> {
+    let normalized = text.trim();
+    let codepoint = match normalized {
+        // Riot Waves / Stitch icon set used in current parity targets.
+        "skull" => 0xF89A,
+        "graphic_eq" => 0xE1B8,
+        "inventory_2" => 0xE1A1,
+        "cable" => 0xEFE6,
+        "deck" => 0xEA42,
+        "search" => 0xE8B6,
+        "pause" => 0xE034,
+        "shuffle" => 0xE043,
+        _ => return None,
+    };
+    char::from_u32(codepoint).map(|glyph| glyph.to_string())
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

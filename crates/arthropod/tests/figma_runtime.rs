@@ -33,6 +33,43 @@ fn figma_runtime_applies_layout_and_collects_render_instances() {
 }
 
 #[test]
+fn figma_runtime_without_prototype_keeps_all_top_level_nodes_visible() {
+    let json = r#"{
+        "nodes": [
+            {
+                "id": "layer-a",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 0, "y": 0, "width": 120, "height": 80 },
+                "fills": [{ "type": "SOLID", "color": [1.0, 0.0, 0.0, 1.0] }]
+            },
+            {
+                "id": "layer-b",
+                "type": "FRAME",
+                "absoluteBoundingBox": { "x": 12, "y": 8, "width": 120, "height": 80 },
+                "fills": [{ "type": "SOLID", "color": [0.0, 1.0, 0.0, 1.0] }]
+            }
+        ]
+    }"#;
+
+    let runtime = FigmaRuntime::from_figma_json(json).expect("runtime should initialize");
+    let layer_a = runtime
+        .node_for_figma_id("layer-a")
+        .expect("layer-a should resolve");
+    let layer_b = runtime
+        .node_for_figma_id("layer-b")
+        .expect("layer-b should resolve");
+
+    assert!(
+        runtime.is_visible(layer_a),
+        "top-level layer-a should remain visible without prototype graph"
+    );
+    assert!(
+        runtime.is_visible(layer_b),
+        "top-level layer-b should remain visible without prototype graph"
+    );
+}
+
+#[test]
 fn figma_runtime_dispatch_navigate_switches_top_level_visibility() {
     let json = r#"{
         "nodes": [
