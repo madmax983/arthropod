@@ -369,12 +369,10 @@ fn figma_image_reference_to_id(reference: &str) -> u64 {
     hash | (1_u64 << 63)
 }
 
-fn ensure_parent_dir(path: &PathBuf) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
-        }
+fn ensure_parent_dir(path: &std::path::Path) -> Result<(), String> {
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
     }
     Ok(())
 }
@@ -391,7 +389,7 @@ fn download_image(
     token: &str,
     image_ref: &str,
     url: &str,
-    assets_dir: &PathBuf,
+    assets_dir: &std::path::Path,
 ) -> JsonValue {
     let mut entry = JsonMap::new();
     entry.insert(

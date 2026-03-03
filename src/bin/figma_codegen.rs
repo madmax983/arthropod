@@ -101,11 +101,13 @@ fn run_with_options(options: &CliOptions) -> Result<(), String> {
     let figma_json = fs::read_to_string(&options.input)
         .map_err(|err| format!("failed to read {}: {err}", options.input.display()))?;
 
-    if let Some(parent) = options.output.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
-        }
+    if let Some(parent) = options
+        .output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("failed to create {}: {err}", parent.display()))?;
     }
 
     let codegen_options = FigmaCodegenOptions {

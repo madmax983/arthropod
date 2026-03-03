@@ -440,6 +440,49 @@ mod tests {
     }
 
     #[test]
+    fn test_update_triggers_effects_and_computed() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(Arc::clone(&runtime), vec![1, 2, 3]);
+        let (read, write) = signal.split();
+
+        // Create a computed value derived from the signal
+        let read_for_computed = read.clone();
+        let computed = crate::Computed::new(Arc::clone(&runtime), move || {
+            read_for_computed.with(|v| v.len())
+        });
+
+        // Create an effect that logs the signal's updates
+        let log = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log_clone = Arc::clone(&log);
+        let read_for_effect = read.clone();
+        let _effect = crate::Effect::new(Arc::clone(&runtime), move || {
+            log_clone
+                .lock()
+                .unwrap()
+                .push(read_for_effect.with(|v| v.clone()));
+        });
+
+        // Initial state
+        assert_eq!(computed.get(), 3);
+        assert_eq!(*log.lock().unwrap(), vec![vec![1, 2, 3]]);
+
+        // Mutate the signal using update()
+        write.update(|v| {
+            v.push(4);
+            v.push(5);
+        });
+
+        // Assert that computed value is updated
+        assert_eq!(computed.get(), 5);
+
+        // Assert that effect ran again and logged the new state
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec![vec![1, 2, 3], vec![1, 2, 3, 4, 5]]
+        );
+    }
+
+    #[test]
     fn test_get_untracked() {
         let runtime = Runtime::new();
         let signal = Signal::new(Arc::clone(&runtime), 1);
