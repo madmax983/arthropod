@@ -377,7 +377,7 @@ fn ensure_parent_dir(path: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
-fn write_json_pretty(path: &PathBuf, value: &JsonValue) -> Result<(), String> {
+fn write_json_pretty(path: &std::path::Path, value: &JsonValue) -> Result<(), String> {
     ensure_parent_dir(path)?;
     let text = serde_json::to_string_pretty(value)
         .map_err(|err| format!("failed to serialize JSON for {}: {err}", path.display()))?;
