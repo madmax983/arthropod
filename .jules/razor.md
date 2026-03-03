@@ -22,3 +22,13 @@
 **Bloat:** `MainThreadSignal<T>` in `arthropod-ecs` (Redundant Wrapper)
 **Cut:** Removed wrapper struct and used `ReadSignal<T>` directly (which is already thread-safe).
 **Saved:** ~30 lines of boilerplate, removed unnecessary indirection (`.inner()`) and cognitive overhead.
+
+## [Reduction]
+**Bloat:** Nested `if let` and `if` statements checking `Option` types
+**Cut:** Collapsed nested checks using `.filter()` (e.g., `if let Some(x) = y.filter(|v| condition)`)
+**Saved:** ~6 lines across `figma_codegen.rs` and `figma_pull.rs`, resolving `clippy::collapsible_if` warnings.
+
+## [Reduction]
+**Bloat:** Passing `&PathBuf` as function arguments
+**Cut:** Replaced with `&Path` slice references
+**Saved:** Reduced unnecessary allocations and pointer indirection in `figma_pull.rs`, resolving `clippy::ptr_arg` warnings.
