@@ -29,8 +29,12 @@ pub mod reactive_particles;
 pub mod kinetic_text;
 
 #[cfg(feature = "nova")]
+pub mod spellcaster;
+
+#[cfg(feature = "nova")]
 pub mod command_palette;
 
+#[cfg(feature = "nova")]
 pub mod flux_radar;
 
 // --- Stubs for missing features ---
@@ -289,6 +293,55 @@ pub mod particles {
     pub fn register_particles(_app: &mut crate::App) {
         eprintln!(
             "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        );
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod spellcaster {
+    #![allow(deprecated)]
+    use bevy_ecs::prelude::{Component, Resource};
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `spellcaster` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(Resource, Default, Clone)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct Grimoire;
+
+    impl Grimoire {
+        #[allow(clippy::new_ret_no_self)]
+        pub fn learn<F, G>(&mut self, _gesture: G, _effect: F)
+        where
+            F: Fn() + Send + Sync + 'static,
+        {
+            panic!("Grimoire requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+    }
+
+    #[derive(Component, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct Wand;
+
+    #[derive(Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct WandInput;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_spellcaster(_app: &mut crate::App) {
+        eprintln!(
+            "ERROR: 'register_spellcaster' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
         );
     }
 }

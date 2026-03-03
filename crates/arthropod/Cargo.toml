@@ -40,4 +40,4 @@ harness = false
 required-features = ["nova"]
 
 [features]
-nova = ["flux-state/nova"]
+nova = ["flux-state/nova", "input-engine/nova"]

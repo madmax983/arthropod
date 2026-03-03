@@ -74,6 +74,11 @@ impl StrokeMatcher {
         }
     }
 
+    /// Check if a stroke is currently being tracked (button held down).
+    pub fn is_tracking(&self) -> bool {
+        self.is_tracking
+    }
+
     fn calculate_metrics(&self) -> Option<StrokeMetrics> {
         // Filter out sequential duplicates to ensure robust angle calculation
         let mut clean_points = self.points.clone();
