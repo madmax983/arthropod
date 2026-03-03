@@ -2761,8 +2761,7 @@ fn estimate_text_size(
             font_size
         } else {
             let glyph_width = char_count as f32 * font_size * advance_factor;
-            let tracking_width =
-                (char_count.saturating_sub(1) as f32) * letter_spacing_px;
+            let tracking_width = (char_count.saturating_sub(1) as f32) * letter_spacing_px;
             glyph_width + tracking_width
         };
         max_line_width = max_line_width.max(line_width);
@@ -4700,6 +4699,10 @@ tailwind.config = { theme: { extend: {
             .and_then(JsonValue::as_str)
             .expect("expected imageSourceRef");
         assert_eq!(source_ref, "composite://halftone/assets/sample.png");
+        assert!(
+            json.get("blendMode").is_none(),
+            "halftone base layer should not invent blend mode when CSS does not provide one"
+        );
     }
 
     #[test]

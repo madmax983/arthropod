@@ -326,17 +326,17 @@ fn register_generated_images(backend: &mut WgpuBackend) {
     let mut missing = Vec::new();
     let mut failed = 0usize;
     for asset in assets {
-        let image_id = ImageId(figma_image_reference_to_id(&asset.image_ref));
-        if let Some((rgba, width, height)) = load_procedural_image(&asset.source_ref, &roots) {
-            let rgba = if let Some(filter) = asset.filter {
-                apply_image_filter(rgba, filter)
-            } else {
-                rgba
-            };
+        let GeneratedImageAsset {
+            image_ref,
+            source_ref,
+            filter: _renderer_color_filter,
+        } = asset;
+        let image_id = ImageId(figma_image_reference_to_id(&image_ref));
+        if let Some((rgba, width, height)) = load_procedural_image(&source_ref, &roots) {
             if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
                 eprintln!(
                     "warning: failed to register procedural image `{}` for `{}`: {err}",
-                    asset.source_ref, asset.image_ref
+                    source_ref, image_ref
                 );
                 failed += 1;
             } else {
@@ -345,23 +345,18 @@ fn register_generated_images(backend: &mut WgpuBackend) {
             continue;
         }
 
-        let Some(path) = resolve_image_path_with_roots(&asset.source_ref, &roots) else {
-            missing.push(asset.source_ref.clone());
+        let Some(path) = resolve_image_path_with_roots(&source_ref, &roots) else {
+            missing.push(source_ref.clone());
             continue;
         };
 
         match load_image(&path) {
             Ok((rgba, width, height)) => {
-                let rgba = if let Some(filter) = asset.filter {
-                    apply_image_filter(rgba, filter)
-                } else {
-                    rgba
-                };
                 if let Err(err) = backend.register_image_rgba8(image_id, width, height, rgba) {
                     eprintln!(
                         "warning: failed to register image `{}` for `{}`: {err}",
                         path.display(),
-                        asset.image_ref
+                        image_ref
                     );
                     failed += 1;
                 } else {
@@ -372,7 +367,7 @@ fn register_generated_images(backend: &mut WgpuBackend) {
                 eprintln!(
                     "warning: failed to decode image `{}` for `{}`: {err}",
                     path.display(),
-                    asset.source_ref
+                    source_ref
                 );
                 failed += 1;
             }
@@ -468,6 +463,7 @@ fn likely_path_reference(value: &str) -> bool {
     value.contains('/') || value.contains('\\')
 }
 
+#[cfg(test)]
 fn apply_image_filter(mut rgba: Vec<u8>, filter: ImageFilterSpec) -> Vec<u8> {
     for pixel in rgba.chunks_exact_mut(4) {
         let mut r = pixel[0] as f32 / 255.0;

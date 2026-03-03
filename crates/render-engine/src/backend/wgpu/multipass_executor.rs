@@ -698,8 +698,9 @@ impl<'a> MultipassRenderer<'a> {
         if !raw_text_nodes.is_empty() {
             // Step 1: Shape text in parallel if above threshold
             // Shaping is CPU-intensive and read-only (uses thread-local FontSystem)
-            let shaped_results: Vec<ShapedTextResult<'_>> =
-                if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
+            let shaped_results: Vec<ShapedTextResult<'_>> = if raw_text_nodes.len()
+                >= TEXT_PARALLEL_THRESHOLD
+            {
                 // Parallel shaping
                 raw_text_nodes
                     .par_iter()
