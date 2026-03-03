@@ -31,3 +31,7 @@
 ## 2024-05-25 - [String Manipulation Safety]
 **Learning:** `TextInputState` relies heavily on `char_idx_to_byte_idx` to safely map character indices (cursor position) to byte indices for `String` mutation. This prevents panics when handling multi-byte Unicode characters (e.g., Emoji).
 **Action:** Added comprehensive unit tests covering Unicode insertion/deletion and boundary conditions to ensure `String::insert` and `String::remove` never panic due to invalid byte indices.
+
+## 2024-10-25 - [Missing Update Coverage]
+**Learning:** Found an untested execution path inside `WriteSignal::update()`. `WriteSignal::update()` executes a closure safely bypassing the tracking mechanisms. If it fails, the system might not properly invoke `self.runtime.notify(self.id)`.
+**Action:** Created `sentry_correctness.rs` to add tests for `update()` mutating the value and correctly updating the runtime graph by triggering subsequent `Effect` and subscriber calculations.
