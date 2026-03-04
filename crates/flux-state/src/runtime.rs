@@ -215,11 +215,10 @@ impl RuntimeInner {
         while let Some(node) = self.traversal_buffer.pop() {
             // mark_stale borrows &mut self, but returns bool.
             // The borrow ends after the if condition check.
-            #[allow(clippy::collapsible_if)]
-            if self.mark_stale(node) {
-                if let Some(subs) = self.subscribers.get(&node) {
-                    self.traversal_buffer.extend(subs);
-                }
+            if self.mark_stale(node)
+                && let Some(subs) = self.subscribers.get(&node)
+            {
+                self.traversal_buffer.extend(subs);
             }
         }
     }

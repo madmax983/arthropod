@@ -107,7 +107,6 @@ fn bench_node_lookup(c: &mut Criterion) {
 }
 
 /// Benchmark mutable node access (for reactive updates)
-#[allow(clippy::collapsible_if)]
 fn bench_node_mutation(c: &mut Criterion) {
     // Setup: Create a scene with 100 nodes
     let mut scene = Scene::new();
@@ -125,12 +124,15 @@ fn bench_node_mutation(c: &mut Criterion) {
     c.bench_function("mutate_100_node_colors", |b| {
         b.iter(|| {
             for &id in &node_ids {
-                if let Some(NodeContent::Styled { style }) =
-                    scene.get_node_mut(id).map(|n| &mut n.content)
+                if let Some(NodeContent::Styled { style }) = scene
+                    .get_node_mut(id)
+                    .map(|n| &mut n.content)
+                    .filter(|content| match content {
+                        NodeContent::Styled { style } => !style.fills.is_empty(),
+                        _ => false,
+                    })
                 {
-                    if !style.fills.is_empty() {
-                        style.fills[0] = Paint::Solid(Color::BLUE.as_vec4());
-                    }
+                    style.fills[0] = Paint::Solid(Color::BLUE.as_vec4());
                 }
             }
         });

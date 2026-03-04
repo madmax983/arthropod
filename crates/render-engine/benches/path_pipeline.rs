@@ -146,14 +146,15 @@ impl BenchPathInterner {
         }
     }
 
-    #[allow(clippy::collapsible_if)]
     fn hash_for(&mut self, path: &VectorPath) -> u64 {
         let ptr = path as *const VectorPath as usize;
         let fp = Self::fingerprint(path);
-        if let Some(entry) = self.by_ptr.get(&ptr) {
-            if entry.fp.len == fp.len && entry.fp.first == fp.first && entry.fp.last == fp.last {
-                return entry.hash;
-            }
+        if let Some(entry) = self
+            .by_ptr
+            .get(&ptr)
+            .filter(|e| e.fp.len == fp.len && e.fp.first == fp.first && e.fp.last == fp.last)
+        {
+            return entry.hash;
         }
         let hash = TessellationCache::fill_key(path);
         self.by_ptr.insert(ptr, BenchInternerEntry { hash, fp });
