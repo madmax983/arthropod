@@ -472,9 +472,12 @@ fn collect_instances_impl<'a>(
     // I will duplicate `style_requires_multipass` for now as I plan to move it to `multipass_executor` which is next.
     // But `instance_collector` needs it.
     // Maybe `style_requires_multipass` should be in `effects.rs` or `style-engine`.
-    let mut instances = Vec::new();
-    let mut text_nodes_for_shaping = Vec::new();
-    let mut path_batches = Vec::new();
+
+    // Pre-allocate to reduce heap re-allocations during iteration.
+    let capacity = scene.node_count().clamp(16, 4096);
+    let mut instances = Vec::with_capacity(capacity);
+    let mut text_nodes_for_shaping = Vec::with_capacity(capacity / 4);
+    let mut path_batches = Vec::with_capacity(capacity / 4);
 
     for (node_id, node) in scene.iter_visuals_custom(stack) {
         if !node.visible {

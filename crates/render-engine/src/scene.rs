@@ -272,6 +272,11 @@ impl Scene {
         self.nodes.iter().map(|(id, node)| (*id, node))
     }
 
+    /// Return the total number of nodes in the scene.
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     /// Iterate over visual nodes in depth-first (Painter's Algorithm) order.
     ///
     /// This iterator traverses the scene graph starting from the root, yielding
