@@ -271,7 +271,7 @@ pub use implementation::{FluxRadarConfig, FluxRadarState, FluxRuntime};
 #[cfg(feature = "nova")]
 mod tests {
     use super::*;
-    use flux_state::{Runtime, Signal};
+    use flux_state::Signal;
 
     #[test]
     fn test_flux_radar_registration() {

@@ -252,7 +252,7 @@ pub fn init_ghost_replay(app: &mut crate::App) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::prelude::*;
+
     use plat_core::{
         ElementState, Event, Modifiers, MouseButton, MouseInput, Point, WindowEvent, WindowId,
     };

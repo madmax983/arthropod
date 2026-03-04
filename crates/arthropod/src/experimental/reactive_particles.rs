@@ -111,7 +111,7 @@ mod tests {
         // Verify sync
         let emitter = world.entity(entity).get::<ParticleEmitter>().unwrap();
         assert_eq!(emitter.rate, 10.0);
-        assert_eq!(emitter.active, true);
+        assert!(emitter.active);
 
         // Update signals
         write_rate.set(50.0);
@@ -123,6 +123,6 @@ mod tests {
         // Verify update
         let emitter = world.entity(entity).get::<ParticleEmitter>().unwrap();
         assert_eq!(emitter.rate, 50.0);
-        assert_eq!(emitter.active, false);
+        assert!(!emitter.active);
     }
 }

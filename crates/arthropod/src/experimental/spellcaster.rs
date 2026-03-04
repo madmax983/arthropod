@@ -152,7 +152,7 @@ mod tests {
         world.spawn(Wand::default());
 
         // Simulate Swipe Right
-        let points = vec![
+        let points = [
             Point::new(0.0, 0.0),
             Point::new(20.0, 0.0),
             Point::new(40.0, 0.0),

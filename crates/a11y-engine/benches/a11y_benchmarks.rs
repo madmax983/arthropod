@@ -113,8 +113,8 @@ fn bench_get_dirty_nodes(c: &mut Criterion) {
         tree.clear_dirty();
 
         // Mark some as dirty
-        for i in 0..dirty_count {
-            tree.update_node(node_ids[i], |node| {
+        for id in node_ids.iter().take(dirty_count) {
+            tree.update_node(*id, |node| {
                 node.state.disabled = true;
             });
         }
@@ -357,8 +357,8 @@ fn bench_frame_a11y_overhead(c: &mut Criterion) {
                     tree.clear_dirty();
 
                     // Update only a subset (dirty nodes from frame changes)
-                    for i in 0..count {
-                        tree.update_node(node_ids[i], |node| {
+                    for id in node_ids.iter().take(count) {
+                        tree.update_node(*id, |node| {
                             node.bounds = Rect::new(
                                 black_box(100.0),
                                 black_box(200.0),

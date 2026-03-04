@@ -51,7 +51,7 @@ fn create_text_input_node(ctx: &mut WidgetContext) -> NodeId {
     let (read, write) = signal.split();
     let node_id = ctx.create_node(
         ctx.root(),
-        NodeContent::Rect {
+        NodeContent::SolidColor {
             color: Color::WHITE,
         },
     );
@@ -114,7 +114,7 @@ fn bench_dispatch_keyboard(c: &mut Criterion) {
         let node_id = create_text_input_node(&mut ctx);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
         let event = create_keyboard_event(Key::A);
 
@@ -129,7 +129,7 @@ fn bench_dispatch_keyboard(c: &mut Criterion) {
         let _node2 = create_text_input_node(&mut ctx);
         ctx.focus_next();
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
         let event = create_keyboard_event(Key::Tab);
 
@@ -145,14 +145,14 @@ fn bench_dispatch_keyboard(c: &mut Criterion) {
         let (read, write) = signal.split();
         let node_id = ctx.create_node(
             ctx.root(),
-            NodeContent::Rect {
+            NodeContent::SolidColor {
                 color: Color::WHITE,
             },
         );
         ctx.add_text_input_state(node_id, read, write, false, None);
         ctx.focus_node(node_id);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
         let event = create_keyboard_event(Key::Backspace);
 
@@ -170,7 +170,7 @@ fn bench_dispatch_mouse(c: &mut Criterion) {
 
     group.bench_function("cursor_moved", |b| {
         let mut ctx = WidgetContext::new_test();
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let scene = Scene::new();
 
         let mut x = 0.0;
@@ -193,7 +193,7 @@ fn bench_dispatch_form_submit(c: &mut Criterion) {
         let form_node = NodeId(999);
         ctx.add_form_state(form_node, IndexMap::new(), None);
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), Some(form_node));
+        let mut dispatcher = EventDispatcher::new(Some(form_node));
         let scene = Scene::new();
         let event = create_keyboard_event(Key::Enter);
 
@@ -363,7 +363,7 @@ fn bench_frame_update_cycle(c: &mut Criterion) {
         }
         ctx.focus_next();
 
-        let mut dispatcher = EventDispatcher::new(HashMap::new(), None);
+        let mut dispatcher = EventDispatcher::new(None);
         let events = vec![
             create_keyboard_event(Key::H),
             create_keyboard_event(Key::E),

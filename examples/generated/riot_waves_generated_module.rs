@@ -1,14 +1,14 @@
 pub mod riot_waves_generated {
 
-use arthropod::figma::{FigmaImportError, ImportedFigmaDocument, import_figma_document};
-use arthropod::figma_runtime::{FigmaRuntime, FigmaRuntimeError};
+    use arthropod::figma::{FigmaImportError, ImportedFigmaDocument, import_figma_document};
+    use arthropod::figma_runtime::{FigmaRuntime, FigmaRuntimeError};
 
-pub const SOURCE_BYTES: usize = 50038;
-pub const SOURCE_FNV64: u64 = 0xa794d13089c5185c;
-pub const NODE_COUNT: usize = 74;
-pub const PROTOTYPE_EDGE_COUNT: usize = 0;
+    pub const SOURCE_BYTES: usize = 50038;
+    pub const SOURCE_FNV64: u64 = 0xa794d13089c5185c;
+    pub const NODE_COUNT: usize = 74;
+    pub const PROTOTYPE_EDGE_COUNT: usize = 0;
 
-pub const FIGMA_JSON: &str = r#"{
+    pub const FIGMA_JSON: &str = r#"{
   "nodes": [
     {
       "bounds": [
@@ -2456,11 +2456,11 @@ pub const FIGMA_JSON: &str = r#"{
   ]
 }"#;
 
-pub fn document() -> Result<ImportedFigmaDocument, FigmaImportError> {
-import_figma_document(FIGMA_JSON)
-}
+    pub fn document() -> Result<ImportedFigmaDocument, FigmaImportError> {
+        import_figma_document(FIGMA_JSON)
+    }
 
-pub fn runtime() -> Result<FigmaRuntime, FigmaRuntimeError> {
-FigmaRuntime::from_figma_json(FIGMA_JSON)
-}
+    pub fn runtime() -> Result<FigmaRuntime, FigmaRuntimeError> {
+        FigmaRuntime::from_figma_json(FIGMA_JSON)
+    }
 }

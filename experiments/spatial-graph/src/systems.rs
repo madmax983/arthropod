@@ -11,10 +11,8 @@ pub fn stats_system(mut stats: ResMut<Stats>, query: Query<&SceneNodeRef>, scene
 
     for scene_node_ref in query.iter() {
         total += 1;
-        if let Some(node) = scene.get_node(scene_node_ref.0) {
-            if node.visible {
-                visible += 1;
-            }
+        if let Some(_node) = scene.get_node(scene_node_ref.0).filter(|n| n.visible) {
+            visible += 1;
         }
     }
 

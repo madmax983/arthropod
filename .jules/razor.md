@@ -32,3 +32,8 @@
 **Bloat:** Passing `&PathBuf` as function arguments
 **Cut:** Replaced with `&Path` slice references
 **Saved:** Reduced unnecessary allocations and pointer indirection in `figma_pull.rs`, resolving `clippy::ptr_arg` warnings.
+
+## [Reduction]
+**Bloat:** Nested `if let` and `if` checking options in spatial graph
+**Cut:** Collapsed nested checks using chained `.filter()` calls.
+**Saved:** Reduced nesting depth and cognitive load, removed `clippy::collapsible_if` warnings in `spatial-graph/systems.rs`.

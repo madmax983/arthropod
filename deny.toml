@@ -8,13 +8,14 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
 ignore = [
     "RUSTSEC-2024-0436", # paste is unmaintained (transitive dependency via accesskit)
+    "RUSTSEC-2025-0057", # fxhash is unmaintained
 ]
 
 [licenses]
 # Allow permissive licenses
 allow = [
-    "CDLA-Permissive-2.0",
     "MIT",
+    "MPL-2.0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",

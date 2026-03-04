@@ -11,7 +11,7 @@ fn test_perlin_1d_bounds() {
         let x = i as f32 * 0.1;
         let val = perlin_1d(x);
         assert!(
-            val >= -1.0 && val <= 1.0,
+            (-1.0..=1.0).contains(&val),
             "Value {} at {} is out of bounds",
             val,
             x
@@ -32,7 +32,7 @@ fn test_perlin_2d_bounds() {
             let y = j as f32 * 0.1;
             let val = perlin_2d(x, y);
             assert!(
-                val >= -1.0 && val <= 1.0,
+                (-1.0..=1.0).contains(&val),
                 "Value {} at ({}, {}) is out of bounds",
                 val,
                 x,

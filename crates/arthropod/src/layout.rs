@@ -530,7 +530,6 @@ mod tests {
 
     #[test]
     fn test_default_style_values() {
-        use arthropod_ecs::layout_bridge;
 
         // Use default_style via reflection on perform_layout call or check bridge behavior
         // Since default_style is private, we can't test it directly here.

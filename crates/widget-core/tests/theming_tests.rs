@@ -161,7 +161,7 @@ fn test_form_uses_design_tokens() {
 
     let runtime = Runtime::new();
     let field = Signal::new(runtime.clone(), String::new());
-    let form = Form::new((("test", TextInput::new(field.into())),));
+    let form = Form::new((("test", TextInput::new(field)),));
 
     let mut ctx = WidgetContext::new_test();
     let theme = create_test_theme();
@@ -195,7 +195,7 @@ fn test_form_falls_back_without_tokens() {
 
     let runtime = Runtime::new();
     let field = Signal::new(runtime.clone(), String::new());
-    let form = Form::new((("test", TextInput::new(field.into())),));
+    let form = Form::new((("test", TextInput::new(field)),));
 
     // Create context WITHOUT design tokens
     let mut ctx = WidgetContext::new_test();
