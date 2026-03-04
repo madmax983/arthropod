@@ -42,8 +42,6 @@ pub mod flux_radar;
 #[cfg(not(feature = "nova"))]
 pub mod command_palette {
     #![allow(deprecated)]
-    use bevy_ecs::prelude::Component;
-    use std::marker::PhantomData;
 
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
@@ -400,7 +398,6 @@ pub mod kinetic_text {
 #[cfg(not(feature = "nova"))]
 pub mod reactive_particles {
     #![allow(deprecated)]
-    use bevy_ecs::prelude::Component;
 
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
@@ -408,7 +405,7 @@ pub mod reactive_particles {
     /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
     pub const MISSING_FEATURE: () = ();
 
-    #[derive(Component, Default)]
+    #[derive(bevy_ecs::prelude::Component, Default)]
     #[deprecated(
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
@@ -509,8 +506,6 @@ pub mod xray {
 #[cfg(not(feature = "nova"))]
 pub mod elastic {
     #![allow(deprecated)]
-    use bevy_ecs::prelude::Resource;
-    use std::marker::PhantomData;
 
     /// ⚠️ **MISSING FEATURE** ⚠️
     ///
@@ -522,15 +517,15 @@ pub mod elastic {
     #[deprecated(
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
-    pub struct ElasticSignal<T>(PhantomData<T>);
+    pub struct ElasticSignal<T>(std::marker::PhantomData<T>);
 
-    #[derive(Resource, Default)]
+    #[derive(bevy_ecs::prelude::Resource, Default)]
     #[deprecated(
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub struct ElasticRegistry;
 
-    #[derive(Resource, Default)]
+    #[derive(bevy_ecs::prelude::Resource, Default)]
     #[deprecated(
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
