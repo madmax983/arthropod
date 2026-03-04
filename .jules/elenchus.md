@@ -92,3 +92,10 @@
 *   Verified `dos_protection.rs` fails when `MAX_MESSAGE_SIZE` is increased to allow attacks (Mutation 1).
 *   Verified `dos_protection.rs` fails when `MAX_MESSAGE_SIZE` is too low for legitimate traffic (Mutation 2).
 *   Verified `havoc_connection_flood.rs` fails when availability is compromised (Mutation 2).
+
+## 2026-03-01 - [Audit of flux-state Uncovered Lines and Features]
+**Module:** `crates/flux-state/src/runtime.rs`, `crates/flux-state/src/computed.rs`, `crates/flux-state/src/signal.rs`, `crates/flux-state/src/effect.rs`
+**Severity:** 🟡 Suspect
+**Finding:** Uncovered code paths related to memory reuse optimization in `take_pending_effects`, panic recovery edge cases (`PanicRestorer`), and conditionally compiled debugging features (`nova` labels).
+**Evidence:** `cargo mutants` reported missed mutations like replacing `buffer.capacity() > self.spare_pending_effects.capacity()` and `replace && with || in <impl Drop for PanicRestorer<'a>>::drop`. Features like `with_label` and `inspect_graph` were completely unexercised.
+**Recommendation:** Test the buffer reuse by running effects and verifying the capacity is preserved via `spare_pending_effects_capacity` (exposed behind `test_utils` feature flag). Add an isolated test for `PanicRestorer` correctly handling an empty buffer, ensuring `take_pending_effects` doesn't drop the context wrongly. Add tests checking `nova` label functionality and the structural integrity of `inspect_graph`. Added `test_get_computed_if_fresh_returns_none` to verify that stale values trigger recomputations.

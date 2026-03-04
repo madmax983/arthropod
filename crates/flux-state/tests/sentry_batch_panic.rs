@@ -87,3 +87,44 @@ fn test_batch_panic_recovery() {
         );
     }
 }
+
+#[test]
+fn test_panic_restorer_empty() {
+    // Tests the path where PanicRestorer drops when `remaining_effects` is empty.
+    let runtime = Runtime::new();
+    let trigger = Signal::new(runtime.clone(), 0);
+    let (read, write) = trigger.split();
+
+    let _effect = Effect::new(runtime.clone(), move || {
+        let val = read.get();
+        if val == 1 {
+            panic!("Single effect panic");
+        }
+    });
+
+    // 1. Trigger Update to value 1
+    // This schedules 1 effect. `take_pending_effects` moves it to `local_effects`.
+    // `process_effect_batch` iterates, pops the single effect.
+    // `PanicRestorer` is created with an EMPTY `remaining_effects`.
+    // The effect runs and panics.
+    // `PanicRestorer` drops. Since `remaining_effects` is empty, it does nothing.
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        write.set(1);
+    }));
+
+    assert!(result.is_err(), "Should have panicked");
+
+    // We can do another safe update to ensure the runtime isn't poisoned or looping
+    let (read2, write2) = Signal::new(runtime.clone(), 0).split();
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let log_clone = log.clone();
+    let _effect2 = Effect::new(runtime.clone(), move || {
+        let val = read2.get();
+        if val == 1 {
+            log_clone.lock().unwrap().push("Safe");
+        }
+    });
+
+    write2.set(1);
+    assert_eq!(*log.lock().unwrap(), vec!["Safe"]);
+}

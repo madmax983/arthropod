@@ -658,6 +658,63 @@ impl Runtime {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Effect, Signal};
+
+    #[test]
+    fn test_buffer_capacity_reused() {
+        let runtime = Runtime::new();
+
+        // Check initial capacity
+        assert_eq!(
+            runtime
+                .inner
+                .lock()
+                .unwrap()
+                .spare_pending_effects
+                .capacity(),
+            0
+        );
+
+        let signal = Signal::new(runtime.clone(), 0);
+        let (read, write) = signal.split();
+
+        // Create 50 effects that depend on `signal`
+        let mut effects = Vec::new();
+        for _ in 0..50 {
+            let read_clone = read.clone();
+            effects.push(Effect::new(runtime.clone(), move || {
+                let _ = read_clone.get();
+            }));
+        }
+
+        // `write.set` notifies subscribers, increasing `pending_effects` capacity
+        write.set(1);
+
+        // After flush, the capacity from `pending_effects` is moved to `spare_pending_effects`
+        let spare_capacity = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .spare_pending_effects
+            .capacity();
+        assert!(spare_capacity >= 50);
+
+        // Run again to ensure it re-uses the buffer
+        write.set(2);
+
+        let new_spare_capacity = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .spare_pending_effects
+            .capacity();
+        assert_eq!(spare_capacity, new_spare_capacity); // Capacity shouldn't have changed
+    }
+}
+
 #[cfg(feature = "nova")]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
