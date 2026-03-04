@@ -163,7 +163,8 @@ impl HasWindowHandle for WindowImpl {
             .ok_or(raw_window_handle::HandleError::Unavailable)?;
         let view_ptr = Retained::as_ptr(&ns_view) as *mut std::ffi::c_void;
 
-        let handle = AppKitWindowHandle::new(NonNull::new(view_ptr).unwrap());
+        let non_null = NonNull::new(view_ptr).ok_or(raw_window_handle::HandleError::Unavailable)?;
+        let handle = AppKitWindowHandle::new(non_null);
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::AppKit(handle)) })
     }
 }

@@ -73,3 +73,6 @@
 ## 2026-03-01 - [MCP Query Hierarchy DoS]
 **Threat:** `scene.query_hierarchy` allowed potentially infinite recursion and unbounded memory allocation via `max_depth` up to 100 on large DAGs/trees. A "Billion Laughs" style attack could exhaust server memory.
 **Defense:** Reduced `MAX_QUERY_DEPTH` to 32. Implemented `MAX_RESPONSE_NODES` limit (5000). Added cycle detection using `HashSet` to prevent infinite loops in DAGs.
+**2025-02-23 - Prevent unwrap panics in platform window handle retrieval**
+**Threat:** A panic condition could be triggered by `unwrap()` during `window_handle` calls on null pointers (`HWND` or `NSView` pointers), causing Denial of Service (application crash).
+**Defense:** Replaced `unwrap()` with `ok_or(HandleError::Unavailable)?` to gracefully handle cases where the window handle is not available or has an invalid/null value.
