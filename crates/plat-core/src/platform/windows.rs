@@ -397,8 +397,9 @@ impl HasWindowHandle for WindowImpl {
         &self,
     ) -> std::result::Result<WindowHandle<'_>, raw_window_handle::HandleError> {
         use std::num::NonZeroIsize;
-        let handle =
-            Win32WindowHandle::new(NonZeroIsize::new(self.hwnd.0 as usize as isize).unwrap());
+        let non_zero = NonZeroIsize::new(self.hwnd.0 as usize as isize)
+            .ok_or(raw_window_handle::HandleError::Unavailable)?;
+        let handle = Win32WindowHandle::new(non_zero);
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
     }
 }
@@ -473,14 +474,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 let x = get_x_lparam(lparam);
                 let y = get_y_lparam(lparam);
 
-                let (button, state) = match msg {
-                    WM_LBUTTONDOWN => (MouseButton::Left, ElementState::Pressed),
-                    WM_LBUTTONUP => (MouseButton::Left, ElementState::Released),
-                    WM_RBUTTONDOWN => (MouseButton::Right, ElementState::Pressed),
-                    WM_RBUTTONUP => (MouseButton::Right, ElementState::Released),
-                    WM_MBUTTONDOWN => (MouseButton::Middle, ElementState::Pressed),
-                    WM_MBUTTONUP => (MouseButton::Middle, ElementState::Released),
-                    _ => unreachable!(),
+                let Some((button, state)) = (match msg {
+                    WM_LBUTTONDOWN => Some((MouseButton::Left, ElementState::Pressed)),
+                    WM_LBUTTONUP => Some((MouseButton::Left, ElementState::Released)),
+                    WM_RBUTTONDOWN => Some((MouseButton::Right, ElementState::Pressed)),
+                    WM_RBUTTONUP => Some((MouseButton::Right, ElementState::Released)),
+                    WM_MBUTTONDOWN => Some((MouseButton::Middle, ElementState::Pressed)),
+                    WM_MBUTTONUP => Some((MouseButton::Middle, ElementState::Released)),
+                    _ => {
+                        log::error!("Unexpected mouse button message: {}", msg);
+                        None
+                    }
+                }) else {
+                    return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
                 };
 
                 // Note: Modifier extraction from wparam will be implemented in a future PR
@@ -728,5 +734,27 @@ mod tests {
     fn should_render_dirty_windows_is_true_for_active_modes() {
         assert!(should_render_dirty_windows(ControlFlow::Poll));
         assert!(should_render_dirty_windows(ControlFlow::Wait));
+    }
+
+    #[test]
+    fn test_window_handle_fails_gracefully_with_null_hwnd() {
+        use raw_window_handle::HasWindowHandle;
+
+        let window = WindowImpl {
+            hwnd: HWND(0 as _),
+            hinstance: Default::default(),
+            id: WindowId(1),
+            thread_id: std::thread::current().id(),
+            backdrop_material: AtomicU8::new(0),
+            #[cfg(target_os = "windows")]
+            composition: None,
+        };
+
+        // window_handle() should fail with HandleError::Unavailable since HWND is 0 (null)
+        // This validates our removal of `.unwrap()` inside `window_handle()`.
+        assert!(matches!(
+            window.window_handle(),
+            Err(raw_window_handle::HandleError::Unavailable)
+        ));
     }
 }

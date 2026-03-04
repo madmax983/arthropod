@@ -35,3 +35,6 @@
 ## 2024-10-25 - [Missing Update Coverage]
 **Learning:** Found an untested execution path inside `WriteSignal::update()`. `WriteSignal::update()` executes a closure safely bypassing the tracking mechanisms. If it fails, the system might not properly invoke `self.runtime.notify(self.id)`.
 **Action:** Created `sentry_correctness.rs` to add tests for `update()` mutating the value and correctly updating the runtime graph by triggering subsequent `Effect` and subscriber calculations.
+**Graceful Failure over Panics in Window Handles**
+**Learning:** Returning `unreachable!()` in a Windows `wndproc` or `unwrap()`ing a potentially null `HWND` during handle retrieval creates unnecessary panic risks that could crash the application on edge cases or unexpected OS messages.
+**Action:** Always prefer safe `ok_or` conversions into standard handle errors (like `raw_window_handle::HandleError::Unavailable`) and properly defer to `DefWindowProcW` instead of forcefully asserting message types.
