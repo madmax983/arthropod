@@ -18,6 +18,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [009](009-overlays-and-popups.md) | Overlays & Popups | Draft |
 | [010](010-layout-engine-v2.md) | Layout Engine V2 (Flexbox) | Draft |
 | [012](012-accessibility-engine.md) | Accessibility Engine | Draft |
+| [013](013-text-input-widget.md) | Standard TextInput Widget | Draft |
 
 ## Lifecycle
 
