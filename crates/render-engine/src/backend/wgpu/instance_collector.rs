@@ -360,25 +360,25 @@ fn pick_text_fill_paint(style: &style_engine::VisualStyle) -> Option<&style_engi
 
 pub(crate) fn resolve_path_fill_paints(
     style: &style_engine::VisualStyle,
-) -> Vec<style_engine::Paint> {
+) -> std::borrow::Cow<'_, [style_engine::Paint]> {
     if style.fills.is_empty() {
-        vec![style_engine::Paint::solid(glam::Vec4::new(
+        std::borrow::Cow::Owned(vec![style_engine::Paint::solid(glam::Vec4::new(
             1.0, 0.0, 1.0, 1.0,
-        ))]
+        ))])
     } else {
-        style.fills.clone()
+        std::borrow::Cow::Borrowed(&style.fills)
     }
 }
 
 pub(crate) fn resolve_path_stroke_paints(
     stroke: &style_engine::StrokeStyle,
-) -> Vec<style_engine::Paint> {
+) -> std::borrow::Cow<'_, [style_engine::Paint]> {
     if stroke.paints.is_empty() {
-        vec![style_engine::Paint::solid(glam::Vec4::new(
+        std::borrow::Cow::Owned(vec![style_engine::Paint::solid(glam::Vec4::new(
             1.0, 0.0, 1.0, 1.0,
-        ))]
+        ))])
     } else {
-        stroke.paints.clone()
+        std::borrow::Cow::Borrowed(&stroke.paints)
     }
 }
 
@@ -518,7 +518,7 @@ fn collect_instances_impl<'a>(
                         }
                     }
 
-                    for fill_paint in &fill_paints {
+                    for fill_paint in fill_paints.as_ref() {
                         for mesh in &fill_meshes {
                             path_batches.push(PathBatch {
                                 mesh: Arc::clone(mesh),
@@ -562,7 +562,7 @@ fn collect_instances_impl<'a>(
                                 }
                             }
 
-                            for stroke_paint in &stroke_paints {
+                            for stroke_paint in stroke_paints.as_ref() {
                                 for mesh in &stroke_meshes {
                                     path_batches.push(PathBatch {
                                         mesh: Arc::clone(mesh),
@@ -600,7 +600,7 @@ fn collect_instances_impl<'a>(
                     if let Ok(mesh) = mesh_result
                         && !mesh.indices.is_empty()
                     {
-                        for fill_paint in &fill_paints {
+                        for fill_paint in fill_paints.as_ref() {
                             path_batches.push(PathBatch {
                                 mesh: Arc::clone(&mesh),
                                 paint: fill_paint.clone(),
@@ -625,7 +625,7 @@ fn collect_instances_impl<'a>(
                         if let Ok(mesh) = stroke_mesh_result
                             && !mesh.indices.is_empty()
                         {
-                            for stroke_paint in &stroke_paints {
+                            for stroke_paint in stroke_paints.as_ref() {
                                 path_batches.push(PathBatch {
                                     mesh: Arc::clone(&mesh),
                                     paint: stroke_paint.clone(),
@@ -717,7 +717,7 @@ pub(crate) fn collect_style_batches_for_bounds(
             }
         }
 
-        for fill_paint in &fill_paints {
+        for fill_paint in fill_paints.as_ref() {
             for mesh in &fill_meshes {
                 path_batches.push(PathBatch {
                     mesh: Arc::clone(mesh),
@@ -751,7 +751,7 @@ pub(crate) fn collect_style_batches_for_bounds(
                     }
                 }
 
-                for stroke_paint in &stroke_paints {
+                for stroke_paint in stroke_paints.as_ref() {
                     for mesh in &stroke_meshes {
                         path_batches.push(PathBatch {
                             mesh: Arc::clone(mesh),
@@ -783,7 +783,7 @@ pub(crate) fn collect_style_batches_for_bounds(
         if let Ok(mesh) = mesh_result
             && !mesh.indices.is_empty()
         {
-            for fill_paint in &fill_paints {
+            for fill_paint in fill_paints.as_ref() {
                 path_batches.push(PathBatch {
                     mesh: Arc::clone(&mesh),
                     paint: fill_paint.clone(),
@@ -803,7 +803,7 @@ pub(crate) fn collect_style_batches_for_bounds(
             if let Ok(mesh) = stroke_mesh_result
                 && !mesh.indices.is_empty()
             {
-                for stroke_paint in &stroke_paints {
+                for stroke_paint in stroke_paints.as_ref() {
                     path_batches.push(PathBatch {
                         mesh: Arc::clone(&mesh),
                         paint: stroke_paint.clone(),

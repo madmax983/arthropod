@@ -13,3 +13,7 @@
 **[Lock Contention in Reactive Primitives]**
 **Learning:** `Signal::get` and `Computed::get` are hot paths. Acquiring the `RuntimeInner` lock multiple times (once for tracking, once for handle retrieval) adds significant overhead (~20-30% of total read time).
 **Action:** Combine operations into single-lock methods on the Runtime (`track_and_get_signal`, `track_and_get_computed_if_fresh`). This reduces lock acquisitions from 2-3 to 1 in the happy path.
+
+**Cow to avoid allocating Vec for Paint Slices**
+**Learning:** `resolve_path_fill_paints` and `resolve_path_stroke_paints` returned `Vec<Paint>`, which resulted in cloning the underlying `Vec<Paint>` slices from `VisualStyle` and `StrokeStyle` every time they were called in a hot loop within `instance_collector::collect_instances_impl`. The returned vectors were only iterated over, making them a perfect candidate for `std::borrow::Cow`.
+**Action:** When returning a slice or an allocated fallback element, use `std::borrow::Cow<'_, [T]>` (i.e. `Cow::Borrowed(&slice)` and `Cow::Owned(vec![fallback])`) to avoid unconditionally cloning `Vec` items when iterating. Iterate using `.as_ref()`.
