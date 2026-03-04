@@ -11,3 +11,9 @@
 ## 2024-05-23 - [Macro Syntax Magic]
 **Confusion:** The `txt!(@read)` syntax was confusing because it looked like invalid Rust code and the example didn't explain that `@` is syntactic sugar handled by the macro.
 **Clarification:** Documented `txt!(@read)` in `crates/widget-core/src/text.rs` and `crates/widget-macros/src/lib.rs`, explaining that it's a special syntax for passing reactive signals.
+## 2024-05-24 - [App::run Documentation Update]
+**Confusion:** The documentation examples for `App::run` in `crates/arthropod/src/app/core.rs` and `crates/arthropod/src/app/mod.rs` were using `Form::new` instead of the declarative macros (`col!`, `txt!`, `btn!`) that are the recommended way to build UIs in the framework. This didn't align with the examples in the main `lib.rs` and `widget-core`.
+**Clarification:** Updated the `App::run` examples in both files to build a reactive "Counter App" using declarative macros, making the recommended approach clearer and more consistent across the codebase.
+## 2024-05-25 - [App::run Macro Documentation Fix]
+**Confusion:** The documentation example for `App::run` using `col!`, `txt!`, and `btn!` macros failed to compile in CI because it used hallucinated UI patterns (`heading1` literal, `align` property on `col!`) and incorrectly passed a `Signal<i32>` directly to a text widget instead of `ReadSignal<String>`.
+**Clarification:** Corrected the example to properly demonstrate standard API patterns: passing a `ReadSignal<String>` using the `@` prefix (`txt!(@read_name)`), wrapping columns in `Center::new(...)` instead of passing `align`, and using explicit `size: <f32>` values.

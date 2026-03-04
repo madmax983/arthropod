@@ -9,14 +9,25 @@
 //!
 //! ```no_run
 //! use arthropod::prelude::*;
-//! use widget_core::{Form, TextInput};
 //!
 //! fn main() -> Result<(), AppError> {
-//!     App::run("My Form", 400, 300, |ctx| {
-//!         let name = ctx.signal(String::new());
-//!         Form::new((
-//!             ("name", TextInput::new(name)),
-//!         ))
+//!     App::run("Welcome App", 400, 300, |ctx| {
+//!         // 1. Create reactive state (a string)
+//!         let name_signal = ctx.signal(String::from("Arthropod"));
+//!         let (read_name, _write_name) = name_signal.split();
+//!
+//!         // 2. Build declarative UI tree using macros
+//!         Center::new(
+//!             col!(
+//!                 [
+//!                     txt!("Welcome to", size: 24.0),
+//!                     // Use @ syntax to pass the reactive signal
+//!                     txt!(@read_name, size: 48.0),
+//!                 ],
+//!                 gap: 20.0,
+//!                 padding: 40.0
+//!             )
+//!         )
 //!     })
 //! }
 //! ```
