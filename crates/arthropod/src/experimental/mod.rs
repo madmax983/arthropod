@@ -40,6 +40,104 @@ pub mod flux_radar;
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
+fn print_missing_feature_warning(module_name: &str) {
+    use crossterm::{
+        execute,
+        style::{Color, Print, ResetColor, SetForegroundColor},
+    };
+    use std::io::stderr;
+
+    let mut stderr = stderr();
+
+    let _ = execute!(
+        stderr,
+        SetForegroundColor(Color::Red),
+        Print(
+            "╭────────────────────────────────────────────────────────────────────────╮
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::Yellow),
+        Print("⚠️  MISSING FEATURE DETECTED                                          "),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print(
+            "├────────────────────────────────────────────────────────────────────────┤
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::White),
+        Print("You attempted to use the experimental '"),
+        SetForegroundColor(Color::Cyan),
+        Print(module_name),
+        SetForegroundColor(Color::White),
+    );
+
+    // The inner width is 72 chars.
+    // "You attempted to use the experimental '" = 39 chars
+    // "' module," = 9 chars
+    // Fixed text = 48 chars.
+    // Padding = 72 - 48 - module_name.len() = 24 - module_name.len()
+    let len = 23_usize.saturating_sub(module_name.len());
+    let padding = " ".repeat(len);
+
+    let _ = execute!(
+        stderr,
+        Print("' module,"),
+        Print(padding),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::White),
+        Print("but the required 'nova' feature is NOT enabled.                        "),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print(
+            "│                                                                        │
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::Yellow),
+        Print("💡 Action Required:                                                    "),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::White),
+        Print("Add `features = [\"nova\"]` to your `arthropod` dependency               "),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print("│ "),
+        SetForegroundColor(Color::White),
+        Print("in your Cargo.toml file.                                               "),
+        SetForegroundColor(Color::Red),
+        Print(
+            "│
+"
+        ),
+        Print(
+            "╰────────────────────────────────────────────────────────────────────────╯
+"
+        ),
+        ResetColor
+    );
+}
+
+#[cfg(not(feature = "nova"))]
 pub mod command_palette {
     #![allow(deprecated)]
 
@@ -63,6 +161,13 @@ pub mod command_palette {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub struct Command;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_command_palette(_app: &mut crate::App) {
+        super::print_missing_feature_warning("command_palette");
+    }
 }
 
 #[cfg(not(feature = "nova"))]
@@ -82,7 +187,7 @@ pub mod ghost_replay {
 
     #[deprecated(note = "Requires 'nova' feature. Enable it in Cargo.toml.")]
     pub fn init_ghost_replay(_app: &mut crate::App) {
-        eprintln!("ERROR: 'init_ghost_replay' requires 'nova' feature. Enable it in Cargo.toml.");
+        super::print_missing_feature_warning("ghost_replay");
     }
 }
 
@@ -137,9 +242,7 @@ pub mod story {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_story(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_story' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("story");
     }
 
     /// ⚠️ **MISSING FEATURE** ⚠️
@@ -289,9 +392,7 @@ pub mod particles {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_particles(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("particles");
     }
 }
 
@@ -338,9 +439,7 @@ pub mod spellcaster {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_spellcaster(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_spellcaster' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("spellcaster");
     }
 }
 
@@ -432,9 +531,7 @@ pub mod reactive_particles {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_reactive_particles(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_reactive_particles' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("reactive_particles");
     }
 }
 
@@ -497,9 +594,7 @@ pub mod xray {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_xray(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_xray' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("xray");
     }
 }
 
@@ -549,9 +644,7 @@ pub mod elastic {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_elastic_feature(_world: &mut bevy_ecs::prelude::World) {
-        eprintln!(
-            "ERROR: 'register_elastic_feature' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("elastic");
     }
 }
 
@@ -624,8 +717,6 @@ pub mod signal_graph {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub fn register_signal_graph(_app: &mut crate::App) {
-        eprintln!(
-            "ERROR: 'register_signal_graph' - This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
-        );
+        super::print_missing_feature_warning("signal_graph");
     }
 }

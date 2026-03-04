@@ -224,6 +224,7 @@ dependencies = [
  "arthropod-ecs",
  "bevy_ecs",
  "criterion",
+ "crossterm 0.29.0",
  "env_logger",
  "flux-state",
  "glam",

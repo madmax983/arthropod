@@ -25,6 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json.workspace = true
 bevy_ecs = { version = "0.15", features = ["multi_threaded"] }
 indexmap = "2.13.0"
+crossterm = "0.29.0"
 
 [dev-dependencies]
 glam = "0.29"
