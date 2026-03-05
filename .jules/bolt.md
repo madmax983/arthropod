@@ -21,3 +21,7 @@
 **Pre-allocate vectors during scene traversal using node count**
 **Learning:** In `instance_collector.rs`, `Vec::new()` was repeatedly called inside render passes per-frame, leading to excessive heap re-allocations as vectors grew. Calculating vector capacities dynamically based on scene node count directly avoids this, providing a measurable performance gain. `Vec::with_capacity(count)` ensures vectors start with the exact necessary space.
 **Action:** When creating new vectors (`Vec::new()`) inside tight loops or per-frame operations, use `Vec::with_capacity(capacity)` with a capacity derived from an existing metric (e.g. `scene.node_count().clamp(16, 4096)`).
+
+## Removed redundant clone of `style` in multipass executor
+**Learning:** `style.as_ref().clone()` was unconditionally copying a potentially large `VisualStyle` struct in a hot loop in `multipass_executor.rs`.
+**Action:** Changed to `style.as_ref()` and pass a reference to `collect_style_batches_for_bounds` and use fields natively to avoid a heap allocation per frame per node.

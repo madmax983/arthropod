@@ -145,7 +145,7 @@ impl<'a> MultipassRenderer<'a> {
                 continue;
             }
 
-            let style = style.as_ref().clone();
+            let style = style.as_ref();
             let effective_opacity = inherited_opacity * style.opacity;
             if effective_opacity <= 0.0 {
                 continue;
@@ -233,7 +233,7 @@ impl<'a> MultipassRenderer<'a> {
 
             let (node_instances, node_path_batches) = collect_style_batches_for_bounds(
                 &mut batch_ctx,
-                &style,
+                style,
                 effective_opacity,
                 render_bounds,
                 node.transform,
