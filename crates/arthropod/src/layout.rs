@@ -3,9 +3,6 @@
 //! Bridges the WidgetContext layout styles to Scene node bounds using
 //! the layout-engine (taffy) for flexbox computation.
 
-// Allow collapsible_if since nested if-let chains are more readable
-#![allow(clippy::collapsible_if)]
-
 use layout_engine::{FlexStyle, LayoutConstraints};
 use render_engine::{NodeId, Scene};
 use std::collections::HashMap;

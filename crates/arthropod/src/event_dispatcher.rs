@@ -6,9 +6,6 @@
 //! - Mouse click hit testing and focus management
 //! - Form submission on Enter
 
-// Allow collapsible_if since nested if-let chains are more readable in this context
-#![allow(clippy::collapsible_if)]
-
 use plat_core::{
     ElementState, Event, Key, KeyboardInput, MouseButton, MouseInput, Point, WindowEvent,
 };
@@ -210,14 +207,12 @@ impl EventDispatcher {
         };
 
         // Check if we hit a text node - if so, get its parent (the input container)
-        if let Some(hit_node) = app_scene.get_node(app_node_id) {
-            if let NodeContent::Styled { ref style } = hit_node.content {
-                if style.text.is_some() {
-                    if let Some(parent_id) = app_scene.find_parent(app_node_id) {
-                        app_node_id = parent_id;
-                    }
-                }
-            }
+        if app_scene
+            .get_node(app_node_id)
+            .filter(|n| matches!(&n.content, NodeContent::Styled { style } if style.text.is_some()))
+            .is_some()
+        {
+            app_node_id = app_scene.find_parent(app_node_id).unwrap_or(app_node_id);
         }
 
         // Widget node ID == App node ID (identity mapping)
