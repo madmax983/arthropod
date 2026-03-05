@@ -17,7 +17,7 @@ pub struct WidgetMacroConfig {
     /// Constructor function to call (default: "new")
     pub constructor: String,
     /// Positional argument type (when constructor arg differs from field type)
-    /// e.g., "Signal<String>" for TextInput where constructor takes Signal but stores ReadSignal/WriteSignal
+    /// e.g., "`Signal<String>`" for TextInput where constructor takes Signal but stores ReadSignal/WriteSignal
     pub positional_type: Option<String>,
     /// Method to add children (default: "child" for arrays, "field" for named_children)
     pub child_method: Option<String>,

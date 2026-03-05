@@ -17,3 +17,6 @@
 ## 2024-05-25 - [App::run Macro Documentation Fix]
 **Confusion:** The documentation example for `App::run` using `col!`, `txt!`, and `btn!` macros failed to compile in CI because it used hallucinated UI patterns (`heading1` literal, `align` property on `col!`) and incorrectly passed a `Signal<i32>` directly to a text widget instead of `ReadSignal<String>`.
 **Clarification:** Corrected the example to properly demonstrate standard API patterns: passing a `ReadSignal<String>` using the `@` prefix (`txt!(@read_name)`), wrapping columns in `Center::new(...)` instead of passing `align`, and using explicit `size: <f32>` values.
+## 2024-05-26 - [Rustdoc Warnings in Macros]
+**Confusion:** Rustdoc warnings were generated in `widget-macros` due to using literal macro syntax (`#[positional]`, `#[children]`) which it mistook for intra-doc links, and angle brackets (`Signal<String>`) which it mistook for unclosed HTML tags.
+**Clarification:** Wrapped these elements in backticks (e.g., \`#[positional]\` and \`Signal<String>\`) to ensure they are parsed as code elements, resolving all rustdoc warnings.

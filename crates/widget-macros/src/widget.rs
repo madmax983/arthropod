@@ -1,7 +1,7 @@
 //! Unified Widget derive macro implementation
 //!
-//! Auto-detects whether the widget is a display widget (has #[positional])
-//! or a container widget (has #[children]) and generates the appropriate macro.
+//! Auto-detects whether the widget is a display widget (has `#[positional]`)
+//! or a container widget (has `#[children]`) and generates the appropriate macro.
 //!
 //! This derive generates:
 //! 1. Declarative macros for widget instantiation (txt!, btn!, col!, etc.)
