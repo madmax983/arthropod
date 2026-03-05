@@ -37,6 +37,9 @@ pub mod command_palette;
 #[cfg(feature = "nova")]
 pub mod flux_radar;
 
+#[cfg(feature = "nova")]
+pub mod spatial_query;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -673,6 +676,39 @@ pub mod chronos {
         note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
     )]
     pub struct ChronosDebugger;
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod spatial_query {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `spatial_query` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct SpatialIndex;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn update_spatial_index(
+        _scene: bevy_ecs::prelude::Res<render_engine::Scene>,
+        _spatial_index: bevy_ecs::prelude::ResMut<SpatialIndex>,
+    ) {
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_spatial_query(_app: &mut crate::App) {
+        super::print_missing_feature_warning("spatial_query");
+    }
 }
 
 #[cfg(not(feature = "nova"))]
