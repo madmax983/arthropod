@@ -728,7 +728,7 @@ mod tests {
         // Catch panic
         let result = std::panic::catch_unwind(|| {
             let mut batch = vec![NodeId(1), NodeId(2), NodeId(3)];
-            let mut restorer = super::PanicRestorer {
+            let restorer = super::PanicRestorer {
                 runtime: &runtime,
                 remaining_effects: &mut batch,
             };
@@ -932,7 +932,7 @@ impl Runtime {
     }
 
     /// Snapshots the current dependency graph for debugging/devtools.
-    pub fn inspect_graph(&self) -> GraphSnapshot {
+    pub fn inspect_graph(self: &Arc<Self>) -> GraphSnapshot {
         let inner = self.inner.lock().unwrap();
         let mut nodes = Vec::new();
         let mut dependencies = Vec::new();
@@ -997,6 +997,10 @@ impl Runtime {
         for id in &inner.stale {
             stale_nodes.push(*id);
         }
+
+        nodes.sort_by_key(|n| n.id.0);
+        dependencies.sort_by_key(|(src, tgt)| (src.0, tgt.0));
+        stale_nodes.sort_by_key(|n| n.0);
 
         GraphSnapshot {
             nodes,
