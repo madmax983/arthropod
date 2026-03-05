@@ -712,6 +712,189 @@ mod tests {
             .capacity();
         assert_eq!(spare_capacity, new_spare_capacity); // Capacity shouldn't have changed
     }
+
+    #[test]
+    fn test_panic_restorer() {
+        let runtime = Runtime::new();
+
+        // Populate pending effects
+        {
+            let mut inner = runtime.inner.lock().unwrap();
+            inner.pending_effects.push(NodeId(1));
+            inner.pending_effects.push(NodeId(2));
+            inner.pending_effects.push(NodeId(3));
+        }
+
+        // Catch panic
+        let result = std::panic::catch_unwind(|| {
+            let mut batch = vec![NodeId(1), NodeId(2), NodeId(3)];
+            let mut restorer = super::PanicRestorer {
+                runtime: &runtime,
+                remaining_effects: &mut batch,
+            };
+
+            // Pop one effect (simulate running it)
+            restorer.remaining_effects.pop();
+
+            // Trigger panic
+            panic!("test panic");
+        });
+
+        assert!(result.is_err());
+
+        // Check that remaining effects were restored
+        let inner = runtime.inner.lock().unwrap();
+        assert_eq!(
+            inner.pending_effects,
+            vec![NodeId(1), NodeId(2), NodeId(3), NodeId(1), NodeId(2)]
+        );
+    }
+
+    #[test]
+    fn test_buffer_donation() {
+        let runtime = Runtime::new();
+
+        // 1. Initial state (empty)
+        let mut buffer = Vec::with_capacity(10);
+        let taken = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut buffer);
+        assert!(!taken);
+        // The empty buffer was donated
+        assert_eq!(
+            runtime
+                .inner
+                .lock()
+                .unwrap()
+                .spare_pending_effects
+                .capacity(),
+            10
+        );
+
+        // 2. Buffer donation should only happen if buffer.capacity() > spare_capacity
+        let mut small_buffer = Vec::with_capacity(5);
+        let taken = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut small_buffer);
+        assert!(!taken);
+        // capacity shouldn't change
+        assert_eq!(
+            runtime
+                .inner
+                .lock()
+                .unwrap()
+                .spare_pending_effects
+                .capacity(),
+            10
+        );
+    }
+
+    #[test]
+    fn test_spare_buffer_reuse() {
+        let runtime = Runtime::new();
+
+        // Create a spare buffer
+        {
+            let mut inner = runtime.inner.lock().unwrap();
+            inner.spare_pending_effects = Vec::with_capacity(20);
+            inner.pending_effects.push(NodeId(1));
+        }
+
+        // Take pending effects. The spare buffer should be used as the new pending_effects.
+        let mut buffer = Vec::new();
+        let taken = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut buffer);
+
+        assert!(taken);
+        assert_eq!(buffer, vec![NodeId(1)]);
+
+        // Check that spare_pending_effects is now empty (was moved)
+        let inner = runtime.inner.lock().unwrap();
+        assert_eq!(inner.spare_pending_effects.capacity(), 0);
+        assert_eq!(inner.pending_effects.capacity(), 20); // Reused spare
+    }
+
+    #[test]
+    fn test_get_computed_if_fresh() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 10);
+        let (read, write) = signal.split();
+
+        // Create computed and run once to init
+        let read_clone = read.clone();
+        let computed = crate::Computed::new(runtime.clone(), move || read_clone.get() * 2);
+
+        // Value is fresh right after init/read
+        assert_eq!(computed.get(), 20);
+
+        // Get the internal node ID of the computed
+        // (we find it by looking at the inner state directly for the test)
+        let computed_id = *runtime
+            .inner
+            .lock()
+            .unwrap()
+            .computeds
+            .keys()
+            .next()
+            .unwrap();
+
+        // 1. Should return Some when fresh
+        let fresh_val = runtime.get_computed_if_fresh(computed_id).unwrap();
+        let val_guard = fresh_val
+            .downcast_ref::<std::sync::RwLock<i32>>()
+            .unwrap()
+            .read()
+            .unwrap();
+        assert_eq!(*val_guard, 20);
+        drop(val_guard);
+
+        // Update dependency to make it stale
+        write.set(15);
+
+        // 2. Should return None when stale
+        assert!(runtime.get_computed_if_fresh(computed_id).is_none());
+    }
+
+    #[test]
+    fn test_is_stale() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 100);
+        let (read, write) = signal.split();
+
+        let read_clone = read.clone();
+        let computed = crate::Computed::new(runtime.clone(), move || read_clone.get() + 5);
+
+        // Get the internal node ID of the computed
+        let computed_id = *runtime
+            .inner
+            .lock()
+            .unwrap()
+            .computeds
+            .keys()
+            .next()
+            .unwrap();
+
+        // After creation and initial evaluation, it's fresh
+        assert_eq!(computed.get(), 105);
+        assert!(!runtime.is_stale(computed_id));
+
+        // Update signal
+        write.set(200);
+
+        // Now it's stale
+        assert!(runtime.is_stale(computed_id));
+
+        // Reading it recomputes it, making it fresh again
+        assert_eq!(computed.get(), 205);
+        assert!(!runtime.is_stale(computed_id));
+    }
 }
 
 #[cfg(feature = "nova")]

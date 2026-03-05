@@ -99,3 +99,10 @@
 **Finding:** Uncovered code paths related to memory reuse optimization in `take_pending_effects`, panic recovery edge cases (`PanicRestorer`), and conditionally compiled debugging features (`nova` labels).
 **Evidence:** `cargo mutants` reported missed mutations like replacing `buffer.capacity() > self.spare_pending_effects.capacity()` and `replace && with || in <impl Drop for PanicRestorer<'a>>::drop`. Features like `with_label` and `inspect_graph` were completely unexercised.
 **Recommendation:** Test the buffer reuse by running effects and verifying the capacity is preserved via `spare_pending_effects_capacity` (exposed behind `test_utils` feature flag). Add an isolated test for `PanicRestorer` correctly handling an empty buffer, ensuring `take_pending_effects` doesn't drop the context wrongly. Add tests checking `nova` label functionality and the structural integrity of `inspect_graph`. Added `test_get_computed_if_fresh_returns_none` to verify that stale values trigger recomputations.
+
+**[Verdict: Test Coverage Gap in `RuntimeInner` Buffer Logic and Computed Status]**
+**Module:** `crates/flux-state/src/runtime.rs`
+**Severity:** 🟡 Suspect
+**Finding:** Found multiple missing mutants relating to internal buffer donation capacity logic (`take_pending_effects`), `PanicRestorer`, `get_computed_if_fresh`, and `is_stale`. This indicated tests were completely missing for these edge cases and API surface paths.
+**Evidence:** `cargo mutants` reported these as MISSED, showing the operations could be entirely deleted or mutated to default values without any test failing.
+**Recommendation:** Added `test_panic_restorer`, `test_buffer_donation`, `test_spare_buffer_reuse`, `test_get_computed_if_fresh`, and `test_is_stale` to cover these blind spots. Mutation score improved significantly. The few remaining missed mutants relate to boolean/comparison equivalencies (`>` vs `>=` where both outcomes result in functionally identical or extremely subtle runtime memory overhead behavior).
