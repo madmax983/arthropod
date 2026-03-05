@@ -175,6 +175,10 @@ path = "examples/form_syntax_demo.rs"
 name = "riot_waves_generated"
 path = "examples/riot_waves_generated.rs"
 
+[[example]]
+name = "carousel_demo"
+path = "examples/carousel_demo.rs"
+
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]

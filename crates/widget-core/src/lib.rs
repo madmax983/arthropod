@@ -146,6 +146,7 @@
 
 pub mod button;
 pub mod card;
+pub mod carousel;
 pub mod center;
 pub mod checkbox;
 pub mod column;
@@ -171,6 +172,7 @@ pub mod widget_trait;
 
 pub use button::{Button, ButtonStyle};
 pub use card::Card;
+pub use carousel::Carousel;
 pub use center::Center;
 pub use checkbox::Checkbox;
 pub use column::Column;

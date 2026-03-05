@@ -22,3 +22,7 @@
 **Concept:** Physics-based layout interpolation that transforms discrete `layout-engine` updates into smooth, organic animations using `flux-state` and `anim-graph`.
 **Fate:** Merged
 **Lesson:** Layouts shouldn't snap. By treating layout rects as animatable signals, we can make the entire UI feel "fluid" without changing the core layout logic.
+## [Carousel]
+**Concept:** A reusable horizontal layout widget to page through a list of children. Exposes the active index via `flux-state` signals, allowing external control and observation.
+**Fate:** Merged
+**Lesson:** Even without robust conditional rendering or `display: none` in the layout engine, we can construct interactive sliders using `flux-state` signals to keep state, and users can track it.
