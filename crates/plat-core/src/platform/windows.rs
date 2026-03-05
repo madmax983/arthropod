@@ -56,10 +56,14 @@ fn get_y_lparam(lparam: LPARAM) -> f64 {
 }
 
 /// Helper to safely retrieve WindowId from HWND user data, handling 32-bit sign extension correctly.
+///
+/// # Safety
+/// The provided `HWND` must be a valid window handle.
 #[inline]
 unsafe fn get_window_id(hwnd: HWND) -> Option<WindowId> {
     // GetWindowLongPtrW returns zero on failure (or if the value is zero).
     // We assume valid WindowIds are non-zero (initialized to 1).
+    // SAFETY: We trust the caller provided a valid HWND. Reading user data from a valid HWND is safe.
     let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
     if ptr == 0 {
         return None;
@@ -76,14 +80,14 @@ pub struct EventLoopImpl {
 
 impl EventLoopImpl {
     pub fn new() -> std::result::Result<Self, PlatformError> {
-        unsafe {
-            let hinstance = GetModuleHandleW(None)
-                .map_err(|e| {
-                    PlatformError::Initialization(format!("GetModuleHandleW failed: {}", e))
-                })?
-                .into();
-            Ok(Self { hinstance })
+        // SAFETY: Calling GetModuleHandleW with None safely returns the module handle for the current executable.
+        let hinstance = unsafe {
+            GetModuleHandleW(None).map_err(|e| {
+                PlatformError::Initialization(format!("GetModuleHandleW failed: {}", e))
+            })?
         }
+        .into();
+        Ok(Self { hinstance })
     }
 
     pub fn create_window(
@@ -124,50 +128,56 @@ unsafe impl Sync for WindowImpl {}
 
 impl WindowImpl {
     fn new(hinstance: HINSTANCE, config: WindowConfig) -> std::result::Result<Self, PlatformError> {
-        unsafe {
-            // Register window class only once
-            let class_name = w!("ArthropodWindow");
+        // Register window class only once
+        let class_name = w!("ArthropodWindow");
 
-            REGISTER_CLASS.call_once(|| {
-                let wc = WNDCLASSW {
-                    lpfnWndProc: Some(wndproc),
-                    hInstance: hinstance,
-                    lpszClassName: class_name,
-                    style: CS_HREDRAW | CS_VREDRAW,
-                    hCursor: LoadCursorW(None, IDC_ARROW).ok().unwrap_or_default(),
-                    hbrBackground: HBRUSH(0 as _), // Transparent background for composition
-                    ..Default::default()
-                };
+        REGISTER_CLASS.call_once(|| {
+            // SAFETY: Loading a standard cursor by ID is safe and guaranteed to exist.
+            let hcursor = unsafe { LoadCursorW(None, IDC_ARROW).ok().unwrap_or_default() };
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(wndproc),
+                hInstance: hinstance,
+                lpszClassName: class_name,
+                style: CS_HREDRAW | CS_VREDRAW,
+                hCursor: hcursor,
+                hbrBackground: HBRUSH(0 as _), // Transparent background for composition
+                ..Default::default()
+            };
 
+            // SAFETY: Registering a unique class with a safe wndproc.
+            unsafe {
                 let _ = RegisterClassW(&wc);
-            });
-
-            let id = WindowId(NEXT_WINDOW_ID.fetch_add(1, Ordering::SeqCst));
-
-            // Ensure ID fits in pointer for 32-bit systems where usize < u64
-            // This prevents ID truncation when passing via lpParam
-            if std::mem::size_of::<usize>() < 8 && id.0 > usize::MAX as u64 {
-                return Err(PlatformError::Initialization(
-                    "Window ID overflow on 32-bit system".into(),
-                ));
             }
+        });
 
-            let title: Vec<u16> = config
-                .title
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
+        let id = WindowId(NEXT_WINDOW_ID.fetch_add(1, Ordering::SeqCst));
 
-            // Note: WS_EX_NOREDIRECTIONBITMAP is required for DirectComposition to work correctly
-            // with transparent swapchains. It tells the DWM not to allocate a redirection bitmap,
-            // relying entirely on the application's swapchain for content.
-            let mut ex_style = WINDOW_EX_STYLE::default();
-            if config.composition_mode {
-                ex_style |= WS_EX_NOREDIRECTIONBITMAP;
-            }
+        // Ensure ID fits in pointer for 32-bit systems where usize < u64
+        // This prevents ID truncation when passing via lpParam
+        if std::mem::size_of::<usize>() < 8 && id.0 > usize::MAX as u64 {
+            return Err(PlatformError::Initialization(
+                "Window ID overflow on 32-bit system".into(),
+            ));
+        }
 
-            // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
-            let hwnd: HWND = CreateWindowExW(
+        let title: Vec<u16> = config
+            .title
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        // Note: WS_EX_NOREDIRECTIONBITMAP is required for DirectComposition to work correctly
+        // with transparent swapchains. It tells the DWM not to allocate a redirection bitmap,
+        // relying entirely on the application's swapchain for content.
+        let mut ex_style = WINDOW_EX_STYLE::default();
+        if config.composition_mode {
+            ex_style |= WS_EX_NOREDIRECTIONBITMAP;
+        }
+
+        // Pass WindowId via lpParam so WM_NCCREATE can set it in GWLP_USERDATA
+        // SAFETY: CreateWindowExW parameters are bounded, zero-terminated strings and properly aligned.
+        let hwnd: HWND = unsafe {
+            CreateWindowExW(
                 ex_style,
                 class_name,
                 PCWSTR(title.as_ptr()),
@@ -181,70 +191,79 @@ impl WindowImpl {
                 Some(hinstance),
                 Some(id.0 as *const std::ffi::c_void),
             )
-            .map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
+        }
+        .map_err(|e| PlatformError::WindowCreation(format!("CreateWindowExW failed: {}", e)))?;
 
-            if config.visible {
+        if config.visible {
+            // SAFETY: The provided HWND was just created and is valid.
+            unsafe {
                 let _ = ShowWindow(hwnd, SW_SHOW);
             }
+        }
 
-            // Extend frame into client area to ensure transparency works
-            if config.composition_mode {
-                use windows::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea;
-                let margins = windows::Win32::UI::Controls::MARGINS {
-                    cxLeftWidth: -1, // -1 extends to entire client area
-                    cxRightWidth: -1,
-                    cyTopHeight: -1,
-                    cyBottomHeight: -1,
-                };
+        // Extend frame into client area to ensure transparency works
+        if config.composition_mode {
+            use windows::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea;
+            let margins = windows::Win32::UI::Controls::MARGINS {
+                cxLeftWidth: -1, // -1 extends to entire client area
+                cxRightWidth: -1,
+                cyTopHeight: -1,
+                cyBottomHeight: -1,
+            };
+            // SAFETY: HWND is valid and DwmExtendFrameIntoClientArea is safe to call.
+            unsafe {
                 let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
             }
+        }
 
-            // Increment window count
-            WINDOW_COUNT.fetch_add(1, Ordering::SeqCst);
+        // Increment window count
+        WINDOW_COUNT.fetch_add(1, Ordering::SeqCst);
 
-            // Initialize DirectComposition if requested
-            let composition = if config.composition_mode {
-                // Initialize COM for DirectComposition
+        // Initialize DirectComposition if requested
+        let composition = if config.composition_mode {
+            // Initialize COM for DirectComposition
+            // SAFETY: Safe to repeatedly attempt to initialize COM on the same thread for DirectComposition.
+            unsafe {
                 let _ = windows::Win32::System::Com::CoInitializeEx(
                     None,
                     windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
                 );
+            }
 
-                let device = composition::CompositionDevice::new().map_err(|e| {
-                    PlatformError::Initialization(format!("DirectComposition device: {}", e))
-                })?;
-                // Topmost=false ensures composition content is BEHIND wgpu swapchain
-                let target = device.create_target_for_hwnd(hwnd, false).map_err(|e| {
-                    PlatformError::Initialization(format!("Composition target: {}", e))
-                })?;
-                let root_visual = device
-                    .create_visual()
-                    .map_err(|e| PlatformError::Initialization(format!("Root visual: {}", e)))?;
+            let device = composition::CompositionDevice::new().map_err(|e| {
+                PlatformError::Initialization(format!("DirectComposition device: {}", e))
+            })?;
+            // Topmost=false ensures composition content is BEHIND wgpu swapchain
+            let target = device
+                .create_target_for_hwnd(hwnd, false)
+                .map_err(|e| PlatformError::Initialization(format!("Composition target: {}", e)))?;
+            let root_visual = device
+                .create_visual()
+                .map_err(|e| PlatformError::Initialization(format!("Root visual: {}", e)))?;
 
-                target
-                    .set_root(&root_visual)
-                    .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
+            target
+                .set_root(&root_visual)
+                .map_err(|e| PlatformError::Initialization(format!("Set root: {}", e)))?;
 
-                // Windows COM DirectComposition wrappers are inherently single-threaded, Arc is for ref counting
-                #[allow(clippy::arc_with_non_send_sync)]
-                Some(std::sync::Arc::new(WindowComposition {
-                    device,
-                    target,
-                    root_visual,
-                }))
-            } else {
-                None
-            };
+            // Windows COM DirectComposition wrappers are inherently single-threaded, Arc is for ref counting
+            #[allow(clippy::arc_with_non_send_sync)]
+            Some(std::sync::Arc::new(WindowComposition {
+                device,
+                target,
+                root_visual,
+            }))
+        } else {
+            None
+        };
 
-            Ok(Self {
-                hwnd,
-                hinstance,
-                id,
-                thread_id: thread::current().id(),
-                backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
-                composition,
-            })
-        }
+        Ok(Self {
+            hwnd,
+            hinstance,
+            id,
+            thread_id: thread::current().id(),
+            backdrop_material: AtomicU8::new(0), // BackdropMaterial::None
+            composition,
+        })
     }
 
     pub fn id(&self) -> WindowId {
@@ -252,26 +271,29 @@ impl WindowImpl {
     }
 
     pub fn inner_size(&self) -> Size<u32> {
+        let mut rect = RECT::default();
+        // SAFETY: self.hwnd is a valid handle, reading client rect into standard structure is safe.
         unsafe {
-            let mut rect = RECT::default();
             let _ = GetClientRect(self.hwnd, &mut rect);
-            Size::new(
-                (rect.right - rect.left) as u32,
-                (rect.bottom - rect.top) as u32,
-            )
         }
+        Size::new(
+            (rect.right - rect.left) as u32,
+            (rect.bottom - rect.top) as u32,
+        )
     }
 
     pub fn set_title(&self, title: &str) {
+        let title: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: self.hwnd is a valid handle and `title` is properly null-terminated.
         unsafe {
-            let title: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
             let _ = SetWindowTextW(self.hwnd, PCWSTR(title.as_ptr()));
         }
     }
 
     pub fn request_redraw(&self) {
+        // InvalidateRect will trigger WM_PAINT, which marks window as dirty
+        // SAFETY: self.hwnd is a valid handle. InvalidateRect is safe to call on a valid window.
         unsafe {
-            // InvalidateRect will trigger WM_PAINT, which marks window as dirty
             let _ = InvalidateRect(Some(self.hwnd), None, false);
         }
     }
@@ -282,6 +304,7 @@ impl WindowImpl {
     }
 
     pub fn set_visible(&self, visible: bool) {
+        // SAFETY: self.hwnd is a valid handle. ShowWindow is safe.
         unsafe {
             let _ = ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
@@ -322,6 +345,7 @@ impl Drop for WindowImpl {
             // Drop composition resources first (while COM is still active)
             self.composition = None;
             // Now uninitialize COM
+            // SAFETY: COM was initialized via CoInitializeEx during `new`. Cleaning up properly here.
             unsafe {
                 windows::Win32::System::Com::CoUninitialize();
             }
@@ -332,9 +356,10 @@ impl Drop for WindowImpl {
         // the count reflects the remaining windows (excluding this one).
         WINDOW_COUNT.fetch_sub(1, Ordering::SeqCst);
 
+        // Ensure the window is destroyed when the Rust struct is dropped
+        // This handles cases where the app drops the window manually
+        // SAFETY: Destroys a window securely via a previously acquired valid `hwnd`.
         unsafe {
-            // Ensure the window is destroyed when the Rust struct is dropped
-            // This handles cases where the app drops the window manually
             let _ = DestroyWindow(self.hwnd);
         }
     }
@@ -400,6 +425,7 @@ impl HasWindowHandle for WindowImpl {
         let non_zero = NonZeroIsize::new(self.hwnd.0 as usize as isize)
             .ok_or(raw_window_handle::HandleError::Unavailable)?;
         let handle = Win32WindowHandle::new(non_zero);
+        // SAFETY: The provided RawWindowHandle describes a Win32 window successfully validated by NonZeroIsize.
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
     }
 }
@@ -409,11 +435,15 @@ impl HasDisplayHandle for WindowImpl {
         &self,
     ) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
         let handle = WindowsDisplayHandle::new();
+        // SAFETY: Describes the implicit display environment corresponding to this platform instance.
         Ok(unsafe { DisplayHandle::borrow_raw(RawDisplayHandle::Windows(handle)) })
     }
 }
 
 /// Window procedure callback.
+///
+/// # Safety
+/// System callback handling window messages natively. Parameters must obey Win32 HWND/MSG convention bounds.
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_NCCREATE => {
@@ -421,11 +451,14 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             // SAFETY: lparam is a pointer to CREATESTRUCTW during WM_NCCREATE
             let create_struct = unsafe { &*(lparam.0 as *const CREATESTRUCTW) };
             let window_id = create_struct.lpCreateParams as u64;
+            // SAFETY: We own the HWND at creation and safely set user data on it.
             unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, window_id as isize) };
+            // SAFETY: System-provided safe fallback for messages.
             unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         WM_SIZE => {
             // Retrieve WindowId from window user data
+            // SAFETY: Read user data associated with this wndproc's HWND safely.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 // Extract new window size from lparam
                 let width = (lparam.0 & 0xFFFF) as u32;
@@ -446,6 +479,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_MOUSEMOVE => {
             // Retrieve WindowId from window user data
+            // SAFETY: System gives us valid HWND on WM_MOUSEMOVE.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 // Extract mouse coordinates using helpers (handles negative coords on multi-monitor)
                 let x = get_x_lparam(lparam);
@@ -470,6 +504,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         | WM_MBUTTONUP => {
             use crate::{ElementState, MouseButton, MouseInput};
 
+            // SAFETY: Safe to query HWND for valid window ID during button input.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 let x = get_x_lparam(lparam);
                 let y = get_y_lparam(lparam);
@@ -486,6 +521,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                         None
                     }
                 }) else {
+                    // SAFETY: Use default window proc safely for unhandled window states.
                     return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
                 };
 
@@ -512,6 +548,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
             use crate::{ElementState, Key, KeyboardInput};
 
+            // SAFETY: Identify correctly handled window handle.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 let vk = wparam.0 as u32;
                 let state = if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
@@ -576,6 +613,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         WM_PAINT => {
             // Mark window as needing redraw
+            // SAFETY: Checking user data of valid hwnd to trigger repaint.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 DIRTY_WINDOWS.with(|dirty| {
                     dirty.borrow_mut().insert(window_id);
@@ -583,6 +621,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
 
             // Validate the window to prevent Windows from re-sending WM_PAINT
+            // SAFETY: FFI boundary safe interactions. BeginPaint retrieves valid DC. EndPaint validly matches it.
             unsafe {
                 let mut ps = PAINTSTRUCT::default();
                 let _hdc = BeginPaint(hwnd, &mut ps);
@@ -591,6 +630,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             LRESULT(0)
         }
         WM_CLOSE => {
+            // SAFETY: Window handle verified for closure event.
             if let Some(window_id) = unsafe { get_window_id(hwnd) } {
                 EVENT_SENDER.with(|sender| {
                     if let Some(sender) = sender.borrow().as_ref() {
@@ -605,13 +645,16 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             // If the app wants to close, it should drop the Window or return ControlFlow::Exit.
             LRESULT(0)
         }
-        WM_DESTROY => unsafe {
+        WM_DESTROY => {
             // Only quit the application when the last window is destroyed
             if WINDOW_COUNT.load(Ordering::SeqCst) == 0 {
-                PostQuitMessage(0);
+                // SAFETY: PostQuitMessage instructs the system event loop correctly safely.
+                unsafe {
+                    PostQuitMessage(0);
+                }
             }
             LRESULT(0)
-        },
+        }
         WM_ERASEBKGND => {
             // Return 1 (TRUE) to tell Windows we handled background erasure (by doing nothing)
             // This prevents GDI from clearing the window to the class background color
@@ -623,6 +666,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 let mut result = LRESULT(0);
                 A11Y_PROVIDERS.with(|providers| {
                     if let Some(provider) = providers.borrow().get(&(hwnd.0 as isize)) {
+                        // SAFETY: Validates Uia Return request to supply RawElementProvider successfully.
                         unsafe {
                             result = UiaReturnRawElementProvider(hwnd, wparam, lparam, provider);
                         }
@@ -630,9 +674,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 });
                 result
             } else {
+                // SAFETY: Unhandled messages fall back to DefWindowProcW safely.
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
         }
+        // SAFETY: Fallback loop default handling via DefWindowProcW safely.
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
@@ -656,16 +702,17 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
         *sender.borrow_mut() = Some(event_sender);
     });
 
-    unsafe {
-        let mut msg = MSG::default();
+    let mut msg = MSG::default();
 
-        loop {
-            if control_flow == ControlFlow::Exit {
-                break;
-            }
+    loop {
+        if control_flow == ControlFlow::Exit {
+            break;
+        }
 
-            // Wait for messages efficiently based on control flow
-            let _wait_result = if control_flow == ControlFlow::Wait {
+        // Wait for messages efficiently based on control flow
+        // SAFETY: MsgWaitForMultipleObjectsEx is safe when waiting on UI events using generic OS constants.
+        let _wait_result = unsafe {
+            if control_flow == ControlFlow::Wait {
                 // Wait indefinitely for messages (0% CPU when idle)
                 MsgWaitForMultipleObjectsEx(
                     None,        // No handles to wait for
@@ -682,39 +729,43 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
                     QS_ALLINPUT,
                     MWMO_INPUTAVAILABLE,
                 )
-            };
+            }
+        };
 
-            // Drain ALL pending messages before rendering (no interleaving)
-            // This batches input processing for better performance
-            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-                if msg.message == WM_QUIT {
-                    return Ok(());
-                }
+        // Drain ALL pending messages before rendering (no interleaving)
+        // This batches input processing for better performance
+        // SAFETY: PeekMessageW retrieves valid messages without mutating external non-synchronized state.
+        while unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() } {
+            if msg.message == WM_QUIT {
+                return Ok(());
+            }
 
+            // SAFETY: Process standard Win32 MSG sequence.
+            unsafe {
                 let _ = TranslateMessage(&msg);
                 let _ = DispatchMessageW(&msg);
             }
+        }
 
-            // Drain all events from channel (won't panic even if wndproc fires during app.on_event)
-            while let Ok(event) = event_receiver.try_recv() {
-                app.on_event(event, &mut control_flow);
-                if !should_render_dirty_windows(control_flow) {
-                    break;
-                }
-            }
-
+        // Drain all events from channel (won't panic even if wndproc fires during app.on_event)
+        while let Ok(event) = event_receiver.try_recv() {
+            app.on_event(event, &mut control_flow);
             if !should_render_dirty_windows(control_flow) {
                 break;
             }
+        }
 
-            // Only redraw windows that are actually dirty
-            // This prevents unnecessary rendering when nothing has changed
-            let dirty_windows: Vec<WindowId> =
-                DIRTY_WINDOWS.with(|dirty| dirty.borrow_mut().drain().collect());
+        if !should_render_dirty_windows(control_flow) {
+            break;
+        }
 
-            for window_id in dirty_windows {
-                app.on_redraw(window_id);
-            }
+        // Only redraw windows that are actually dirty
+        // This prevents unnecessary rendering when nothing has changed
+        let dirty_windows: Vec<WindowId> =
+            DIRTY_WINDOWS.with(|dirty| dirty.borrow_mut().drain().collect());
+
+        for window_id in dirty_windows {
+            app.on_redraw(window_id);
         }
     }
 

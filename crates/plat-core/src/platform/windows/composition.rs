@@ -24,15 +24,15 @@ impl CompositionDevice {
     /// # Safety
     /// COM must be initialized before calling this function.
     pub fn new() -> Result<Self> {
-        unsafe {
-            // Create D3D11 device for DirectComposition
-            let dxgi_device: IDXGIDevice = create_dxgi_device()?;
+        // SAFETY: The caller must ensure COM is initialized before calling this function.
+        // `create_dxgi_device` handles internal safety for DXGI device creation.
+        let dxgi_device: IDXGIDevice = unsafe { create_dxgi_device()? };
 
-            // Create DirectComposition desktop device
-            let device: IDCompositionDesktopDevice = DCompositionCreateDevice3(&dxgi_device)?;
+        // SAFETY: The `dxgi_device` is valid, and COM is properly initialized per the function's requirements.
+        let device: IDCompositionDesktopDevice =
+            unsafe { DCompositionCreateDevice3(&dxgi_device)? };
 
-            Ok(Self { device })
-        }
+        Ok(Self { device })
     }
 
     /// Creates a composition target bound to a window handle.
@@ -41,18 +41,16 @@ impl CompositionDevice {
     /// If `topmost` is true, the visual tree is rendered on top of the window's children.
     /// If `topmost` is false, it is rendered behind the window's children (but in front of the window background).
     pub fn create_target_for_hwnd(&self, hwnd: HWND, topmost: bool) -> Result<CompositionTarget> {
-        unsafe {
-            let target = self.device.CreateTargetForHwnd(hwnd, topmost)?;
-            Ok(CompositionTarget { target })
-        }
+        // SAFETY: The provided HWND must be valid. `self.device` guarantees it is properly initialized.
+        let target = unsafe { self.device.CreateTargetForHwnd(hwnd, topmost)? };
+        Ok(CompositionTarget { target })
     }
 
     /// Creates a new composition visual.
     pub fn create_visual(&self) -> Result<CompositionVisual> {
-        unsafe {
-            let visual = self.device.CreateVisual()?;
-            Ok(CompositionVisual { visual })
-        }
+        // SAFETY: `self.device` is a valid COM object, and `CreateVisual` initializes a new IDCompositionVisual2 safely.
+        let visual = unsafe { self.device.CreateVisual()? };
+        Ok(CompositionVisual { visual })
     }
 
     /// Creates a backdrop visual with the specified material effect.
@@ -68,20 +66,19 @@ impl CompositionDevice {
         &self,
         material: crate::materials::BackdropMaterial,
     ) -> Result<BackdropVisual> {
-        unsafe {
-            let visual = self.device.CreateVisual()?;
+        // SAFETY: `self.device` is valid, allowing safe creation of a visual object.
+        let visual = unsafe { self.device.CreateVisual()? };
 
-            // Note: We return a standard visual for now as current bindings
-            // don't easily support IDCompositionDevice3 or Direct2D interop
-            // without additional dependencies/features.
-            // The transparency effect relies on the window-level DWM attributes
-            // and the transparent swapchain.
+        // Note: We return a standard visual for now as current bindings
+        // don't easily support IDCompositionDevice3 or Direct2D interop
+        // without additional dependencies/features.
+        // The transparency effect relies on the window-level DWM attributes
+        // and the transparent swapchain.
 
-            Ok(BackdropVisual {
-                visual: CompositionVisual::from_raw(visual),
-                material,
-            })
-        }
+        Ok(BackdropVisual {
+            visual: CompositionVisual::from_raw(visual),
+            material,
+        })
     }
 
     /// Creates a composition surface from a DXGI swap chain.
@@ -112,10 +109,10 @@ pub struct CompositionTarget {
 impl CompositionTarget {
     /// Sets the root visual for this target.
     pub fn set_root(&self, visual: &CompositionVisual) -> Result<()> {
-        unsafe {
-            self.target.SetRoot(&visual.visual)?;
-            Ok(())
-        }
+        // SAFETY: The provided visual and target are valid COM objects.
+        // DirectComposition manages the tree structure, preventing dangling pointers if managed correctly.
+        unsafe { self.target.SetRoot(&visual.visual)? };
+        Ok(())
     }
 
     /// Returns the underlying IDCompositionTarget.
@@ -139,10 +136,9 @@ impl CompositionVisual {
     /// Sets the content of this visual to a composition surface.
     #[allow(dead_code)]
     pub fn set_content(&self, surface: &CompositionSurface) -> Result<()> {
-        unsafe {
-            self.visual.SetContent(&surface.surface)?;
-            Ok(())
-        }
+        // SAFETY: Both the visual and the provided surface are assumed valid COM references.
+        unsafe { self.visual.SetContent(&surface.surface)? };
+        Ok(())
     }
 
     /// Sets the size of this visual.
@@ -161,10 +157,9 @@ impl CompositionVisual {
     /// Note: This is a placeholder for future visual hierarchy support.
     /// DirectComposition uses AddVisual() on the parent, not a Children() collection.
     pub fn add_child(&self, child: &CompositionVisual) -> Result<()> {
-        unsafe {
-            self.visual.AddVisual(&child.visual, false, None)?;
-            Ok(())
-        }
+        // SAFETY: Both the parent and the child visual are valid COM objects.
+        unsafe { self.visual.AddVisual(&child.visual, false, None)? };
+        Ok(())
     }
 
     /// Returns the underlying IDCompositionVisual2.
@@ -213,10 +208,15 @@ impl BackdropVisual {
 /// DirectComposition requires a DXGI device (from D3D11 or D3D12) to create
 /// composition surfaces. We use D3D11 here as it's lighter-weight and
 /// DirectComposition is API-agnostic.
+///
+/// # Safety
+/// The caller is responsible for ensuring the OS context allows DXGI creation.
 unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
     let mut device = None;
     let feature_levels = [D3D_FEATURE_LEVEL_11_0];
 
+    // SAFETY: D3D11CreateDevice is an FFI call that initializes the D3D device safely
+    // when given correct standard parameters.
     unsafe {
         D3D11CreateDevice(
             None, // Use default adapter
@@ -229,10 +229,10 @@ unsafe fn create_dxgi_device() -> Result<IDXGIDevice> {
             None,
             None,
         )?;
-
-        let d3d_device = device.ok_or_else(|| Error::from(E_FAIL))?;
-        d3d_device.cast::<IDXGIDevice>()
     }
+
+    let d3d_device = device.ok_or_else(|| Error::from(E_FAIL))?;
+    d3d_device.cast::<IDXGIDevice>()
 }
 
 #[cfg(test)]
@@ -249,64 +249,83 @@ mod tests {
     #[test]
     fn test_composition_device_creation() {
         // COM must be initialized for DirectComposition
+        // SAFETY: Initialize COM appropriately for testing.
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
 
-            let device = CompositionDevice::new();
-            assert!(device.is_ok(), "Failed to create DirectComposition device");
+        let device = CompositionDevice::new();
+        assert!(device.is_ok(), "Failed to create DirectComposition device");
 
+        // SAFETY: Uninitialize COM securely to avoid memory leaks after testing.
+        unsafe {
             CoUninitialize();
         }
     }
 
     #[test]
     fn test_composition_target_creation() {
+        // SAFETY: Initialize COM for test requirements.
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
 
-            // Create a test window (minimal Win32 window)
-            let hwnd = create_test_window();
+        // Create a test window (minimal Win32 window)
+        // SAFETY: Window creation utilizes safe wrapper/test utilities or safe OS calls correctly.
+        let hwnd = unsafe { create_test_window() };
 
-            let device = CompositionDevice::new().unwrap();
-            let target = device.create_target_for_hwnd(hwnd, true);
-            assert!(target.is_ok(), "Failed to create composition target");
+        let device = CompositionDevice::new().unwrap();
+        let target = device.create_target_for_hwnd(hwnd, true);
+        assert!(target.is_ok(), "Failed to create composition target");
 
+        // SAFETY: The provided HWND was successfully created, ensuring safe window destruction.
+        unsafe {
             let _ = DestroyWindow(hwnd);
+        }
+        // SAFETY: Uninitialize COM on tear down.
+        unsafe {
             CoUninitialize();
         }
     }
 
     #[test]
     fn test_composition_visual_creation() {
+        // SAFETY: Initialize COM before testing functionality.
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
 
-            let device = CompositionDevice::new().unwrap();
-            let visual = device.create_visual();
-            assert!(visual.is_ok(), "Failed to create composition visual");
+        let device = CompositionDevice::new().unwrap();
+        let visual = device.create_visual();
+        assert!(visual.is_ok(), "Failed to create composition visual");
 
+        // SAFETY: Clean up COM initialized resources.
+        unsafe {
             CoUninitialize();
         }
     }
 
     #[test]
     fn test_backdrop_visual_creation() {
+        // SAFETY: Safely initiate COM for DirectComposition creation usage.
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
 
-            let device = CompositionDevice::new().unwrap();
+        let device = CompositionDevice::new().unwrap();
 
-            // Test creating backdrop visuals for different materials
-            let mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica);
-            assert!(mica.is_ok(), "Failed to create Mica backdrop visual");
+        // Test creating backdrop visuals for different materials
+        let mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica);
+        assert!(mica.is_ok(), "Failed to create Mica backdrop visual");
 
-            let acrylic =
-                device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
-            assert!(acrylic.is_ok(), "Failed to create Acrylic backdrop visual");
+        let acrylic = device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
+        assert!(acrylic.is_ok(), "Failed to create Acrylic backdrop visual");
 
-            let none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None);
-            assert!(none.is_ok(), "Failed to create None backdrop visual");
+        let none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None);
+        assert!(none.is_ok(), "Failed to create None backdrop visual");
 
+        // SAFETY: Tear down COM state.
+        unsafe {
             CoUninitialize();
         }
     }
@@ -318,22 +337,29 @@ mod tests {
         wparam: WPARAM,
         lparam: LPARAM,
     ) -> LRESULT {
+        // SAFETY: The system manages valid handles for this callback securely.
         unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
     // Helper to create minimal test window
     unsafe fn create_test_window() -> HWND {
-        unsafe {
-            let class_name = w!("TestWindow");
-            let hinstance: HINSTANCE = GetModuleHandleW(None).unwrap().into();
-            let wc = WNDCLASSW {
-                lpfnWndProc: Some(test_wndproc),
-                lpszClassName: class_name,
-                hInstance: hinstance,
-                ..Default::default()
-            };
-            let _ = RegisterClassW(&wc);
+        let class_name = w!("TestWindow");
 
+        // SAFETY: GetModuleHandleW correctly retrieves module handles for class registration.
+        let hinstance: HINSTANCE = unsafe { GetModuleHandleW(None).unwrap().into() };
+        let wc = WNDCLASSW {
+            lpfnWndProc: Some(test_wndproc),
+            lpszClassName: class_name,
+            hInstance: hinstance,
+            ..Default::default()
+        };
+        // SAFETY: The provided WNDCLASSW is fully constructed with correct data pointers.
+        unsafe {
+            let _ = RegisterClassW(&wc);
+        }
+
+        // SAFETY: Creates a temporary testing window via system API, with static class identifiers.
+        unsafe {
             CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 class_name,

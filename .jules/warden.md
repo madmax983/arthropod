@@ -79,3 +79,6 @@
 **2025-02-12 - [Undocumented Unsafe Blocks & Multiple Operations]**
 **Threat:** [Lack of documentation and multiple unsafeties within a single block hides potential undefined behavior risks from auditors and static analysis.]
 **Defense:** [Split multiple operations into separate `unsafe` blocks and provide explicit `// SAFETY:` justifications for each operation outlining the lifetime and usage guarantees.]
+## 2024-02-12 - [Undocumented Unsafe Blocks & Multiple Operations]
+**Threat:** Lack of documentation and multiple unsafeties within a single block hides potential undefined behavior risks from auditors and static analysis.
+**Defense:** Split multiple operations into separate `unsafe` blocks and provide explicit `// SAFETY:` justifications for each operation outlining the lifetime and usage guarantees in `composition.rs` and `windows.rs`.
