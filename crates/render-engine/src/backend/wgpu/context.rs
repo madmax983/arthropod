@@ -214,10 +214,9 @@ impl WgpuContext {
         // Create surface
         // SAFETY: wgpu::Surface requires 'static lifetime, but we're borrowing the window.
         // This is guaranteed by the caller ensuring backend drops before window.
-        let surface = unsafe {
-            let target = wgpu::SurfaceTargetUnsafe::from_window(window)?;
-            instance.create_surface_unsafe(target)?
-        };
+        let target = unsafe { wgpu::SurfaceTargetUnsafe::from_window(window)? };
+        // SAFETY: The target uses the window handle, which outlives the surface.
+        let surface = unsafe { instance.create_surface_unsafe(target)? };
 
         // Request adapter
         info!("Requesting GPU adapter");

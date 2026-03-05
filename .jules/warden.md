@@ -76,3 +76,6 @@
 **2025-02-23 - Prevent unwrap panics in platform window handle retrieval**
 **Threat:** A panic condition could be triggered by `unwrap()` during `window_handle` calls on null pointers (`HWND` or `NSView` pointers), causing Denial of Service (application crash).
 **Defense:** Replaced `unwrap()` with `ok_or(HandleError::Unavailable)?` to gracefully handle cases where the window handle is not available or has an invalid/null value.
+**2025-02-12 - [Undocumented Unsafe Blocks & Multiple Operations]**
+**Threat:** [Lack of documentation and multiple unsafeties within a single block hides potential undefined behavior risks from auditors and static analysis.]
+**Defense:** [Split multiple operations into separate `unsafe` blocks and provide explicit `// SAFETY:` justifications for each operation outlining the lifetime and usage guarantees.]

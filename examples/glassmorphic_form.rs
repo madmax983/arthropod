@@ -607,6 +607,7 @@ impl Application for GlassmorphicFormApp {
         window.set_backdrop_material(BackdropMaterial::Mica);
 
         let size = window.inner_size();
+        // SAFETY: The window drops after the backend in GlassmorphicFormApp, satisfying the wgpu::Surface 'static lifetime requirement.
         let mut backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .expect("Failed to create backend");
         backend.set_clear_color(Color::rgba(0.03, 0.05, 0.12, 1.0));
