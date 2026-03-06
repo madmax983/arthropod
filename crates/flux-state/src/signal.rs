@@ -521,4 +521,15 @@ mod tests {
         assert_eq!(val, 99);
         assert_eq!(read.get(), 99);
     }
+
+    #[test]
+    #[cfg(feature = "nova")]
+    fn test_signal_with_label() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 0).with_label("my_signal");
+
+        let graph = runtime.inspect_graph();
+        let node = graph.nodes.iter().find(|n| n.id == signal.id).unwrap();
+        assert_eq!(node.label, "my_signal");
+    }
 }

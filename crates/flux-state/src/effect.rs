@@ -217,4 +217,22 @@ mod tests {
         // Should NOT run
         assert_eq!(*log.lock().unwrap(), 2);
     }
+
+    #[test]
+    #[cfg(feature = "nova")]
+    fn test_effect_with_label() {
+        let runtime = Runtime::new();
+        let count = Signal::new(runtime.clone(), 0);
+        let (read, _) = count.split();
+
+        let read_clone = read.clone();
+        let effect = Effect::new(runtime.clone(), move || {
+            let _ = read_clone.get();
+        })
+        .with_label("my_effect");
+
+        let graph = runtime.inspect_graph();
+        let node = graph.nodes.iter().find(|n| n.id == effect.id).unwrap();
+        assert_eq!(node.label, "my_effect");
+    }
 }

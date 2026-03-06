@@ -100,8 +100,9 @@ struct PanicRestorer<'a> {
 
 impl<'a> Drop for PanicRestorer<'a> {
     fn drop(&mut self) {
-        if std::thread::panicking() && !self.remaining_effects.is_empty() {
+        if std::thread::panicking() {
             // Restore unexecuted effects to the pending queue so they aren't lost.
+            // If empty, extend_from_slice does nothing, avoiding an extra conditional branch.
             let mut inner = match self.runtime.inner.lock() {
                 Ok(guard) => guard,
                 Err(poisoned) => poisoned.into_inner(),
@@ -791,6 +792,27 @@ mod tests {
                 .capacity(),
             10
         );
+
+        // 3. Buffer donation should not swap if equal capacity
+        let mut equal_buffer = Vec::with_capacity(10);
+        let equal_buffer_ptr = equal_buffer.as_ptr();
+        // We verify that if capacity is equal, the spare buffer isn't unnecessarily replaced
+        // (which would be the case if > was changed to >=).
+        let taken = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut equal_buffer);
+        assert!(!taken);
+
+        let spare_ptr = {
+            let inner = runtime.inner.lock().unwrap();
+            assert_eq!(inner.spare_pending_effects.capacity(), 10);
+            inner.spare_pending_effects.as_ptr()
+        };
+        // The original spare_pending_effects was donated by `buffer` in step 1.
+        // It should NOT be the same as `equal_buffer_ptr`.
+        assert_ne!(spare_ptr, equal_buffer_ptr);
     }
 
     #[test]
@@ -819,6 +841,32 @@ mod tests {
         let inner = runtime.inner.lock().unwrap();
         assert_eq!(inner.spare_pending_effects.capacity(), 0);
         assert_eq!(inner.pending_effects.capacity(), 20); // Reused spare
+    }
+
+    #[test]
+    fn test_take_pending_effects_no_spare() {
+        let runtime = Runtime::new();
+
+        {
+            let mut inner = runtime.inner.lock().unwrap();
+            inner.spare_pending_effects = Vec::new(); // capacity 0
+            inner.pending_effects.push(NodeId(2));
+        }
+
+        let mut buffer = Vec::with_capacity(5);
+        let taken = runtime
+            .inner
+            .lock()
+            .unwrap()
+            .take_pending_effects(&mut buffer);
+
+        assert!(taken);
+        assert_eq!(buffer, vec![NodeId(2)]);
+
+        // Because spare_pending_effects was empty (capacity 0), take_pending_effects
+        // should have fallen back to returning the provided buffer.
+        let inner = runtime.inner.lock().unwrap();
+        assert_eq!(inner.pending_effects.capacity(), 5);
     }
 
     #[test]
@@ -894,6 +942,61 @@ mod tests {
         // Reading it recomputes it, making it fresh again
         assert_eq!(computed.get(), 205);
         assert!(!runtime.is_stale(computed_id));
+    }
+
+    #[test]
+    #[cfg(feature = "nova")]
+    fn test_inspect_graph_coverage() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 1).with_label("sig");
+        let (read, _) = signal.split();
+
+        let read_clone = read.clone();
+        let comp =
+            crate::Computed::new(runtime.clone(), move || read_clone.get() + 1).with_label("comp");
+
+        let read_comp_clone = comp.clone();
+        let _effect = crate::Effect::new(runtime.clone(), move || {
+            let _ = read_comp_clone.get();
+        })
+        .with_label("eff");
+
+        let snap = runtime.inspect_graph();
+
+        // We should have 3 nodes: Signal, Computed, Effect
+        assert_eq!(snap.nodes.len(), 3);
+
+        let sig_node = snap
+            .nodes
+            .iter()
+            .find(|n| n.node_type == NodeType::Signal)
+            .unwrap();
+        assert_eq!(sig_node.label, "sig");
+
+        let comp_node = snap
+            .nodes
+            .iter()
+            .find(|n| n.node_type == NodeType::Computed)
+            .unwrap();
+        assert_eq!(comp_node.label, "comp");
+
+        let eff_node = snap
+            .nodes
+            .iter()
+            .find(|n| n.node_type == NodeType::Effect)
+            .unwrap();
+        assert_eq!(eff_node.label, "eff");
+
+        // We should have 2 edges: Signal -> Computed, Computed -> Effect
+        assert_eq!(snap.dependencies.len(), 2);
+
+        // Assert sorting is correct
+        assert!(snap.nodes.windows(2).all(|w| w[0].id.0 <= w[1].id.0));
+        assert!(
+            snap.dependencies
+                .windows(2)
+                .all(|w| (w[0].0.0, w[0].1.0) <= (w[1].0.0, w[1].1.0))
+        );
     }
 }
 

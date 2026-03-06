@@ -370,4 +370,20 @@ mod tests {
         w_toggle.set(false);
         assert_eq!(computed.get(), 30);
     }
+
+    #[test]
+    #[cfg(feature = "nova")]
+    fn test_computed_with_label() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 1);
+        let (read, _) = signal.split();
+
+        let read_clone = read.clone();
+        let computed =
+            Computed::new(runtime.clone(), move || read_clone.get() * 2).with_label("my_computed");
+
+        let graph = runtime.inspect_graph();
+        let node = graph.nodes.iter().find(|n| n.id == computed.id).unwrap();
+        assert_eq!(node.label, "my_computed");
+    }
 }

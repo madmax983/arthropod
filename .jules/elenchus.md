@@ -106,3 +106,17 @@
 **Finding:** Found multiple missing mutants relating to internal buffer donation capacity logic (`take_pending_effects`), `PanicRestorer`, `get_computed_if_fresh`, and `is_stale`. This indicated tests were completely missing for these edge cases and API surface paths.
 **Evidence:** `cargo mutants` reported these as MISSED, showing the operations could be entirely deleted or mutated to default values without any test failing.
 **Recommendation:** Added `test_panic_restorer`, `test_buffer_donation`, `test_spare_buffer_reuse`, `test_get_computed_if_fresh`, and `test_is_stale` to cover these blind spots. Mutation score improved significantly. The few remaining missed mutants relate to boolean/comparison equivalencies (`>` vs `>=` where both outcomes result in functionally identical or extremely subtle runtime memory overhead behavior).
+
+## 2026-03-01 - [Audit of flux-state Uncovered Lines and Features - Phase 2]
+**Module:** `crates/flux-state/src/runtime.rs`, `crates/flux-state/src/computed.rs`, `crates/flux-state/src/signal.rs`, `crates/flux-state/src/effect.rs`
+**Severity:** 🔴 Critical / 🟡 Suspect
+**Finding:** Uncovered code paths related to memory reuse optimization in `take_pending_effects`, panic recovery edge cases (`PanicRestorer`), and conditionally compiled debugging features (`nova` labels).
+**Evidence:** `cargo mutants` reported missed mutations:
+- `replace > with >=` in `buffer.capacity() > self.spare_pending_effects.capacity()`
+- `replace && with ||` in `if std::thread::panicking() && !self.remaining_effects.is_empty()`
+- Missed coverage of `with_label` for `Computed`, `Effect`, `Signal`, and `Runtime::inspect_graph`.
+**Recommendation:**
+- Wrote tests under `#[cfg(feature = "nova")]` to verify `inspect_graph`, `set_label`, and node types in all primitives.
+- Restructured `PanicRestorer<'a>::drop` to remove the redundant `!self.remaining_effects.is_empty()` check and unconditionally invoke the block when panicking, eliminating the logic vulnerability to mutant conditional expressions.
+- Enhanced `test_buffer_donation` to assert pointers to confirm that spare buffers are genuinely reused and not accidentally replaced with an equivalently sized default buffer if boundary capacities are equal (`>` vs `>=`).
+- Mutants were fully killed, elevating test suite quality to 100% effective mutant extermination minus one known unviable infinite loop edge case timeout in `take_pending_effects`.
