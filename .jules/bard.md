@@ -20,3 +20,6 @@
 ## 2024-05-26 - [Rustdoc Warnings in Macros]
 **Confusion:** Rustdoc warnings were generated in `widget-macros` due to using literal macro syntax (`#[positional]`, `#[children]`) which it mistook for intra-doc links, and angle brackets (`Signal<String>`) which it mistook for unclosed HTML tags.
 **Clarification:** Wrapped these elements in backticks (e.g., \`#[positional]\` and \`Signal<String>\`) to ensure they are parsed as code elements, resolving all rustdoc warnings.
+## 2024-05-27 - [Feature Gated Missing Docs]
+**Confusion:** Rustdoc warnings for `missing_docs` were successfully passing when running `cargo rustdoc -p flux-state -- -D missing_docs` despite `nova` feature-gated structures not being documented.
+**Clarification:** You must explicitly pass the feature flags (e.g., `--features nova`) when running `cargo rustdoc` to ensure the tool checks and enforces documentation on conditionally compiled code.

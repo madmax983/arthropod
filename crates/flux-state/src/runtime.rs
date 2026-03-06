@@ -1000,30 +1000,66 @@ mod tests {
     }
 }
 
+/// A snapshot of the reactive dependency graph at a specific point in time.
+///
+/// This is typically used for debugging or building developer tools (like `flux-devtools`
+/// or `flux-radar`) to visualize how state is connected and what is currently stale.
+///
+/// The fields in this struct are explicitly sorted by ID to provide a stable snapshot
+/// across multiple frames, preventing UI jitter in diagnostic tools.
+///
+/// # Examples
+///
+/// ```
+/// # use flux_state::{Runtime, Signal};
+/// # let runtime = Runtime::new();
+/// # let count = Signal::new(runtime.clone(), 0);
+/// # let (read, write) = count.split();
+/// # #[cfg(feature = "nova")]
+/// # {
+/// let snapshot = runtime.inspect_graph();
+/// assert_eq!(snapshot.nodes.len(), 1); // Only the signal exists
+/// # }
+/// ```
 #[cfg(feature = "nova")]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
 pub struct GraphSnapshot {
+    /// A list of all reactive nodes (`Signal`, `Computed`, `Effect`) currently alive in the graph.
     pub nodes: Vec<NodeInfo>,
+    /// A list of directed edges representing dependencies.
+    /// The format is `(Source, Subscriber)`. For example, if a `Computed` depends on a `Signal`,
+    /// the tuple will be `(SignalId, ComputedId)`.
     pub dependencies: Vec<(NodeId, NodeId)>,
+    /// A list of node IDs that are currently marked as "stale" and need recomputation
+    /// the next time they are read.
     pub stale_nodes: Vec<NodeId>,
 }
 
+/// Metadata about a specific node in the reactive graph.
 #[cfg(feature = "nova")]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeInfo {
+    /// The unique identifier for this node.
     pub id: NodeId,
+    /// The kind of reactive primitive this node represents.
     pub node_type: NodeType,
+    /// A human-readable debug label assigned to the node, or a fallback string
+    /// like `Signal(NodeId(1))` if no label was provided.
     pub label: String,
 }
 
+/// The type of a reactive node.
 #[cfg(feature = "nova")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "nova", derive(serde::Serialize, serde::Deserialize))]
 pub enum NodeType {
+    /// A root state container created via `Signal::new`.
     Signal,
+    /// Derived state created via `Computed::new`.
     Computed,
+    /// A side-effect closure created via `Effect::new`.
     Effect,
 }
 
@@ -1035,6 +1071,46 @@ impl Runtime {
     }
 
     /// Snapshots the current dependency graph for debugging/devtools.
+    ///
+    /// This method is gated behind the `nova` feature and is primarily meant
+    /// for developer tools to introspect the state of reactivity within `flux-state`.
+    ///
+    /// The returned `GraphSnapshot` represents an instantaneous state, mapping all
+    /// signals, computed values, and effects, their current relationships (edges),
+    /// and whether they are marked as stale.
+    ///
+    /// # Thread Safety and Performance
+    ///
+    /// `inspect_graph` briefly acquires the runtime's internal `Mutex`, blocking other
+    /// reactive reads and writes while it creates a deep copy of the structural nodes.
+    /// Because of this lock contention and the allocation overhead, this method is intended
+    /// for dev/diagnostic loops (e.g., rendering an overlay UI tree) rather than
+    /// high-frequency production code.
+    ///
+    /// # Stability
+    ///
+    /// The values in the returned `GraphSnapshot` (nodes, dependencies, stale_nodes)
+    /// are explicitly sorted by `NodeId` so that snapshots are stable across
+    /// multiple UI frames and do not jitter when visualized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use flux_state::{Runtime, Signal, Computed};
+    /// # let runtime = Runtime::new();
+    /// # let count = Signal::new(runtime.clone(), 10);
+    /// # let (read, write) = count.split();
+    /// # let read_clone = read.clone();
+    /// # let double = Computed::new(runtime.clone(), move || read_clone.get() * 2);
+    /// #
+    /// // ...
+    /// # #[cfg(feature = "nova")]
+    /// # {
+    /// let snapshot = runtime.inspect_graph();
+    /// assert_eq!(snapshot.nodes.len(), 2); // 1 Signal + 1 Computed
+    /// assert_eq!(snapshot.dependencies.len(), 1); // Edge: Signal -> Computed
+    /// # }
+    /// ```
     pub fn inspect_graph(self: &Arc<Self>) -> GraphSnapshot {
         let inner = self.inner.lock().unwrap();
         let mut nodes = Vec::new();
