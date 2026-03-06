@@ -435,27 +435,27 @@ impl WidgetContext {
 
     /// Send a character to focused input
     pub fn send_char(&mut self, c: char) {
-        crate::input_logic::send_char(&mut self.text_input_states, self.focused_node, c);
+        input_engine::text::send_char(&mut self.text_input_states, self.focused_node, c);
     }
 
     /// Send backspace to focused input
     pub fn send_backspace(&mut self) {
-        crate::input_logic::send_backspace(&mut self.text_input_states, self.focused_node);
+        input_engine::text::send_backspace(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send delete to focused input
     pub fn send_delete(&mut self) {
-        crate::input_logic::send_delete(&mut self.text_input_states, self.focused_node);
+        input_engine::text::send_delete(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send left arrow key to focused input
     pub fn send_key_left(&mut self) {
-        crate::input_logic::send_key_left(&mut self.text_input_states, self.focused_node);
+        input_engine::text::send_key_left(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send right arrow key to focused input
     pub fn send_key_right(&mut self) {
-        crate::input_logic::send_key_right(&mut self.text_input_states, self.focused_node);
+        input_engine::text::send_key_right(&mut self.text_input_states, self.focused_node);
     }
 
     /// Set validator for a node
@@ -534,7 +534,7 @@ impl WidgetContext {
 
     /// Get all field errors for a form
     pub fn get_form_field_errors(&self, node_id: NodeId) -> HashMap<String, String> {
-        crate::form_logic::get_form_field_errors(node_id, &self.form_states, &self.validators)
+        input_engine::form::get_form_field_errors(node_id, &self.form_states, &self.validators)
     }
 
     /// Get form state for a form node
@@ -544,7 +544,7 @@ impl WidgetContext {
 
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
-        crate::form_logic::revalidate_form(
+        input_engine::form::revalidate_form(
             node_id,
             &mut self.form_states,
             &self.text_input_states,
@@ -554,7 +554,7 @@ impl WidgetContext {
 
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
-        crate::form_logic::trigger_submit(
+        input_engine::form::trigger_submit(
             node_id,
             &mut self.form_states,
             &self.text_input_states,
@@ -602,7 +602,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_next(&mut self) -> Option<NodeId> {
-        crate::input_logic::focus_next(&self.text_input_states, &mut self.focused_node)
+        input_engine::focus::focus_next(&self.text_input_states, &mut self.focused_node)
     }
 
     /// Focus the previous focusable node (Shift+Tab navigation).
@@ -615,7 +615,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_prev(&mut self) -> Option<NodeId> {
-        crate::input_logic::focus_prev(&self.text_input_states, &mut self.focused_node)
+        input_engine::focus::focus_prev(&self.text_input_states, &mut self.focused_node)
     }
 
     // =========================================================================
