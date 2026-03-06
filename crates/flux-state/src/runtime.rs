@@ -1112,3 +1112,71 @@ impl Runtime {
         }
     }
 }
+
+#[cfg(test)]
+mod tests_sentry {
+    use super::*;
+    use std::sync::RwLock;
+
+    #[test]
+    #[should_panic(expected = "Signal not found for id NodeId(9999)")]
+    fn test_get_signal_handle_panics_on_missing_signal() {
+        let runtime = Runtime::new();
+        runtime.get_signal_handle(NodeId(9999));
+    }
+
+    #[test]
+    #[should_panic(expected = "Computed not found for id NodeId(9999)")]
+    fn test_get_computed_handle_panics_on_missing_computed() {
+        let runtime = Runtime::new();
+        runtime.get_computed_handle(NodeId(9999));
+    }
+
+    #[test]
+    #[should_panic(expected = "Computed value not initialized for id")]
+    fn test_get_computed_handle_panics_on_uninitialized_computed() {
+        let runtime = Runtime::new();
+
+        let mut inner = runtime.inner.lock().unwrap();
+        let id = NodeId(inner.next_id);
+        inner.next_id += 1;
+        inner.computeds.insert(
+            id,
+            ComputedNode {
+                value: None,
+                compute: Arc::new(|| Arc::new(RwLock::new(42))),
+            },
+        );
+        drop(inner);
+
+        runtime.get_computed_handle(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "Signal not found for id NodeId(9999)")]
+    fn test_track_and_get_signal_panics_on_missing_signal() {
+        let runtime = Runtime::new();
+        runtime.track_and_get_signal(NodeId(9999));
+    }
+
+    #[test]
+    #[should_panic(expected = "Computed not found for id NodeId(9999)")]
+    fn test_track_and_get_computed_if_fresh_panics_on_missing_computed() {
+        let runtime = Runtime::new();
+        runtime.track_and_get_computed_if_fresh(NodeId(9999));
+    }
+
+    #[test]
+    #[should_panic(expected = "Computed not found for id NodeId(9999)")]
+    fn test_get_computed_if_fresh_panics_on_missing_computed() {
+        let runtime = Runtime::new();
+        runtime.get_computed_if_fresh(NodeId(9999));
+    }
+
+    #[test]
+    #[should_panic(expected = "Computed not found for id NodeId(9999)")]
+    fn test_recompute_panics_on_missing_computed() {
+        let runtime = Runtime::new();
+        runtime.recompute(NodeId(9999));
+    }
+}
