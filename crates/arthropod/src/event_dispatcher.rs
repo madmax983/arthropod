@@ -46,6 +46,19 @@ impl EventDispatcher {
     /// # Arguments
     ///
     /// * `form_node` - Optional form node for Enter key submission
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod::EventDispatcher;
+    /// use render_engine::NodeId;
+    ///
+    /// // Create dispatcher without a form
+    /// let dispatcher = EventDispatcher::new(None);
+    ///
+    /// // Create dispatcher linked to a specific form node
+    /// let form_dispatcher = EventDispatcher::new(Some(NodeId(42)));
+    /// ```
     pub fn new(form_node: Option<NodeId>) -> Self {
         Self {
             mouse_pos: (0.0, 0.0),
@@ -55,11 +68,34 @@ impl EventDispatcher {
     }
 
     /// Get current mouse position.
+    ///
+    /// Returns the (x, y) coordinates of the mouse from the last dispatched cursor move event.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod::EventDispatcher;
+    ///
+    /// let dispatcher = EventDispatcher::new(None);
+    /// let (x, y) = dispatcher.mouse_pos();
+    /// assert_eq!((x, y), (0.0, 0.0));
+    /// ```
     pub fn mouse_pos(&self) -> (f32, f32) {
         self.mouse_pos
     }
 
     /// Check if shift is held.
+    ///
+    /// Returns `true` if the shift modifier key is currently pressed based on dispatched events.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod::EventDispatcher;
+    ///
+    /// let dispatcher = EventDispatcher::new(None);
+    /// assert!(!dispatcher.shift_held());
+    /// ```
     pub fn shift_held(&self) -> bool {
         self.shift_held
     }
@@ -78,6 +114,25 @@ impl EventDispatcher {
     /// # Returns
     ///
     /// `DispatchResult` indicating what changed (if anything)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod::{EventDispatcher, DispatchResult};
+    /// use plat_core::{Event, LifecycleEvent};
+    /// use widget_core::WidgetContext;
+    /// use render_engine::Scene;
+    ///
+    /// let mut dispatcher = EventDispatcher::new(None);
+    /// let mut widget_ctx = WidgetContext::new_test();
+    /// let scene = Scene::new();
+    ///
+    /// // Dispatch an ignored event
+    /// let event = Event::Lifecycle(LifecycleEvent::Resumed);
+    /// let result = dispatcher.dispatch(&event, &mut widget_ctx, &scene);
+    ///
+    /// assert_eq!(result, DispatchResult::Ignored);
+    /// ```
     pub fn dispatch(
         &mut self,
         event: &Event,
@@ -232,6 +287,19 @@ impl EventDispatcher {
     }
 
     /// Get the form node (if any)
+    ///
+    /// Returns `Some(NodeId)` if this dispatcher was created with a target form node
+    /// for form submission (like handling Enter key presses).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use arthropod::EventDispatcher;
+    /// use render_engine::NodeId;
+    ///
+    /// let dispatcher = EventDispatcher::new(Some(NodeId(42)));
+    /// assert_eq!(dispatcher.form_node(), Some(NodeId(42)));
+    /// ```
     pub fn form_node(&self) -> Option<NodeId> {
         self.form_node
     }
