@@ -16,9 +16,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use widget_core::WidgetContext;
 
+use crate::app::AppContext;
 use crate::app::widget::run_widget_app;
-use crate::app::{AppContext, WidgetExt};
-use widget_core::Widget;
+use widget_core::{Widget, WidgetBoxed};
 
 /// Errors that can occur during app creation or execution
 #[derive(Error, Debug)]
@@ -497,7 +497,7 @@ impl App {
     {
         run_widget_app(title, width, height, |ctx| {
             let widget = build(ctx);
-            Box::new(widget) as Box<dyn WidgetExt>
+            Box::new(widget) as Box<dyn WidgetBoxed>
         })
     }
 }

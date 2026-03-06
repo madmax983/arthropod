@@ -37,3 +37,8 @@
 **Bloat:** Nested `if let` and `if` checking options in spatial graph
 **Cut:** Collapsed nested checks using chained `.filter()` calls.
 **Saved:** Reduced nesting depth and cognitive load, removed `clippy::collapsible_if` warnings in `spatial-graph/systems.rs`.
+
+## [Reduction]
+**Bloat:** `WidgetExt` trait mirroring `widget_core::WidgetBoxed`
+**Cut:** Removed duplicate trait definition and its blanket impl, replaced with standard `WidgetBoxed`
+**Saved:** ~30 lines of duplicate boilerplate, removed a single-use trait.

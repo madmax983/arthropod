@@ -38,4 +38,4 @@ pub mod widget;
 
 // Re-export main types to maintain API compatibility
 pub use self::core::{App, AppError};
-pub use widget::{AppContext, WidgetExt};
+pub use widget::AppContext;

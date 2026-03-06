@@ -9,12 +9,12 @@ use plat_core::{
     Application, ControlFlow, Event, EventLoop, Size, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
-    Color, NodeContent, NodeId, Scene,
+    Color, NodeContent, Scene,
     backend::{RenderBackend, WgpuBackend},
 };
 use std::cell::RefCell;
 use std::sync::Arc;
-use widget_core::{Widget, WidgetContext};
+use widget_core::{WidgetBoxed, WidgetContext};
 
 // =============================================================================
 // High-Level Widget App Infrastructure
@@ -27,7 +27,7 @@ thread_local! {
 }
 
 /// Type alias for widget builder function to reduce type complexity.
-type WidgetBuilder = Box<dyn FnOnce(&mut AppContext) -> Box<dyn WidgetExt>>;
+type WidgetBuilder = Box<dyn FnOnce(&mut AppContext) -> Box<dyn WidgetBoxed>>;
 
 /// Configuration passed to WidgetApp via thread-local.
 pub(crate) struct WidgetAppConfig {
@@ -35,31 +35,6 @@ pub(crate) struct WidgetAppConfig {
     pub width: u32,
     pub height: u32,
     pub builder: WidgetBuilder,
-}
-
-/// Extension trait for type-erased widgets.
-///
-/// This trait allows `Widget` implementations to be stored in `Box<dyn WidgetExt>`
-/// and used dynamically. It provides a `build_boxed` method that delegates to
-/// the standard `Widget::build` method.
-///
-/// # Why is this needed?
-///
-/// The `Widget` trait is not object-safe because it may have generic methods or
-/// associated types in future versions. `WidgetExt` provides an object-safe
-/// interface for cases where you need a heterogeneous collection of widgets or
-/// dynamic dispatch (like in `App::run`).
-pub trait WidgetExt {
-    /// Build the widget into the context, returning the root node ID.
-    ///
-    /// This is identical to `Widget::build`, but callable on a trait object.
-    fn build_boxed(&self, ctx: &mut WidgetContext) -> NodeId;
-}
-
-impl<W: Widget + 'static> WidgetExt for W {
-    fn build_boxed(&self, ctx: &mut WidgetContext) -> NodeId {
-        self.build(ctx)
-    }
 }
 
 /// Context provided to widget builders in App::run().
@@ -99,7 +74,7 @@ impl AppContext {
 /// Delegates from `App::run`.
 pub fn run_widget_app<F>(title: &str, width: u32, height: u32, build: F) -> Result<(), AppError>
 where
-    F: FnOnce(&mut AppContext) -> Box<dyn WidgetExt> + 'static,
+    F: FnOnce(&mut AppContext) -> Box<dyn WidgetBoxed> + 'static,
 {
     // Store configuration in thread-local for WidgetApp::new() to retrieve
     WIDGET_APP_CONFIG.with(|cell| {
