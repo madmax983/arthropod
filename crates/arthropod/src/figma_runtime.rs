@@ -16,9 +16,12 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
+/// Represents an error returned when instantiating the `FigmaRuntime`.
 pub enum FigmaRuntimeError {
+    /// Failure occurred while parsing the raw Figma API JSON document.
     #[error("figma import failed: {0}")]
     Import(#[from] FigmaImportError),
+    /// Failure occurred initializing the inner `PrototypeRuntime`.
     #[error("prototype runtime initialization failed: {0}")]
     Prototype(#[from] PrototypeRuntimeError),
 }
@@ -40,11 +43,13 @@ pub struct FigmaRuntime {
 }
 
 impl FigmaRuntime {
+    /// Creates a new `FigmaRuntime` by first parsing raw Figma API JSON data.
     pub fn from_figma_json(json: &str) -> Result<Self, FigmaRuntimeError> {
         let imported = import_figma_document(json)?;
         Self::from_imported(imported)
     }
 
+    /// Initializes a `FigmaRuntime` instance from an already parsed `ImportedFigmaDocument`.
     pub fn from_imported(imported: ImportedFigmaDocument) -> Result<Self, FigmaRuntimeError> {
         let has_prototype_edges = !imported.prototype_graph.edges.is_empty();
         let mut runtime = if has_prototype_edges && !imported.figma_to_scene.is_empty() {
@@ -83,22 +88,27 @@ impl FigmaRuntime {
         Ok(state)
     }
 
+    /// Returns a read-only reference to the current, parsed render `Scene`.
     pub fn scene(&self) -> &Scene {
         &self.scene
     }
 
+    /// Returns a mutable reference to the `Scene` for modifications.
     pub fn scene_mut(&mut self) -> &mut Scene {
         &mut self.scene
     }
 
+    /// Exposes the map associating original Figma string IDs to assigned `NodeId`s.
     pub fn figma_to_scene(&self) -> &HashMap<String, NodeId> {
         &self.figma_to_scene
     }
 
+    /// Translates a raw Figma ID string to its corresponding integer `NodeId`, if it exists.
     pub fn node_for_figma_id(&self, figma_id: &str) -> Option<NodeId> {
         self.figma_to_scene.get(figma_id).copied()
     }
 
+    /// Gets the ID of the node currently representing the active visual screen.
     pub fn current_screen(&self) -> Option<NodeId> {
         self.prototype_runtime
             .as_ref()
@@ -106,6 +116,7 @@ impl FigmaRuntime {
             .or_else(|| self.top_level_screens.first().copied())
     }
 
+    /// Imperatively sets the active node to display as the current screen.
     pub fn set_current_screen(&mut self, node: NodeId) {
         if let Some(runtime) = &mut self.prototype_runtime {
             runtime.set_current_screen(node);
@@ -113,6 +124,10 @@ impl FigmaRuntime {
         }
     }
 
+    /// Checks the visibility state of a specific node within the scene graph.
+    ///
+    /// The node's visibility can be influenced by the structure, layout properties,
+    /// or active overlays from the prototype runtime.
     pub fn is_visible(&self, node: NodeId) -> bool {
         self.scene
             .get_node(node)
@@ -120,6 +135,10 @@ impl FigmaRuntime {
             .unwrap_or(false)
     }
 
+    /// Performs an auto-layout pass on the entire scene using the provided viewport dimensions.
+    ///
+    /// This recalculates the geometry for all nodes, making sure that Figma frames and components
+    /// are sized and positioned properly based on their Flexbox constraints.
     pub fn apply_layout(&mut self, viewport_width: f32, viewport_height: f32) {
         let root = self.scene.root();
         auto_layout(
@@ -131,6 +150,11 @@ impl FigmaRuntime {
         );
     }
 
+    /// Routes an event to the underlying prototype runtime.
+    ///
+    /// This method allows the Figma document to respond to events such as `Click` or `Hover`.
+    /// The runtime evaluates any matching prototype graph edges, applies resulting visual
+    /// effects (such as changing the current screen), and returns the executed effect list.
     pub fn dispatch(&mut self, event: PrototypeRuntimeEvent) -> Vec<PrototypeRuntimeEffect> {
         let Some(runtime) = &mut self.prototype_runtime else {
             return Vec::new();
@@ -141,6 +165,10 @@ impl FigmaRuntime {
         effects
     }
 
+    /// Converts the internal scene state into a list of GPU-ready render instances.
+    ///
+    /// This collects layout nodes with visual styles (like shapes, borders, and text)
+    /// into simple rendering primitives used directly by the backend wgpu renderer or headless tests.
     pub fn collect_render_instances(&self) -> Vec<PrimitiveInstance> {
         self.scene
             .iter_visuals()
