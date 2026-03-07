@@ -120,7 +120,9 @@ impl WgpuContext {
         W: HasWindowHandle + HasDisplayHandle,
     {
         pollster::block_on(async {
-            // SAFETY: Propagates caller safety requirement into shared async initializer.
+            // SAFETY: The caller provides the guarantee that `window` will outlive
+            // the returned `WgpuContext`. We safely propagate this lifetime guarantee
+            // into the asynchronous initialization implementation.
             unsafe { Self::new_impl(window, width, height, composition_mode).await }
         })
     }
@@ -143,7 +145,9 @@ impl WgpuContext {
     where
         W: HasWindowHandle + HasDisplayHandle,
     {
-        // SAFETY: Propagates caller safety requirement into shared async initializer.
+        // SAFETY: The caller provides the guarantee that `window` will outlive
+        // the returned `WgpuContext`. We safely propagate this lifetime guarantee
+        // into the asynchronous initialization implementation.
         unsafe { Self::new_impl(window, width, height, composition_mode).await }
     }
 

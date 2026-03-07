@@ -82,3 +82,7 @@
 ## 2024-02-12 - [Undocumented Unsafe Blocks & Multiple Operations]
 **Threat:** Lack of documentation and multiple unsafeties within a single block hides potential undefined behavior risks from auditors and static analysis.
 **Defense:** Split multiple operations into separate `unsafe` blocks and provide explicit `// SAFETY:` justifications for each operation outlining the lifetime and usage guarantees in `composition.rs` and `windows.rs`.
+
+**2024-05-17 - Missing SAFETY Documentation in unsafe Blocks**
+**Threat:** The codebase contained multiple undocumented `unsafe` blocks. Undocumented `unsafe` code allows Undefined Behavior (UB) because it lacks formal safety proofs.
+**Defense:** Audited the `unsafe` blocks across `crates/plat-core/src/platform/macos.rs`, `crates/plat-core/src/compositor.rs`, `crates/arthropod/src/app/core.rs`, `crates/render-engine/src/backend/wgpu/mod.rs`, and `crates/render-engine/src/backend/wgpu/context.rs`. Added formal `// SAFETY:` proofs explaining why the specific invariants are upheld before each `unsafe` block.

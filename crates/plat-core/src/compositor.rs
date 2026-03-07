@@ -236,6 +236,9 @@ mod platform {
 
         pub fn commit(&self) -> Result<(), PlatformError> {
             // Commit all changes to the composition tree
+            // SAFETY: The `Commit` method on the DirectComposition device is a safe FFI call when
+            // the device is properly initialized and valid. It commits all pending changes
+            // to the visual tree and makes them visible on screen.
             unsafe {
                 self.composition
                     .device

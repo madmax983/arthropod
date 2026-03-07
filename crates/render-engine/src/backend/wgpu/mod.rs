@@ -87,7 +87,9 @@ impl WgpuBackend {
     where
         W: HasWindowHandle + HasDisplayHandle,
     {
-        // SAFETY: Propagating the safety requirement to the caller.
+        // SAFETY: The caller guarantees that `window` will outlive the returned
+        // `WgpuBackend` and its internal `wgpu::Surface`. This ensures we don't
+        // attempt to interact with a destroyed window from the GPU surface.
         let context = unsafe { WgpuContext::new(window, width, height, composition_mode)? };
         Self::from_context(context)
     }
@@ -111,7 +113,9 @@ impl WgpuBackend {
     where
         W: HasWindowHandle + HasDisplayHandle,
     {
-        // SAFETY: Propagating the safety requirement to the caller.
+        // SAFETY: The caller guarantees that `window` will outlive the returned
+        // `WgpuBackend` and its internal `wgpu::Surface`. This ensures we don't
+        // attempt to interact with a destroyed window from the GPU surface.
         let context =
             unsafe { WgpuContext::new_async(window, width, height, composition_mode).await? };
         Self::from_context(context)

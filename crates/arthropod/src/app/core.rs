@@ -79,7 +79,9 @@ impl App {
         let size = window.inner_size();
 
         // Create GPU backend (standard mode - not using DirectComposition)
-        // SAFETY: Safe because `App` struct guarantees correct drop order (context before window).
+        // SAFETY: The `WgpuBackend::new` method requires that the window object outlives the
+        // created surface. The `App` struct enforces this by guaranteeing that `context`
+        // (which owns the backend and surface) is dropped before `window`.
         let backend = unsafe { WgpuBackend::new(&window, size.width, size.height, false) }
             .map_err(|e| AppError::BackendCreation(e.to_string()))?;
 

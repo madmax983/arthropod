@@ -89,6 +89,9 @@ impl WindowImpl {
         };
 
         // Create window
+        // SAFETY: The `initWithContentRect_styleMask_backing_defer` method correctly initializes a new `NSWindow`
+        // using the provided content rectangle, style mask, and backing store type. The `mtm.alloc()` ensures
+        // the allocation happens on the main thread safely.
         let window = unsafe {
             NSWindow::initWithContentRect_styleMask_backing_defer(
                 mtm.alloc(),
@@ -165,6 +168,7 @@ impl HasWindowHandle for WindowImpl {
 
         let non_null = NonNull::new(view_ptr).ok_or(raw_window_handle::HandleError::Unavailable)?;
         let handle = AppKitWindowHandle::new(non_null);
+        // SAFETY: The provided RawWindowHandle describes an AppKit window successfully validated by NonNull.
         Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::AppKit(handle)) })
     }
 }
@@ -174,6 +178,7 @@ impl HasDisplayHandle for WindowImpl {
         &self,
     ) -> std::result::Result<DisplayHandle<'_>, raw_window_handle::HandleError> {
         let handle = AppKitDisplayHandle::new();
+        // SAFETY: Describes the implicit display environment corresponding to this platform instance.
         Ok(unsafe { DisplayHandle::borrow_raw(RawDisplayHandle::AppKit(handle)) })
     }
 }
