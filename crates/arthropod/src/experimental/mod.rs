@@ -61,7 +61,7 @@ fn print_missing_feature_warning(module_name: &str) {
         ),
         Print("│ "),
         SetForegroundColor(Color::Yellow),
-        Print("⚠️  MISSING FEATURE DETECTED                                          "),
+        Print("⚠️  MISSING FEATURE DETECTED                                           "),
         SetForegroundColor(Color::Red),
         Print(
             "│
@@ -84,7 +84,7 @@ fn print_missing_feature_warning(module_name: &str) {
     // "' module," = 9 chars
     // Fixed text = 48 chars.
     // Padding = 72 - 48 - module_name.len() = 24 - module_name.len()
-    let len = 23_usize.saturating_sub(module_name.len());
+    let len = 24_usize.saturating_sub(module_name.len());
     let padding = " ".repeat(len);
 
     let _ = execute!(
@@ -98,7 +98,7 @@ fn print_missing_feature_warning(module_name: &str) {
         ),
         Print("│ "),
         SetForegroundColor(Color::White),
-        Print("but the required 'nova' feature is NOT enabled.                        "),
+        Print("but the required 'nova' feature is NOT enabled.                         "),
         SetForegroundColor(Color::Red),
         Print(
             "│
@@ -110,7 +110,7 @@ fn print_missing_feature_warning(module_name: &str) {
         ),
         Print("│ "),
         SetForegroundColor(Color::Yellow),
-        Print("💡 Action Required:                                                    "),
+        Print("💡 Action Required:                                                     "),
         SetForegroundColor(Color::Red),
         Print(
             "│
@@ -118,7 +118,7 @@ fn print_missing_feature_warning(module_name: &str) {
         ),
         Print("│ "),
         SetForegroundColor(Color::White),
-        Print("Add `features = [\"nova\"]` to your `arthropod` dependency               "),
+        Print("Add `features = [\"nova\"]` to your `arthropod` dependency                "),
         SetForegroundColor(Color::Red),
         Print(
             "│
@@ -126,7 +126,7 @@ fn print_missing_feature_warning(module_name: &str) {
         ),
         Print("│ "),
         SetForegroundColor(Color::White),
-        Print("in your Cargo.toml file.                                               "),
+        Print("in your Cargo.toml file.                                                "),
         SetForegroundColor(Color::Red),
         Print(
             "│
