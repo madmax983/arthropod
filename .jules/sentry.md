@@ -38,3 +38,7 @@
 **Graceful Failure over Panics in Window Handles**
 **Learning:** Returning `unreachable!()` in a Windows `wndproc` or `unwrap()`ing a potentially null `HWND` during handle retrieval creates unnecessary panic risks that could crash the application on edge cases or unexpected OS messages.
 **Action:** Always prefer safe `ok_or` conversions into standard handle errors (like `raw_window_handle::HandleError::Unavailable`) and properly defer to `DefWindowProcW` instead of forcefully asserting message types.
+
+## 2024-10-25 - [Form and Focus State Testing]
+**Learning:** The `input-engine`'s headless state components (`TextInputState`, `FormState`) interact closely with `flux_state::Signal` and `ValidationState`. Found a potential division-by-zero panic in `cycle_focus_index` when the UI tree contains 0 focusable elements and improved test coverage significantly across form data collection and validation logic.
+**Action:** Add boundary value tests for focus cycling calculations (`total == 0`) and always include `#[cfg(test)]` modules that mock `flux_state::Runtime` instances for headless UI testing.

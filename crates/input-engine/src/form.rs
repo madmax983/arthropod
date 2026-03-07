@@ -154,3 +154,197 @@ pub fn trigger_submit(
         form_state_mut.submit_error = result.err();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flux_state::{Runtime, Signal};
+    use std::sync::Mutex;
+
+    fn create_text_state(initial: &str) -> TextInputState {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime, initial.to_string());
+        let (read, write) = signal.split();
+        TextInputState {
+            read_signal: read,
+            write_signal: write,
+            cursor_position: initial.chars().count(),
+            readonly: false,
+            max_length: None,
+        }
+    }
+
+    #[test]
+    fn should_validate_fields_and_update_form_state() {
+        let mut form_states = HashMap::new();
+        let mut text_input_states = IndexMap::new();
+        let mut validators = HashMap::new();
+
+        let form_id = NodeId(10);
+        let field_id = NodeId(11);
+
+        let mut field_mapping = IndexMap::new();
+        field_mapping.insert("username".to_string(), field_id);
+
+        form_states.insert(
+            form_id,
+            FormState {
+                field_mapping,
+                is_valid: true, // Initially true, should become false
+                on_submit: None,
+                submit_error: None,
+            },
+        );
+
+        text_input_states.insert(field_id, create_text_state("short"));
+
+        // Validator: Must be > 5 chars
+        validators.insert(
+            field_id,
+            ValidationState {
+                validator: Arc::new(|val| {
+                    if val.len() > 5 {
+                        Ok(())
+                    } else {
+                        Err("Too short".to_string())
+                    }
+                }),
+                error: None,
+            },
+        );
+
+        revalidate_form(
+            form_id,
+            &mut form_states,
+            &text_input_states,
+            &mut validators,
+        );
+
+        assert_eq!(form_states.get(&form_id).unwrap().is_valid, false);
+        let errors = get_form_field_errors(form_id, &form_states, &validators);
+        assert_eq!(errors.get("username"), Some(&"Too short".to_string()));
+
+        // Make it valid
+        text_input_states
+            .get(&field_id)
+            .unwrap()
+            .write_signal
+            .set("longenough".to_string());
+
+        revalidate_form(
+            form_id,
+            &mut form_states,
+            &text_input_states,
+            &mut validators,
+        );
+        assert_eq!(form_states.get(&form_id).unwrap().is_valid, true);
+        let errors = get_form_field_errors(form_id, &form_states, &validators);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn should_collect_form_data_correctly() {
+        let field1_id = NodeId(11);
+        let field2_id = NodeId(12);
+
+        let mut field_mapping = IndexMap::new();
+        field_mapping.insert("username".to_string(), field1_id);
+        field_mapping.insert("email".to_string(), field2_id);
+
+        let form_state = FormState {
+            field_mapping,
+            is_valid: true,
+            on_submit: None,
+            submit_error: None,
+        };
+
+        let mut text_input_states = IndexMap::new();
+        text_input_states.insert(field1_id, create_text_state("alice"));
+        text_input_states.insert(field2_id, create_text_state("alice@example.com"));
+
+        let data = collect_form_data(&form_state, &text_input_states);
+        assert_eq!(data.len(), 2);
+        assert_eq!(data.get("username"), Some(&"alice".to_string()));
+        assert_eq!(data.get("email"), Some(&"alice@example.com".to_string()));
+    }
+
+    #[test]
+    fn should_trigger_submit_only_when_valid() {
+        let mut form_states = HashMap::new();
+        let mut text_input_states = IndexMap::new();
+        let mut validators = HashMap::new();
+
+        let form_id = NodeId(10);
+        let field_id = NodeId(11);
+
+        let mut field_mapping = IndexMap::new();
+        field_mapping.insert("code".to_string(), field_id);
+
+        let submit_called = Arc::new(Mutex::new(false));
+        let submit_called_clone = submit_called.clone();
+
+        form_states.insert(
+            form_id,
+            FormState {
+                field_mapping,
+                is_valid: true,
+                on_submit: Some(Arc::new(move |_data| {
+                    *submit_called_clone.lock().unwrap() = true;
+                    Err("Server error".to_string())
+                })),
+                submit_error: None,
+            },
+        );
+
+        text_input_states.insert(field_id, create_text_state("invalid_code"));
+
+        // Validator fails for "invalid_code"
+        validators.insert(
+            field_id,
+            ValidationState {
+                validator: Arc::new(|val| {
+                    if val == "1234" {
+                        Ok(())
+                    } else {
+                        Err("Bad code".to_string())
+                    }
+                }),
+                error: None,
+            },
+        );
+
+        // Try submit - it should revalidate and fail before calling submit callback
+        trigger_submit(
+            form_id,
+            &mut form_states,
+            &text_input_states,
+            &mut validators,
+        );
+
+        assert_eq!(*submit_called.lock().unwrap(), false);
+        assert_eq!(form_states.get(&form_id).unwrap().is_valid, false);
+        assert_eq!(form_states.get(&form_id).unwrap().submit_error, None);
+
+        // Fix the input
+        text_input_states
+            .get(&field_id)
+            .unwrap()
+            .write_signal
+            .set("1234".to_string());
+
+        // Try submit again
+        trigger_submit(
+            form_id,
+            &mut form_states,
+            &text_input_states,
+            &mut validators,
+        );
+
+        assert_eq!(*submit_called.lock().unwrap(), true);
+        assert_eq!(form_states.get(&form_id).unwrap().is_valid, true);
+        assert_eq!(
+            form_states.get(&form_id).unwrap().submit_error,
+            Some("Server error".to_string())
+        );
+    }
+}
