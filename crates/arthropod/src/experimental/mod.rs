@@ -40,6 +40,9 @@ pub mod flux_radar;
 #[cfg(feature = "nova")]
 pub mod spatial_query;
 
+#[cfg(feature = "nova")]
+pub mod magneto;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -754,5 +757,43 @@ pub mod signal_graph {
     )]
     pub fn register_signal_graph(_app: &mut crate::App) {
         super::print_missing_feature_warning("signal_graph");
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod magneto {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `magneto` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Component, Debug, Clone)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct MagneticNode {
+        pub target_id: render_engine::NodeId,
+        pub target_distance: f32,
+        pub stiffness: f32,
+        pub damping: f32,
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn update_magnetic_links(
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+        _query: bevy_ecs::prelude::Query<(&MagneticNode, &arthropod_ecs::components::SceneNodeRef)>,
+    ) {
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_magneto(_app: &mut crate::App) {
+        super::print_missing_feature_warning("magneto");
     }
 }
