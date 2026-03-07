@@ -26,8 +26,8 @@
 //! Note: Mica requires Windows 11. On Windows 10, falls back to Acrylic blur.
 
 use plat_core::{
-    Application, BackdropMaterial, ControlFlow, Event, EventLoop, HasBackdropMaterial, Rect, Size,
-    Window, WindowConfig, WindowEvent, WindowId,
+    Application, BackdropMaterial, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig,
+    WindowEvent, WindowId,
 };
 use render_engine::{
     Color, NodeContent, Scene, SceneNode,

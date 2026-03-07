@@ -42,3 +42,8 @@
 **Bloat:** `WidgetExt` trait mirroring `widget_core::WidgetBoxed`
 **Cut:** Removed duplicate trait definition and its blanket impl, replaced with standard `WidgetBoxed`
 **Saved:** ~30 lines of duplicate boilerplate, removed a single-use trait.
+
+## [Reduction]
+**Bloat:** `HasBackdropMaterial` trait
+**Cut:** Replaced with concrete methods on `Window` and `WindowImpl`
+**Saved:** 1 trait definition and several unused imports

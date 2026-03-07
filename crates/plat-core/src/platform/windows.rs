@@ -4,8 +4,7 @@ pub mod composition;
 
 use crate::{
     Application, ControlFlow, Event, PlatformError, Point, Size, Window, WindowConfig, WindowEvent,
-    WindowId,
-    materials::{BackdropMaterial, HasBackdropMaterial},
+    WindowId, materials::BackdropMaterial,
 };
 use raw_window_handle::{
     DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
@@ -365,8 +364,8 @@ impl Drop for WindowImpl {
     }
 }
 
-impl HasBackdropMaterial for WindowImpl {
-    fn set_backdrop_material(&self, material: BackdropMaterial) {
+impl WindowImpl {
+    pub fn set_backdrop_material(&self, material: BackdropMaterial) {
         // Use window-vibrancy crate for full-window backdrop effects
         // This applies the effect to the entire window via DWM, allowing
         // semi-transparent wgpu content to show the backdrop through.
@@ -407,7 +406,7 @@ impl HasBackdropMaterial for WindowImpl {
             .store(material_value, Ordering::SeqCst);
     }
 
-    fn backdrop_material(&self) -> BackdropMaterial {
+    pub fn backdrop_material(&self) -> BackdropMaterial {
         match self.backdrop_material.load(Ordering::SeqCst) {
             1 => BackdropMaterial::Mica,
             2 => BackdropMaterial::MicaAlt,

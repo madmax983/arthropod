@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 
 use glam::Vec4;
 use plat_core::{
-    Application, BackdropMaterial, ControlFlow, ElementState, Event, EventLoop,
-    HasBackdropMaterial, Key, MouseButton, Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
+    Application, BackdropMaterial, ControlFlow, ElementState, Event, EventLoop, Key, MouseButton,
+    Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
     Color, NodeContent, NodeId, Paint, Scene, SceneNode, TextContent,

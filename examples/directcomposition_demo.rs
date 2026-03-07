@@ -21,8 +21,8 @@
 //! Full Mica effect requires Windows 11.
 
 use plat_core::{
-    Application, BackdropMaterial, Compositor, ControlFlow, Event, EventLoop, HasBackdropMaterial,
-    Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
+    Application, BackdropMaterial, Compositor, ControlFlow, Event, EventLoop, Rect, Size, Window,
+    WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
     Color, NodeContent, Scene, SceneNode,

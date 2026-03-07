@@ -17,11 +17,3 @@ pub enum BackdropMaterial {
     /// Windows 10/11 Acrylic - translucent blur effect
     Acrylic,
 }
-
-/// Trait for windows that support backdrop materials
-pub trait HasBackdropMaterial {
-    /// Set the window's backdrop material
-    fn set_backdrop_material(&self, material: BackdropMaterial);
-    /// Get currently applied material
-    fn backdrop_material(&self) -> BackdropMaterial;
-}

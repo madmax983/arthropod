@@ -75,7 +75,7 @@ pub use plat_core::{
 pub use plat_core::{ElementState, Key, MouseButton};
 
 // Platform - Materials
-pub use plat_core::{BackdropMaterial, HasBackdropMaterial};
+pub use plat_core::BackdropMaterial;
 
 // Widget system - Core widgets
 pub use widget_core::{

@@ -1,6 +1,6 @@
 //! Unit tests for BackdropMaterial API.
 
-use plat_core::{BackdropMaterial, HasBackdropMaterial};
+use plat_core::BackdropMaterial;
 
 #[test]
 #[ignore] // Requires actual window - run manually with: cargo test -p plat-core --test material_tests -- --ignored
@@ -74,14 +74,4 @@ fn test_backdrop_material_debug() {
     // Verify Debug trait works
     let debug_str = format!("{:?}", BackdropMaterial::Mica);
     assert!(debug_str.contains("Mica"));
-}
-
-#[test]
-fn test_has_backdrop_material_trait_exists() {
-    // Verify trait has required method signatures
-    fn _check_api<W: HasBackdropMaterial>(w: &W, m: BackdropMaterial) {
-        w.set_backdrop_material(m);
-        let _: BackdropMaterial = w.backdrop_material();
-    }
-    // Actual implementation tested in test_apply_mica_to_window
 }
