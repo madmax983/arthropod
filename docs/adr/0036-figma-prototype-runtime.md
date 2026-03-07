@@ -1,6 +1,6 @@
 # Figma Prototype Runtime Execution Semantics
 
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context
 Our platform needs to handle complex runtime behaviors defined in imported prototype graphs (such as those from Figma). The challenge is effectively executing deterministic navigation behaviors without intertwining them with core app logic. We needed a comprehensive mechanism to orchestrate event dispatch, timeout handling, navigation history, overlay stack rules, back semantics, and URL effects natively within the framework.
