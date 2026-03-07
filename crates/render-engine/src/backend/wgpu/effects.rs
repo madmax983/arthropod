@@ -45,21 +45,24 @@ pub struct EffectPass {
 }
 
 /// Planner input extracted from a scene node.
+///
+/// Performance Note: We hold an `Option<&'a VisualStyle>` reference instead of an
+/// owned copy to prevent expensive heap allocations (`.clone()`) per scene node during effect planning.
 #[derive(Debug, Clone)]
-pub struct EffectPlanNode {
+pub struct EffectPlanNode<'a> {
     pub node_id: NodeId,
-    pub style: Option<VisualStyle>,
+    pub style: Option<&'a VisualStyle>,
     pub bounds: plat_core::Rect,
     pub has_children: bool,
     pub visible: bool,
     pub opacity: f32,
 }
 
-impl EffectPlanNode {
+impl<'a> EffectPlanNode<'a> {
     #[must_use]
-    pub fn from_scene(node_id: NodeId, node: &SceneNode) -> Self {
+    pub fn from_scene(node_id: NodeId, node: &'a SceneNode) -> Self {
         let style = match &node.content {
-            NodeContent::Styled { style } => Some((**style).clone()),
+            NodeContent::Styled { style } => Some(&**style),
             NodeContent::Empty | NodeContent::SolidColor { .. } => None,
         };
         Self {
@@ -472,7 +475,7 @@ fn clamp_bounds_to_frame(bounds: plat_core::Rect, frame_width: u32, frame_height
 /// The returned list is in frame execution order.
 #[must_use]
 pub fn plan_effect_passes(
-    nodes: &[EffectPlanNode],
+    nodes: &[EffectPlanNode<'_>],
     frame_width: u32,
     frame_height: u32,
 ) -> Vec<EffectPass> {
