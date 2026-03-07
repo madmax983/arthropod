@@ -189,7 +189,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let guard = self.handle.read().unwrap();
@@ -212,7 +212,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let guard = self.handle.read().unwrap();
         f(&*guard)
@@ -261,7 +261,7 @@ impl<T: Clone + 'static + Send + Sync> ReadSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn get(&self) -> T {
         self.with(|v| v.clone())
     }
@@ -289,7 +289,7 @@ impl<T: Clone + 'static + Send + Sync> ReadSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn get_untracked(&self) -> T {
         self.with_untracked(|v| v.clone())
     }
@@ -317,7 +317,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
         let guard = self.handle.read().unwrap();
@@ -341,7 +341,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let guard = self.handle.read().unwrap();
         f(&*guard)
@@ -375,7 +375,7 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn set(&self, value: T) {
         {
             let mut guard = self.handle.write().unwrap();
@@ -408,7 +408,7 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     /// # Panics
     ///
     /// - Panics if the internal lock is poisoned.
-    /// - Panics if the stored type does not match `T`.
+    ///
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         {
             let mut guard = self.handle.write().unwrap();

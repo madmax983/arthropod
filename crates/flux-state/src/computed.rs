@@ -386,4 +386,76 @@ mod tests {
         let node = graph.nodes.iter().find(|n| n.id == computed.id).unwrap();
         assert_eq!(node.label, "my_computed");
     }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch")]
+    fn test_computed_with_type_mismatch() {
+        let runtime = Runtime::new();
+
+        // Create a computed directly with runtime that returns a String
+        let id = runtime.create_computed(Arc::new(move || {
+            Arc::new(RwLock::new(String::from("wrong type")))
+                as Arc<dyn std::any::Any + Send + Sync>
+        }));
+
+        // initialize the computed node (simulating Computed::new)
+        runtime.recompute(id);
+
+        let computed = Computed::<i32> {
+            id,
+            runtime,
+            _marker: std::marker::PhantomData,
+        };
+
+        // Calling .with should panic with "Type mismatch"
+        computed.with(|_v| ());
+    }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch")]
+    fn test_computed_with_untracked_type_mismatch() {
+        let runtime = Runtime::new();
+
+        // Create a computed directly with runtime that returns a String
+        let id = runtime.create_computed(Arc::new(move || {
+            Arc::new(RwLock::new(String::from("wrong type")))
+                as Arc<dyn std::any::Any + Send + Sync>
+        }));
+
+        // initialize the computed node (simulating Computed::new)
+        runtime.recompute(id);
+
+        let computed = Computed::<i32> {
+            id,
+            runtime,
+            _marker: std::marker::PhantomData,
+        };
+
+        // Calling .with_untracked should panic with "Type mismatch"
+        computed.with_untracked(|_v| ());
+    }
+
+    #[test]
+    fn test_computed_debug_type_mismatch() {
+        let runtime = Runtime::new();
+
+        // Create a computed directly with runtime that returns a String
+        let id = runtime.create_computed(Arc::new(move || {
+            Arc::new(RwLock::new(String::from("wrong type")))
+                as Arc<dyn std::any::Any + Send + Sync>
+        }));
+
+        // initialize the computed node (simulating Computed::new)
+        runtime.recompute(id);
+
+        let computed = Computed::<i32> {
+            id,
+            runtime,
+            _marker: std::marker::PhantomData,
+        };
+
+        // Debug printing shouldn't panic but return an error string
+        let debug_str = format!("{:?}", computed);
+        assert!(debug_str.contains("<type mismatch>"));
+    }
 }
