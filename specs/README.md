@@ -20,6 +20,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [011](011-context-menu.md) | Context Menus | Draft |
 | [012](012-accessibility-engine.md) | Accessibility Engine | Draft |
 | [013](013-text-input-widget.md) | Standard TextInput Widget | Draft |
+| [014](014-dropdown-select-widget.md) | Dropdown Select Widget | Draft |
 | [014](014-align-content.md) | Align Content (Flexbox) | Draft |
 
 ## Lifecycle
