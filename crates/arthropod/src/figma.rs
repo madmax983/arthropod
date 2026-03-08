@@ -370,49 +370,67 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
     }
 
     let mut resolved_instance_properties = HashMap::new();
-    for (instance_node_id, instance_meta) in &instances {
-        let mut resolved = HashMap::new();
+    let mut component_base_cache = HashMap::new();
 
+    for (instance_node_id, instance_meta) in &instances {
         if let Some(component_scene_id) = instance_meta
             .component_id
             .as_ref()
             .and_then(|figma_id| figma_to_scene.get(figma_id))
             .copied()
         {
-            if let Some(definitions) = component_property_definitions.get(&component_scene_id) {
-                for (name, definition) in definitions {
-                    if let Some(default_value) = definition.default_value.clone() {
-                        resolved.insert(name.clone(), default_value);
+            let base = component_base_cache
+                .entry(component_scene_id)
+                .or_insert_with(|| {
+                    let mut resolved = HashMap::new();
+                    if let Some(definitions) =
+                        component_property_definitions.get(&component_scene_id)
+                    {
+                        for (name, definition) in definitions {
+                            if let Some(default_value) = definition.default_value.clone() {
+                                resolved.insert(name.clone(), default_value);
+                            }
+                        }
                     }
-                }
-            }
 
-            if let Some(component_variants) = variant_properties.get(&component_scene_id) {
-                for (name, value) in component_variants {
+                    if let Some(component_variants) = variant_properties.get(&component_scene_id) {
+                        for (name, value) in component_variants {
+                            resolved.entry(name.clone()).or_insert_with(|| {
+                                ImportedComponentPropertyValue::Text(value.clone())
+                            });
+                        }
+                    }
                     resolved
-                        .entry(name.clone())
-                        .or_insert_with(|| ImportedComponentPropertyValue::Text(value.clone()));
-                }
+                });
+
+            if !base.is_empty() {
+                resolved_instance_properties.insert(*instance_node_id, base.clone());
             }
         }
+    }
 
-        if let Some(overrides) = instance_property_overrides.get(instance_node_id) {
+    for (node_id, overrides) in &instance_property_overrides {
+        if instances.contains_key(node_id) && !overrides.is_empty() {
+            let resolved = resolved_instance_properties
+                .entry(*node_id)
+                .or_insert_with(HashMap::new);
             for (name, override_entry) in overrides {
                 resolved.insert(name.clone(), override_entry.value.clone());
             }
         }
+    }
 
-        if let Some(instance_variants) = variant_properties.get(instance_node_id) {
+    for (node_id, instance_variants) in &variant_properties {
+        if instances.contains_key(node_id) && !instance_variants.is_empty() {
+            let resolved = resolved_instance_properties
+                .entry(*node_id)
+                .or_insert_with(HashMap::new);
             for (name, value) in instance_variants {
                 resolved.insert(
                     name.clone(),
                     ImportedComponentPropertyValue::Text(value.clone()),
                 );
             }
-        }
-
-        if !resolved.is_empty() {
-            resolved_instance_properties.insert(*instance_node_id, resolved);
         }
     }
 
