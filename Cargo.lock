@@ -2242,6 +2242,7 @@ dependencies = [
 name = "input-engine"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "flux-state",
  "indexmap",
  "log",

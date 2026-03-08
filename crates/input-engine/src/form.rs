@@ -84,19 +84,20 @@ pub fn revalidate_form(
     text_input_states: &IndexMap<NodeId, TextInputState>,
     validators: &mut HashMap<NodeId, ValidationState>,
 ) {
-    // Re-run validators on all fields with current values
-    if let Some(form_state) = form_states.get(&node_id) {
+    // Re-run validators on all fields with current values and compute overall validity
+    if let Some(form_state) = form_states.get_mut(&node_id) {
+        let mut is_valid = true;
         for &field_node_id in form_state.field_mapping.values() {
             validate_field(field_node_id, text_input_states, validators);
+
+            if validators
+                .get(&field_node_id)
+                .is_some_and(|v| v.error.is_some())
+            {
+                is_valid = false;
+            }
         }
-    }
-
-    // Get field errors after re-validation
-    let field_errors = get_form_field_errors(node_id, form_states, validators);
-
-    // Update form is_valid state
-    if let Some(form_state) = form_states.get_mut(&node_id) {
-        form_state.is_valid = field_errors.is_empty();
+        form_state.is_valid = is_valid;
     }
 }
 
