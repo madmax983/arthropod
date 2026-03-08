@@ -38,6 +38,9 @@
 **Graceful Failure over Panics in Window Handles**
 **Learning:** Returning `unreachable!()` in a Windows `wndproc` or `unwrap()`ing a potentially null `HWND` during handle retrieval creates unnecessary panic risks that could crash the application on edge cases or unexpected OS messages.
 **Action:** Always prefer safe `ok_or` conversions into standard handle errors (like `raw_window_handle::HandleError::Unavailable`) and properly defer to `DefWindowProcW` instead of forcefully asserting message types.
+**[Reactive Graph Coverage & Debug Safety]
+**Learning:** Forcing a type mismatch via `std::mem::transmute` just to hit a Debug path is extremely unsafe and introduces UB. Sometimes 100% coverage requires exposing safe internals rather than resorting to UB, or simply accepting acceptable unreached error branches.
+**Action:** Avoid `std::mem::transmute` entirely when mocking type mismatches. If an error branch cannot be safely hit from the public API, write safe tests to maximize valid path coverage instead.
 
 ## 2024-10-25 - [Form and Focus State Testing]
 **Learning:** The `input-engine`'s headless state components (`TextInputState`, `FormState`) interact closely with `flux_state::Signal` and `ValidationState`. Found a potential division-by-zero panic in `cycle_focus_index` when the UI tree contains 0 focusable elements and improved test coverage significantly across form data collection and validation logic.
