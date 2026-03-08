@@ -45,3 +45,6 @@
 ## 2024-10-25 - [Form and Focus State Testing]
 **Learning:** The `input-engine`'s headless state components (`TextInputState`, `FormState`) interact closely with `flux_state::Signal` and `ValidationState`. Found a potential division-by-zero panic in `cycle_focus_index` when the UI tree contains 0 focusable elements and improved test coverage significantly across form data collection and validation logic.
 **Action:** Add boundary value tests for focus cycling calculations (`total == 0`) and always include `#[cfg(test)]` modules that mock `flux_state::Runtime` instances for headless UI testing.
+**[Explicit Panic Coverage]
+**Learning:** Found several explicit panic points inside `crates/flux-state/src/runtime.rs` that were missing test coverage, specifically when missing/invalid `NodeId`s were requested.
+**Action:** Added `#should_panic` tests to exercise these `unwrap_or_else(|| panic!(...))` error bounds, completing full panic path coverage in `runtime.rs`.

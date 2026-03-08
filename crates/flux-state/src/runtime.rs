@@ -1255,4 +1255,11 @@ mod tests_sentry {
         let runtime = Runtime::new();
         runtime.recompute(NodeId(9999));
     }
+
+    #[test]
+    #[should_panic(expected = "Computed not found for id NodeId(9999)")]
+    fn test_track_and_get_computed_if_fresh_panics_on_missing_computed_not_stale() {
+        let runtime = Runtime::new();
+        runtime.track_and_get_computed_if_fresh(NodeId(9999));
+    }
 }

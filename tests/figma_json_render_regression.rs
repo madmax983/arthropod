@@ -9,8 +9,7 @@ use arthropod_test::visual_test::{compare_images_with_tolerance, load_image, sav
 use plat_core::{EventLoop, Rect, Size, WindowConfig};
 use render_engine::{
     BlendMode, Color, ColorStop, CornerRadii, Effect, NodeContent, Paint, Scene, SceneNode, Vec2,
-    Vec4, VisualStyle,
-    backend::{RenderBackend, WgpuBackend},
+    Vec4, VisualStyle, backend::WgpuBackend,
 };
 use serde::Deserialize;
 use style_engine::{

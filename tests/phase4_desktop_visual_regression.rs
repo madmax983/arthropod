@@ -7,8 +7,7 @@ use arthropod_test::visual_test::{compare_images_with_tolerance, load_image, sav
 use plat_core::{EventLoop, Rect, Size, WindowConfig};
 use render_engine::backend::wgpu::effects::composite_blend_over;
 use render_engine::{
-    BlendMode, Color, NodeContent, Scene, SceneNode, VisualStyle,
-    backend::{WgpuBackend},
+    BlendMode, Color, NodeContent, Scene, SceneNode, VisualStyle, backend::WgpuBackend,
 };
 
 #[path = "../examples/phase4_visual_scenes.rs"]
