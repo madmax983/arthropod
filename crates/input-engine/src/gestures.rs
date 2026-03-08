@@ -48,6 +48,26 @@ pub struct SequenceMatcher<G> {
 }
 
 impl<G: Clone + Send + Sync + PartialEq + std::fmt::Debug> SequenceMatcher<G> {
+    /// Constructs a new `SequenceMatcher` to begin tracking a specific series of sequential key inputs.
+    ///
+    /// You should use this when you need to trigger a unique action (like a cheat code, Easter egg,
+    /// or complex command palette invocation) only after the user has perfectly executed a strict sequence of keys.
+    /// If the sequence is broken by an incorrect key, the internal state resets automatically.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use input_engine::SequenceMatcher;
+    /// use plat_core::Key;
+    ///
+    /// #[derive(Debug, Clone, PartialEq)]
+    /// enum MyAction { FireHadouken }
+    ///
+    /// // The classic fighting game motion: Down, Down-Right (ignored here), Right, Punch.
+    /// // Wait, let's keep it simple: Down, Right, Space.
+    /// let sequence = vec![Key::Down, Key::Right, Key::Space];
+    /// let _matcher = SequenceMatcher::new(sequence, MyAction::FireHadouken);
+    /// ```
     pub fn new(sequence: Vec<Key>, gesture: G) -> Self {
         Self {
             sequence,
@@ -118,6 +138,26 @@ pub struct ChordMatcher<G> {
 }
 
 impl<G: Clone + Send + Sync + PartialEq + std::fmt::Debug> ChordMatcher<G> {
+    /// Constructs a new `ChordMatcher` to begin tracking a simultaneous combination of keys.
+    ///
+    /// You should use this when you need to detect standard keyboard shortcuts or modifiers combined
+    /// with primary action keys (e.g., `Ctrl + S`, `Shift + Alt + Delete`). The matcher will fire
+    /// the moment the final required key is depressed, regardless of whether other irrelevant keys
+    /// are also currently held down.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use input_engine::ChordMatcher;
+    /// use plat_core::Key;
+    ///
+    /// #[derive(Debug, Clone, PartialEq)]
+    /// enum MyShortcut { SaveDocument }
+    ///
+    /// // Requires both Control and S to be held down simultaneously.
+    /// let keys = vec![Key::Control, Key::S];
+    /// let _matcher = ChordMatcher::new(keys, MyShortcut::SaveDocument);
+    /// ```
     pub fn new(keys: Vec<Key>, gesture: G) -> Self {
         Self {
             required_keys: keys,

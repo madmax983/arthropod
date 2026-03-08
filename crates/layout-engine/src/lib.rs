@@ -82,21 +82,43 @@ pub enum FlexDirection {
 /// Main-axis child distribution.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexJustifyContent {
+    /// Items are packed flush to each other toward the start edge of the alignment container in the main axis.
+    /// This is the default layout, useful for naturally stacking children starting from the "top" or "left".
     #[default]
     Start,
+    /// Items are packed flush to each other toward the center of the alignment container along the main axis.
+    /// Use this to visually center a cluster of widgets together horizontally or vertically.
     Center,
+    /// Items are packed flush to each other toward the end edge of the alignment container in the main axis.
+    /// Useful for pinning items like action buttons to the right or bottom of a parent container.
     End,
+    /// Items are evenly distributed in the alignment container along the main axis.
+    /// The spacing between each pair of adjacent items is the same. The first item is flush with the main-start edge, and the last item is flush with the main-end edge.
+    /// Use this when you want items to spread out across the entire available space (e.g., a left-aligned title and a right-aligned help icon).
     SpaceBetween,
+    /// Items are evenly distributed in the alignment container along the main axis, with half-size spaces on either end.
+    /// The spacing between each pair of adjacent items is the same. The empty space before the first and after the last item equals half of the space between each pair of adjacent items.
     SpaceAround,
+    /// Items are evenly distributed in the alignment container along the main axis, with equal-size spaces on either end.
+    /// The spacing between each pair of adjacent items, the main-start edge and the first item, and the main-end edge and the last item, are all exactly the same.
     SpaceEvenly,
 }
 
 /// Cross-axis alignment.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexAlign {
+    /// The cross-start margin edge of the items is placed flush with the cross-start edge of the line.
+    /// Useful for aligning the top of items in a horizontal row, or left edge in a vertical column.
     Start,
+    /// The items' margin boxes are centered within the line on the cross-axis.
+    /// Use this when sibling items of varying heights need to share a consistent horizontal centerline (e.g., an icon and a line of text).
     Center,
+    /// The cross-end margin edge of the items is placed flush with the cross-end edge of the line.
+    /// Useful for aligning the bottom of items in a horizontal row, or right edge in a vertical column.
     End,
+    /// If the cross-size property of the flex item computes to `auto`, and neither of the cross-axis margins are `auto`, the flex item is stretched.
+    /// This means its used value is the length necessary to make the cross size of the item's margin box as close to the same size as the line as possible, while still respecting the constraints imposed by min-height/min-width/max-height/max-width.
+    /// By default, items stretch to fill the available cross-axis space.
     #[default]
     Stretch,
 }
@@ -104,37 +126,93 @@ pub enum FlexAlign {
 /// Child wrapping behavior.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FlexWrap {
+    /// The flex container is single-line.
+    /// It forces all its items onto a single line, shrinking them if necessary, or allowing them to overflow the container.
     #[default]
     NoWrap,
+    /// The flex container is multi-line.
+    /// Items wrap onto multiple lines. The cross-start edge of the first line matches the cross-start edge of the container.
+    /// Subsequent lines are placed sequentially along the cross axis.
     Wrap,
 }
 
 /// Per-item cross-axis override.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ItemAlignSelf {
+    /// Computes to the parent's [`FlexAlign`] value.
+    /// This is the default, ensuring the item follows the alignment strategy dictated by its container.
     #[default]
     Auto,
+    /// Overrides the parent's alignment to pack this specific item toward the cross-start edge.
     Start,
+    /// Overrides the parent's alignment to center this specific item within the cross-axis.
     Center,
+    /// Overrides the parent's alignment to pack this specific item toward the cross-end edge.
     End,
+    /// Overrides the parent's alignment to force this specific item to stretch across the full cross-axis size.
     Stretch,
 }
 
-/// Layout constraints for root nodes
+/// Layout constraints for root nodes.
+///
+/// You should use this when you need to enforce strict boundaries on how much screen real estate
+/// a root flexbox container is allowed to claim. These limits act as a hard ceiling (or floor)
+/// overriding any internal requests for growth or shrinkage from child nodes. This is typically
+/// used to restrict the root layout to the physical dimensions of the host OS window.
+///
+/// ## Examples
+///
+/// ```
+/// use layout_engine::LayoutConstraints;
+///
+/// let limits = LayoutConstraints {
+///     max_width: Some(1920.0),
+///     max_height: Some(1080.0),
+///     min_width: None,
+///     min_height: None,
+/// };
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct LayoutConstraints {
+    /// The maximum horizontal space this container is permitted to occupy.
+    /// Overrides internal flex-grow requests if they exceed this limit. Typically matches the OS Window width for the root node.
     pub max_width: Option<f32>,
+    /// The maximum vertical space this container is permitted to occupy.
+    /// Overrides internal flex-grow requests if they exceed this limit. Typically matches the OS Window height for the root node.
     pub max_height: Option<f32>,
+    /// The minimum horizontal space this container must occupy, overriding child shrinking.
     pub min_width: Option<f32>,
+    /// The minimum vertical space this container must occupy, overriding child shrinking.
     pub min_height: Option<f32>,
 }
 
-/// Computed layout result
+/// Computed layout result.
+///
+/// This structure holds the final, localized geometry that the layout engine determined for a node.
+/// You should query this when translating abstract UI nodes into tangible render primitives, allowing
+/// you to know exactly where on the screen a widget belongs and how much space it commands.
+///
+/// ## Examples
+///
+/// ```
+/// use layout_engine::ComputedLayout;
+///
+/// let bounds = ComputedLayout {
+///     x: 15.0,
+///     y: 20.0,
+///     width: 100.0,
+///     height: 50.0,
+/// };
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ComputedLayout {
+    /// The final, absolute or relative horizontal offset computed by Taffy.
     pub x: f32,
+    /// The final, absolute or relative vertical offset computed by Taffy.
     pub y: f32,
+    /// The final horizontal size required to encompass all children and margins.
     pub width: f32,
+    /// The final vertical size required to encompass all children and margins.
     pub height: f32,
 }
 

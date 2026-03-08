@@ -65,6 +65,23 @@ pub struct StrokeMatcher {
 }
 
 impl StrokeMatcher {
+    /// Constructs a new `StrokeMatcher` configured to listen for path data generated while holding
+    /// the specified mouse button.
+    ///
+    /// You should use this when you need gesture-driven interaction (e.g., swiping a right-click or
+    /// drawing a circle with the middle mouse button). It automatically starts collecting path points
+    /// when the trigger button is pressed and analyzes the stroke on release, abstracting away the math
+    /// required to recognize specific spatial patterns.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use input_engine::StrokeMatcher;
+    /// use plat_core::MouseButton;
+    ///
+    /// // Listen for user gestures drawn using the right mouse button
+    /// let _matcher = StrokeMatcher::new(MouseButton::Right);
+    /// ```
     pub fn new(trigger_button: MouseButton) -> Self {
         Self {
             trigger_button,
