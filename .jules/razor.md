@@ -44,6 +44,9 @@
 **Saved:** ~30 lines of duplicate boilerplate, removed a single-use trait.
 
 ## [Reduction]
+**Bloat:** Single-implementation traits `RenderBackend` and `A11yBridge`
+**Cut:** Removed the traits and moved their methods directly to the concrete implementations (`WgpuBackend` and `AccessKitBridge`), following YAGNI and the "One-Time Trait" principle.
+**Saved:** 2 trait definition files simplified, removed 25+ lines of unnecessary abstraction, simplified usage in ~15 other files.
 **Bloat:** `HasBackdropMaterial` trait
 **Cut:** Replaced with concrete methods on `Window` and `WindowImpl`
 **Saved:** 1 trait definition and several unused imports

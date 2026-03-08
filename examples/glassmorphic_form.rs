@@ -11,8 +11,7 @@ use plat_core::{
     Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
 use render_engine::{
-    Color, NodeContent, NodeId, Paint, Scene, SceneNode, TextContent,
-    backend::{RenderBackend, WgpuBackend},
+    Color, NodeContent, NodeId, Paint, Scene, SceneNode, TextContent, backend::WgpuBackend,
 };
 use style_engine::{
     ColorStop, Effect, ImageFill, ImageId, ImageScaleMode, LinearGradient, Paint as StylePaint,

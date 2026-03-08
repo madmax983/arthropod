@@ -5,7 +5,6 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use render_engine::Scene;
-use render_engine::backend::RenderBackend;
 use std::io;
 use std::time::Duration;
 

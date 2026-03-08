@@ -6,7 +6,6 @@ use ratatui::{
     style::{Color as TuiColor, Style, Stylize},
     widgets::{Block, Borders, Paragraph},
 };
-use render_engine::backend::RenderBackend;
 use render_engine::{Color, NodeContent, RendererError, Scene};
 use std::io::Stdout;
 
@@ -73,8 +72,8 @@ fn map_color(color: Color) -> TuiColor {
     TuiColor::Rgb(r, g, b)
 }
 
-impl<B: Backend> RenderBackend for TuiBackend<B> {
-    fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
+impl<B: Backend> TuiBackend<B> {
+    pub fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
         let clear_color = self.clear_color; // Copy for closure
 
         self.terminal
@@ -154,12 +153,12 @@ impl<B: Backend> RenderBackend for TuiBackend<B> {
         Ok(())
     }
 
-    fn resize(&mut self, width: u32, height: u32) {
+    pub fn resize(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
     }
 
-    fn set_clear_color(&mut self, color: Color) {
+    pub fn set_clear_color(&mut self, color: Color) {
         self.clear_color = color;
     }
 }

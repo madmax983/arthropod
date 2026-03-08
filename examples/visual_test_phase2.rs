@@ -19,8 +19,7 @@ use plat_core::{
 };
 use render_engine::{
     Color, ColorStop, CornerRadii, NodeContent, NodeId, Paint, Scene, SceneNode, StrokeStyle,
-    VisualStyle,
-    backend::{RenderBackend, WgpuBackend},
+    VisualStyle, backend::WgpuBackend,
 };
 
 // Import gradient types, StrokeAlign, and TextContent from style_engine

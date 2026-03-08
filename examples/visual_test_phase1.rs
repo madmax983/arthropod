@@ -16,8 +16,7 @@ use plat_core::{
     WindowId,
 };
 use render_engine::{
-    Color, CornerRadii, NodeContent, Scene, SceneNode, VisualStyle,
-    backend::{RenderBackend, WgpuBackend},
+    Color, CornerRadii, NodeContent, Scene, SceneNode, VisualStyle, backend::WgpuBackend,
 };
 
 struct VisualTest {

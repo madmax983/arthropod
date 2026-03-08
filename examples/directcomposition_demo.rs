@@ -24,10 +24,7 @@ use plat_core::{
     Application, BackdropMaterial, Compositor, ControlFlow, Event, EventLoop, Rect, Size, Window,
     WindowConfig, WindowEvent, WindowId,
 };
-use render_engine::{
-    Color, NodeContent, Scene, SceneNode,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, NodeContent, Scene, SceneNode, backend::WgpuBackend};
 
 const SIDEBAR_WIDTH: f32 = 250.0;
 

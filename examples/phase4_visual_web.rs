@@ -34,10 +34,7 @@ mod wasm_app {
         Application, ControlFlow, ElementState, Event, EventLoop, Key, Size, Window, WindowConfig,
         WindowEvent, WindowId,
     };
-    use render_engine::{
-        Color, Scene,
-        backend::{RenderBackend, WgpuBackend},
-    };
+    use render_engine::{Color, Scene, backend::WgpuBackend};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::spawn_local;
     use web_sys::console;

@@ -27,10 +27,7 @@ use plat_core::{
     Application, BackdropMaterial, ControlFlow, ElementState, Event, EventLoop, Key, MouseButton,
     Rect, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
-use render_engine::{
-    Color, NodeContent, NodeId, Scene, SceneNode,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode, backend::WgpuBackend};
 use theme_engine::{DesignTokens, SystemTheme};
 
 /// IDs returned from scene construction for interactive elements

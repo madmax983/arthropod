@@ -1,5 +1,4 @@
 use ratatui::backend::TestBackend;
-use render_engine::backend::RenderBackend;
 use render_engine::{Color, Scene};
 use tui_renderer::TuiBackend;
 

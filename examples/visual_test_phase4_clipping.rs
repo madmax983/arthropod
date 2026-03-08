@@ -1,10 +1,7 @@
 use plat_core::{
     Application, ControlFlow, Event, EventLoop, Size, Window, WindowConfig, WindowEvent, WindowId,
 };
-use render_engine::{
-    Color, Scene,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, Scene, backend::WgpuBackend};
 
 #[path = "phase4_visual_scenes.rs"]
 mod phase4_visual_scenes;

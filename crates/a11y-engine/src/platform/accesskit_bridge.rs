@@ -4,7 +4,6 @@
 //! to AccessKit's platform-specific format.
 
 use crate::node::{A11yId, A11yNode, Role};
-use crate::platform::A11yBridge;
 use crate::tree::A11yTree;
 use accesskit::{Node, NodeId as AccessKitNodeId, TreeUpdate};
 use std::sync::{Arc, Mutex};
@@ -93,17 +92,20 @@ impl AccessKitBridge {
     }
 }
 
-impl A11yBridge for AccessKitBridge {
-    fn update_node(&mut self, _id: A11yId) {
+impl AccessKitBridge {
+    /// Update a node that has changed (or is new)
+    pub fn update_node(&mut self, _id: A11yId) {
         // Updates will be batched and sent via TreeUpdate
         // Individual updates just mark nodes as dirty in the tree
     }
 
-    fn remove_node(&mut self, _id: A11yId) {
+    /// Remove a node from the platform tree
+    pub fn remove_node(&mut self, _id: A11yId) {
         // Removal handled via TreeUpdate
     }
 
-    fn focus_node(&mut self, _id: A11yId) {
+    /// Set navigation focus to a specific node
+    pub fn focus_node(&mut self, _id: A11yId) {
         // Focus changes sent via TreeUpdate
     }
 }

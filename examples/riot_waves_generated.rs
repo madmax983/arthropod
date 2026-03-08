@@ -14,10 +14,7 @@ use plat_core::{
     Application, ControlFlow, ElementState, Event, EventLoop, MouseButton, Size, Window,
     WindowConfig, WindowEvent, WindowId,
 };
-use render_engine::{
-    NodeId,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{NodeId, backend::WgpuBackend};
 use serde_json::Value as JsonValue;
 use style_engine::ImageId;
 

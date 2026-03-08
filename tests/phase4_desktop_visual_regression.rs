@@ -8,7 +8,7 @@ use plat_core::{EventLoop, Rect, Size, WindowConfig};
 use render_engine::backend::wgpu::effects::composite_blend_over;
 use render_engine::{
     BlendMode, Color, NodeContent, Scene, SceneNode, VisualStyle,
-    backend::{RenderBackend, WgpuBackend},
+    backend::{WgpuBackend},
 };
 
 #[path = "../examples/phase4_visual_scenes.rs"]

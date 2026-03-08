@@ -2,10 +2,7 @@ use std::path::PathBuf;
 
 use arthropod_test::visual_test::save_image;
 use plat_core::{EventLoop, Size, WindowConfig};
-use render_engine::{
-    Color,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, backend::WgpuBackend};
 
 #[path = "phase4_visual_scenes.rs"]
 mod phase4_visual_scenes;

@@ -10,7 +10,7 @@ use flux_state::Runtime;
 use plat_core::{EventLoop, Window, WindowConfig};
 use render_engine::{
     NodeId,
-    backend::{PrimitiveInstance, RenderBackend, WgpuBackend},
+    backend::{PrimitiveInstance, WgpuBackend},
 };
 use std::sync::Arc;
 use thiserror::Error;

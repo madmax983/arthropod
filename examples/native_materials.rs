@@ -29,10 +29,7 @@ use plat_core::{
     Application, BackdropMaterial, ControlFlow, Event, EventLoop, Rect, Size, Window, WindowConfig,
     WindowEvent, WindowId,
 };
-use render_engine::{
-    Color, NodeContent, Scene, SceneNode,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, NodeContent, Scene, SceneNode, backend::WgpuBackend};
 use theme_engine::{DesignTokens, SystemTheme};
 
 /// Application state for the native materials demo

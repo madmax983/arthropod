@@ -466,9 +466,10 @@ impl WgpuBackend {
     }
 }
 
-impl super::RenderBackend for WgpuBackend {
+impl WgpuBackend {
+    /// Render a scene.
     #[instrument(skip(self, scene))]
-    fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
+    pub fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
         let _span = span!(Level::TRACE, "render_frame").entered();
 
         let mut executor = MultipassRenderer {
@@ -561,11 +562,13 @@ impl super::RenderBackend for WgpuBackend {
         Ok(())
     }
 
-    fn resize(&mut self, width: u32, height: u32) {
+    /// Resize the rendering surface.
+    pub fn resize(&mut self, width: u32, height: u32) {
         self.context.resize(width, height);
     }
 
-    fn set_clear_color(&mut self, color: Color) {
+    /// Set the clear color.
+    pub fn set_clear_color(&mut self, color: Color) {
         self.context.clear_color = color;
     }
 }

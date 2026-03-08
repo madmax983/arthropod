@@ -8,10 +8,7 @@ use layout_engine::LayoutConstraints;
 use plat_core::{
     Application, ControlFlow, Event, EventLoop, Size, WindowConfig, WindowEvent, WindowId,
 };
-use render_engine::{
-    Color, NodeContent, Scene,
-    backend::{RenderBackend, WgpuBackend},
-};
+use render_engine::{Color, NodeContent, Scene, backend::WgpuBackend};
 use std::cell::RefCell;
 use std::sync::Arc;
 use widget_core::{WidgetBoxed, WidgetContext};

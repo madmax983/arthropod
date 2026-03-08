@@ -24,8 +24,7 @@ mod wasm_app {
         WindowConfig, WindowEvent, WindowId,
     };
     use render_engine::{
-        Color, NodeContent, Scene, SceneNode, TextContent, VisualStyle,
-        backend::{RenderBackend, WgpuBackend},
+        Color, NodeContent, Scene, SceneNode, TextContent, VisualStyle, backend::WgpuBackend,
     };
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::spawn_local;

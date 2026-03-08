@@ -58,8 +58,7 @@ pub use flux_state::{Computed, Effect, Runtime, Signal, WriteSignal};
 
 // Rendering
 pub use render_engine::{
-    Color, NodeContent, NodeId, Scene, SceneNode, Transform2D, Vec2,
-    backend::{RenderBackend, WgpuBackend},
+    Color, NodeContent, NodeId, Scene, SceneNode, Transform2D, Vec2, backend::WgpuBackend,
 };
 
 // Theme engine
