@@ -90,3 +90,6 @@
 **2025-02-17 - Supply Chain Attack Surface Reduction**
 **Threat:** Heavy dependencies (`image`, `scraper`) by default pulled in dozens of complex and unmaintained codecs/parsers (e.g., `fxhash`, `paste` via `ravif`/`metal`), acting as a massive attack surface for deserialization bombs and triggering `cargo audit` failures.
 **Defense:** Disabled default features in `crates/arthropod-test/Cargo.toml` (`image`) and workspace `Cargo.toml` (`scraper`), explicitly opting in only to `png` and `jpeg` for testing, stripping unmaintained transitive dependencies.
+**2026-03-08 - Update scraper to mitigate fxhash RUSTSEC-2025-0057
+**Threat:** The `fxhash` crate is unmaintained and susceptible to known vulnerabilities (RUSTSEC-2025-0057), which poses a supply-chain risk since it was pulled in via the `scraper` dependency.
+**Defense:** Updated the `scraper` crate to `0.25.0`, eliminating `fxhash` from the dependency tree and removing the supply-chain vulnerability risk.
