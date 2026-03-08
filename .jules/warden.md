@@ -86,3 +86,7 @@
 **2024-05-17 - Missing SAFETY Documentation in unsafe Blocks**
 **Threat:** The codebase contained multiple undocumented `unsafe` blocks. Undocumented `unsafe` code allows Undefined Behavior (UB) because it lacks formal safety proofs.
 **Defense:** Audited the `unsafe` blocks across `crates/plat-core/src/platform/macos.rs`, `crates/plat-core/src/compositor.rs`, `crates/arthropod/src/app/core.rs`, `crates/render-engine/src/backend/wgpu/mod.rs`, and `crates/render-engine/src/backend/wgpu/context.rs`. Added formal `// SAFETY:` proofs explaining why the specific invariants are upheld before each `unsafe` block.
+
+**2025-02-17 - Supply Chain Attack Surface Reduction**
+**Threat:** Heavy dependencies (`image`, `scraper`) by default pulled in dozens of complex and unmaintained codecs/parsers (e.g., `fxhash`, `paste` via `ravif`/`metal`), acting as a massive attack surface for deserialization bombs and triggering `cargo audit` failures.
+**Defense:** Disabled default features in `crates/arthropod-test/Cargo.toml` (`image`) and workspace `Cargo.toml` (`scraper`), explicitly opting in only to `png` and `jpeg` for testing, stripping unmaintained transitive dependencies.

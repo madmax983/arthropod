@@ -29,6 +29,8 @@ impl CompositionDevice {
         let dxgi_device: IDXGIDevice = unsafe { create_dxgi_device()? };
 
         // SAFETY: The `dxgi_device` is valid, and COM is properly initialized per the function's requirements.
+        // DCompositionCreateDevice3 safely creates a device from the provided IDXGIDevice
+        // and returns a reference-counted IDCompositionDesktopDevice.
         let device: IDCompositionDesktopDevice =
             unsafe { DCompositionCreateDevice3(&dxgi_device)? };
 

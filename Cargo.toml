@@ -209,7 +209,7 @@ arthropod-mcp = { path = "crates/arthropod-mcp" }
 arthropod-test = { path = "crates/arthropod-test" }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
-scraper = "0.23"
+scraper = { version = "0.23", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"

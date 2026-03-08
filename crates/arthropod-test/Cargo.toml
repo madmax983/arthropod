@@ -15,7 +15,7 @@ renderdoc = "0.11"
 pollster.workspace = true
 
 # Image processing for visual regression tests
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Observability
 tracing.workspace = true
