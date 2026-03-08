@@ -302,12 +302,20 @@ fn render_details_panel(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &G
         .filter(|(_, target)| *target == node.id)
         .map(|(source, _)| {
             let src_node = snapshot.nodes.iter().find(|n| n.id == *source);
-            let label = if let Some(n) = src_node {
-                n.label.clone()
+            if let Some(n) = src_node {
+                ListItem::new(Line::from(vec![
+                    Span::styled("← ", Style::default().fg(Color::DarkGray)),
+                    Span::raw(&n.label),
+                ]))
             } else {
-                format!("Unknown({:?})", source.0)
-            };
-            ListItem::new(format!("← {}", label))
+                ListItem::new(Line::from(vec![
+                    Span::styled("← ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("Unknown Node (ID: {})", source.0),
+                        Style::default().fg(Color::Red),
+                    ),
+                ]))
+            }
         })
         .collect();
 
@@ -326,12 +334,20 @@ fn render_details_panel(f: &mut Frame, area: Rect, node: &NodeInfo, snapshot: &G
         .filter(|(source, _)| *source == node.id)
         .map(|(_, target)| {
             let target_node = snapshot.nodes.iter().find(|n| n.id == *target);
-            let label = if let Some(n) = target_node {
-                n.label.clone()
+            if let Some(n) = target_node {
+                ListItem::new(Line::from(vec![
+                    Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw(&n.label),
+                ]))
             } else {
-                format!("Unknown({:?})", target.0)
-            };
-            ListItem::new(format!("→ {}", label))
+                ListItem::new(Line::from(vec![
+                    Span::styled("→ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("Unknown Node (ID: {})", target.0),
+                        Style::default().fg(Color::Red),
+                    ),
+                ]))
+            }
         })
         .collect();
 
@@ -364,11 +380,16 @@ fn render_status_bar(f: &mut Frame, area: Rect, snapshot: &GraphSnapshot) {
         .count();
 
     let text = Line::from(vec![
-        Span::raw(format!(" Total: {} | ", total)),
         Span::styled(
-            format!("Stale: {} | ", stale),
+            " Total Nodes: ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(format!("{} | ", total)),
+        Span::styled("Stale: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} | ", stale),
             if stale > 0 {
-                Style::default().fg(Color::Red)
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             },
@@ -388,6 +409,7 @@ fn render_status_bar(f: &mut Frame, area: Rect, snapshot: &GraphSnapshot) {
     ]);
 
     let paragraph = Paragraph::new(text)
+        .alignment(Alignment::Center)
         .style(Style::default().bg(Color::DarkGray).fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, area);
