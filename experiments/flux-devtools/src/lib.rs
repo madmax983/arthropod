@@ -51,7 +51,8 @@ struct App {
 
 impl App {
     fn new(runtime: Arc<Runtime>) -> Self {
-        let snapshot = runtime.inspect_graph();
+        let mut snapshot = runtime.inspect_graph();
+        snapshot.nodes.sort_by_key(|n| n.id);
         let mut list_state = ListState::default();
         if !snapshot.nodes.is_empty() {
             list_state.select(Some(0));
