@@ -6,13 +6,10 @@ license.workspace = true
 description = "Testing and debugging utilities for Arthropod"
 
 [dependencies]
-render-engine = { path = "../render-engine" }
-plat-core = { path = "../plat-core" }
 
 # GPU debugging
 wgpu.workspace = true
 renderdoc = "0.11"
-pollster.workspace = true
 
 # Image processing for visual regression tests
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

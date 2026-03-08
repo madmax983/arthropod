@@ -8,7 +8,6 @@ description = "Core widget system for Arthropod GUI framework"
 
 [dependencies]
 render-engine = { path = "../render-engine" }
-text-engine = { path = "../text-engine" }
 layout-engine = { path = "../layout-engine" }
 flux-state = { path = "../flux-state" }
 input-engine = { path = "../input-engine" }

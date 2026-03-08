@@ -11,7 +11,6 @@ arthropod-ecs = { path = "../arthropod-ecs" }
 render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 plat-core = { path = "../plat-core" }
-arthropod-test = { path = "../arthropod-test" }
 
 # MCP SDK
 rmcp = { version = "0.13", features = ["server"] }
@@ -27,7 +26,6 @@ schemars = "1"
 
 # Error handling
 anyhow = "1.0"
-thiserror.workspace = true
 
 # Logging
 tracing.workspace = true

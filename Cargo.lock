@@ -13,7 +13,6 @@ dependencies = [
  "log",
  "plat-core",
  "render-engine",
- "thiserror 2.0.18",
  "windows",
  "windows-core",
 ]
@@ -105,7 +104,6 @@ checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 name = "anim-graph"
 version = "0.1.0"
 dependencies = [
- "log",
  "render-engine",
 ]
 
@@ -198,7 +196,6 @@ dependencies = [
  "layout-engine",
  "log",
  "plat-core",
- "pollster",
  "render-engine",
  "serde",
  "serde_json",
@@ -230,7 +227,6 @@ name = "arthropod-examples"
 version = "0.1.0"
 dependencies = [
  "a11y-engine",
- "anim-graph",
  "anyhow",
  "arthropod",
  "arthropod-ecs",
@@ -250,7 +246,6 @@ dependencies = [
  "serde",
  "serde_json",
  "style-engine",
- "text-engine",
  "theme-engine",
  "tracing",
  "tracing-subscriber",
@@ -267,7 +262,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arthropod-ecs",
- "arthropod-test",
  "bevy_ecs",
  "criterion",
  "crossterm 0.28.1",
@@ -283,7 +277,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -295,9 +288,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "image",
- "plat-core",
- "pollster",
- "render-engine",
  "renderdoc",
  "tracing",
  "tracing-subscriber",
@@ -1404,7 +1394,6 @@ dependencies = [
 name = "flux-state"
 version = "0.1.0"
 dependencies = [
- "log",
  "loom",
  "proptest",
  "serde",
@@ -2223,10 +2212,8 @@ dependencies = [
  "criterion",
  "flux-state",
  "indexmap",
- "log",
  "plat-core",
  "render-engine",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2387,7 +2374,6 @@ name = "layout-engine"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "glam",
  "taffy",
 ]
 
@@ -2687,7 +2673,6 @@ version = "0.1.0"
 dependencies = [
  "anim-graph",
  "flux-state",
- "log",
 ]
 
 [[package]]
@@ -4278,9 +4263,7 @@ dependencies = [
  "arthropod",
  "arthropod-ecs",
  "bevy_ecs",
- "flux-state",
  "glam",
- "log",
  "plat-core",
  "render-engine",
 ]
@@ -4557,13 +4540,10 @@ version = "0.1.0"
 dependencies = [
  "cosmic-text",
  "criterion",
- "glam",
  "js-sys",
  "pollster",
  "rayon",
  "thiserror 2.0.18",
- "unicode-bidi",
- "unicode-segmentation",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -4944,18 +4924,11 @@ checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
 name = "tui-renderer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "arthropod-ecs",
  "crossterm 0.28.1",
- "env_logger",
- "flux-state",
- "glam",
- "log",
  "plat-core",
  "ratatui",
  "render-engine",
  "style-engine",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5542,7 +5515,6 @@ dependencies = [
  "layout-engine",
  "plat-core",
  "render-engine",
- "text-engine",
  "theme-engine",
  "widget-macros",
 ]

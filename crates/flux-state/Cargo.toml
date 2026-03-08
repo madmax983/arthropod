@@ -9,7 +9,6 @@ description = "Reactive state management for Arthropod GUI framework"
 nova = ["dep:serde"]
 
 [dependencies]
-log.workspace = true
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]

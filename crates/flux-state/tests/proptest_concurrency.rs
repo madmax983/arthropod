@@ -1,4 +1,4 @@
-use flux_state::{Computed, Effect, Runtime, Signal};
+use flux_state::{Effect, Runtime, Signal};
 use proptest::prelude::*;
 use std::sync::Arc;
 use std::thread;

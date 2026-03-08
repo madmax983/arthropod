@@ -7,4 +7,3 @@ description = "Animation system for Arthropod GUI framework"
 
 [dependencies]
 render-engine = { path = "../render-engine" }
-log.workspace = true

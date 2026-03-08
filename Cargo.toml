@@ -188,10 +188,8 @@ nova = ["arthropod/nova"]
 [dependencies]
 plat-core = { path = "crates/plat-core" }
 render-engine = { path = "crates/render-engine" }
-anim-graph = { path = "crates/anim-graph" }
 widget-core = { path = "crates/widget-core" }
 flux-state = { path = "crates/flux-state" }
-text-engine = { path = "crates/text-engine" }
 style-engine = { path = "crates/style-engine" }
 glam = "0.29"
 arthropod-ecs = { path = "crates/arthropod-ecs" }

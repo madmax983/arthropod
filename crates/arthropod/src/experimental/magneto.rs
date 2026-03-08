@@ -73,7 +73,7 @@ pub fn register_magneto(app: &mut crate::App) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use render_engine::{Color, NodeContent, Rect, SceneNode, Transform2D, Vec2};
+    use render_engine::{NodeContent, Rect, SceneNode, Transform2D};
 
     #[test]
     fn test_magnetic_pull() {

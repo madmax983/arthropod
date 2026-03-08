@@ -8,9 +8,6 @@ description = "Text shaping and rendering engine for Arthropod GUI framework"
 
 [dependencies]
 cosmic-text = "0.12"
-unicode-bidi = "0.3"
-unicode-segmentation = "1.12"
-glam = "0.29"
 rayon = "1.11"
 thiserror = "2.0"
 

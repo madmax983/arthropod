@@ -221,7 +221,7 @@ mod tests {
             &mut validators,
         );
 
-        assert_eq!(form_states.get(&form_id).unwrap().is_valid, false);
+        assert!(!form_states.get(&form_id).unwrap().is_valid);
         let errors = get_form_field_errors(form_id, &form_states, &validators);
         assert_eq!(errors.get("username"), Some(&"Too short".to_string()));
 
@@ -238,7 +238,7 @@ mod tests {
             &text_input_states,
             &mut validators,
         );
-        assert_eq!(form_states.get(&form_id).unwrap().is_valid, true);
+        assert!(form_states.get(&form_id).unwrap().is_valid);
         let errors = get_form_field_errors(form_id, &form_states, &validators);
         assert!(errors.is_empty());
     }
@@ -322,8 +322,8 @@ mod tests {
             &mut validators,
         );
 
-        assert_eq!(*submit_called.lock().unwrap(), false);
-        assert_eq!(form_states.get(&form_id).unwrap().is_valid, false);
+        assert!(!(*submit_called.lock().unwrap()));
+        assert!(!form_states.get(&form_id).unwrap().is_valid);
         assert_eq!(form_states.get(&form_id).unwrap().submit_error, None);
 
         // Fix the input
@@ -341,8 +341,8 @@ mod tests {
             &mut validators,
         );
 
-        assert_eq!(*submit_called.lock().unwrap(), true);
-        assert_eq!(form_states.get(&form_id).unwrap().is_valid, true);
+        assert!(*submit_called.lock().unwrap());
+        assert!(form_states.get(&form_id).unwrap().is_valid);
         assert_eq!(
             form_states.get(&form_id).unwrap().submit_error,
             Some("Server error".to_string())
