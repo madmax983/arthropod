@@ -25,3 +25,7 @@
 ## Removed redundant clone of `style` in multipass executor
 **Learning:** `style.as_ref().clone()` was unconditionally copying a potentially large `VisualStyle` struct in a hot loop in `multipass_executor.rs`.
 **Action:** Changed to `style.as_ref()` and pass a reference to `collect_style_batches_for_bounds` and use fields natively to avoid a heap allocation per frame per node.
+
+**Pre-allocate arrays and reuse vector buffers in hot loops**
+**Learning:** `collect_style_batches_for_bounds` in `wgpu/instance_collector.rs` was allocating two vectors (`Vec<PrimitiveInstance>` and `Vec<PathBatch>`) for every styled node requiring multipass rendering per frame.
+**Action:** Changed the signature to accept `instances: &mut Vec<PrimitiveInstance>` and `path_batches: &mut Vec<PathBatch>` from the caller (`MultipassRenderer`), allowing the same vector capacities to be cleared and reused across all nodes, removing a significant number of per-frame heap allocations.

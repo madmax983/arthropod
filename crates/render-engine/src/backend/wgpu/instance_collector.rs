@@ -729,9 +729,11 @@ pub(crate) fn collect_style_batches_for_bounds(
     effective_opacity: f32,
     render_bounds: plat_core::Rect,
     node_transform: Transform2D,
-) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
-    let mut instances = Vec::new();
-    let mut path_batches = Vec::new();
+    instances: &mut Vec<PrimitiveInstance>,
+    path_batches: &mut Vec<PathBatch>,
+) {
+    instances.clear();
+    path_batches.clear();
 
     if style.fill_geometry.is_some() {
         let mut cache: Option<&mut TessellationCache> = Some(&mut *ctx.tessellation_cache);
@@ -742,7 +744,7 @@ pub(crate) fn collect_style_batches_for_bounds(
             effective_opacity,
             &mut cache,
             &mut interner,
-            &mut path_batches,
+            path_batches,
         );
     } else if style
         .fills
@@ -755,7 +757,7 @@ pub(crate) fn collect_style_batches_for_bounds(
             &render_bounds,
             effective_opacity,
             &mut cache,
-            &mut path_batches,
+            path_batches,
         );
     } else {
         let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
@@ -825,9 +827,7 @@ pub(crate) fn collect_style_batches_for_bounds(
         );
     }
 
-    apply_node_transform_to_instances(&mut instances, node_transform);
-
-    (instances, path_batches)
+    apply_node_transform_to_instances(instances, node_transform);
 }
 
 #[cfg(test)]

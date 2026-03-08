@@ -130,6 +130,9 @@ impl<'a> MultipassRenderer<'a> {
         let frame_key =
             RenderTargetKey::new(self.context.config.width, self.context.config.height, false);
 
+        let mut instances_buffer = Vec::new();
+        let mut path_batches_buffer = Vec::new();
+
         for &node_id in multipass_node_ids {
             let Some(node) = scene.get_node(node_id) else {
                 continue;
@@ -231,20 +234,22 @@ impl<'a> MultipassRenderer<'a> {
                 queue: &self.context.queue,
             };
 
-            let (node_instances, node_path_batches) = collect_style_batches_for_bounds(
+            collect_style_batches_for_bounds(
                 &mut batch_ctx,
                 style,
                 effective_opacity,
                 render_bounds,
                 node.transform,
+                &mut instances_buffer,
+                &mut path_batches_buffer,
             );
 
             if background_blur_radius.is_none() {
                 self.draw_batches_to_view(
                     &src_view,
                     wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    &node_instances,
-                    &node_path_batches,
+                    &instances_buffer,
+                    &path_batches_buffer,
                     None,
                 );
             } else {
@@ -279,8 +284,8 @@ impl<'a> MultipassRenderer<'a> {
                 self.draw_batches_to_view(
                     surface_view,
                     wgpu::LoadOp::Load,
-                    &node_instances,
-                    &node_path_batches,
+                    &instances_buffer,
+                    &path_batches_buffer,
                     scissor,
                 );
             }
@@ -334,6 +339,9 @@ impl<'a> MultipassRenderer<'a> {
         node_id: crate::NodeId,
         surface_view: &wgpu::TextureView,
     ) {
+        let mut instances_buffer = Vec::new();
+        let mut path_batches_buffer = Vec::new();
+
         let Some(node) = scene.get_node(node_id) else {
             return;
         };
@@ -368,18 +376,20 @@ impl<'a> MultipassRenderer<'a> {
                     glyph_texture: self.glyph_texture,
                     queue: &self.context.queue,
                 };
-                let (instances, path_batches) = collect_style_batches_for_bounds(
+                collect_style_batches_for_bounds(
                     &mut batch_ctx,
                     style,
                     effective_opacity,
                     render_bounds,
                     node.transform,
+                    &mut instances_buffer,
+                    &mut path_batches_buffer,
                 );
                 self.draw_batches_to_view(
                     surface_view,
                     wgpu::LoadOp::Load,
-                    &instances,
-                    &path_batches,
+                    &instances_buffer,
+                    &path_batches_buffer,
                     scissor,
                 );
             }
