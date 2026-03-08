@@ -647,6 +647,11 @@ impl WidgetContext {
         &self.reactive_text_states
     }
 
+    /// Extracts derived text states (`Computed<String>`) configured by widgets.
+    ///
+    /// The app shell pulls these states and injects them into the `arthropod-ecs` Reactive Text component.
+    /// This guarantees that when a source `Signal` changes, the UI will correctly recalculate the derived
+    /// layout and render string automatically.
     pub fn computed_text_states(&self) -> &HashMap<NodeId, ComputedTextState> {
         &self.computed_text_states
     }

@@ -15,6 +15,21 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
+    /// Creates a new interactive Checkbox wired to a reactive state source.
+    ///
+    /// The checkbox acts as a controller for the provided `Signal`, instantly writing
+    /// updates when clicked and reacting to external changes.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust,no_run
+    /// # use flux_state::{Runtime, Signal};
+    /// # use widget_core::Checkbox;
+    /// let runtime = Runtime::new();
+    /// let is_agreed = Signal::new(runtime, false);
+    ///
+    /// let widget = Checkbox::new(is_agreed);
+    /// ```
     pub fn new(signal: Signal<bool>) -> Self {
         let (read_signal, write_signal) = signal.split();
         Self {
@@ -25,11 +40,19 @@ impl Checkbox {
         }
     }
 
+    /// Attaches an accessible text label next to the checkbox.
+    ///
+    /// This makes the entire row clickable (toggling the checkbox) and improves UI hierarchy.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
+    /// Locks the checkbox to prevent user interaction.
+    ///
+    /// The state will still visually reflect changes from the underlying `Signal`,
+    /// but the user cannot toggle it via clicks. Useful for read-only modes or
+    /// form conditions that have not yet been met.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self

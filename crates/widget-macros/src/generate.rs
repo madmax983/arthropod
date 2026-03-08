@@ -87,6 +87,14 @@ pub fn generate_main_macro(
         // Syntax: scaffold!(body, [("slot", widget), ("slot2", widget2)]; params)
         // Uses tuple construction for type-safety (no builder loop)
         quote! {
+            #[doc = concat!("Declarative UI macro for constructing a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "This macro provides a clean, ergonomic syntax for building widget trees without deeply nested builder patterns.\n"]
+            #[doc = "It supports passing positional arguments, named children (slots), and configuration flags in any order.\n\n"]
+            #[doc = "## Example\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!("// Assuming `", stringify!(#macro_name), "!` requires a positional value:\n")]
+            #[doc = concat!(stringify!(#macro_name), "!(my_value, disabled, padding: 10.0);\n")]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // Positional + named children array
@@ -116,6 +124,15 @@ pub fn generate_main_macro(
         // Named children macro: array of (name, widget) tuples (for Form-like widgets)
         // Uses tuple construction for type-safety (no builder loop)
         quote! {
+            #[doc = concat!("Declarative Form macro for constructing a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "This macro accepts an array of named child slots, ideal for building forms or structured collections.\n\n"]
+            #[doc = "## Example\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!(stringify!(#macro_name), "!([\n")]
+            #[doc = "    (\"email\", input!(@email_sig)),\n"]
+            #[doc = "    (\"password\", input!(@pass_sig))\n"]
+            #[doc = "]);\n"]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // Named children array only
@@ -134,6 +151,15 @@ pub fn generate_main_macro(
         // Container macro: children array -> tuple construction (one-shot, type-safe)
         // Cannot use builder loop because each .child() call changes the type
         quote! {
+            #[doc = concat!("Declarative Container macro for constructing a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "This macro accepts an array of child widgets, constructing a single type-safe tuple node.\n\n"]
+            #[doc = "## Example\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!(stringify!(#macro_name), "!([\n")]
+            #[doc = "    txt!(\"First Child\"),\n"]
+            #[doc = "    txt!(\"Second Child\")\n"]
+            #[doc = "], gap: 10.0);\n"]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // Children only - construct tuple directly
@@ -151,6 +177,14 @@ pub fn generate_main_macro(
     } else if supports_reactive {
         // Display widget with reactive support
         quote! {
+            #[doc = concat!("Declarative Reactive macro for constructing a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "This macro supports both static values and reactive state bindings via the `@` prefix.\n"]
+            #[doc = "When `@` is used, the macro treats the argument as a `ReadSignal` and auto-wires the widget to update reactively.\n\n"]
+            #[doc = "## Examples\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!("// Static:\n", stringify!(#macro_name), "!( \"Hello\" );\n\n")]
+            #[doc = concat!("// Reactive (assuming `my_sig` is a ReadSignal):\n", stringify!(#macro_name), "!( @my_sig );\n")]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // Reactive: @signal
@@ -179,6 +213,12 @@ pub fn generate_main_macro(
     } else if has_effective_positional {
         // Display widget with positional arg (either from field or positional_type)
         quote! {
+            #[doc = concat!("Declarative macro for constructing a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "Simplifies widget instantiation by replacing chained builder calls with a single macro invocation.\n\n"]
+            #[doc = "## Example\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!(stringify!(#macro_name), "!(my_value, primary);\n")]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // Positional only
@@ -196,6 +236,12 @@ pub fn generate_main_macro(
     } else {
         // Widget with no positional arg (only params/flags)
         quote! {
+            #[doc = concat!("Declarative macro for configuring a [`", stringify!(#struct_name), "`].\n\n")]
+            #[doc = "This macro accepts flags and parameters to customize the widget without requiring a positional argument.\n\n"]
+            #[doc = "## Example\n\n"]
+            #[doc = "```ignore\n"]
+            #[doc = concat!(stringify!(#macro_name), "!(disabled, padding: 8.0);\n")]
+            #[doc = "```\n"]
             #[macro_export]
             macro_rules! #macro_name {
                 // No positional args, just params/flags
@@ -355,6 +401,8 @@ pub fn generate_with_alias(
     let alias_macro = alias.map(|alias_name| {
         let alias_ident = Ident::new(alias_name, Span::call_site());
         quote! {
+            #[doc = concat!("Alias macro for [`", stringify!(#macro_name), "!`].\n\n")]
+            #[doc = "Functions identically to the primary macro but provides an alternative, potentially more semantic name.\n"]
             #[macro_export]
             macro_rules! #alias_ident {
                 ($($tt:tt)*) => {

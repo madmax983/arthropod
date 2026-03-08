@@ -46,13 +46,31 @@ pub struct Button {
     disabled: bool,
 }
 
-/// Button visual style
+/// Visual styling tier for a `Button`.
+///
+/// Use styles to enforce visual hierarchy and guide users to the most important actions.
+///
+/// ## Examples
+///
+/// ```rust,no_run
+/// # use widget_core::{btn, ButtonStyle};
+/// // The primary action on a screen (e.g., "Submit" or "Save").
+/// let submit = btn!("Save", primary);
+///
+/// // Alternative actions (e.g., "Cancel" or "Back").
+/// let cancel = btn!("Cancel", secondary);
+/// ```
 #[derive(Clone, Copy, Default, WidgetEnum)]
 pub enum ButtonStyle {
+    /// The highest emphasis style, rendered with the active system accent color.
+    /// Use this for the main intended action on a screen.
     #[flag]
     Primary,
+    /// A lower emphasis style, rendered with the secondary surface color.
+    /// Use this for alternative or optional actions.
     #[flag]
     Secondary,
+    /// The base, neutral style, rendered with a light surface color.
     #[default]
     Default,
 }
