@@ -41,6 +41,9 @@ pub mod flux_radar;
 pub mod spatial_query;
 
 #[cfg(feature = "nova")]
+pub mod inspector_overlay;
+
+#[cfg(feature = "nova")]
 pub mod magneto;
 
 // --- Stubs for missing features ---
@@ -711,6 +714,36 @@ pub mod spatial_query {
     )]
     pub fn register_spatial_query(_app: &mut crate::App) {
         super::print_missing_feature_warning("spatial_query");
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod inspector_overlay {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `inspector_overlay` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct InspectorOverlayConfig;
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct InspectorOverlayState;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_inspector_overlay(_app: &mut crate::App) {
+        super::print_missing_feature_warning("inspector_overlay");
     }
 }
 
