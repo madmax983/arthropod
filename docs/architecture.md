@@ -178,11 +178,11 @@ classDiagram
         +focus_next()
     }
 
-    class LogicModules {
+    class InputEngine {
         <<Namespace>>
-        +input_logic
-        +form_logic
-        +validation
+        +text
+        +form
+        +focus
     }
 
     class TextInputState {
@@ -193,7 +193,7 @@ classDiagram
 
     Widget ..> WidgetContext : Uses
     WidgetContext "1" *-- "*" TextInputState : Owns
-    WidgetContext ..> LogicModules : Delegates to
+    WidgetContext ..> InputEngine : Delegates to
 ```
 
 ## Key Architectural Decisions
