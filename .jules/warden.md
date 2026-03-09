@@ -93,3 +93,6 @@
 **2026-03-08 - Update scraper to mitigate fxhash RUSTSEC-2025-0057
 **Threat:** The `fxhash` crate is unmaintained and susceptible to known vulnerabilities (RUSTSEC-2025-0057), which poses a supply-chain risk since it was pulled in via the `scraper` dependency.
 **Defense:** Updated the `scraper` crate to `0.25.0`, eliminating `fxhash` from the dependency tree and removing the supply-chain vulnerability risk.
+## 2026-03-08 - [Windows UI Automation Provider Memory Leak]
+**Threat:** `A11Y_PROVIDERS` thread-local hashmap in `crates/plat-core/src/platform/windows.rs` did not clean up the UI Automation Provider upon window destruction (`Drop` of `WindowImpl`). Since HWND keys might be reused by the OS, this caused potential memory leaks, stale provider persistence, and incorrect provider inheritance.
+**Defense:** Added cleanup logic in the `Drop` implementation of `WindowImpl` to cleanly remove the UI Automation provider associated with the specific HWND upon window destruction.

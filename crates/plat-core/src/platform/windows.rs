@@ -337,16 +337,26 @@ impl WindowImpl {
 
 impl Drop for WindowImpl {
     fn drop(&mut self) {
-        // If we initialized COM for DirectComposition, uninitialize it
-        // Must be done before destroying the window to ensure clean teardown
         #[cfg(target_os = "windows")]
-        if self.composition.is_some() {
-            // Drop composition resources first (while COM is still active)
-            self.composition = None;
-            // Now uninitialize COM
-            // SAFETY: COM was initialized via CoInitializeEx during `new`. Cleaning up properly here.
-            unsafe {
-                windows::Win32::System::Com::CoUninitialize();
+        {
+            // Clean up UI Automation provider registration for this HWND to prevent leaks.
+            // When the window is destroyed, its HWND might be reused by the OS.
+            if thread::current().id() == self.thread_id {
+                A11Y_PROVIDERS.with(|providers| {
+                    providers.borrow_mut().remove(&(self.hwnd.0 as isize));
+                });
+            }
+
+            // If we initialized COM for DirectComposition, uninitialize it
+            // Must be done before destroying the window to ensure clean teardown
+            if self.composition.is_some() {
+                // Drop composition resources first (while COM is still active)
+                self.composition = None;
+                // Now uninitialize COM
+                // SAFETY: COM was initialized via CoInitializeEx during `new`. Cleaning up properly here.
+                unsafe {
+                    windows::Win32::System::Com::CoUninitialize();
+                }
             }
         }
 
