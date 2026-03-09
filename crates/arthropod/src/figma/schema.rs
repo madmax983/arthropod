@@ -5,7 +5,7 @@ use layout_engine::{
     FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap, ItemAlignSelf,
 };
 use plat_core::Rect;
-use render_engine::{NodeContent, NodeId, Scene, SceneNode, Transform2D, Vec2, Vec4};
+use render_engine::{NodeId, Transform2D, Vec2, Vec4};
 use serde::Deserialize;
 use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
 use style_engine::{
@@ -15,443 +15,10 @@ use style_engine::{
     TextAlign, TextAlignVertical, TextAutoResize, TextCase, TextContent, TextDecoration,
     TextOverflow, VectorPath, VisualStyle, WindingRule,
 };
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum FigmaImportError {
-    #[error("failed to parse figma json: {0}")]
-    Parse(#[from] serde_json::Error),
-    #[error(
-        "invalid figma json shape: expected an array of nodes or an object with a `nodes` array"
-    )]
-    InvalidDocumentShape,
-}
+use super::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConstraintAxis {
-    Min,
-    Center,
-    Max,
-    Stretch,
-    Scale,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LayoutPositioning {
-    Auto,
-    Absolute,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeTrigger {
-    OnClick,
-    OnHover,
-    OnDrag,
-    AfterTimeout,
-    OnPress,
-    OnKeyDown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeActionKind {
-    Navigate,
-    OpenOverlay,
-    SwapOverlay,
-    CloseOverlay,
-    Back,
-    Url,
-    ScrollTo,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeTransitionKind {
-    Instant,
-    Dissolve,
-    MoveIn,
-    MoveOut,
-    Push,
-    SlideIn,
-    SlideOut,
-    SmartAnimate,
-    ScrollAnimate,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeEasing {
-    Linear,
-    EaseIn,
-    EaseOut,
-    EaseInAndOut,
-    Gentle,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeDirection {
-    Left,
-    Right,
-    Top,
-    Bottom,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PrototypeTransition {
-    pub kind: PrototypeTransitionKind,
-    pub duration_ms: Option<u32>,
-    pub easing: Option<PrototypeEasing>,
-    pub direction: Option<PrototypeDirection>,
-    pub match_layers: Option<bool>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeOverlayPosition {
-    Center,
-    TopLeft,
-    TopCenter,
-    TopRight,
-    BottomLeft,
-    BottomCenter,
-    BottomRight,
-    Manual,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrototypeOverlayBackgroundInteraction {
-    None,
-    CloseOnClickOutside,
-    PassThrough,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PrototypeOverlayConfig {
-    pub position: Option<PrototypeOverlayPosition>,
-    pub background_interaction: Option<PrototypeOverlayBackgroundInteraction>,
-    pub relative_position: Option<(f32, f32)>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImportedConstraints {
-    pub horizontal: ConstraintAxis,
-    pub vertical: ConstraintAxis,
-    pub positioning: LayoutPositioning,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PrototypeEdge {
-    pub from: NodeId,
-    pub to_figma_id: Option<String>,
-    pub trigger: PrototypeTrigger,
-    pub trigger_timeout_ms: Option<u32>,
-    pub action: PrototypeActionKind,
-    pub preserve_scroll_position: bool,
-    pub transition: Option<PrototypeTransition>,
-    pub overlay: Option<PrototypeOverlayConfig>,
-    pub url: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct PrototypeGraph {
-    pub edges: Vec<PrototypeEdge>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImportedComponentKind {
-    Component,
-    ComponentSet,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImportedComponentNode {
-    pub kind: ImportedComponentKind,
-    pub key: Option<String>,
-    pub component_set_id: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImportedInstanceNode {
-    pub component_id: Option<String>,
-    pub main_component_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImportedComponentPropertyType {
-    Variant,
-    Boolean,
-    Text,
-    InstanceSwap,
-    Unknown,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ImportedComponentPropertyValue {
-    Text(String),
-    Bool(bool),
-    Number(f64),
-    NodeRef(String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImportedComponentPropertyDefinition {
-    pub property_type: ImportedComponentPropertyType,
-    pub default_value: Option<ImportedComponentPropertyValue>,
-    pub preferred_values: Vec<ImportedComponentPropertyValue>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImportedComponentPropertyOverride {
-    pub property_type: ImportedComponentPropertyType,
-    pub value: ImportedComponentPropertyValue,
-}
-
-pub struct ImportedFigmaDocument {
-    pub scene: Scene,
-    pub layout_styles: HashMap<NodeId, FlexStyle>,
-    pub constraints: HashMap<NodeId, ImportedConstraints>,
-    pub prototype_graph: PrototypeGraph,
-    pub figma_to_scene: HashMap<String, NodeId>,
-    pub components: HashMap<NodeId, ImportedComponentNode>,
-    pub instances: HashMap<NodeId, ImportedInstanceNode>,
-    pub variant_properties: HashMap<NodeId, HashMap<String, String>>,
-    pub component_property_definitions:
-        HashMap<NodeId, HashMap<String, ImportedComponentPropertyDefinition>>,
-    pub instance_property_overrides:
-        HashMap<NodeId, HashMap<String, ImportedComponentPropertyOverride>>,
-    pub resolved_instance_properties:
-        HashMap<NodeId, HashMap<String, ImportedComponentPropertyValue>>,
-}
-
-pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
-    let document = parse_figma_document(json)?;
-
-    let mut scene = Scene::new();
-    let root = scene.root();
-    let mut figma_to_scene = HashMap::new();
-    let mut layout_styles = HashMap::new();
-    let mut constraints_map = HashMap::new();
-    let mut components = HashMap::new();
-    let mut instances = HashMap::new();
-    let mut variant_properties = HashMap::new();
-    let mut component_property_definitions = HashMap::new();
-    let mut instance_property_overrides = HashMap::new();
-    let mut pending: Vec<usize> = (0..document.nodes.len()).collect();
-
-    while !pending.is_empty() {
-        let mut progressed = false;
-        let mut unresolved = Vec::new();
-
-        for index in pending {
-            let node = &document.nodes[index];
-            let parent = match &node.parent_id {
-                Some(parent_id) => figma_to_scene.get(&parent_id.as_key()).copied(),
-                None => Some(root),
-            };
-
-            if let Some(parent_id) = parent {
-                let bounds = node.resolved_bounds();
-                let mut scene_node = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(node.to_visual_style()),
-                });
-                scene_node.bounds = bounds;
-                scene_node.opacity = node.to_node_opacity();
-                if let Some(transform) = node.to_node_transform(bounds) {
-                    scene_node.transform = transform;
-                }
-                let scene_id = scene.add_node(parent_id, scene_node);
-
-                figma_to_scene.insert(node.id.as_key(), scene_id);
-                layout_styles.insert(scene_id, node.to_flex_style(bounds));
-                constraints_map.insert(scene_id, node.to_constraints());
-                if let Some(component) = node.to_component_node() {
-                    components.insert(scene_id, component);
-                }
-                if let Some(instance) = node.to_instance_node() {
-                    instances.insert(scene_id, instance);
-                }
-                let variants = node.to_variant_properties();
-                if !variants.is_empty() {
-                    variant_properties.insert(scene_id, variants);
-                }
-                let definitions = node.to_component_property_definitions();
-                if !definitions.is_empty() {
-                    component_property_definitions.insert(scene_id, definitions);
-                }
-                let overrides = node.to_instance_property_overrides();
-                if !overrides.is_empty() {
-                    instance_property_overrides.insert(scene_id, overrides);
-                }
-                progressed = true;
-            } else {
-                unresolved.push(index);
-            }
-        }
-
-        if !progressed {
-            for index in unresolved {
-                let node = &document.nodes[index];
-                let bounds = node.resolved_bounds();
-                let mut scene_node = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(node.to_visual_style()),
-                });
-                scene_node.bounds = bounds;
-                scene_node.opacity = node.to_node_opacity();
-                if let Some(transform) = node.to_node_transform(bounds) {
-                    scene_node.transform = transform;
-                }
-                let scene_id = scene.add_node(root, scene_node);
-
-                figma_to_scene.insert(node.id.as_key(), scene_id);
-                layout_styles.insert(scene_id, node.to_flex_style(bounds));
-                constraints_map.insert(scene_id, node.to_constraints());
-                if let Some(component) = node.to_component_node() {
-                    components.insert(scene_id, component);
-                }
-                if let Some(instance) = node.to_instance_node() {
-                    instances.insert(scene_id, instance);
-                }
-                let variants = node.to_variant_properties();
-                if !variants.is_empty() {
-                    variant_properties.insert(scene_id, variants);
-                }
-                let definitions = node.to_component_property_definitions();
-                if !definitions.is_empty() {
-                    component_property_definitions.insert(scene_id, definitions);
-                }
-                let overrides = node.to_instance_property_overrides();
-                if !overrides.is_empty() {
-                    instance_property_overrides.insert(scene_id, overrides);
-                }
-            }
-            break;
-        }
-
-        pending = unresolved;
-    }
-
-    let mut prototype_edges = Vec::new();
-    for node in &document.nodes {
-        let Some(from) = figma_to_scene.get(&node.id.as_key()).copied() else {
-            continue;
-        };
-        for interaction in &node.prototype_interactions {
-            let Some((trigger, trigger_timeout_ms)) = interaction.trigger_spec() else {
-                continue;
-            };
-
-            let inherited_transition = interaction.transition_details();
-            let inherited_preserve_scroll = interaction.preserve_scroll_position.unwrap_or(false);
-
-            if interaction.actions.is_empty() {
-                if let Some(edge) = interaction.to_legacy_edge(
-                    from,
-                    trigger,
-                    trigger_timeout_ms,
-                    inherited_transition,
-                    inherited_preserve_scroll,
-                ) {
-                    prototype_edges.push(edge);
-                }
-                continue;
-            }
-
-            for action in &interaction.actions {
-                if let Some(edge) = action.to_edge(
-                    from,
-                    trigger,
-                    trigger_timeout_ms,
-                    inherited_transition.clone(),
-                    inherited_preserve_scroll,
-                ) {
-                    prototype_edges.push(edge);
-                }
-            }
-        }
-    }
-
-    let mut resolved_instance_properties = HashMap::new();
-    let mut component_base_cache = HashMap::new();
-
-    for (instance_node_id, instance_meta) in &instances {
-        if let Some(component_scene_id) = instance_meta
-            .component_id
-            .as_ref()
-            .and_then(|figma_id| figma_to_scene.get(figma_id))
-            .copied()
-        {
-            let base = component_base_cache
-                .entry(component_scene_id)
-                .or_insert_with(|| {
-                    let mut resolved = HashMap::new();
-                    if let Some(definitions) =
-                        component_property_definitions.get(&component_scene_id)
-                    {
-                        for (name, definition) in definitions {
-                            if let Some(default_value) = definition.default_value.clone() {
-                                resolved.insert(name.clone(), default_value);
-                            }
-                        }
-                    }
-
-                    if let Some(component_variants) = variant_properties.get(&component_scene_id) {
-                        for (name, value) in component_variants {
-                            resolved.entry(name.clone()).or_insert_with(|| {
-                                ImportedComponentPropertyValue::Text(value.clone())
-                            });
-                        }
-                    }
-                    resolved
-                });
-
-            if !base.is_empty() {
-                resolved_instance_properties.insert(*instance_node_id, base.clone());
-            }
-        }
-    }
-
-    for (node_id, overrides) in &instance_property_overrides {
-        if instances.contains_key(node_id) && !overrides.is_empty() {
-            let resolved = resolved_instance_properties
-                .entry(*node_id)
-                .or_insert_with(HashMap::new);
-            for (name, override_entry) in overrides {
-                resolved.insert(name.clone(), override_entry.value.clone());
-            }
-        }
-    }
-
-    for (node_id, instance_variants) in &variant_properties {
-        if instances.contains_key(node_id) && !instance_variants.is_empty() {
-            let resolved = resolved_instance_properties
-                .entry(*node_id)
-                .or_insert_with(HashMap::new);
-            for (name, value) in instance_variants {
-                resolved.insert(
-                    name.clone(),
-                    ImportedComponentPropertyValue::Text(value.clone()),
-                );
-            }
-        }
-    }
-
-    Ok(ImportedFigmaDocument {
-        scene,
-        layout_styles,
-        constraints: constraints_map,
-        prototype_graph: PrototypeGraph {
-            edges: prototype_edges,
-        },
-        figma_to_scene,
-        components,
-        instances,
-        variant_properties,
-        component_property_definitions,
-        instance_property_overrides,
-        resolved_instance_properties,
-    })
-}
-
-fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
+pub(crate) fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
     let mut raw: JsonValue = serde_json::from_str(json)?;
     normalize_enum_wrappers(&mut raw);
     let nodes = match raw {
@@ -472,7 +39,7 @@ fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
     Ok(serde_json::from_value(JsonValue::Object(normalized))?)
 }
 
-fn normalize_enum_wrappers(value: &mut JsonValue) {
+pub(crate) fn normalize_enum_wrappers(value: &mut JsonValue) {
     match value {
         JsonValue::Array(items) => {
             for item in items {
@@ -495,7 +62,7 @@ fn normalize_enum_wrappers(value: &mut JsonValue) {
     }
 }
 
-fn flatten_document_nodes(
+pub(crate) fn flatten_document_nodes(
     nodes: &[JsonValue],
     parent_id: Option<&str>,
     path: &mut Vec<usize>,
@@ -533,7 +100,7 @@ fn flatten_document_nodes(
     }
 }
 
-fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> String {
+pub(crate) fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> String {
     if let Some(value) = object.get("id") {
         if let Some(text) = value.as_str() {
             let trimmed = text.trim();
@@ -557,7 +124,7 @@ fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> Strin
     format!("generated:{path_text}")
 }
 
-fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
+pub(crate) fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
     if object.contains_key("absoluteBoundingBox") || object.contains_key("bounds") {
         return;
     }
@@ -579,7 +146,7 @@ fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
     );
 }
 
-fn bounds_from_xywh(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 4]> {
+pub(crate) fn bounds_from_xywh(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 4]> {
     let x = json_number(object.get("x"))?;
     let y = json_number(object.get("y"))?;
     let width = json_number(object.get("width"))?;
@@ -587,7 +154,9 @@ fn bounds_from_xywh(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 
     Some([x, y, width, height])
 }
 
-fn bounds_from_size_and_transform(object: &JsonMap<String, JsonValue>) -> Option<[JsonNumber; 4]> {
+pub(crate) fn bounds_from_size_and_transform(
+    object: &JsonMap<String, JsonValue>,
+) -> Option<[JsonNumber; 4]> {
     let size = object.get("size")?.as_object()?;
     let width = json_number(size.get("x").or_else(|| size.get("width")))?;
     let height = json_number(size.get("y").or_else(|| size.get("height")))?;
@@ -600,7 +169,7 @@ fn bounds_from_size_and_transform(object: &JsonMap<String, JsonValue>) -> Option
     Some([x, y, width, height])
 }
 
-fn transform_translation_component(
+pub(crate) fn transform_translation_component(
     transform: Option<&JsonValue>,
     horizontal: bool,
 ) -> Option<JsonNumber> {
@@ -632,12 +201,12 @@ fn transform_translation_component(
     }
 }
 
-fn json_number(value: Option<&JsonValue>) -> Option<JsonNumber> {
+pub(crate) fn json_number(value: Option<&JsonValue>) -> Option<JsonNumber> {
     let value = value.and_then(JsonValue::as_f64)?;
     JsonNumber::from_f64(value)
 }
 
-fn normalize_text_style_fields(object: &mut JsonMap<String, JsonValue>) {
+pub(crate) fn normalize_text_style_fields(object: &mut JsonMap<String, JsonValue>) {
     let is_text = object
         .get("type")
         .and_then(JsonValue::as_str)
@@ -700,7 +269,7 @@ fn normalize_text_style_fields(object: &mut JsonMap<String, JsonValue>) {
     }
 }
 
-fn normalize_paint_fields(object: &mut JsonMap<String, JsonValue>) {
+pub(crate) fn normalize_paint_fields(object: &mut JsonMap<String, JsonValue>) {
     if !object.contains_key("fills") {
         if let Some(paints) = object.get("fillPaints").cloned() {
             object.insert("fills".to_string(), paints);
@@ -731,7 +300,7 @@ fn normalize_paint_fields(object: &mut JsonMap<String, JsonValue>) {
     }
 }
 
-fn insert_style_alias(
+pub(crate) fn insert_style_alias(
     style: &mut JsonMap<String, JsonValue>,
     object: &JsonMap<String, JsonValue>,
     style_key: &str,
@@ -745,7 +314,7 @@ fn insert_style_alias(
     }
 }
 
-fn normalize_line_height_alias(
+pub(crate) fn normalize_line_height_alias(
     style: &mut JsonMap<String, JsonValue>,
     line_height: Option<&JsonValue>,
 ) {
@@ -786,7 +355,7 @@ fn normalize_line_height_alias(
     }
 }
 
-fn map_color_stops(stops: &[FigmaColorStop]) -> Vec<ColorStop> {
+pub(crate) fn map_color_stops(stops: &[FigmaColorStop]) -> Vec<ColorStop> {
     stops
         .iter()
         .filter_map(|stop| {
@@ -800,7 +369,7 @@ fn map_color_stops(stops: &[FigmaColorStop]) -> Vec<ColorStop> {
         .collect()
 }
 
-fn normalize_color_component(value: f32) -> f32 {
+pub(crate) fn normalize_color_component(value: f32) -> f32 {
     if !value.is_finite() {
         return 0.0;
     }
@@ -811,7 +380,7 @@ fn normalize_color_component(value: f32) -> f32 {
     }
 }
 
-fn normalize_alpha_component(value: f32) -> f32 {
+pub(crate) fn normalize_alpha_component(value: f32) -> f32 {
     if !value.is_finite() {
         return 1.0;
     }
@@ -822,7 +391,7 @@ fn normalize_alpha_component(value: f32) -> f32 {
     }
 }
 
-fn parse_hex_color(hex: &str) -> Option<Vec4> {
+pub(crate) fn parse_hex_color(hex: &str) -> Option<Vec4> {
     let text = hex.trim();
     let bytes = text.strip_prefix('#').unwrap_or(text);
     match bytes.len() {
@@ -871,7 +440,7 @@ fn parse_hex_color(hex: &str) -> Option<Vec4> {
     }
 }
 
-fn parse_hex_nibble(value: u8) -> Option<u8> {
+pub(crate) fn parse_hex_nibble(value: u8) -> Option<u8> {
     match value {
         b'0'..=b'9' => Some(value - b'0'),
         b'a'..=b'f' => Some(value - b'a' + 10),
@@ -880,13 +449,13 @@ fn parse_hex_nibble(value: u8) -> Option<u8> {
     }
 }
 
-fn parse_hex_byte(high: u8, low: u8) -> Option<u8> {
+pub(crate) fn parse_hex_byte(high: u8, low: u8) -> Option<u8> {
     let high = parse_hex_nibble(high)?;
     let low = parse_hex_nibble(low)?;
     Some((high << 4) | low)
 }
 
-fn figma_image_reference_to_id(reference: &str) -> u64 {
+pub(crate) fn figma_image_reference_to_id(reference: &str) -> u64 {
     if let Ok(parsed) = reference.parse::<u64>() {
         return parsed;
     }
@@ -898,7 +467,7 @@ fn figma_image_reference_to_id(reference: &str) -> u64 {
     hash | (1_u64 << 63)
 }
 
-fn figma_image_transform(
+pub(crate) fn figma_image_transform(
     scale_mode: FigmaImageScaleMode,
     transform: Option<&FigmaImageTransform>,
     scaling_factor: Option<f32>,
@@ -918,7 +487,7 @@ fn figma_image_transform(
     Some([inverse, 0.0, 0.0, 0.0, inverse, 0.0, 0.0, 0.0, 1.0])
 }
 
-fn figma_stroke_miter_limit_from_angle(angle_degrees: f32) -> Option<f32> {
+pub(crate) fn figma_stroke_miter_limit_from_angle(angle_degrees: f32) -> Option<f32> {
     if !angle_degrees.is_finite() || angle_degrees <= 0.0 {
         return None;
     }
@@ -932,150 +501,150 @@ fn figma_stroke_miter_limit_from_angle(angle_degrees: f32) -> Option<f32> {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaDocument {
+pub(crate) struct FigmaDocument {
     #[serde(default)]
-    nodes: Vec<FigmaNode>,
+    pub(crate) nodes: Vec<FigmaNode>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaNode {
-    id: FigmaNodeKey,
+pub(crate) struct FigmaNode {
+    pub(crate) id: FigmaNodeKey,
     #[serde(default, alias = "parentId")]
-    parent_id: Option<FigmaNodeKey>,
+    pub(crate) parent_id: Option<FigmaNodeKey>,
     #[serde(default, rename = "type")]
-    node_type: Option<FigmaNodeType>,
+    pub(crate) node_type: Option<FigmaNodeType>,
     #[serde(default)]
-    key: Option<String>,
+    pub(crate) key: Option<String>,
     #[serde(default, alias = "componentSetId")]
-    component_set_id: Option<FigmaNodeKey>,
+    pub(crate) component_set_id: Option<FigmaNodeKey>,
     #[serde(default, alias = "componentId")]
-    component_id: Option<FigmaNodeKey>,
+    pub(crate) component_id: Option<FigmaNodeKey>,
     #[serde(default, alias = "mainComponent")]
-    main_component: Option<FigmaMainComponent>,
+    pub(crate) main_component: Option<FigmaMainComponent>,
     #[serde(default, alias = "mainComponentId")]
-    main_component_id: Option<FigmaNodeKey>,
+    pub(crate) main_component_id: Option<FigmaNodeKey>,
     #[serde(default)]
-    variant_properties: HashMap<String, FigmaPropertyValue>,
+    pub(crate) variant_properties: HashMap<String, FigmaPropertyValue>,
     #[serde(default)]
-    component_properties: HashMap<String, FigmaComponentProperty>,
+    pub(crate) component_properties: HashMap<String, FigmaComponentProperty>,
     #[serde(default)]
-    component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
+    pub(crate) component_property_definitions: HashMap<String, FigmaComponentPropertyDefinition>,
     #[serde(default)]
-    fills: Vec<FigmaPaint>,
+    pub(crate) fills: Vec<FigmaPaint>,
     #[serde(default)]
-    strokes: Vec<FigmaPaint>,
+    pub(crate) strokes: Vec<FigmaPaint>,
     #[serde(default)]
-    stroke_weight: Option<f32>,
+    pub(crate) stroke_weight: Option<f32>,
     #[serde(default)]
-    stroke_align: Option<FigmaStrokeAlign>,
+    pub(crate) stroke_align: Option<FigmaStrokeAlign>,
     #[serde(default)]
-    stroke_cap: Option<FigmaStrokeCap>,
+    pub(crate) stroke_cap: Option<FigmaStrokeCap>,
     #[serde(default)]
-    stroke_join: Option<FigmaStrokeJoin>,
+    pub(crate) stroke_join: Option<FigmaStrokeJoin>,
     #[serde(default)]
-    stroke_miter_angle: Option<f32>,
+    pub(crate) stroke_miter_angle: Option<f32>,
     #[serde(default)]
-    stroke_miter_limit: Option<f32>,
+    pub(crate) stroke_miter_limit: Option<f32>,
     #[serde(default)]
-    stroke_dashes: Option<Vec<f32>>,
+    pub(crate) stroke_dashes: Option<Vec<f32>>,
     #[serde(default, alias = "strokeDashOffset")]
-    dash_offset: Option<f32>,
+    pub(crate) dash_offset: Option<f32>,
     #[serde(default, alias = "individualStrokeWeights")]
-    individual_stroke_weights: Option<FigmaSideWeights>,
+    pub(crate) individual_stroke_weights: Option<FigmaSideWeights>,
     #[serde(default)]
-    effects: Vec<FigmaEffect>,
+    pub(crate) effects: Vec<FigmaEffect>,
     #[serde(default)]
-    fill_geometry: Option<Vec<FigmaPathGeometry>>,
+    pub(crate) fill_geometry: Option<Vec<FigmaPathGeometry>>,
     #[serde(default)]
-    stroke_geometry: Option<Vec<FigmaPathGeometry>>,
+    pub(crate) stroke_geometry: Option<Vec<FigmaPathGeometry>>,
     #[serde(default)]
-    corner_radius: Option<f32>,
+    pub(crate) corner_radius: Option<f32>,
     #[serde(default)]
-    rectangle_corner_radii: Option<[f32; 4]>,
+    pub(crate) rectangle_corner_radii: Option<[f32; 4]>,
     #[serde(default)]
-    corner_smoothing: Option<f32>,
+    pub(crate) corner_smoothing: Option<f32>,
     #[serde(default)]
-    opacity: Option<f32>,
+    pub(crate) opacity: Option<f32>,
     #[serde(default)]
-    rotation: Option<f32>,
+    pub(crate) rotation: Option<f32>,
     #[serde(default)]
-    blend_mode: Option<FigmaBlendMode>,
+    pub(crate) blend_mode: Option<FigmaBlendMode>,
     #[serde(default)]
-    clips_content: Option<bool>,
+    pub(crate) clips_content: Option<bool>,
     #[serde(default, alias = "isMask")]
-    is_mask: Option<bool>,
+    pub(crate) is_mask: Option<bool>,
     #[serde(default, alias = "maskType")]
-    mask_type: Option<FigmaMaskType>,
+    pub(crate) mask_type: Option<FigmaMaskType>,
     #[serde(default)]
-    bounds: Option<[f32; 4]>,
+    pub(crate) bounds: Option<[f32; 4]>,
     #[serde(default, alias = "absoluteBoundingBox")]
-    absolute_bounding_box: Option<FigmaRect>,
+    pub(crate) absolute_bounding_box: Option<FigmaRect>,
     #[serde(default)]
-    layout_mode: Option<FigmaLayoutMode>,
+    pub(crate) layout_mode: Option<FigmaLayoutMode>,
     #[serde(default)]
-    primary_axis_align_items: Option<FigmaPrimaryAxisAlignItems>,
+    pub(crate) primary_axis_align_items: Option<FigmaPrimaryAxisAlignItems>,
     #[serde(default)]
-    counter_axis_align_items: Option<FigmaCounterAxisAlignItems>,
+    pub(crate) counter_axis_align_items: Option<FigmaCounterAxisAlignItems>,
     #[serde(default)]
-    layout_wrap: Option<FigmaLayoutWrap>,
+    pub(crate) layout_wrap: Option<FigmaLayoutWrap>,
     #[serde(default)]
-    primary_axis_sizing_mode: Option<FigmaAxisSizingMode>,
+    pub(crate) primary_axis_sizing_mode: Option<FigmaAxisSizingMode>,
     #[serde(default)]
-    counter_axis_sizing_mode: Option<FigmaAxisSizingMode>,
+    pub(crate) counter_axis_sizing_mode: Option<FigmaAxisSizingMode>,
     #[serde(default)]
-    layout_align: Option<FigmaLayoutAlign>,
+    pub(crate) layout_align: Option<FigmaLayoutAlign>,
     #[serde(default)]
-    layout_sizing_horizontal: Option<FigmaLayoutSizingMode>,
+    pub(crate) layout_sizing_horizontal: Option<FigmaLayoutSizingMode>,
     #[serde(default)]
-    layout_sizing_vertical: Option<FigmaLayoutSizingMode>,
+    pub(crate) layout_sizing_vertical: Option<FigmaLayoutSizingMode>,
     #[serde(default)]
-    item_spacing: Option<f32>,
+    pub(crate) item_spacing: Option<f32>,
     #[serde(default)]
-    padding_left: Option<f32>,
+    pub(crate) padding_left: Option<f32>,
     #[serde(default)]
-    padding_right: Option<f32>,
+    pub(crate) padding_right: Option<f32>,
     #[serde(default)]
-    padding_top: Option<f32>,
+    pub(crate) padding_top: Option<f32>,
     #[serde(default)]
-    padding_bottom: Option<f32>,
+    pub(crate) padding_bottom: Option<f32>,
     #[serde(default)]
-    layout_grow: Option<f32>,
+    pub(crate) layout_grow: Option<f32>,
     #[serde(default)]
-    min_width: Option<f32>,
+    pub(crate) min_width: Option<f32>,
     #[serde(default)]
-    max_width: Option<f32>,
+    pub(crate) max_width: Option<f32>,
     #[serde(default)]
-    min_height: Option<f32>,
+    pub(crate) min_height: Option<f32>,
     #[serde(default)]
-    max_height: Option<f32>,
+    pub(crate) max_height: Option<f32>,
     #[serde(default)]
-    constraints: Option<FigmaConstraints>,
+    pub(crate) constraints: Option<FigmaConstraints>,
     #[serde(default)]
-    layout_positioning: Option<FigmaLayoutPositioning>,
+    pub(crate) layout_positioning: Option<FigmaLayoutPositioning>,
     #[serde(default)]
-    characters: Option<String>,
+    pub(crate) characters: Option<String>,
     #[serde(default)]
-    text_auto_resize: Option<FigmaTextAutoResize>,
+    pub(crate) text_auto_resize: Option<FigmaTextAutoResize>,
     #[serde(default)]
-    max_lines: Option<u32>,
+    pub(crate) max_lines: Option<u32>,
     #[serde(default)]
-    text_truncation: Option<FigmaTextTruncation>,
+    pub(crate) text_truncation: Option<FigmaTextTruncation>,
     #[serde(default)]
-    style: Option<FigmaTypeStyle>,
+    pub(crate) style: Option<FigmaTypeStyle>,
     #[serde(default, alias = "interactions", alias = "prototypeInteractions")]
-    prototype_interactions: Vec<FigmaPrototypeInteraction>,
+    pub(crate) prototype_interactions: Vec<FigmaPrototypeInteraction>,
 }
 
 impl FigmaNode {
-    fn to_node_opacity(&self) -> f32 {
+    pub(crate) fn to_node_opacity(&self) -> f32 {
         self.opacity
             .filter(|value| value.is_finite())
             .map(|value| value.clamp(0.0, 1.0))
             .unwrap_or(1.0)
     }
 
-    fn to_node_transform(&self, bounds: Rect) -> Option<Transform2D> {
+    pub(crate) fn to_node_transform(&self, bounds: Rect) -> Option<Transform2D> {
         let rotation_radians = self
             .rotation
             .filter(|value| value.is_finite())
@@ -1090,7 +659,7 @@ impl FigmaNode {
         Some(to_center.compose(&rotate).compose(&from_center))
     }
 
-    fn resolved_bounds(&self) -> Rect {
+    pub(crate) fn resolved_bounds(&self) -> Rect {
         if let Some(bounds) = self.absolute_bounding_box {
             return Rect::new(
                 bounds.x,
@@ -1105,7 +674,7 @@ impl FigmaNode {
         Rect::new(0.0, 0.0, 0.0, 0.0)
     }
 
-    fn to_flex_style(&self, bounds: Rect) -> FlexStyle {
+    pub(crate) fn to_flex_style(&self, bounds: Rect) -> FlexStyle {
         let layout_mode = self.layout_mode.unwrap_or(FigmaLayoutMode::None);
         let mut style = FlexStyle {
             direction: match layout_mode {
@@ -1219,7 +788,7 @@ impl FigmaNode {
         style
     }
 
-    fn to_constraints(&self) -> ImportedConstraints {
+    pub(crate) fn to_constraints(&self) -> ImportedConstraints {
         let positioning = match self
             .layout_positioning
             .unwrap_or(FigmaLayoutPositioning::Auto)
@@ -1249,7 +818,7 @@ impl FigmaNode {
         }
     }
 
-    fn to_visual_style(&self) -> VisualStyle {
+    pub(crate) fn to_visual_style(&self) -> VisualStyle {
         let mut style = VisualStyle::new();
 
         if matches!(self.node_type, Some(FigmaNodeType::Text))
@@ -1326,7 +895,7 @@ impl FigmaNode {
         style
     }
 
-    fn to_stroke_style(&self) -> Option<StrokeStyle> {
+    pub(crate) fn to_stroke_style(&self) -> Option<StrokeStyle> {
         if self.strokes.is_empty() && self.stroke_weight.unwrap_or_default() <= 0.0 {
             return None;
         }
@@ -1377,7 +946,7 @@ impl FigmaNode {
         Some(stroke)
     }
 
-    fn to_text_content(&self) -> Option<TextContent> {
+    pub(crate) fn to_text_content(&self) -> Option<TextContent> {
         let characters = self.characters.as_ref()?.clone();
         let style = self.style.as_ref();
         let is_icon_ligature_font = style
@@ -1447,7 +1016,7 @@ impl FigmaNode {
         Some(text)
     }
 
-    fn to_component_node(&self) -> Option<ImportedComponentNode> {
+    pub(crate) fn to_component_node(&self) -> Option<ImportedComponentNode> {
         match self.node_type.unwrap_or(FigmaNodeType::Unknown) {
             FigmaNodeType::Component => Some(ImportedComponentNode {
                 kind: ImportedComponentKind::Component,
@@ -1463,7 +1032,7 @@ impl FigmaNode {
         }
     }
 
-    fn to_instance_node(&self) -> Option<ImportedInstanceNode> {
+    pub(crate) fn to_instance_node(&self) -> Option<ImportedInstanceNode> {
         if self.node_type != Some(FigmaNodeType::Instance) {
             return None;
         }
@@ -1489,7 +1058,7 @@ impl FigmaNode {
         })
     }
 
-    fn to_variant_properties(&self) -> HashMap<String, String> {
+    pub(crate) fn to_variant_properties(&self) -> HashMap<String, String> {
         let mut variants = HashMap::new();
 
         for (name, value) in &self.variant_properties {
@@ -1515,7 +1084,7 @@ impl FigmaNode {
         variants
     }
 
-    fn to_component_property_definitions(
+    pub(crate) fn to_component_property_definitions(
         &self,
     ) -> HashMap<String, ImportedComponentPropertyDefinition> {
         let mut definitions = HashMap::new();
@@ -1546,7 +1115,9 @@ impl FigmaNode {
         definitions
     }
 
-    fn to_instance_property_overrides(&self) -> HashMap<String, ImportedComponentPropertyOverride> {
+    pub(crate) fn to_instance_property_overrides(
+        &self,
+    ) -> HashMap<String, ImportedComponentPropertyOverride> {
         let mut overrides = HashMap::new();
         for (name, property) in &self.component_properties {
             let Some(value) = property.value.as_ref() else {
@@ -1571,7 +1142,7 @@ impl FigmaNode {
     }
 }
 
-fn map_font_style(style: Option<&FigmaTypeStyle>) -> FontStyle {
+pub(crate) fn map_font_style(style: Option<&FigmaTypeStyle>) -> FontStyle {
     let Some(style) = style else {
         return FontStyle::Normal;
     };
@@ -1588,7 +1159,7 @@ fn map_font_style(style: Option<&FigmaTypeStyle>) -> FontStyle {
     FontStyle::Normal
 }
 
-fn map_line_height(style: Option<&FigmaTypeStyle>) -> LineHeight {
+pub(crate) fn map_line_height(style: Option<&FigmaTypeStyle>) -> LineHeight {
     let Some(style) = style else {
         return LineHeight::Auto;
     };
@@ -1607,7 +1178,7 @@ fn map_line_height(style: Option<&FigmaTypeStyle>) -> LineHeight {
     LineHeight::Auto
 }
 
-fn figma_constraint_axis(axis: &str) -> ConstraintAxis {
+pub(crate) fn figma_constraint_axis(axis: &str) -> ConstraintAxis {
     let normalized = axis.trim().to_ascii_uppercase();
     match normalized.as_str() {
         "MIN" | "LEFT" | "TOP" => ConstraintAxis::Min,
@@ -1619,7 +1190,7 @@ fn figma_constraint_axis(axis: &str) -> ConstraintAxis {
     }
 }
 
-fn canonical_property_name(name: &str) -> String {
+pub(crate) fn canonical_property_name(name: &str) -> String {
     let trimmed = name.trim();
     let canonical = trimmed
         .split_once('#')
@@ -1631,7 +1202,7 @@ fn canonical_property_name(name: &str) -> String {
     canonical.to_string()
 }
 
-fn duration_to_ms(value: f64) -> Option<u32> {
+pub(crate) fn duration_to_ms(value: f64) -> Option<u32> {
     if !value.is_finite() || value <= 0.0 {
         return None;
     }
@@ -1643,7 +1214,7 @@ fn duration_to_ms(value: f64) -> Option<u32> {
     Some(rounded as u32)
 }
 
-fn apply_text_case(text: &str, text_case: TextCase) -> String {
+pub(crate) fn apply_text_case(text: &str, text_case: TextCase) -> String {
     match text_case {
         TextCase::Original => text.to_string(),
         TextCase::Upper | TextCase::SmallCaps | TextCase::SmallCapsForced => text.to_uppercase(),
@@ -1656,7 +1227,7 @@ fn apply_text_case(text: &str, text_case: TextCase) -> String {
     }
 }
 
-fn title_case_word(word: &str) -> String {
+pub(crate) fn title_case_word(word: &str) -> String {
     let mut chars = word.chars();
     let Some(first) = chars.next() else {
         return String::new();
@@ -1666,13 +1237,13 @@ fn title_case_word(word: &str) -> String {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaNodeKey {
+pub(crate) enum FigmaNodeKey {
     Text(String),
     Numeric(u64),
 }
 
 impl FigmaNodeKey {
-    fn as_key(&self) -> String {
+    pub(crate) fn as_key(&self) -> String {
         match self {
             Self::Text(value) => value.clone(),
             Self::Numeric(value) => value.to_string(),
@@ -1682,7 +1253,7 @@ impl FigmaNodeKey {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaNodeType {
+pub(crate) enum FigmaNodeType {
     Frame,
     Group,
     Rectangle,
@@ -1696,7 +1267,7 @@ enum FigmaNodeType {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaLayoutMode {
+pub(crate) enum FigmaLayoutMode {
     #[serde(rename = "NONE")]
     None,
     Horizontal,
@@ -1707,7 +1278,7 @@ enum FigmaLayoutMode {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrimaryAxisAlignItems {
+pub(crate) enum FigmaPrimaryAxisAlignItems {
     Min,
     Center,
     Max,
@@ -1719,7 +1290,7 @@ enum FigmaPrimaryAxisAlignItems {
 }
 
 impl FigmaPrimaryAxisAlignItems {
-    fn to_justify_content(self) -> FlexJustifyContent {
+    pub(crate) fn to_justify_content(self) -> FlexJustifyContent {
         match self {
             Self::Min => FlexJustifyContent::Start,
             Self::Center => FlexJustifyContent::Center,
@@ -1734,7 +1305,7 @@ impl FigmaPrimaryAxisAlignItems {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaCounterAxisAlignItems {
+pub(crate) enum FigmaCounterAxisAlignItems {
     Min,
     Center,
     Max,
@@ -1744,7 +1315,7 @@ enum FigmaCounterAxisAlignItems {
 }
 
 impl FigmaCounterAxisAlignItems {
-    fn to_align(self) -> FlexAlign {
+    pub(crate) fn to_align(self) -> FlexAlign {
         match self {
             Self::Min => FlexAlign::Start,
             Self::Center => FlexAlign::Center,
@@ -1757,7 +1328,7 @@ impl FigmaCounterAxisAlignItems {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaLayoutWrap {
+pub(crate) enum FigmaLayoutWrap {
     NoWrap,
     Wrap,
     #[serde(other)]
@@ -1765,7 +1336,7 @@ enum FigmaLayoutWrap {
 }
 
 impl FigmaLayoutWrap {
-    fn to_wrap(self) -> FlexWrap {
+    pub(crate) fn to_wrap(self) -> FlexWrap {
         match self {
             Self::NoWrap => FlexWrap::NoWrap,
             Self::Wrap => FlexWrap::Wrap,
@@ -1776,7 +1347,7 @@ impl FigmaLayoutWrap {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaLayoutAlign {
+pub(crate) enum FigmaLayoutAlign {
     Inherit,
     Stretch,
     Min,
@@ -1789,7 +1360,7 @@ enum FigmaLayoutAlign {
 }
 
 impl FigmaLayoutAlign {
-    fn to_align_self(self) -> Option<ItemAlignSelf> {
+    pub(crate) fn to_align_self(self) -> Option<ItemAlignSelf> {
         match self {
             Self::Inherit | Self::Auto | Self::Unknown => None,
             Self::Stretch => Some(ItemAlignSelf::Stretch),
@@ -1802,7 +1373,7 @@ impl FigmaLayoutAlign {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaLayoutSizingMode {
+pub(crate) enum FigmaLayoutSizingMode {
     Fill,
     Hug,
     Fixed,
@@ -1813,7 +1384,7 @@ enum FigmaLayoutSizingMode {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaAxisSizingMode {
+pub(crate) enum FigmaAxisSizingMode {
     Fixed,
     Auto,
     #[serde(other)]
@@ -1822,7 +1393,7 @@ enum FigmaAxisSizingMode {
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaLayoutPositioning {
+pub(crate) enum FigmaLayoutPositioning {
     Auto,
     Absolute,
     #[serde(other)]
@@ -1831,51 +1402,51 @@ enum FigmaLayoutPositioning {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaRect {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+pub(crate) struct FigmaRect {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaConstraints {
+pub(crate) struct FigmaConstraints {
     #[serde(default)]
-    horizontal: Option<String>,
+    pub(crate) horizontal: Option<String>,
     #[serde(default)]
-    vertical: Option<String>,
+    pub(crate) vertical: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaMainComponent {
-    id: FigmaNodeKey,
+pub(crate) struct FigmaMainComponent {
+    pub(crate) id: FigmaNodeKey,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaComponentProperty {
+pub(crate) struct FigmaComponentProperty {
     #[serde(default, rename = "type")]
-    property_type: Option<FigmaComponentPropertyType>,
+    pub(crate) property_type: Option<FigmaComponentPropertyType>,
     #[serde(default)]
-    value: Option<FigmaPropertyValue>,
+    pub(crate) value: Option<FigmaPropertyValue>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaComponentPropertyDefinition {
+pub(crate) struct FigmaComponentPropertyDefinition {
     #[serde(default, rename = "type")]
-    property_type: Option<FigmaComponentPropertyType>,
+    pub(crate) property_type: Option<FigmaComponentPropertyType>,
     #[serde(default, alias = "defaultValue")]
-    default_value: Option<FigmaPropertyValue>,
+    pub(crate) default_value: Option<FigmaPropertyValue>,
     #[serde(default, alias = "preferredValues")]
-    preferred_values: Vec<FigmaPropertyValue>,
+    pub(crate) preferred_values: Vec<FigmaPropertyValue>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaComponentPropertyType {
+pub(crate) enum FigmaComponentPropertyType {
     Variant,
     Boolean,
     Text,
@@ -1885,7 +1456,7 @@ enum FigmaComponentPropertyType {
 }
 
 impl FigmaComponentPropertyType {
-    fn to_public(self) -> ImportedComponentPropertyType {
+    pub(crate) fn to_public(self) -> ImportedComponentPropertyType {
         match self {
             Self::Variant => ImportedComponentPropertyType::Variant,
             Self::Boolean => ImportedComponentPropertyType::Boolean,
@@ -1898,7 +1469,7 @@ impl FigmaComponentPropertyType {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaPropertyValue {
+pub(crate) enum FigmaPropertyValue {
     Text(String),
     Bool(bool),
     Integer(i64),
@@ -1907,7 +1478,7 @@ enum FigmaPropertyValue {
 }
 
 impl FigmaPropertyValue {
-    fn as_string(&self) -> String {
+    pub(crate) fn as_string(&self) -> String {
         match self {
             Self::Text(value) => value.clone(),
             Self::Bool(value) => value.to_string(),
@@ -1922,7 +1493,7 @@ impl FigmaPropertyValue {
         }
     }
 
-    fn to_imported_value(&self) -> ImportedComponentPropertyValue {
+    pub(crate) fn to_imported_value(&self) -> ImportedComponentPropertyValue {
         match self {
             Self::Text(value) => ImportedComponentPropertyValue::Text(value.clone()),
             Self::Bool(value) => ImportedComponentPropertyValue::Bool(*value),
@@ -1941,16 +1512,16 @@ impl FigmaPropertyValue {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPropertyNodeRef {
+pub(crate) struct FigmaPropertyNodeRef {
     #[serde(default)]
-    id: Option<FigmaNodeKey>,
+    pub(crate) id: Option<FigmaNodeKey>,
     #[serde(default, alias = "nodeId")]
-    node_id: Option<FigmaNodeKey>,
+    pub(crate) node_id: Option<FigmaNodeKey>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaPathGeometry {
+pub(crate) enum FigmaPathGeometry {
     SvgPathData(String),
     PathObject(FigmaPathGeometryObject),
     Unsupported(JsonValue),
@@ -1958,15 +1529,15 @@ enum FigmaPathGeometry {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPathGeometryObject {
+pub(crate) struct FigmaPathGeometryObject {
     #[serde(alias = "pathData")]
-    path: String,
+    pub(crate) path: String,
     #[serde(default)]
-    winding_rule: Option<FigmaWindingRule>,
+    pub(crate) winding_rule: Option<FigmaWindingRule>,
 }
 
 impl FigmaPathGeometry {
-    fn to_vector_path(&self) -> Option<VectorPath> {
+    pub(crate) fn to_vector_path(&self) -> Option<VectorPath> {
         let (path_data, winding_rule) = match self {
             Self::SvgPathData(path) => (path.as_str(), None),
             Self::PathObject(object) => (
@@ -1987,7 +1558,7 @@ impl FigmaPathGeometry {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
-enum FigmaWindingRule {
+pub(crate) enum FigmaWindingRule {
     #[serde(rename = "NONZERO")]
     NonZero,
     #[serde(rename = "EVENODD", alias = "EVEN_ODD")]
@@ -1997,7 +1568,7 @@ enum FigmaWindingRule {
 }
 
 impl FigmaWindingRule {
-    fn to_winding_rule(self) -> WindingRule {
+    pub(crate) fn to_winding_rule(self) -> WindingRule {
         match self {
             Self::NonZero => WindingRule::NonZero,
             Self::EvenOdd => WindingRule::EvenOdd,
@@ -2008,7 +1579,7 @@ impl FigmaWindingRule {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaBlendMode {
+pub(crate) enum FigmaBlendMode {
     Normal,
     Darken,
     Multiply,
@@ -2033,7 +1604,7 @@ enum FigmaBlendMode {
 }
 
 impl FigmaBlendMode {
-    fn to_blend_mode(self) -> BlendMode {
+    pub(crate) fn to_blend_mode(self) -> BlendMode {
         match self {
             Self::Normal => BlendMode::Normal,
             Self::Darken => BlendMode::Darken,
@@ -2061,7 +1632,7 @@ impl FigmaBlendMode {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaColorValue {
+pub(crate) enum FigmaColorValue {
     Vec4([f32; 4]),
     Vec3([f32; 3]),
     Object(FigmaColorObject),
@@ -2069,7 +1640,7 @@ enum FigmaColorValue {
 }
 
 impl FigmaColorValue {
-    fn to_vec4(&self) -> Option<Vec4> {
+    pub(crate) fn to_vec4(&self) -> Option<Vec4> {
         match self {
             Self::Vec4([r, g, b, a]) => Some(Vec4::new(
                 normalize_color_component(*r),
@@ -2100,25 +1671,25 @@ impl FigmaColorValue {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaColorObject {
-    r: f32,
-    g: f32,
-    b: f32,
+pub(crate) struct FigmaColorObject {
+    pub(crate) r: f32,
+    pub(crate) g: f32,
+    pub(crate) b: f32,
     #[serde(default)]
-    a: Option<f32>,
+    pub(crate) a: Option<f32>,
     #[serde(default)]
-    alpha: Option<f32>,
+    pub(crate) alpha: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct FigmaColorStop {
-    position: f32,
-    color: FigmaColorValue,
+pub(crate) struct FigmaColorStop {
+    pub(crate) position: f32,
+    pub(crate) color: FigmaColorValue,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaImageScaleMode {
+pub(crate) enum FigmaImageScaleMode {
     Fill,
     Fit,
     Crop,
@@ -2127,7 +1698,7 @@ enum FigmaImageScaleMode {
 }
 
 impl FigmaImageScaleMode {
-    fn to_scale_mode(self) -> ImageScaleMode {
+    pub(crate) fn to_scale_mode(self) -> ImageScaleMode {
         match self {
             Self::Fill => ImageScaleMode::Fill,
             Self::Fit => ImageScaleMode::Fit,
@@ -2140,14 +1711,14 @@ impl FigmaImageScaleMode {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaImageIdValue {
+pub(crate) enum FigmaImageIdValue {
     Numeric(u64),
     Text(String),
     HashBytes(Vec<u8>),
 }
 
 impl FigmaImageIdValue {
-    fn to_image_id(&self) -> ImageId {
+    pub(crate) fn to_image_id(&self) -> ImageId {
         match self {
             Self::Numeric(id) => ImageId(*id),
             Self::Text(reference) => ImageId(figma_image_reference_to_id(reference)),
@@ -2164,15 +1735,15 @@ impl FigmaImageIdValue {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaImageDescriptor {
+pub(crate) struct FigmaImageDescriptor {
     #[serde(default)]
-    hash: Option<Vec<u8>>,
+    pub(crate) hash: Option<Vec<u8>>,
     #[serde(default, alias = "filename", alias = "name")]
-    reference: Option<String>,
+    pub(crate) reference: Option<String>,
 }
 
 impl FigmaImageDescriptor {
-    fn to_image_id_value(&self) -> Option<FigmaImageIdValue> {
+    pub(crate) fn to_image_id_value(&self) -> Option<FigmaImageIdValue> {
         if let Some(hash) = self.hash.as_ref().filter(|hash| !hash.is_empty()) {
             return Some(FigmaImageIdValue::HashBytes(hash.clone()));
         }
@@ -2184,7 +1755,7 @@ impl FigmaImageDescriptor {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaImageTransform {
+pub(crate) enum FigmaImageTransform {
     Object(FigmaImageTransformObject),
     Matrix3x3([f32; 9]),
     Rows2x3([[f32; 3]; 2]),
@@ -2193,17 +1764,17 @@ enum FigmaImageTransform {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaImageTransformObject {
-    m00: f32,
-    m01: f32,
-    m02: f32,
-    m10: f32,
-    m11: f32,
-    m12: f32,
+pub(crate) struct FigmaImageTransformObject {
+    pub(crate) m00: f32,
+    pub(crate) m01: f32,
+    pub(crate) m02: f32,
+    pub(crate) m10: f32,
+    pub(crate) m11: f32,
+    pub(crate) m12: f32,
 }
 
 impl FigmaImageTransform {
-    fn to_matrix3x3(&self) -> [f32; 9] {
+    pub(crate) fn to_matrix3x3(&self) -> [f32; 9] {
         match self {
             Self::Object(object) => [
                 object.m00, object.m01, object.m02, object.m10, object.m11, object.m12, 0.0, 0.0,
@@ -2218,12 +1789,12 @@ impl FigmaImageTransform {
     }
 }
 
-fn is_ligature_icon_font_family(font_family: &str) -> bool {
+pub(crate) fn is_ligature_icon_font_family(font_family: &str) -> bool {
     let normalized = font_family.trim().to_ascii_lowercase();
     normalized.contains("material symbols") || normalized.contains("material icons")
 }
 
-fn material_icon_ligature_to_codepoint(text: &str) -> Option<String> {
+pub(crate) fn material_icon_ligature_to_codepoint(text: &str) -> Option<String> {
     let normalized = text.trim();
     let codepoint = match normalized {
         // Riot Waves / Stitch icon set used in current parity targets.
@@ -2242,17 +1813,17 @@ fn material_icon_ligature_to_codepoint(text: &str) -> Option<String> {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaImageFilter {
+pub(crate) struct FigmaImageFilter {
     #[serde(default)]
-    grayscale: Option<f32>,
+    pub(crate) grayscale: Option<f32>,
     #[serde(default)]
-    contrast: Option<f32>,
+    pub(crate) contrast: Option<f32>,
     #[serde(default)]
-    invert: Option<f32>,
+    pub(crate) invert: Option<f32>,
 }
 
 impl FigmaImageFilter {
-    fn to_color_filter(self) -> Option<ColorFilter> {
+    pub(crate) fn to_color_filter(self) -> Option<ColorFilter> {
         let grayscale = self
             .grayscale
             .filter(|value| value.is_finite())
@@ -2284,7 +1855,7 @@ impl FigmaImageFilter {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPaint {
+pub(crate) enum FigmaPaint {
     Solid {
         color: FigmaColorValue,
         #[serde(default)]
@@ -2337,7 +1908,7 @@ enum FigmaPaint {
 }
 
 impl FigmaPaint {
-    fn to_paint(&self) -> Option<Paint> {
+    pub(crate) fn to_paint(&self) -> Option<Paint> {
         match self {
             Self::Solid {
                 color,
@@ -2458,7 +2029,7 @@ impl FigmaPaint {
         }
     }
 
-    fn to_color_filter_effect(&self) -> Option<Effect> {
+    pub(crate) fn to_color_filter_effect(&self) -> Option<Effect> {
         let Self::Image {
             image_filter,
             visible,
@@ -2478,14 +2049,14 @@ impl FigmaPaint {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaStrokeAlign {
+pub(crate) enum FigmaStrokeAlign {
     Inside,
     Center,
     Outside,
 }
 
 impl FigmaStrokeAlign {
-    fn to_stroke_align(self) -> StrokeAlign {
+    pub(crate) fn to_stroke_align(self) -> StrokeAlign {
         match self {
             Self::Inside => StrokeAlign::Inside,
             Self::Center => StrokeAlign::Center,
@@ -2496,7 +2067,7 @@ impl FigmaStrokeAlign {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaStrokeCap {
+pub(crate) enum FigmaStrokeCap {
     None,
     Round,
     Square,
@@ -2507,7 +2078,7 @@ enum FigmaStrokeCap {
 }
 
 impl FigmaStrokeCap {
-    fn to_stroke_cap(self) -> StrokeCap {
+    pub(crate) fn to_stroke_cap(self) -> StrokeCap {
         match self {
             Self::None => StrokeCap::Butt,
             Self::Round | Self::CircleFilled => StrokeCap::Round,
@@ -2519,14 +2090,14 @@ impl FigmaStrokeCap {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaStrokeJoin {
+pub(crate) enum FigmaStrokeJoin {
     Miter,
     Round,
     Bevel,
 }
 
 impl FigmaStrokeJoin {
-    fn to_stroke_join(self) -> StrokeJoin {
+    pub(crate) fn to_stroke_join(self) -> StrokeJoin {
         match self {
             Self::Miter => StrokeJoin::Miter,
             Self::Round => StrokeJoin::Round,
@@ -2537,14 +2108,14 @@ impl FigmaStrokeJoin {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaMaskType {
+pub(crate) enum FigmaMaskType {
     Alpha,
     Vector,
     Luminance,
 }
 
 impl FigmaMaskType {
-    fn to_mask_type(self) -> MaskType {
+    pub(crate) fn to_mask_type(self) -> MaskType {
         match self {
             Self::Alpha => MaskType::Alpha,
             Self::Vector => MaskType::Vector,
@@ -2555,15 +2126,15 @@ impl FigmaMaskType {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaSideWeights {
-    top: f32,
-    right: f32,
-    bottom: f32,
-    left: f32,
+pub(crate) struct FigmaSideWeights {
+    pub(crate) top: f32,
+    pub(crate) right: f32,
+    pub(crate) bottom: f32,
+    pub(crate) left: f32,
 }
 
 impl FigmaSideWeights {
-    fn to_side_weights(self) -> SideWeights {
+    pub(crate) fn to_side_weights(self) -> SideWeights {
         SideWeights {
             top: self.top.max(0.0),
             right: self.right.max(0.0),
@@ -2575,7 +2146,7 @@ impl FigmaSideWeights {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaEffect {
+pub(crate) enum FigmaEffect {
     DropShadow {
         offset: [f32; 2],
         radius: f32,
@@ -2605,7 +2176,7 @@ enum FigmaEffect {
 }
 
 impl FigmaEffect {
-    fn to_effect(&self) -> Option<Effect> {
+    pub(crate) fn to_effect(&self) -> Option<Effect> {
         match self {
             Self::DropShadow {
                 offset,
@@ -2656,42 +2227,42 @@ const fn default_visible() -> bool {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaTypeStyle {
+pub(crate) struct FigmaTypeStyle {
     #[serde(default)]
-    font_family: Option<String>,
+    pub(crate) font_family: Option<String>,
     #[serde(default)]
-    font_style: Option<String>,
+    pub(crate) font_style: Option<String>,
     #[serde(default)]
-    font_weight: Option<u16>,
+    pub(crate) font_weight: Option<u16>,
     #[serde(default)]
-    font_size: Option<f32>,
+    pub(crate) font_size: Option<f32>,
     #[serde(default)]
-    italic: Option<bool>,
+    pub(crate) italic: Option<bool>,
     #[serde(default)]
-    text_align_horizontal: Option<FigmaTextAlignHorizontal>,
+    pub(crate) text_align_horizontal: Option<FigmaTextAlignHorizontal>,
     #[serde(default)]
-    line_height_px: Option<f32>,
+    pub(crate) line_height_px: Option<f32>,
     #[serde(default)]
-    line_height_percent_font_size: Option<f32>,
+    pub(crate) line_height_percent_font_size: Option<f32>,
     #[serde(default)]
-    letter_spacing: Option<f32>,
+    pub(crate) letter_spacing: Option<f32>,
     #[serde(default)]
-    text_decoration: Option<FigmaTextDecoration>,
+    pub(crate) text_decoration: Option<FigmaTextDecoration>,
     #[serde(default)]
-    text_case: Option<FigmaTextCase>,
+    pub(crate) text_case: Option<FigmaTextCase>,
     #[serde(default)]
-    text_align_vertical: Option<FigmaTextAlignVertical>,
+    pub(crate) text_align_vertical: Option<FigmaTextAlignVertical>,
     #[serde(default)]
-    paragraph_spacing: Option<f32>,
+    pub(crate) paragraph_spacing: Option<f32>,
     #[serde(default)]
-    paragraph_indent: Option<f32>,
+    pub(crate) paragraph_indent: Option<f32>,
     #[serde(default)]
-    text_truncation: Option<FigmaTextTruncation>,
+    pub(crate) text_truncation: Option<FigmaTextTruncation>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextAlignHorizontal {
+pub(crate) enum FigmaTextAlignHorizontal {
     Left,
     Center,
     Right,
@@ -2701,7 +2272,7 @@ enum FigmaTextAlignHorizontal {
 }
 
 impl FigmaTextAlignHorizontal {
-    fn to_text_align(self) -> TextAlign {
+    pub(crate) fn to_text_align(self) -> TextAlign {
         match self {
             Self::Left => TextAlign::Left,
             Self::Center => TextAlign::Center,
@@ -2714,7 +2285,7 @@ impl FigmaTextAlignHorizontal {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextDecoration {
+pub(crate) enum FigmaTextDecoration {
     None,
     Underline,
     Strikethrough,
@@ -2723,7 +2294,7 @@ enum FigmaTextDecoration {
 }
 
 impl FigmaTextDecoration {
-    fn to_text_decoration(self) -> TextDecoration {
+    pub(crate) fn to_text_decoration(self) -> TextDecoration {
         match self {
             Self::None => TextDecoration::None,
             Self::Underline => TextDecoration::Underline,
@@ -2735,7 +2306,7 @@ impl FigmaTextDecoration {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextCase {
+pub(crate) enum FigmaTextCase {
     Original,
     Upper,
     Lower,
@@ -2747,7 +2318,7 @@ enum FigmaTextCase {
 }
 
 impl FigmaTextCase {
-    fn to_text_case(self) -> TextCase {
+    pub(crate) fn to_text_case(self) -> TextCase {
         match self {
             Self::Original => TextCase::Original,
             Self::Upper => TextCase::Upper,
@@ -2762,7 +2333,7 @@ impl FigmaTextCase {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextAlignVertical {
+pub(crate) enum FigmaTextAlignVertical {
     Top,
     Center,
     Bottom,
@@ -2771,7 +2342,7 @@ enum FigmaTextAlignVertical {
 }
 
 impl FigmaTextAlignVertical {
-    fn to_text_align_vertical(self) -> TextAlignVertical {
+    pub(crate) fn to_text_align_vertical(self) -> TextAlignVertical {
         match self {
             Self::Top => TextAlignVertical::Top,
             Self::Center => TextAlignVertical::Center,
@@ -2783,7 +2354,7 @@ impl FigmaTextAlignVertical {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextAutoResize {
+pub(crate) enum FigmaTextAutoResize {
     None,
     WidthAndHeight,
     Height,
@@ -2794,7 +2365,7 @@ enum FigmaTextAutoResize {
 }
 
 impl FigmaTextAutoResize {
-    fn to_text_auto_resize(self) -> TextAutoResize {
+    pub(crate) fn to_text_auto_resize(self) -> TextAutoResize {
         match self {
             Self::None => TextAutoResize::None,
             Self::WidthAndHeight => TextAutoResize::WidthAndHeight,
@@ -2808,7 +2379,7 @@ impl FigmaTextAutoResize {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaTextTruncation {
+pub(crate) enum FigmaTextTruncation {
     None,
     Disabled,
     Ending,
@@ -2817,7 +2388,7 @@ enum FigmaTextTruncation {
 }
 
 impl FigmaTextTruncation {
-    fn to_text_overflow(self) -> TextOverflow {
+    pub(crate) fn to_text_overflow(self) -> TextOverflow {
         match self {
             Self::Ending => TextOverflow::Ellipsis,
             Self::None | Self::Disabled | Self::Unknown => TextOverflow::Clip,
@@ -2827,9 +2398,9 @@ impl FigmaTextTruncation {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPrototypeInteraction {
+pub(crate) struct FigmaPrototypeInteraction {
     #[serde(default)]
-    trigger: Option<FigmaPrototypeTriggerInput>,
+    pub(crate) trigger: Option<FigmaPrototypeTriggerInput>,
     #[serde(
         default,
         alias = "destinationId",
@@ -2837,35 +2408,35 @@ struct FigmaPrototypeInteraction {
         alias = "transitionNodeID",
         alias = "transitionNodeId"
     )]
-    destination_id: Option<FigmaNodeKey>,
+    pub(crate) destination_id: Option<FigmaNodeKey>,
     #[serde(default)]
-    actions: Vec<FigmaPrototypeAction>,
+    pub(crate) actions: Vec<FigmaPrototypeAction>,
     #[serde(default, rename = "action")]
-    action_type: Option<FigmaPrototypeActionType>,
+    pub(crate) action_type: Option<FigmaPrototypeActionType>,
     #[serde(default)]
-    navigation: Option<FigmaPrototypeActionType>,
+    pub(crate) navigation: Option<FigmaPrototypeActionType>,
     #[serde(default)]
-    transition: Option<FigmaPrototypeTransition>,
+    pub(crate) transition: Option<FigmaPrototypeTransition>,
     #[serde(default)]
-    preserve_scroll_position: Option<bool>,
+    pub(crate) preserve_scroll_position: Option<bool>,
     #[serde(default)]
-    url: Option<String>,
+    pub(crate) url: Option<String>,
 }
 
 impl FigmaPrototypeInteraction {
-    fn trigger_spec(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+    pub(crate) fn trigger_spec(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
         self.trigger
             .as_ref()
             .and_then(FigmaPrototypeTriggerInput::to_public)
     }
 
-    fn transition_details(&self) -> Option<PrototypeTransition> {
+    pub(crate) fn transition_details(&self) -> Option<PrototypeTransition> {
         self.transition
             .as_ref()
             .and_then(FigmaPrototypeTransition::to_public)
     }
 
-    fn to_legacy_edge(
+    pub(crate) fn to_legacy_edge(
         &self,
         from: NodeId,
         trigger: PrototypeTrigger,
@@ -2897,7 +2468,7 @@ impl FigmaPrototypeInteraction {
         })
     }
 
-    fn legacy_action_kind(&self) -> PrototypeActionKind {
+    pub(crate) fn legacy_action_kind(&self) -> PrototypeActionKind {
         if let Some(action) = self
             .action_type
             .or(self.navigation)
@@ -2917,9 +2488,9 @@ impl FigmaPrototypeInteraction {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPrototypeAction {
+pub(crate) struct FigmaPrototypeAction {
     #[serde(default, rename = "type")]
-    action_type: Option<FigmaPrototypeActionType>,
+    pub(crate) action_type: Option<FigmaPrototypeActionType>,
     #[serde(
         default,
         alias = "destinationId",
@@ -2928,23 +2499,23 @@ struct FigmaPrototypeAction {
         alias = "transitionNodeID",
         alias = "transitionNodeId"
     )]
-    destination_id: Option<FigmaNodeKey>,
+    pub(crate) destination_id: Option<FigmaNodeKey>,
     #[serde(default)]
-    transition: Option<FigmaPrototypeTransition>,
+    pub(crate) transition: Option<FigmaPrototypeTransition>,
     #[serde(default)]
-    preserve_scroll_position: Option<bool>,
+    pub(crate) preserve_scroll_position: Option<bool>,
     #[serde(default)]
-    overlay_position_type: Option<FigmaOverlayPositionType>,
+    pub(crate) overlay_position_type: Option<FigmaOverlayPositionType>,
     #[serde(default)]
-    overlay_background_interaction: Option<FigmaOverlayBackgroundInteraction>,
+    pub(crate) overlay_background_interaction: Option<FigmaOverlayBackgroundInteraction>,
     #[serde(default)]
-    overlay_relative_position: Option<FigmaVector2>,
+    pub(crate) overlay_relative_position: Option<FigmaVector2>,
     #[serde(default)]
-    url: Option<String>,
+    pub(crate) url: Option<String>,
 }
 
 impl FigmaPrototypeAction {
-    fn to_edge(
+    pub(crate) fn to_edge(
         &self,
         from: NodeId,
         trigger: PrototypeTrigger,
@@ -2997,7 +2568,7 @@ impl FigmaPrototypeAction {
         })
     }
 
-    fn overlay_config(&self) -> Option<PrototypeOverlayConfig> {
+    pub(crate) fn overlay_config(&self) -> Option<PrototypeOverlayConfig> {
         let position = self
             .overlay_position_type
             .and_then(FigmaOverlayPositionType::to_public);
@@ -3018,13 +2589,13 @@ impl FigmaPrototypeAction {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaPrototypeTriggerInput {
+pub(crate) enum FigmaPrototypeTriggerInput {
     Simple(FigmaPrototypeTrigger),
     Detailed(FigmaPrototypeTriggerDetails),
 }
 
 impl FigmaPrototypeTriggerInput {
-    fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+    pub(crate) fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
         match self {
             Self::Simple(trigger) => trigger.to_public().map(|value| (value, None)),
             Self::Detailed(details) => details.to_public(),
@@ -3034,17 +2605,17 @@ impl FigmaPrototypeTriggerInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPrototypeTriggerDetails {
+pub(crate) struct FigmaPrototypeTriggerDetails {
     #[serde(default, rename = "type")]
-    trigger_type: Option<FigmaPrototypeTrigger>,
+    pub(crate) trigger_type: Option<FigmaPrototypeTrigger>,
     #[serde(default)]
-    timeout: Option<f64>,
+    pub(crate) timeout: Option<f64>,
     #[serde(default)]
-    delay: Option<f64>,
+    pub(crate) delay: Option<f64>,
 }
 
 impl FigmaPrototypeTriggerDetails {
-    fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
+    pub(crate) fn to_public(&self) -> Option<(PrototypeTrigger, Option<u32>)> {
         let trigger = self
             .trigger_type
             .and_then(FigmaPrototypeTrigger::to_public)?;
@@ -3055,21 +2626,21 @@ impl FigmaPrototypeTriggerDetails {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPrototypeTransition {
+pub(crate) struct FigmaPrototypeTransition {
     #[serde(default, rename = "type")]
-    transition_type: Option<FigmaPrototypeTransitionType>,
+    pub(crate) transition_type: Option<FigmaPrototypeTransitionType>,
     #[serde(default, alias = "transitionDuration")]
-    duration: Option<f64>,
+    pub(crate) duration: Option<f64>,
     #[serde(default, alias = "transitionEasing")]
-    easing: Option<FigmaPrototypeEasingInput>,
+    pub(crate) easing: Option<FigmaPrototypeEasingInput>,
     #[serde(default, alias = "transitionDirection")]
-    direction: Option<FigmaPrototypeDirection>,
+    pub(crate) direction: Option<FigmaPrototypeDirection>,
     #[serde(default)]
-    match_layers: Option<bool>,
+    pub(crate) match_layers: Option<bool>,
 }
 
 impl FigmaPrototypeTransition {
-    fn to_public(&self) -> Option<PrototypeTransition> {
+    pub(crate) fn to_public(&self) -> Option<PrototypeTransition> {
         let kind = self
             .transition_type
             .unwrap_or(FigmaPrototypeTransitionType::Unknown)
@@ -3101,7 +2672,7 @@ impl FigmaPrototypeTransition {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrototypeActionType {
+pub(crate) enum FigmaPrototypeActionType {
     #[serde(alias = "NODE")]
     Navigate,
     OpenOverlay,
@@ -3117,7 +2688,7 @@ enum FigmaPrototypeActionType {
 }
 
 impl FigmaPrototypeActionType {
-    fn to_public(self) -> PrototypeActionKind {
+    pub(crate) fn to_public(self) -> PrototypeActionKind {
         match self {
             Self::Navigate => PrototypeActionKind::Navigate,
             Self::OpenOverlay => PrototypeActionKind::OpenOverlay,
@@ -3133,7 +2704,7 @@ impl FigmaPrototypeActionType {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrototypeTransitionType {
+pub(crate) enum FigmaPrototypeTransitionType {
     Instant,
     Dissolve,
     MoveIn,
@@ -3149,7 +2720,7 @@ enum FigmaPrototypeTransitionType {
 }
 
 impl FigmaPrototypeTransitionType {
-    fn to_public(self) -> PrototypeTransitionKind {
+    pub(crate) fn to_public(self) -> PrototypeTransitionKind {
         match self {
             Self::Instant => PrototypeTransitionKind::Instant,
             Self::Dissolve => PrototypeTransitionKind::Dissolve,
@@ -3167,13 +2738,13 @@ impl FigmaPrototypeTransitionType {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
-enum FigmaPrototypeEasingInput {
+pub(crate) enum FigmaPrototypeEasingInput {
     Simple(FigmaPrototypeEasing),
     Detailed(FigmaPrototypeEasingDetails),
 }
 
 impl FigmaPrototypeEasingInput {
-    fn to_public(&self) -> Option<PrototypeEasing> {
+    pub(crate) fn to_public(&self) -> Option<PrototypeEasing> {
         match self {
             Self::Simple(easing) => Some(easing.to_public()),
             Self::Detailed(details) => details.easing_type.map(FigmaPrototypeEasing::to_public),
@@ -3183,14 +2754,14 @@ impl FigmaPrototypeEasingInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaPrototypeEasingDetails {
+pub(crate) struct FigmaPrototypeEasingDetails {
     #[serde(default, rename = "type")]
-    easing_type: Option<FigmaPrototypeEasing>,
+    pub(crate) easing_type: Option<FigmaPrototypeEasing>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrototypeEasing {
+pub(crate) enum FigmaPrototypeEasing {
     Linear,
     EaseIn,
     EaseOut,
@@ -3201,7 +2772,7 @@ enum FigmaPrototypeEasing {
 }
 
 impl FigmaPrototypeEasing {
-    fn to_public(self) -> PrototypeEasing {
+    pub(crate) fn to_public(self) -> PrototypeEasing {
         match self {
             Self::Linear => PrototypeEasing::Linear,
             Self::EaseIn => PrototypeEasing::EaseIn,
@@ -3215,7 +2786,7 @@ impl FigmaPrototypeEasing {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrototypeDirection {
+pub(crate) enum FigmaPrototypeDirection {
     Left,
     Right,
     Top,
@@ -3225,7 +2796,7 @@ enum FigmaPrototypeDirection {
 }
 
 impl FigmaPrototypeDirection {
-    fn to_public(self) -> Option<PrototypeDirection> {
+    pub(crate) fn to_public(self) -> Option<PrototypeDirection> {
         match self {
             Self::Left => Some(PrototypeDirection::Left),
             Self::Right => Some(PrototypeDirection::Right),
@@ -3238,7 +2809,7 @@ impl FigmaPrototypeDirection {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaOverlayPositionType {
+pub(crate) enum FigmaOverlayPositionType {
     Center,
     TopLeft,
     TopCenter,
@@ -3252,7 +2823,7 @@ enum FigmaOverlayPositionType {
 }
 
 impl FigmaOverlayPositionType {
-    fn to_public(self) -> Option<PrototypeOverlayPosition> {
+    pub(crate) fn to_public(self) -> Option<PrototypeOverlayPosition> {
         match self {
             Self::Center => Some(PrototypeOverlayPosition::Center),
             Self::TopLeft => Some(PrototypeOverlayPosition::TopLeft),
@@ -3269,7 +2840,7 @@ impl FigmaOverlayPositionType {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaOverlayBackgroundInteraction {
+pub(crate) enum FigmaOverlayBackgroundInteraction {
     None,
     CloseOnClickOutside,
     #[serde(alias = "PASSTHROUGH", alias = "PASS_THROUGH")]
@@ -3279,7 +2850,7 @@ enum FigmaOverlayBackgroundInteraction {
 }
 
 impl FigmaOverlayBackgroundInteraction {
-    fn to_public(self) -> PrototypeOverlayBackgroundInteraction {
+    pub(crate) fn to_public(self) -> PrototypeOverlayBackgroundInteraction {
         match self {
             Self::None => PrototypeOverlayBackgroundInteraction::None,
             Self::CloseOnClickOutside => PrototypeOverlayBackgroundInteraction::CloseOnClickOutside,
@@ -3291,20 +2862,20 @@ impl FigmaOverlayBackgroundInteraction {
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FigmaVector2 {
-    x: f32,
-    y: f32,
+pub(crate) struct FigmaVector2 {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
 }
 
 impl FigmaVector2 {
-    fn to_tuple(self) -> (f32, f32) {
+    pub(crate) fn to_tuple(self) -> (f32, f32) {
         (self.x, self.y)
     }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum FigmaPrototypeTrigger {
+pub(crate) enum FigmaPrototypeTrigger {
     OnClick,
     OnHover,
     OnDrag,
@@ -3316,7 +2887,7 @@ enum FigmaPrototypeTrigger {
 }
 
 impl FigmaPrototypeTrigger {
-    fn to_public(self) -> Option<PrototypeTrigger> {
+    pub(crate) fn to_public(self) -> Option<PrototypeTrigger> {
         match self {
             Self::OnClick => Some(PrototypeTrigger::OnClick),
             Self::OnHover => Some(PrototypeTrigger::OnHover),
