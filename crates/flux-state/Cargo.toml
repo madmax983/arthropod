@@ -12,5 +12,6 @@ nova = ["dep:serde"]
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
+arbitrary = { version = "1.4.2", features = ["derive"] }
 loom = "0.7.2"
 proptest = "1.4"
