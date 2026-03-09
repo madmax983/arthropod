@@ -16,4 +16,4 @@ proc-macro2 = "1.0"
 heck = "0.5"  # For case conversion (PascalCase -> snake_case)
 
 [dev-dependencies]
-trybuild = "1.0"
+trybuild = "1.0.116"

@@ -42,7 +42,6 @@ regex = "1.10"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-pollster.workspace = true
 
 [[bin]]
 name = "arthropod-mcp"
