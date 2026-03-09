@@ -2,44 +2,96 @@
 
 use crate::{Point, Size, WindowId};
 
-/// Top-level event type.
+/// The root event type dispatched by the application's main event loop.
+///
+/// This enum wraps all possible interactions, separating window-specific inputs
+/// (like mouse clicks and resizing) from global application lifecycle events
+/// (like suspension or resumption).
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{Event, LifecycleEvent};
+///
+/// let event = Event::Lifecycle(LifecycleEvent::Resumed);
+/// match event {
+///     Event::Lifecycle(LifecycleEvent::Resumed) => {
+///         println!("App is waking up!");
+///     }
+///     _ => {}
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub enum Event {
-    /// Window-specific event.
+    /// An event that targets a specific graphical window.
     Window {
+        /// A unique, opaque token identifying which window received the input.
         window_id: WindowId,
+        /// The specific action or state change that occurred on the window.
         event: WindowEvent,
     },
-    /// Application lifecycle event.
+    /// An event affecting the global state of the application process.
     Lifecycle(LifecycleEvent),
 }
 
-/// Window-specific events.
+/// Window-specific events that are dispatched to the application.
+///
+/// These events represent the lifecycle, state changes, and hardware interactions
+/// directed at a specific window. Handling these events correctly is critical for
+/// a responsive and well-behaved application.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{WindowEvent, Size};
+///
+/// let event = WindowEvent::Resized(Size::new(800, 600));
+/// match event {
+///     WindowEvent::Resized(size) => {
+///         println!("Window resized to {}x{}", size.width, size.height);
+///     }
+///     _ => {}
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub enum WindowEvent {
-    /// Window close was requested (e.g., clicking the X button).
+    /// Dispatched when the user clicks the close button (X) on the window frame,
+    /// or uses a platform-specific shortcut (like Alt+F4) to close it.
     CloseRequested,
-    /// Window was resized.
+    /// Dispatched whenever the window's client area changes size.
+    /// You should use this to trigger a layout pass and update rendering surface sizes.
     Resized(Size<u32>),
-    /// Window gained or lost focus.
+    /// Dispatched when the window gains or loses keyboard focus.
+    /// Use this to pause animations or mute audio when the application is backgrounded.
     Focused(bool),
-    /// Scale factor changed.
+    /// Dispatched when the window moves to a monitor with a different DPI scale factor,
+    /// or if the user changes the system-wide display scaling settings.
     ScaleFactorChanged {
+        /// The new scale factor, typically a value like 1.0 (100%), 1.5 (150%), or 2.0 (200%).
         scale_factor: f64,
+        /// The new physical size of the window after the scaling has been applied.
         new_inner_size: Size<u32>,
     },
-    /// A redraw was requested.
+    /// Dispatched when the OS or the window manager requests the application to redraw its contents.
+    /// This happens when the window is exposed, resized, or explicitly invalidated.
     RedrawRequested,
-    /// Keyboard input.
+    /// Represents a discrete keyboard interaction, such as a key being pressed or released.
     KeyboardInput(KeyboardInput),
-    /// Mouse button input.
+    /// Represents a physical mouse button click or release within the window's client area.
     MouseInput(MouseInput),
-    /// Cursor moved within the window.
-    CursorMoved { position: Point<f64> },
-    /// Cursor entered or left the window.
+    /// Dispatched whenever the pointing device (mouse, trackpad) moves within the client area.
+    CursorMoved {
+        /// The new precise sub-pixel position of the cursor relative to the top-left of the client area.
+        position: Point<f64>,
+    },
+    /// Dispatched when the cursor physically enters or leaves the boundary of the window.
+    /// Useful for resetting hover states or triggering edge-pan behaviors.
     CursorEntered(bool),
-    /// Mouse wheel/scroll event.
-    MouseWheel { delta: ScrollDelta },
+    /// Dispatched when a scroll wheel on a mouse is rotated, or when a trackpad gesture is interpreted as scrolling.
+    MouseWheel {
+        /// The direction and magnitude of the scroll movement.
+        delta: ScrollDelta,
+    },
 }
 
 /// Application lifecycle events.
@@ -51,21 +103,66 @@ pub enum LifecycleEvent {
     Suspended,
 }
 
-/// Keyboard input event.
+/// Represents a single keyboard interaction event.
+///
+/// This struct captures the exact state of the keyboard at the moment the event occurred,
+/// including the specific key, whether it went down or up, and any modifier keys that were held.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{KeyboardInput, Key, ElementState, Modifiers};
+///
+/// let input = KeyboardInput {
+///     key: Key::A,
+///     state: ElementState::Pressed,
+///     modifiers: Modifiers { shift: true, ..Default::default() },
+///     repeat: false,
+/// };
+///
+/// if input.state == ElementState::Pressed && input.modifiers.shift {
+///     println!("User typed a capital A!");
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct KeyboardInput {
+    /// The specific logical key that triggered the event.
     pub key: Key,
+    /// Indicates whether the physical key was pushed down or released.
     pub state: ElementState,
+    /// A snapshot of the Shift, Ctrl, Alt, and Meta keys at the time of the event.
     pub modifiers: Modifiers,
+    /// If `true`, this event was automatically generated by the operating system's
+    /// key-repeat behavior because the user is holding the key down.
     pub repeat: bool,
 }
 
-/// Mouse button input event.
+/// Represents a discrete physical interaction with a mouse button.
+///
+/// This struct is used to track clicks, drags, and releases. It includes the
+/// exact position of the cursor to allow for hit-testing against UI elements.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{MouseInput, MouseButton, ElementState, Point, Modifiers};
+///
+/// let input = MouseInput {
+///     button: MouseButton::Left,
+///     state: ElementState::Pressed,
+///     position: Point::new(100.0, 50.0),
+///     modifiers: Modifiers::default(),
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct MouseInput {
+    /// The physical button on the mouse that was pressed or released.
     pub button: MouseButton,
+    /// Indicates whether the button transitioned to a pressed or released state.
     pub state: ElementState,
+    /// The coordinates of the cursor when the button state changed.
     pub position: Point<f64>,
+    /// Any keyboard modifiers that were held down during the click (e.g., for Shift-clicking).
     pub modifiers: Modifiers,
 }
 
@@ -78,33 +175,76 @@ pub enum ScrollDelta {
     PixelDelta(f64, f64),
 }
 
-/// State of a button or key.
+/// Describes the physical state of a binary input element, such as a key or a mouse button.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::ElementState;
+///
+/// let state = ElementState::Pressed;
+/// assert_eq!(state == ElementState::Pressed, true);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementState {
+    /// The element is actively being held down by the user.
     Pressed,
+    /// The element is not currently being interacted with.
     Released,
 }
 
-/// Mouse button.
+/// Identifies a specific button on a pointing device.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::MouseButton;
+///
+/// let primary_action = MouseButton::Left;
+/// let context_menu_action = MouseButton::Right;
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseButton {
+    /// The primary button, typically the left button on a right-handed mouse.
     Left,
+    /// The secondary button, typically used to summon context menus.
     Right,
+    /// The tertiary button, often located under the scroll wheel.
     Middle,
+    /// Represents extra buttons found on specialized mice (e.g., thumb buttons for back/forward).
     Other(u16),
 }
 
-/// Modifier key state.
+/// Represents the current active state of keyboard modifier keys.
+///
+/// This is heavily used to interpret user intent during text entry or when
+/// constructing keyboard shortcuts (e.g., `Ctrl+C`).
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::Modifiers;
+///
+/// let save_shortcut = Modifiers {
+///     ctrl: true,
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Modifiers {
+    /// True if either the left or right Shift key is held down.
     pub shift: bool,
+    /// True if either the left or right Control key is held down.
     pub ctrl: bool,
+    /// True if either the left or right Alt (or Option) key is held down.
     pub alt: bool,
+    /// True if the Windows key (on Windows) or the Command key (on macOS) is held down.
     pub meta: bool, // Windows key / Command key
 }
 
 /// Keyboard key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)] // We do not need docs for every single key
 pub enum Key {
     // Letters
     A,
