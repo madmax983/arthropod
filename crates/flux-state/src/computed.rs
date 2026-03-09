@@ -458,4 +458,26 @@ mod tests {
         let debug_str = format!("{:?}", computed);
         assert!(debug_str.contains("<type mismatch>"));
     }
+
+    #[test]
+    fn test_computed_debug_locked() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 42);
+        let (read, _write) = signal.clone().split();
+
+        let computed = Computed::new(runtime.clone(), move || read.get() * 2);
+
+        // Lock the computed value manually
+        let handle = runtime.get_computed_handle(computed.id);
+        let guard = handle
+            .downcast_ref::<RwLock<i32>>()
+            .unwrap()
+            .write()
+            .unwrap();
+
+        let debug_str = format!("{:?}", computed);
+        assert!(debug_str.contains("value: <locked>"));
+
+        drop(guard);
+    }
 }
