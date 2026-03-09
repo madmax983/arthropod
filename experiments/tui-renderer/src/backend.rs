@@ -84,7 +84,7 @@ impl<B: Backend> TuiBackend<B> {
                 frame.render_widget(block, size);
 
                 // Iterate visuals in Z-order
-                for (_id, node) in scene.iter_visuals() {
+                for (_id, node, _) in scene.iter_visuals() {
                     if !node.visible || node.opacity <= 0.0 {
                         continue;
                     }
@@ -140,7 +140,7 @@ impl<B: Backend> TuiBackend<B> {
                             }
                         }
                         NodeContent::SolidColor { color } => {
-                            let bg = map_color(*color);
+                            let bg = map_color(color.clone());
                             let block = Block::default().bg(bg);
                             frame.render_widget(block, rect);
                         }

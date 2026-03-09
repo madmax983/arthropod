@@ -287,7 +287,7 @@ impl Scene {
     pub fn iter_visuals(&self) -> VisualIterator<'_> {
         VisualIterator {
             scene: self,
-            stack: vec![self.root],
+            stack: vec![(self.root, 1.0)],
         }
     }
 
@@ -297,10 +297,10 @@ impl Scene {
     /// the traversal stack. The stack is cleared before use.
     pub fn iter_visuals_custom<'a, 'b>(
         &'a self,
-        stack: &'b mut Vec<NodeId>,
+        stack: &'b mut Vec<(NodeId, f32)>,
     ) -> VisualRefIterator<'a, 'b> {
         stack.clear();
-        stack.push(self.root);
+        stack.push((self.root, 1.0));
         VisualRefIterator { scene: self, stack }
     }
 
@@ -434,46 +434,58 @@ impl Scene {
 /// Iterator for visual nodes in depth-first (Painter's Algorithm) order.
 pub struct VisualIterator<'a> {
     scene: &'a Scene,
-    stack: Vec<NodeId>,
+    stack: Vec<(NodeId, f32)>,
 }
 
 impl<'a> Iterator for VisualIterator<'a> {
-    type Item = (NodeId, &'a SceneNode);
+    type Item = (NodeId, &'a SceneNode, f32);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let id = self.stack.pop()?;
+        let (id, opacity) = self.stack.pop()?;
         let node = self.scene.get_node(id)?;
+
+        let new_opacity = if node.visible {
+            opacity * node.opacity.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         // Push children in reverse order so they are processed in forward order
         // (stack is LIFO, so pushing [1, 2] means popping 2 then 1, visiting 1 then 2)
         for &child_id in node.children.iter().rev() {
-            self.stack.push(child_id);
+            self.stack.push((child_id, new_opacity));
         }
 
-        Some((id, node))
+        Some((id, node, new_opacity))
     }
 }
 
 /// Iterator for visual nodes using a borrowed stack.
 pub struct VisualRefIterator<'a, 'b> {
     scene: &'a Scene,
-    stack: &'b mut Vec<NodeId>,
+    stack: &'b mut Vec<(NodeId, f32)>,
 }
 
 impl<'a, 'b> Iterator for VisualRefIterator<'a, 'b> {
-    type Item = (NodeId, &'a SceneNode);
+    type Item = (NodeId, &'a SceneNode, f32);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let id = self.stack.pop()?;
+        let (id, opacity) = self.stack.pop()?;
         let node = self.scene.get_node(id)?;
+
+        let new_opacity = if node.visible {
+            opacity * node.opacity.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         // Push children in reverse order so they are processed in forward order
         // (stack is LIFO, so pushing [1, 2] means popping 2 then 1, visiting 1 then 2)
         for &child_id in node.children.iter().rev() {
-            self.stack.push(child_id);
+            self.stack.push((child_id, new_opacity));
         }
 
-        Some((id, node))
+        Some((id, node, new_opacity))
     }
 }
 
@@ -749,7 +761,7 @@ mod tests {
         let grandchild1 = scene.add_node(child1, SceneNode::new(NodeContent::Empty));
         let child2 = scene.add_node(root, SceneNode::new(NodeContent::Empty));
 
-        let traversal: Vec<NodeId> = scene.iter_visuals().map(|(id, _)| id).collect();
+        let traversal: Vec<NodeId> = scene.iter_visuals().map(|(id, _, _)| id).collect();
 
         // Expected order: Root, Child1, Grandchild1, Child2
         assert_eq!(traversal, vec![root, child1, grandchild1, child2]);
@@ -768,13 +780,13 @@ mod tests {
         let _grandchild3 = scene.add_node(child2, SceneNode::new(NodeContent::Empty));
 
         // Standard iterator
-        let standard_order: Vec<NodeId> = scene.iter_visuals().map(|(id, _)| id).collect();
+        let standard_order: Vec<NodeId> = scene.iter_visuals().map(|(id, _, _)| id).collect();
 
         // Custom iterator with reused stack
         let mut stack = Vec::new();
         let custom_order: Vec<NodeId> = scene
             .iter_visuals_custom(&mut stack)
-            .map(|(id, _)| id)
+            .map(|(id, _, _)| id)
             .collect();
 
         assert_eq!(standard_order, custom_order);
@@ -783,10 +795,10 @@ mod tests {
         assert!(stack.is_empty());
 
         // Verify we can reuse the stack (it should be cleared by iter_visuals_custom)
-        stack.push(NodeId(999)); // Add junk
+        stack.push((NodeId(999), 1.0)); // Add junk
         let custom_order_2: Vec<NodeId> = scene
             .iter_visuals_custom(&mut stack)
-            .map(|(id, _)| id)
+            .map(|(id, _, _)| id)
             .collect();
 
         assert_eq!(standard_order, custom_order_2);

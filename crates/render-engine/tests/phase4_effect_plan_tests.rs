@@ -25,7 +25,7 @@ fn test_effect_plan_orders_layer_blur_pipeline_steps() {
     let scene = make_scene_with_layer_blur();
     let nodes: Vec<EffectPlanNode<'_>> = scene
         .iter_visuals()
-        .map(|(node_id, node)| EffectPlanNode::from_scene(node_id, node))
+        .map(|(node_id, node, _)| EffectPlanNode::from_scene(node_id, node))
         .collect();
 
     let plan = plan_effect_passes(&nodes, 1280, 720);

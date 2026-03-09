@@ -53,7 +53,7 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) path_interner: &'a mut PathInterner,
     pub(crate) text_renderer: &'a mut TextRenderer,
     pub(crate) glyph_texture: &'a wgpu::Texture,
-    pub(crate) traversal_stack: &'a mut Vec<crate::NodeId>,
+    pub(crate) traversal_stack: &'a mut Vec<(crate::NodeId, f32)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -828,7 +828,7 @@ impl<'a> MultipassRenderer<'a> {
 
 pub(crate) fn collect_multipass_node_ids(
     scene: &Scene,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
 ) -> Vec<crate::NodeId> {
     collect_ordered_render_nodes(scene, stack)
         .into_iter()
@@ -844,17 +844,17 @@ pub(crate) fn collect_multipass_node_ids(
 
 pub(crate) fn collect_ordered_render_nodes(
     scene: &Scene,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
 ) -> Vec<OrderedRenderNode> {
     use crate::NodeContent;
 
     scene
         .iter_visuals_custom(stack)
-        .filter_map(|(node_id, node)| {
+        .filter_map(|(node_id, node, inherited_opacity)| {
             if !node.visible {
                 return None;
             }
-            if inherited_node_opacity(scene, node_id) <= 0.0 {
+            if inherited_opacity <= 0.0 {
                 return None;
             }
             match &node.content {
@@ -878,16 +878,16 @@ pub(crate) fn collect_ordered_render_nodes(
 
 pub(crate) fn classify_scene_effect_kinds(
     scene: &Scene,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
 ) -> Vec<EffectPassKind> {
     use crate::NodeContent;
 
     let mut kinds = Vec::new();
-    for (node_id, node) in scene.iter_visuals_custom(stack) {
+    for (_node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
         if !node.visible {
             continue;
         }
-        if inherited_node_opacity(scene, node_id) <= 0.0 {
+        if inherited_opacity <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {
@@ -898,16 +898,16 @@ pub(crate) fn classify_scene_effect_kinds(
     kinds
 }
 
-pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<crate::NodeId>) -> f32 {
+pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<(crate::NodeId, f32)>) -> f32 {
     use crate::NodeContent;
     use style_engine::Effect;
 
     let mut max_radius = 0.0f32;
-    for (node_id, node) in scene.iter_visuals_custom(stack) {
+    for (_node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
         if !node.visible {
             continue;
         }
-        if inherited_node_opacity(scene, node_id) <= 0.0 {
+        if inherited_opacity <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {
@@ -930,7 +930,7 @@ pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<crate::NodeId
 
 pub(crate) fn collect_background_capture_bounds(
     scene: &Scene,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
     frame_width: u32,
     frame_height: u32,
 ) -> Vec<[u32; 4]> {
@@ -940,11 +940,11 @@ pub(crate) fn collect_background_capture_bounds(
     let mut bounds = Vec::new();
     let frame = [0, 0, frame_width, frame_height];
 
-    for (node_id, node) in scene.iter_visuals_custom(stack) {
+    for (_node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
         if !node.visible {
             continue;
         }
-        if inherited_node_opacity(scene, node_id) <= 0.0 {
+        if inherited_opacity <= 0.0 {
             continue;
         }
         let NodeContent::Styled { style } = &node.content else {

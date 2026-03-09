@@ -56,7 +56,7 @@ pub struct WgpuBackend {
     effect_target_pool: RenderTargetPool,
     clip_stack: ClipStack,
     effect_sampler: wgpu::Sampler,
-    traversal_stack: Vec<crate::NodeId>,
+    traversal_stack: Vec<(crate::NodeId, f32)>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -205,7 +205,7 @@ impl WgpuBackend {
         use crate::NodeContent;
         let mut report = PathCacheWarmupReport::default();
 
-        for (_node_id, node) in scene.iter_visuals() {
+        for (_node_id, node, _) in scene.iter_visuals() {
             if !node.visible || node.opacity <= 0.0 {
                 continue;
             }

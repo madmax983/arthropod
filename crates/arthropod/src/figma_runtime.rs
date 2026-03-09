@@ -172,7 +172,7 @@ impl FigmaRuntime {
     pub fn collect_render_instances(&self) -> Vec<PrimitiveInstance> {
         self.scene
             .iter_visuals()
-            .flat_map(|(_, node)| create_node_instances(node))
+            .flat_map(|(_, node, _)| create_node_instances(node))
             .collect()
     }
 

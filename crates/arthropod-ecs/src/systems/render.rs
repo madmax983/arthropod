@@ -33,7 +33,7 @@ pub fn collect_renderables_system(
     // Persistent cache for the set of renderable node IDs to avoid per-frame allocation
     mut renderable_nodes_cache: Local<HashSet<NodeId>>,
     // Persistent stack for scene traversal to avoid per-frame allocation
-    mut traversal_stack: Local<Vec<NodeId>>,
+    mut traversal_stack: Local<Vec<(NodeId, f32)>>,
 ) {
     commands.0.clear();
     renderable_nodes_cache.clear();
@@ -44,17 +44,17 @@ pub fn collect_renderables_system(
     // 2. Collect visual nodes in painter's order, filtered by renderable set
     let visual_nodes: Vec<_> = scene
         .iter_visuals_custom(&mut traversal_stack)
-        .filter(|(id, _)| renderable_nodes_cache.contains(id))
+        .filter(|(id, _, _)| renderable_nodes_cache.contains(id))
         .collect();
 
     // 3. Generate instances — use threshold to choose execution path
     if visual_nodes.len() >= RENDER_PARALLEL_THRESHOLD {
         commands.0 = visual_nodes
             .par_iter()
-            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
+            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
     } else {
-        for (_, node) in &visual_nodes {
+        for (_, node, _) in &visual_nodes {
             commands
                 .0
                 .extend(render_engine::backend::wgpu::create_node_instances(node));
@@ -98,19 +98,19 @@ mod tests {
         let renderable_nodes: HashSet<NodeId> = node_ids.iter().copied().collect();
         let visual_nodes: Vec<_> = scene
             .iter_visuals()
-            .filter(|(id, _)| renderable_nodes.contains(id))
+            .filter(|(id, _, _)| renderable_nodes.contains(id))
             .collect();
 
         // Sequential
         let sequential: Vec<_> = visual_nodes
             .iter()
-            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
+            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
 
         // Parallel
         let parallel: Vec<_> = visual_nodes
             .par_iter()
-            .flat_map(|(_, node)| render_engine::backend::wgpu::create_node_instances(node))
+            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
             .collect();
 
         assert_eq!(sequential.len(), parallel.len());

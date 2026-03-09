@@ -32,3 +32,7 @@
 **Pre-allocate arrays and reuse vector buffers in hot loops**
 **Learning:** `collect_style_batches_for_bounds` in `wgpu/instance_collector.rs` was allocating two vectors (`Vec<PrimitiveInstance>` and `Vec<PathBatch>`) for every styled node requiring multipass rendering per frame.
 **Action:** Changed the signature to accept `instances: &mut Vec<PrimitiveInstance>` and `path_batches: &mut Vec<PathBatch>` from the caller (`MultipassRenderer`), allowing the same vector capacities to be cleared and reused across all nodes, removing a significant number of per-frame heap allocations.
+
+**[Performance] Avoid O(d) ancestor walks on every node for opacity calculation**
+**Learning:** `inherited_node_opacity` was being called for every single node returned by the `iter_visuals` iterator. This triggers an `O(d)` ancestor lookup for every node to compute the inherited opacity, which does identical tree walks multiple times for children with the same parents, dragging down hit testing and scene traversal performance.
+**Action:** Move inherited properties like `opacity` into the traversal state directly (e.g., store them in the DFS stack in `iter_visuals`). Pass down the pre-multiplied values when iterating.

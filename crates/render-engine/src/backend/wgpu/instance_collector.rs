@@ -390,7 +390,7 @@ pub(crate) fn collect_instances<'a>(
     pipeline: &mut PrimitivePipeline,
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
     scene: &'a Scene,
 ) -> (
     Vec<PrimitiveInstance>,
@@ -411,7 +411,7 @@ pub(crate) fn collect_instances_excluding_multipass<'a>(
     pipeline: &mut PrimitivePipeline,
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
     scene: &'a Scene,
 ) -> (
     Vec<PrimitiveInstance>,
@@ -600,7 +600,7 @@ fn collect_instances_impl<'a>(
     mut pipeline: Option<&mut PrimitivePipeline>,
     mut tessellation_cache: Option<&mut TessellationCache>,
     mut path_interner: Option<&mut PathInterner>,
-    stack: &mut Vec<crate::NodeId>,
+    stack: &mut Vec<(crate::NodeId, f32)>,
     scene: &'a Scene,
     skip_multipass: bool,
 ) -> (
@@ -623,11 +623,10 @@ fn collect_instances_impl<'a>(
     let mut text_nodes_for_shaping = Vec::with_capacity(capacity / 4);
     let mut path_batches = Vec::with_capacity(capacity / 4);
 
-    for (node_id, node) in scene.iter_visuals_custom(stack) {
+    for (node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
         if !node.visible {
             continue;
         }
-        let inherited_opacity = inherited_node_opacity(scene, node_id);
         if inherited_opacity <= 0.0 {
             continue;
         }
