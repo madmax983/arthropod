@@ -1,0 +1,58 @@
+Found 100 mutants to test
+ok       Unmutated baseline in 21s build + 18s test
+ INFO Auto-set test timeout to 94s
+caught   crates/flux-state/src/computed.rs:102:9: replace <impl std::fmt::Debug for Computed<T>>::fmt -> std::fmt::Result with Ok(Default::default()) in 3s build + 0s test
+caught   crates/flux-state/src/effect.rs:162:9: replace <impl Drop for Effect>::drop with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:103:9: replace <impl Drop for PanicRestorer<'a>>::drop with () in 3s build + 0s test
+TIMEOUT  crates/flux-state/src/runtime.rs:124:9: replace <impl Drop for ComputingGuard<'a>>::drop with () in 3s build + 94s test
+caught   crates/flux-state/src/runtime.rs:148:9: replace <impl Drop for ContextGuard<'a>>::drop with () in 9s build + 0s test
+caught   crates/flux-state/src/runtime.rs:171:9: replace RuntimeInner::check_recursion -> bool with true in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:171:9: replace RuntimeInner::check_recursion -> bool with false in 3s build + 19s test
+caught   crates/flux-state/src/runtime.rs:177:9: replace RuntimeInner::cleanup_dependencies with () in 4s build + 19s test
+caught   crates/flux-state/src/runtime.rs:188:9: replace RuntimeInner::mark_stale -> bool with true in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:188:9: replace RuntimeInner::mark_stale -> bool with false in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:210:9: replace RuntimeInner::mark_subscribers_stale with () in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:228:9: replace RuntimeInner::push_context -> Result<(), String> with Ok(()) in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:234:24: replace >= with < in RuntimeInner::push_context in 5s build + 0s test
+caught   crates/flux-state/src/runtime.rs:245:9: replace RuntimeInner::pop_context with () in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:254:9: replace RuntimeInner::current_context -> Option<NodeId> with None in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:260:9: replace RuntimeInner::prepare_execution -> Result<(), String> with Ok(()) in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:261:12: delete ! in RuntimeInner::prepare_execution in 4s build + 1s test
+TIMEOUT  crates/flux-state/src/runtime.rs:268:9: replace RuntimeInner::take_pending_effects -> bool with true in 5s build + 94s test
+caught   crates/flux-state/src/runtime.rs:268:9: replace RuntimeInner::take_pending_effects -> bool with false in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:271:34: replace > with == in RuntimeInner::take_pending_effects in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:271:34: replace > with < in RuntimeInner::take_pending_effects in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:271:34: replace > with >= in RuntimeInner::take_pending_effects in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:279:66: replace > with == in RuntimeInner::take_pending_effects in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:279:66: replace > with < in RuntimeInner::take_pending_effects in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:279:66: replace > with >= in RuntimeInner::take_pending_effects in 3s build + 0s test
+TIMEOUT  crates/flux-state/src/runtime.rs:295:9: replace RuntimeInner::detect_deadlock -> Result<(), String> with Ok(()) in 3s build + 94s test
+caught   crates/flux-state/src/runtime.rs:301:34: replace == with != in RuntimeInner::detect_deadlock in 3s build + 1s test
+caught   crates/flux-state/src/runtime.rs:354:23: replace += with -= in Runtime::create_signal in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:354:23: replace += with *= in Runtime::create_signal in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:365:23: replace += with -= in Runtime::create_computed in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:365:23: replace += with *= in Runtime::create_computed in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:382:23: replace += with -= in Runtime::create_effect in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:382:23: replace += with *= in Runtime::create_effect in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:407:9: replace Runtime::track with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:425:9: replace Runtime::notify with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:435:9: replace Runtime::flush_effects with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:452:9: replace Runtime::process_effect_batch with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:463:9: replace Runtime::run_effect with () in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:531:9: replace Runtime::track_and_get_computed_if_fresh -> Option<Arc<dyn Any +Send +Sync>> with None in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:551:9: replace Runtime::get_computed_if_fresh -> Option<Arc<dyn Any +Send +Sync>> with None in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:565:9: replace Runtime::is_stale -> bool with true in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:565:9: replace Runtime::is_stale -> bool with false in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:592:9: replace Runtime::finish_computation with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:607:9: replace Runtime::recompute with () in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:629:26: replace && with || in Runtime::recompute in 4s build + 0s test
+caught   crates/flux-state/src/runtime.rs:629:16: delete ! in Runtime::recompute in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:629:29: delete ! in Runtime::recompute in 2s build + 0s test
+caught   crates/flux-state/src/runtime.rs:651:9: replace Runtime::dispose_effect with () in 3s build + 0s test
+caught   crates/flux-state/src/runtime.rs:1069:9: replace Runtime::set_label with () in 3s build + 0s test
+caught   crates/flux-state/src/signal.rs:70:9: replace <impl std::fmt::Debug for Signal<T>>::fmt -> std::fmt::Result with Ok(Default::default()) in 4s build + 18s test
+caught   crates/flux-state/src/signal.rs:82:9: replace <impl std::fmt::Debug for ReadSignal<T>>::fmt -> std::fmt::Result with Ok(Default::default()) in 3s build + 21s test
+caught   crates/flux-state/src/signal.rs:94:9: replace <impl std::fmt::Debug for WriteSignal<T>>::fmt -> std::fmt::Result with Ok(Default::default()) in 3s build + 18s test
+caught   crates/flux-state/src/signal.rs:380:9: replace WriteSignal<T>::set with () in 3s build + 0s test
+caught   crates/flux-state/src/signal.rs:413:9: replace WriteSignal<T>::update with () in 3s build + 0s test
+100 mutants tested in 11m: 51 caught, 46 unviable, 3 timeouts
