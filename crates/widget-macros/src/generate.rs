@@ -118,6 +118,17 @@ pub fn generate_main_macro(
                     let widget = $crate::#struct_name::#constructor_ident($pos, ());
                     $crate::#helper_name!(widget, $($rest)*)
                 }};
+
+                // Fallback for missing positional argument
+                ($($unknown:tt)*) => {{
+                    compile_error!(concat!(
+                        "Invalid syntax for ", stringify!(#macro_name), "! macro. Expected a positional argument first.\n\n",
+                        "Correct usage:\n",
+                        "  ", stringify!(#macro_name), "!(value, property: val, flag)\n\n",
+                        "You wrote:\n",
+                        "  ", stringify!(#macro_name), "!(", stringify!($($unknown)*), ")"
+                    ));
+                }};
             }
         }
     } else if has_named_children {
@@ -208,6 +219,17 @@ pub fn generate_main_macro(
                     let widget = $crate::#struct_name::#constructor_ident($pos);
                     $crate::#helper_name!(widget, $($rest)*)
                 }};
+
+                // Fallback for missing positional argument
+                ($($unknown:tt)*) => {{
+                    compile_error!(concat!(
+                        "Invalid syntax for ", stringify!(#macro_name), "! macro. Expected a positional argument first.\n\n",
+                        "Correct usage:\n",
+                        "  ", stringify!(#macro_name), "!(value, property: val, flag)\n\n",
+                        "You wrote:\n",
+                        "  ", stringify!(#macro_name), "!(", stringify!($($unknown)*), ")"
+                    ));
+                }};
             }
         }
     } else if has_effective_positional {
@@ -230,6 +252,17 @@ pub fn generate_main_macro(
                 ($pos:expr, $($rest:tt)*) => {{
                     let widget = $crate::#struct_name::#constructor_ident($pos);
                     $crate::#helper_name!(widget, $($rest)*)
+                }};
+
+                // Fallback for missing positional argument
+                ($($unknown:tt)*) => {{
+                    compile_error!(concat!(
+                        "Invalid syntax for ", stringify!(#macro_name), "! macro. Expected a positional argument first.\n\n",
+                        "Correct usage:\n",
+                        "  ", stringify!(#macro_name), "!(value, property: val, flag)\n\n",
+                        "You wrote:\n",
+                        "  ", stringify!(#macro_name), "!(", stringify!($($unknown)*), ")"
+                    ));
                 }};
             }
         }
