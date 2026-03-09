@@ -296,18 +296,11 @@ pub fn update_particles(
                 scene.remove_node(node_id);
             }
             commands.entity(entity).despawn();
-        } else if let Some(node_id) = particle.node_id {
-            let mut marked = false;
-            #[allow(clippy::collapsible_if)]
-            if let Some(node) = scene.get_mut(node_id) {
-                node.bounds.x += particle.velocity.x * time.dt;
-                node.bounds.y += particle.velocity.y * time.dt;
-                node.opacity = particle.lifetime / particle.max_lifetime;
-                marked = true;
-            }
-            if marked {
-                scene.mark_dirty(node_id);
-            }
+        } else if let Some(node) = particle.node_id.and_then(|id| scene.get_mut(id)) {
+            node.bounds.x += particle.velocity.x * time.dt;
+            node.bounds.y += particle.velocity.y * time.dt;
+            node.opacity = particle.lifetime / particle.max_lifetime;
+            scene.mark_dirty(particle.node_id.unwrap());
         }
     }
 }

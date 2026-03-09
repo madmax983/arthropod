@@ -100,11 +100,12 @@ impl<G: Clone + Send + Sync + PartialEq + std::fmt::Debug> InputPattern for Sequ
                         // Mismatch, reset
                         self.current_index = 0;
                         // Retry start of sequence?
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(&start_key) = self.sequence.first() {
-                            if input.key == start_key {
-                                self.current_index = 1;
-                            }
+                        if self
+                            .sequence
+                            .first()
+                            .is_some_and(|&start_key| input.key == start_key)
+                        {
+                            self.current_index = 1;
                         }
                     }
                 }

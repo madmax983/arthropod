@@ -90,7 +90,6 @@ impl TextInputState {
     ///
     /// If `readonly` is true or `max_length` would be exceeded, the insertion is ignored.
     /// Updates the `write_signal` with the new value and advances the cursor.
-    #[allow(clippy::collapsible_if)]
     pub fn insert_char(&mut self, c: char) {
         if self.readonly {
             return;
@@ -98,10 +97,8 @@ impl TextInputState {
 
         let (mut current_value, char_count) = self.ensure_cursor_valid();
 
-        if let Some(max_len) = self.max_length {
-            if char_count >= max_len {
-                return;
-            }
+        if self.max_length.is_some_and(|max_len| char_count >= max_len) {
+            return;
         }
 
         if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position) {
@@ -115,20 +112,17 @@ impl TextInputState {
     ///
     /// If `readonly` is true or cursor is at the start, does nothing.
     /// Updates the `write_signal` and moves the cursor back.
-    #[allow(clippy::collapsible_if)]
     pub fn backspace(&mut self) {
-        if self.readonly {
+        if self.readonly || self.cursor_position == 0 {
             return;
         }
 
         let (mut current_value, _) = self.ensure_cursor_valid();
 
-        if self.cursor_position > 0 {
-            if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position - 1) {
-                current_value.remove(byte_idx);
-                self.cursor_position -= 1;
-                self.write_signal.set(current_value);
-            }
+        if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position - 1) {
+            current_value.remove(byte_idx);
+            self.cursor_position -= 1;
+            self.write_signal.set(current_value);
         }
     }
 
@@ -136,7 +130,6 @@ impl TextInputState {
     ///
     /// If `readonly` is true or cursor is at the end, does nothing.
     /// Updates the `write_signal`.
-    #[allow(clippy::collapsible_if)]
     pub fn delete(&mut self) {
         if self.readonly {
             return;
@@ -144,11 +137,11 @@ impl TextInputState {
 
         let (mut current_value, char_count) = self.ensure_cursor_valid();
 
-        if self.cursor_position < char_count {
-            if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position) {
-                current_value.remove(byte_idx);
-                self.write_signal.set(current_value);
-            }
+        if self.cursor_position < char_count
+            && let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position)
+        {
+            current_value.remove(byte_idx);
+            self.write_signal.set(current_value);
         }
     }
 
@@ -218,15 +211,12 @@ pub struct ComputedTextState {
 use indexmap::IndexMap;
 use render_engine::NodeId;
 
-#[allow(clippy::collapsible_if)]
 fn with_focused_mut<F>(states: &mut IndexMap<NodeId, TextInputState>, focused: Option<NodeId>, f: F)
 where
     F: FnOnce(&mut TextInputState),
 {
-    if let Some(id) = focused {
-        if let Some(state) = states.get_mut(&id) {
-            f(state);
-        }
+    if let Some(state) = focused.and_then(|id| states.get_mut(&id)) {
+        f(state);
     }
 }
 

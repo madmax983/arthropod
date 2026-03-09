@@ -233,7 +233,6 @@ impl Scene {
     /// scene.remove_node(node);
     /// assert!(scene.get_node(node).is_none());
     /// ```
-    #[allow(clippy::collapsible_if)]
     pub fn remove_node(&mut self, id: NodeId) {
         // 1. Remove from parent's children list FIRST to detach the subtree
         // We peek at the node to get its parent, but don't remove it yet.

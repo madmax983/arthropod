@@ -337,7 +337,6 @@ impl WidgetApp {
     }
 
     /// Sync focus visual state.
-    #[allow(clippy::collapsible_if)]
     fn sync_focus_visuals(&mut self) {
         let focused = self.widget_ctx.focused_node();
         let mut scene = self.app.world_mut().resource_mut::<Scene>();
@@ -346,12 +345,18 @@ impl WidgetApp {
         for &node_id in self.widget_ctx.text_input_states().keys() {
             let app_node = node_id;
 
-            if let Some(node) = scene.get_node_mut(app_node) {
-                if let NodeContent::Styled { ref mut style } = node.content {
-                    if !style.fills.is_empty() {
-                        style.fills[0] = render_engine::Paint::Solid(Color::WHITE.as_vec4());
+            if let Some(fill) = scene
+                .get_node_mut(app_node)
+                .and_then(|n| {
+                    if let NodeContent::Styled { style } = &mut n.content {
+                        Some(style)
+                    } else {
+                        None
                     }
-                }
+                })
+                .and_then(|style| style.fills.first_mut())
+            {
+                *fill = render_engine::Paint::Solid(Color::WHITE.as_vec4());
             }
         }
 
@@ -363,13 +368,18 @@ impl WidgetApp {
         // widget node id == app node id
         let app_node = focused_widget;
 
-        if let Some(node) = scene.get_node_mut(app_node) {
-            if let NodeContent::Styled { ref mut style } = node.content {
-                if !style.fills.is_empty() {
-                    style.fills[0] =
-                        render_engine::Paint::Solid(Color::rgba(0.7, 0.85, 1.0, 1.0).as_vec4());
+        if let Some(fill) = scene
+            .get_node_mut(app_node)
+            .and_then(|n| {
+                if let NodeContent::Styled { style } = &mut n.content {
+                    Some(style)
+                } else {
+                    None
                 }
-            }
+            })
+            .and_then(|style| style.fills.first_mut())
+        {
+            *fill = render_engine::Paint::Solid(Color::rgba(0.7, 0.85, 1.0, 1.0).as_vec4());
         }
     }
 }

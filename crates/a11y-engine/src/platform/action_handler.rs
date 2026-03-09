@@ -75,12 +75,8 @@ impl ActionHandler for ArthropodActionHandler {
             }
             accesskit::Action::Focus => {
                 // Invoke focus handler if registered
-                #[allow(clippy::collapsible_if)]
-                if let Some(ref handler) = self.focus_handler {
-                    #[allow(clippy::collapsible_if)]
-                    if let Ok(mut h) = handler.lock() {
-                        h(node_id);
-                    }
+                if let Some(mut h) = self.focus_handler.as_ref().and_then(|h| h.lock().ok()) {
+                    h(node_id);
                 }
             }
             accesskit::Action::Increment
