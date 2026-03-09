@@ -96,3 +96,7 @@
 ## 2026-03-08 - [Windows UI Automation Provider Memory Leak]
 **Threat:** `A11Y_PROVIDERS` thread-local hashmap in `crates/plat-core/src/platform/windows.rs` did not clean up the UI Automation Provider upon window destruction (`Drop` of `WindowImpl`). Since HWND keys might be reused by the OS, this caused potential memory leaks, stale provider persistence, and incorrect provider inheritance.
 **Defense:** Added cleanup logic in the `Drop` implementation of `WindowImpl` to cleanly remove the UI Automation provider associated with the specific HWND upon window destruction.
+
+**2024-06-25 - Integer Overflow in Image Registration**
+**Threat:** The `register_image_rgba8` function calculated expected buffer length via `width * height * 4`, which on malicious or unusually large inputs could integer-overflow, bypassing length checks. This presented a potential Denial of Service (DoS) or Out-of-bounds read vulnerability when sampling.
+**Defense:** Replaced unchecked multiplication with chained `.checked_mul()` operations, returning a safe Error when an overflow is detected, enforcing correct input validation.

@@ -26,7 +26,12 @@ pub fn register_image_rgba8(
     if width == 0 || height == 0 {
         return Err("image dimensions must be non-zero".to_string());
     }
-    let expected_len = width as usize * height as usize * 4;
+
+    let expected_len = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|area| area.checked_mul(4))
+        .ok_or_else(|| "image dimensions too large, causing overflow".to_string())?;
+
     if rgba8.len() != expected_len {
         return Err(format!(
             "invalid RGBA8 byte length: got {}, expected {} ({}x{}x4)",
@@ -196,6 +201,21 @@ mod tests {
     fn test_register_rejects_invalid_byte_len() {
         let result = register_image_rgba8(ImageId(10), 2, 2, vec![0; 3]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_register_rejects_overflowing_dimensions() {
+        // Use dimensions that would overflow usize when multiplied by 4
+        // For a 32-bit architecture, usize::MAX / 2 * 4 will definitely overflow
+        // For a 64-bit architecture, u32::MAX * u32::MAX * 4 > usize::MAX
+        let width = u32::MAX;
+        let height = u32::MAX;
+        let result = register_image_rgba8(ImageId(99), width, height, vec![]);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "image dimensions too large, causing overflow"
+        );
     }
 
     #[test]
