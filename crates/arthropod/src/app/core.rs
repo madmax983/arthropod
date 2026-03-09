@@ -18,7 +18,7 @@ use widget_core::WidgetContext;
 
 use crate::app::AppContext;
 use crate::app::widget::run_widget_app;
-use widget_core::{Widget, WidgetBoxed};
+use widget_core::Widget;
 
 /// Errors that can occur during app creation or execution
 #[derive(Error, Debug)]
@@ -499,7 +499,7 @@ impl App {
     {
         run_widget_app(title, width, height, |ctx| {
             let widget = build(ctx);
-            Box::new(widget) as Box<dyn WidgetBoxed>
+            Box::new(widget) as Box<dyn Widget>
         })
     }
 }

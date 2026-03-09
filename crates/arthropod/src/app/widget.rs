@@ -11,7 +11,7 @@ use plat_core::{
 use render_engine::{Color, NodeContent, Scene, backend::WgpuBackend};
 use std::cell::RefCell;
 use std::sync::Arc;
-use widget_core::{WidgetBoxed, WidgetContext};
+use widget_core::{Widget, WidgetContext};
 
 // =============================================================================
 // High-Level Widget App Infrastructure
@@ -24,7 +24,7 @@ thread_local! {
 }
 
 /// Type alias for widget builder function to reduce type complexity.
-type WidgetBuilder = Box<dyn FnOnce(&mut AppContext) -> Box<dyn WidgetBoxed>>;
+type WidgetBuilder = Box<dyn FnOnce(&mut AppContext) -> Box<dyn Widget>>;
 
 /// Configuration passed to WidgetApp via thread-local.
 pub(crate) struct WidgetAppConfig {
@@ -71,7 +71,7 @@ impl AppContext {
 /// Delegates from `App::run`.
 pub fn run_widget_app<F>(title: &str, width: u32, height: u32, build: F) -> Result<(), AppError>
 where
-    F: FnOnce(&mut AppContext) -> Box<dyn WidgetBoxed> + 'static,
+    F: FnOnce(&mut AppContext) -> Box<dyn Widget> + 'static,
 {
     // Store configuration in thread-local for WidgetApp::new() to retrieve
     WIDGET_APP_CONFIG.with(|cell| {
@@ -138,7 +138,7 @@ impl Application for WidgetApp {
         // Build widget tree
         let widget = (config.builder)(&mut app_ctx);
         let mut widget_ctx = WidgetContext::new(scene);
-        let widget_root = widget.build_boxed(&mut widget_ctx);
+        let widget_root = widget.build(&mut widget_ctx);
 
         // Detect form node (for Enter submission)
         let form_node = widget_ctx.form_states().keys().next().copied();

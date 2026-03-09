@@ -1,5 +1,4 @@
 use arthropod::prelude::*;
-use widget_core::WidgetBoxed;
 
 fn main() -> Result<(), AppError> {
     App::run("Carousel Demo", 600, 400, |ctx| {
@@ -9,7 +8,7 @@ fn main() -> Result<(), AppError> {
         let (read_index, _) = index.clone().split();
 
         // Let's create some simple "cards" to put in the carousel
-        let cards: Vec<Box<dyn WidgetBoxed>> = vec![
+        let cards: Vec<Box<dyn Widget>> = vec![
             Box::new(
                 Column::new((
                     Text::new("Slide 1").size(32.0),

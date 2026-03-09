@@ -50,3 +50,7 @@
 **Bloat:** `HasBackdropMaterial` trait
 **Cut:** Replaced with concrete methods on `Window` and `WindowImpl`
 **Saved:** 1 trait definition and several unused imports
+## [Reduction]
+**Bloat:** `WidgetBoxed` trait (Single-implementation trait mirroring `Widget`)
+**Cut:** Removed `WidgetBoxed` entirely, replaced with `Box<dyn Widget>` since `Widget` is already object-safe.
+**Saved:** 1 trait definition, ~15 lines of boilerplate, simplified usage in `List`, `Carousel`, and App shell layers.

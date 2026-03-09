@@ -4,36 +4,10 @@ use crate::{Widget, WidgetContext};
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId};
 
-/// Trait for type-erased widgets that can be stored in a Box
-///
-/// This enables dynamic collections like `Vec<Box<dyn WidgetBoxed>>`
-/// where widgets of different types can be stored together.
-///
-/// # Example
-///
-/// ```no_run
-/// use widget_core::{WidgetBoxed, Text, Button};
-///
-/// let mut widgets: Vec<Box<dyn WidgetBoxed>> = Vec::new();
-/// widgets.push(Box::new(Text::new("Hello")));
-/// widgets.push(Box::new(Button::new("Click me")));
-/// ```
-pub trait WidgetBoxed {
-    /// Build this widget, returning the root scene node ID
-    fn build_boxed(&self, ctx: &mut WidgetContext) -> NodeId;
-}
-
-/// Blanket implementation: any Widget can be WidgetBoxed
-impl<W: Widget> WidgetBoxed for W {
-    fn build_boxed(&self, ctx: &mut WidgetContext) -> NodeId {
-        self.build(ctx)
-    }
-}
-
 /// List widget for dynamic collections of widgets
 ///
 /// Unlike Container which uses compile-time tuples, List uses runtime
-/// `Vec` storage with type erasure (`Box<dyn WidgetBoxed>`). This enables
+/// `Vec` storage with type erasure (`Box<dyn Widget>`). This enables
 /// dynamic widget lists from runtime data.
 ///
 /// # Performance
@@ -73,7 +47,7 @@ impl<W: Widget> WidgetBoxed for W {
 ///   which will support O(1) rendering for infinite scrolls.
 pub struct List {
     direction: FlexDirection,
-    children: Vec<Box<dyn WidgetBoxed>>,
+    children: Vec<Box<dyn Widget>>,
     gap: f32,
     padding: f32,
 }
@@ -122,10 +96,8 @@ impl List {
         I: IntoIterator<Item = W>,
         W: Widget + 'static,
     {
-        self.children.extend(
-            iter.into_iter()
-                .map(|w| Box::new(w) as Box<dyn WidgetBoxed>),
-        );
+        self.children
+            .extend(iter.into_iter().map(|w| Box::new(w) as Box<dyn Widget>));
     }
 }
 
@@ -137,7 +109,7 @@ impl Widget for List {
 
         // Build all children and reparent them
         for child in &self.children {
-            let child_id = child.build_boxed(ctx);
+            let child_id = child.build(ctx);
             ctx.reparent_to(child_id, node_id);
         }
 
@@ -199,13 +171,13 @@ mod tests {
     }
 
     #[test]
-    fn test_widget_boxed_trait() {
+    fn test_widget_box() {
         let mut ctx = WidgetContext::new_test();
         let widget = TestWidget;
 
-        // Test that Widget can be used as WidgetBoxed
-        let boxed: Box<dyn WidgetBoxed> = Box::new(widget);
-        let node_id = boxed.build_boxed(&mut ctx);
+        // Test that Widget can be used as Box<dyn Widget>
+        let boxed: Box<dyn Widget> = Box::new(widget);
+        let node_id = boxed.build(&mut ctx);
 
         assert!(ctx.scene().get_node(node_id).is_some());
     }

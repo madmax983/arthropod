@@ -1,6 +1,6 @@
 //! Carousel widget - interactive slider for multiple items
 
-use crate::{Button, Center, Row, Spacer, Text, Widget, WidgetBoxed, WidgetContext};
+use crate::{Button, Center, Row, Spacer, Text, Widget, WidgetContext};
 use flux_state::{Computed, ReadSignal, Signal};
 use render_engine::{NodeContent, NodeId};
 
@@ -27,7 +27,7 @@ use render_engine::{NodeContent, NodeId};
 /// );
 /// ```
 pub struct Carousel {
-    items: Vec<Box<dyn WidgetBoxed>>,
+    items: Vec<Box<dyn Widget>>,
     active_index: ReadSignal<usize>,
     set_active_index: flux_state::WriteSignal<usize>,
 }
@@ -36,7 +36,7 @@ impl Carousel {
     /// Create a new carousel with a list of items.
     /// Requires a signal to track the active index so the host application can also control it,
     /// and so we have access to the reactive runtime.
-    pub fn new(items: Vec<Box<dyn WidgetBoxed>>, index_signal: Signal<usize>) -> Self {
+    pub fn new(items: Vec<Box<dyn Widget>>, index_signal: Signal<usize>) -> Self {
         let (active_index, set_active_index) = index_signal.split();
         Self {
             items,
@@ -134,7 +134,7 @@ impl Widget for Carousel {
         );
 
         for item in &self.items {
-            let item_id = item.build_boxed(ctx);
+            let item_id = item.build(ctx);
             ctx.reparent_to(item_id, viewport);
         }
 

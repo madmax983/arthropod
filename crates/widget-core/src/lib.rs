@@ -179,7 +179,7 @@ pub use context::WidgetContext;
 pub use divider::Divider;
 pub use form::Form;
 pub use grid::Grid;
-pub use list::{list_from, List, WidgetBoxed};
+pub use list::{list_from, List};
 pub use padding::Padding;
 pub use row::Row;
 pub use spacer::Spacer;
