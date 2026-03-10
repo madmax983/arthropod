@@ -57,6 +57,8 @@ pub struct WgpuBackend {
     clip_stack: ClipStack,
     effect_sampler: wgpu::Sampler,
     traversal_stack: Vec<(crate::NodeId, f32)>,
+    ordered_nodes_buffer: Vec<multipass_executor::OrderedRenderNode>,
+    multipass_node_ids_buffer: Vec<crate::NodeId>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -195,6 +197,8 @@ impl WgpuBackend {
             clip_stack: ClipStack::default(),
             effect_sampler,
             traversal_stack: Vec::with_capacity(1024),
+            ordered_nodes_buffer: Vec::with_capacity(1024),
+            multipass_node_ids_buffer: Vec::with_capacity(128),
         })
     }
 
@@ -360,10 +364,15 @@ impl WgpuBackend {
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
             traversal_stack: &mut self.traversal_stack,
+            ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
         };
 
         executor.prepare_phase4_effect_state(scene);
-        let multipass_node_ids = collect_multipass_node_ids(scene, executor.traversal_stack);
+        collect_multipass_node_ids(
+            scene,
+            executor.traversal_stack,
+            &mut self.multipass_node_ids_buffer,
+        );
 
         let frame_key = RenderTargetKey::new(width.max(1), height.max(1), false);
         let frame_handle = executor.acquire_effect_target(frame_key);
@@ -437,7 +446,7 @@ impl WgpuBackend {
 
         // I'll assume I add `collect_frame_batches` to `MultipassRenderer`.
 
-        if multipass_node_ids.is_empty() {
+        if self.multipass_node_ids_buffer.is_empty() {
             let (base_instances, base_path_batches) = executor.collect_frame_batches(scene);
             executor.draw_batches_to_view(
                 &frame_view,
@@ -486,11 +495,16 @@ impl WgpuBackend {
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
             traversal_stack: &mut self.traversal_stack,
+            ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
         };
 
         executor.prepare_phase4_effect_state(scene);
-        let multipass_node_ids = collect_multipass_node_ids(scene, executor.traversal_stack);
-        if multipass_node_ids.is_empty() {
+        collect_multipass_node_ids(
+            scene,
+            executor.traversal_stack,
+            &mut self.multipass_node_ids_buffer,
+        );
+        if self.multipass_node_ids_buffer.is_empty() {
             let (instances, path_batches) = executor.collect_frame_batches(scene);
 
             executor.primitive_pipeline.prepare(

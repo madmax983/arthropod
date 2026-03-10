@@ -1072,7 +1072,8 @@ fn test_collect_multipass_node_ids_preserves_visual_order() {
     let blur_id = scene.add_node(root, blur);
 
     let mut stack = Vec::new();
-    let ids = multipass_executor::collect_multipass_node_ids(&scene, &mut stack);
+    let mut ids = Vec::new();
+    multipass_executor::collect_multipass_node_ids(&scene, &mut stack, &mut ids);
     assert_eq!(ids, vec![blend_id, blur_id]);
 }
 
@@ -1097,7 +1098,8 @@ fn test_collect_multipass_node_ids_skips_nodes_under_zero_opacity_ancestor() {
     scene.add_node(parent_id, blend);
 
     let mut stack = Vec::new();
-    let ids = multipass_executor::collect_multipass_node_ids(&scene, &mut stack);
+    let mut ids = Vec::new();
+    multipass_executor::collect_multipass_node_ids(&scene, &mut stack, &mut ids);
     assert!(
         ids.is_empty(),
         "expected no multipass nodes under transparent ancestor"
@@ -1168,7 +1170,8 @@ fn test_collect_ordered_render_nodes_preserves_interleaved_z_order() {
     let foreground_id = scene.add_node(root, foreground);
 
     let mut stack = Vec::new();
-    let ordered = multipass_executor::collect_ordered_render_nodes(&scene, &mut stack);
+    let mut ordered = Vec::new();
+    multipass_executor::collect_ordered_render_nodes(&scene, &mut stack, &mut ordered);
     let actual: Vec<_> = ordered
         .iter()
         .map(|entry| (entry.node_id, entry.kind))

@@ -54,6 +54,7 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) text_renderer: &'a mut TextRenderer,
     pub(crate) glyph_texture: &'a wgpu::Texture,
     pub(crate) traversal_stack: &'a mut Vec<(crate::NodeId, f32)>,
+    pub(crate) ordered_nodes_buffer: &'a mut Vec<OrderedRenderNode>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -315,8 +316,9 @@ impl<'a> MultipassRenderer<'a> {
             None,
         );
 
-        let ordered_nodes = collect_ordered_render_nodes(scene, self.traversal_stack);
-        for entry in ordered_nodes {
+        collect_ordered_render_nodes(scene, self.traversal_stack, self.ordered_nodes_buffer);
+        for i in 0..self.ordered_nodes_buffer.len() {
+            let entry = self.ordered_nodes_buffer[i];
             match entry.kind {
                 OrderedRenderNodeKind::Direct => {
                     self.render_direct_node(scene, entry.node_id, surface_view);
@@ -826,54 +828,61 @@ impl<'a> MultipassRenderer<'a> {
     }
 }
 
+/// Collects multipass node IDs directly into a pre-allocated buffer to avoid per-frame `Vec` allocations.
+/// This optimization matters because creating new `Vec`s on the rendering hot path during scene traversal
+/// causes significant memory fragmentation and GC/allocator overhead.
 pub(crate) fn collect_multipass_node_ids(
     scene: &Scene,
     stack: &mut Vec<(crate::NodeId, f32)>,
-) -> Vec<crate::NodeId> {
-    collect_ordered_render_nodes(scene, stack)
-        .into_iter()
-        .filter_map(|entry| {
-            if matches!(entry.kind, OrderedRenderNodeKind::Multipass) {
-                Some(entry.node_id)
-            } else {
-                None
+    buffer: &mut Vec<crate::NodeId>,
+) {
+    use crate::NodeContent;
+
+    buffer.clear();
+    for (node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
+        if !node.visible || inherited_opacity <= 0.0 {
+            continue;
+        }
+        #[allow(clippy::collapsible_if)]
+        if let NodeContent::Styled { style } = &node.content {
+            if style_requires_multipass(style) {
+                buffer.push(node_id);
             }
-        })
-        .collect()
+        }
+    }
 }
 
+/// Collects ordered render nodes directly into a pre-allocated buffer to avoid per-frame `Vec` allocations.
+/// Reusing the same `Vec` across frames via `clear()` and `push()` ensures zero allocations on the hot path
+/// after the buffer reaches its maximum required capacity, improving frame times and lowering latency.
 pub(crate) fn collect_ordered_render_nodes(
     scene: &Scene,
     stack: &mut Vec<(crate::NodeId, f32)>,
-) -> Vec<OrderedRenderNode> {
+    buffer: &mut Vec<OrderedRenderNode>,
+) {
     use crate::NodeContent;
 
-    scene
-        .iter_visuals_custom(stack)
-        .filter_map(|(node_id, node, inherited_opacity)| {
-            if !node.visible {
-                return None;
-            }
-            if inherited_opacity <= 0.0 {
-                return None;
-            }
-            match &node.content {
-                NodeContent::Styled { style } => Some(OrderedRenderNode {
-                    node_id,
-                    kind: if style_requires_multipass(style) {
-                        OrderedRenderNodeKind::Multipass
-                    } else {
-                        OrderedRenderNodeKind::Direct
-                    },
-                }),
-                NodeContent::SolidColor { .. } => Some(OrderedRenderNode {
-                    node_id,
-                    kind: OrderedRenderNodeKind::Direct,
-                }),
-                NodeContent::Empty => None,
-            }
-        })
-        .collect()
+    buffer.clear();
+    for (node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
+        if !node.visible || inherited_opacity <= 0.0 {
+            continue;
+        }
+        match &node.content {
+            NodeContent::Styled { style } => buffer.push(OrderedRenderNode {
+                node_id,
+                kind: if style_requires_multipass(style) {
+                    OrderedRenderNodeKind::Multipass
+                } else {
+                    OrderedRenderNodeKind::Direct
+                },
+            }),
+            NodeContent::SolidColor { .. } => buffer.push(OrderedRenderNode {
+                node_id,
+                kind: OrderedRenderNodeKind::Direct,
+            }),
+            NodeContent::Empty => {}
+        }
+    }
 }
 
 pub(crate) fn classify_scene_effect_kinds(
