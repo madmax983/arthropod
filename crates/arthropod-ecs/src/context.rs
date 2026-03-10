@@ -3,17 +3,17 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 
-use crate::components::SceneNodeRef;
+use crate::components::{MousePosition, SceneNodeRef};
 use crate::systems::{
     apply_a11y_bounds_system, collect_renderables_system, gather_a11y_bounds_system, layout_system,
-    A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
+    update_interaction_state_system, A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
 
 #[cfg(feature = "parallel-reactive")]
 use crate::systems::{apply_reactive_changes_system, gather_reactive_changes_system};
 
 #[cfg(not(feature = "parallel-reactive"))]
-use crate::systems::update_all_reactive_system;
+use crate::systems::{update_all_reactive_system, update_widget_style_system};
 
 /// Enterprise GUI framework context - wraps ECS World
 ///
@@ -87,6 +87,7 @@ impl FrameworkContext {
         world.insert_resource(RenderCommands::default());
         world.insert_resource(ReactiveChangeBuffer::default());
         world.insert_resource(A11yBoundsBuffer::default());
+        world.insert_resource(MousePosition::default());
 
         Self {
             world,
@@ -197,8 +198,12 @@ impl FrameworkContext {
         #[cfg(not(feature = "parallel-reactive"))]
         {
             schedule.add_systems((
+                update_interaction_state_system,
                 update_all_reactive_system,
-                layout_system.after(update_all_reactive_system),
+                update_widget_style_system.after(update_interaction_state_system),
+                layout_system
+                    .after(update_all_reactive_system)
+                    .after(update_widget_style_system),
                 // These two overlap — different ResMut, same Res<Scene>
                 gather_a11y_bounds_system.after(layout_system),
                 collect_renderables_system.after(layout_system),

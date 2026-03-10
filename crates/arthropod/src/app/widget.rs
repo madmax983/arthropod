@@ -218,6 +218,17 @@ impl Application for WidgetApp {
                 }
                 return;
             }
+            Event::Window {
+                event: WindowEvent::CursorMoved { position },
+                ..
+            } => {
+                let mut mouse_pos = self.app.world_mut().resource_mut::<arthropod_ecs::components::MousePosition>();
+                mouse_pos.0 = render_engine::Vec2::new(position.x as f32, position.y as f32);
+                
+                if let Some(window) = self.app.window() {
+                    window.request_redraw();
+                }
+            }
             _ => {}
         }
 

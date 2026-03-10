@@ -1,8 +1,8 @@
 use arthropod_ecs::{
     FrameworkContext,
     components::{
-        BackgroundColor, Clickable, LayoutStyle, ReactiveColor, ReactiveComputedText, ReactiveText,
-        SceneNodeRef,
+        BackgroundColor, Clickable, InteractionState, LayoutStyle, ReactiveColor,
+        ReactiveComputedText, ReactiveText, SceneNodeRef, WidgetStyle,
     },
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
@@ -445,6 +445,21 @@ impl App {
                 ReactiveComputedText::new(state.computed.clone())
             },
         );
+
+        // Transfer high-level widget styles
+        self.transfer_components(
+            widget_ctx.widget_styles().iter(),
+            |style: &theme_engine::Style| WidgetStyle(style.clone()),
+        );
+
+        // Ensure all styled nodes have an InteractionState component
+        // This is needed for the style resolution system to work
+        for (node_id, _) in widget_ctx.widget_styles() {
+            if let Some(mut entity) = self.get_entity_mut(*node_id) {
+                // Initialize with default state
+                entity.insert(InteractionState::default());
+            }
+        }
 
         // Note: Complex state (TextInput, Form) is handled by the higher-level
         // WidgetApp controller, not by direct ECS component transfer at this time.

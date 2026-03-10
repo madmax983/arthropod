@@ -206,6 +206,26 @@ impl ReactiveComputedText {
     }
 }
 
+/// Current interaction state of a widget
+///
+/// Tracks hover, focus, and active (pressed) states.
+/// These states are used by the style system to resolve pseudo-states (:hover, etc.)
+/// and by the interaction system to trigger callbacks.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InteractionState {
+    pub hovered: bool,
+    pub focused: bool,
+    pub active: bool, // Pressed
+    pub disabled: bool,
+}
+
+/// Unified style component - resolves pseudo-states into visual/layout properties
+///
+/// Stores a high-level `theme_engine::Style` which contains both layout and
+/// visual properties, including pseudo-state overrides.
+#[derive(Component, Clone, Debug, Default)]
+pub struct WidgetStyle(pub theme_engine::Style);
+
 /// Marker for renderable entities (has visual representation)
 ///
 /// Entities with this component will be included in render queries.
@@ -234,6 +254,12 @@ pub struct LayoutStyle(pub FlexStyle);
 /// This resource is used by the layout system to constrain the root node.
 #[derive(Resource, Default, Clone, Debug)]
 pub struct LayoutConstraintsResource(pub LayoutConstraints);
+
+/// Global resource for mouse position
+///
+/// Used by the interaction system to perform hit testing and update hover states.
+#[derive(Resource, Default, Clone, Copy, Debug)]
+pub struct MousePosition(pub glam::Vec2);
 
 /// Clickable behavior - callback invoked on click
 ///

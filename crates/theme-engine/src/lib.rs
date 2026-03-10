@@ -23,6 +23,10 @@ pub use design_tokens::{DesignTokens, TokenValue};
 pub use style_macro::{Padding, ResolvedStyle, Style, StyleOverrides};
 pub use system_theme::SystemTheme;
 
+// Re-export common styling primitives for convenience
+pub use style_engine::CornerRadii;
+pub use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap};
+
 // Re-export BackdropMaterial for convenience
 pub use plat_core::BackdropMaterial;
 

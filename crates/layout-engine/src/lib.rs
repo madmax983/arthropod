@@ -25,7 +25,7 @@ pub struct LayoutEngine {
 /// Flexbox style properties
 ///
 /// Defines how a widget should be laid out relative to its parent and siblings.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FlexStyle {
     /// Direction of the main axis (Row or Column)
     pub direction: FlexDirection,

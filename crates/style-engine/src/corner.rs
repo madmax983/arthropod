@@ -64,6 +64,12 @@ impl CornerRadii {
     }
 }
 
+impl From<f32> for CornerRadii {
+    fn from(radius: f32) -> Self {
+        Self::uniform(radius)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

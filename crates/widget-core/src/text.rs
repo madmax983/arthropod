@@ -176,6 +176,9 @@ impl Widget for Text {
             }
         };
 
+        // Estimate width before moving text_string
+        let estimated_width = text_string.chars().count() as f32 * self.font_size * 0.6;
+
         // Create text node with raw text (backend will shape it during rendering)
         let node_id = ctx.create_node(
             ctx.root(),
@@ -201,8 +204,9 @@ impl Widget for Text {
 
         // Set layout style with estimated dimensions
         // Height is approximately font_size * 1.4 (accounts for line height)
-        // Width is auto (will grow to fit content)
+        // Width is estimated as font_size * 0.6 per character (average aspect ratio)
         let style = layout_engine::FlexStyle {
+            width: Some(estimated_width),
             height: Some(self.font_size * 1.4),
             ..Default::default()
         };

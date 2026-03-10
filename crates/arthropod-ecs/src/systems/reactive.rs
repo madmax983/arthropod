@@ -3,8 +3,73 @@ use render_engine::{NodeContent, Scene};
 
 use crate::components::{
     ReactiveColor, ReactiveComputedText, ReactiveOpacity, ReactiveText, ReactiveTransform,
-    SceneNodeRef,
+    SceneNodeRef, InteractionState, LayoutStyle, WidgetStyle, MousePosition,
 };
+
+/// System that updates interaction states based on mouse position and hit testing
+pub fn update_interaction_state_system(
+    mouse_pos: Res<MousePosition>,
+    scene: Res<Scene>,
+    mut query: Query<(Entity, &SceneNodeRef, &mut InteractionState)>,
+) {
+    let hit_id = scene.hit_test(mouse_pos.0.x, mouse_pos.0.y);
+    
+    // Create a set of interactive nodes that are actually being hovered
+    let mut hovered_nodes = std::collections::HashSet::new();
+    
+    if let Some(mut current_id) = hit_id {
+        // Bubble up from the hit node to find all interactive ancestors
+        // This ensures that if you hover a Text inside a Button, the Button is also considered hovered.
+        loop {
+            hovered_nodes.insert(current_id);
+            if let Some(parent_id) = scene.parent(current_id) {
+                current_id = parent_id;
+            } else {
+                break;
+            }
+        }
+    }
+
+    for (_entity, node_ref, mut state) in query.iter_mut() {
+        let is_hovered = hovered_nodes.contains(&node_ref.0);
+        if state.hovered != is_hovered {
+            state.hovered = is_hovered;
+        }
+    }
+}
+
+/// System that resolves high-level WidgetStyle into low-level SceneNode properties and LayoutStyle
+/// based on the current InteractionState.
+///
+/// This is the core of the Unified Style System, ensuring that visual and layout properties
+/// automatically update when a widget's state (hover, focus, active, disabled) changes.
+pub fn update_widget_style_system(
+    mut query: Query<
+        (&SceneNodeRef, &WidgetStyle, &InteractionState, Option<&mut LayoutStyle>),
+        Or<(Changed<InteractionState>, Changed<WidgetStyle>)>,
+    >,
+    mut scene: ResMut<Scene>,
+) {
+    for (node_ref, widget_style, state, layout_style) in query.iter_mut() {
+        // 1. Resolve style for current state
+        let resolved = widget_style.0.resolve(state.hovered, state.focused, state.active, state.disabled);
+
+        // 2. Update LayoutStyle component if present (triggers layout engine)
+        if let Some(mut layout) = layout_style {
+            let new_flex = resolved.to_flex_style();
+            if layout.0 != new_flex {
+                layout.0 = new_flex;
+            }
+        }
+
+        // 3. Update VisualStyle in Scene Graph
+        if let Some(node) = scene.get_mut(node_ref.0) {
+            node.content = NodeContent::Styled {
+                style: Box::new(resolved.to_visual_style()),
+            };
+        }
+    }
+}
 
 /// Merged reactive update system - polls all reactive signals in a single pass
 ///

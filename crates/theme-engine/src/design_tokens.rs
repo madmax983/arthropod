@@ -43,6 +43,12 @@ impl TokenValue {
     }
 }
 
+impl From<Color> for TokenValue {
+    fn from(color: Color) -> Self {
+        TokenValue::Color(color)
+    }
+}
+
 /// Semantic design tokens resolved from system theme
 ///
 /// Provides a consistent design language with semantic naming:

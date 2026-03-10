@@ -37,6 +37,8 @@
 //! ```
 
 use crate::{Color, TokenValue};
+use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap};
+use style_engine::{CornerRadii, Paint, StrokeStyle, VisualStyle};
 
 /// Style properties for UI components with pseudo-state support
 ///
@@ -47,17 +49,43 @@ use crate::{Color, TokenValue};
 /// - `:disabled` - Element is disabled (overrides other states)
 #[derive(Debug, Clone, Default)]
 pub struct Style {
-    // Base properties
+    // === Visual Properties ===
     /// Background color or material
     pub background: Option<TokenValue>,
-    /// Padding around content
-    pub padding: Option<Padding>,
     /// Border radius for rounded corners
-    pub border_radius: Option<f32>,
+    pub border_radius: Option<CornerRadii>,
     /// Text/foreground color
     pub color: Option<Color>,
     /// Opacity (0.0 - 1.0)
     pub opacity: Option<f32>,
+    /// Corner smoothing (0.0 - 1.0)
+    pub corner_smoothing: Option<f32>,
+    /// Stroke style
+    pub stroke: Option<StrokeStyle>,
+    /// Shadow effects
+    pub effects: Vec<style_engine::Effect>,
+
+    // === Layout Properties ===
+    /// Direction of the main axis
+    pub direction: Option<FlexDirection>,
+    /// Main-axis distribution
+    pub justify_content: Option<FlexJustifyContent>,
+    /// Cross-axis alignment
+    pub align_items: Option<FlexAlign>,
+    /// Padding around content
+    pub padding: Option<Padding>,
+    /// Gap between children
+    pub gap: Option<f32>,
+    /// Fixed width
+    pub width: Option<f32>,
+    /// Fixed height
+    pub height: Option<f32>,
+    /// Flex grow factor
+    pub flex_grow: Option<f32>,
+    /// Flex shrink factor
+    pub flex_shrink: Option<f32>,
+    /// Flex wrap
+    pub wrap: Option<FlexWrap>,
 
     // Pseudo-state styles
     /// Styles applied on hover
@@ -82,7 +110,9 @@ pub struct StyleOverrides {
     /// Override opacity
     pub opacity: Option<f32>,
     /// Override border radius
-    pub border_radius: Option<f32>,
+    pub border_radius: Option<CornerRadii>,
+    /// Override stroke
+    pub stroke: Option<StrokeStyle>,
 }
 
 /// Fully resolved style values after applying pseudo-states
@@ -90,20 +120,30 @@ pub struct StyleOverrides {
 /// All optional values are resolved to concrete values.
 #[derive(Debug, Clone)]
 pub struct ResolvedStyle {
-    /// Resolved background
+    // Visual
     pub background: Option<TokenValue>,
-    /// Resolved text color
     pub color: Option<Color>,
-    /// Resolved padding
-    pub padding: Option<Padding>,
-    /// Resolved border radius
-    pub border_radius: Option<f32>,
-    /// Resolved opacity (defaults to 1.0)
+    pub border_radius: CornerRadii,
     pub opacity: f32,
+    pub corner_smoothing: f32,
+    pub stroke: Option<StrokeStyle>,
+    pub effects: Vec<style_engine::Effect>,
+
+    // Layout
+    pub direction: FlexDirection,
+    pub justify_content: FlexJustifyContent,
+    pub align_items: FlexAlign,
+    pub padding: Padding,
+    pub gap: f32,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
+    pub flex_grow: f32,
+    pub flex_shrink: f32,
+    pub wrap: FlexWrap,
 }
 
 /// Padding values (top, right, bottom, left)
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Padding {
     pub top: f32,
     pub right: f32,
@@ -143,6 +183,12 @@ impl Padding {
     }
 }
 
+impl From<f32> for Padding {
+    fn from(value: f32) -> Self {
+        Self::uniform(value)
+    }
+}
+
 impl StyleOverrides {
     /// Apply overrides to a resolved style
     fn apply_to(&self, resolved: &mut ResolvedStyle) {
@@ -156,7 +202,10 @@ impl StyleOverrides {
             resolved.opacity = o;
         }
         if let Some(r) = self.border_radius {
-            resolved.border_radius = Some(r);
+            resolved.border_radius = r;
+        }
+        if let Some(s) = &self.stroke {
+            resolved.stroke = Some(s.clone());
         }
     }
 }
@@ -167,68 +216,123 @@ impl Style {
         Self::default()
     }
 
-    /// Set background (builder pattern)
-    pub fn background(mut self, background: TokenValue) -> Self {
-        self.background = Some(background);
+    // === Visual Builders ===
+
+    pub fn background(mut self, background: impl Into<TokenValue>) -> Self {
+        self.background = Some(background.into());
         self
     }
 
-    /// Set padding (builder pattern)
-    pub fn padding(mut self, padding: Padding) -> Self {
-        self.padding = Some(padding);
+    pub fn border_radius(mut self, radius: impl Into<CornerRadii>) -> Self {
+        self.border_radius = Some(radius.into());
         self
     }
 
-    /// Set border radius (builder pattern)
-    pub fn border_radius(mut self, radius: f32) -> Self {
-        self.border_radius = Some(radius);
-        self
-    }
-
-    /// Set text color (builder pattern)
     pub fn color(mut self, color: Color) -> Self {
         self.color = Some(color);
         self
     }
 
-    /// Set opacity (builder pattern)
-    pub fn set_opacity(mut self, opacity: f32) -> Self {
+    pub fn opacity(mut self, opacity: f32) -> Self {
         self.opacity = Some(opacity);
         self
     }
 
+    pub fn corner_smoothing(mut self, smoothing: f32) -> Self {
+        self.corner_smoothing = Some(smoothing);
+        self
+    }
+
+    pub fn stroke(mut self, stroke: StrokeStyle) -> Self {
+        self.stroke = Some(stroke);
+        self
+    }
+
+    pub fn effect(mut self, effect: style_engine::Effect) -> Self {
+        self.effects.push(effect);
+        self
+    }
+
+    // === Layout Builders ===
+
+    pub fn direction(mut self, direction: FlexDirection) -> Self {
+        self.direction = Some(direction);
+        self
+    }
+
+    pub fn justify_content(mut self, justify: FlexJustifyContent) -> Self {
+        self.justify_content = Some(justify);
+        self
+    }
+
+    pub fn align_items(mut self, align: FlexAlign) -> Self {
+        self.align_items = Some(align);
+        self
+    }
+
+    pub fn padding(mut self, padding: Padding) -> Self {
+        self.padding = Some(padding);
+        self
+    }
+
+    pub fn gap(mut self, gap: f32) -> Self {
+        self.gap = Some(gap);
+        self
+    }
+
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn height(mut self, height: f32) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    pub fn flex_grow(mut self, grow: f32) -> Self {
+        self.flex_grow = Some(grow);
+        self
+    }
+
+    pub fn flex_shrink(mut self, shrink: f32) -> Self {
+        self.flex_shrink = Some(shrink);
+        self
+    }
+
+    pub fn wrap(mut self, wrap: FlexWrap) -> Self {
+        self.wrap = Some(wrap);
+        self
+    }
+
     /// Resolve style for current widget state
-    ///
-    /// Applies pseudo-state overrides in order:
-    /// 1. If disabled, only disabled overrides apply (ignores hover/focus/active)
-    /// 2. Otherwise, hover, focus, and active all apply (last write wins for overlapping properties)
-    ///
-    /// # Arguments
-    ///
-    /// * `hover` - Mouse is over the element
-    /// * `focus` - Element has keyboard focus
-    /// * `active` - Element is being pressed
-    /// * `disabled` - Element is disabled
-    ///
-    /// # Returns
-    ///
-    /// A `ResolvedStyle` with all properties resolved to concrete values.
     pub fn resolve(&self, hover: bool, focus: bool, active: bool, disabled: bool) -> ResolvedStyle {
         let mut resolved = ResolvedStyle {
             background: self.background.clone(),
             color: self.color,
-            padding: self.padding,
-            border_radius: self.border_radius,
+            border_radius: self.border_radius.unwrap_or(CornerRadii::ZERO),
             opacity: self.opacity.unwrap_or(1.0),
+            corner_smoothing: self.corner_smoothing.unwrap_or(0.0),
+            stroke: self.stroke.clone(),
+            effects: self.effects.clone(),
+
+            direction: self.direction.unwrap_or(FlexDirection::Column),
+            justify_content: self.justify_content.unwrap_or(FlexJustifyContent::Start),
+            align_items: self.align_items.unwrap_or(FlexAlign::Stretch),
+            padding: self.padding.unwrap_or_default(),
+            gap: self.gap.unwrap_or(0.0),
+            width: self.width,
+            height: self.height,
+            flex_grow: self.flex_grow.unwrap_or(0.0),
+            flex_shrink: self.flex_shrink.unwrap_or(1.0),
+            wrap: self.wrap.unwrap_or(FlexWrap::NoWrap),
         };
 
         if disabled {
-            // Disabled state overrides everything else
             if let Some(d) = &self.disabled {
                 d.apply_to(&mut resolved);
             }
         } else {
-            // Apply states in order (later states override earlier for same properties)
             if hover {
                 if let Some(h) = &self.hover {
                     h.apply_to(&mut resolved);
@@ -250,13 +354,42 @@ impl Style {
     }
 }
 
-// ============================================================================
-// From implementations for TokenValue
-// ============================================================================
+impl ResolvedStyle {
+    /// Convert to style-engine VisualStyle
+    pub fn to_visual_style(&self) -> VisualStyle {
+        let mut style = VisualStyle::new();
 
-impl From<Color> for TokenValue {
-    fn from(color: Color) -> Self {
-        TokenValue::Color(color)
+        if let Some(bg) = &self.background {
+            style.fills.push(Paint::Solid(bg.as_color()));
+        }
+
+        style.corner_radii = self.border_radius;
+        style.corner_smoothing = self.corner_smoothing;
+        style.opacity = self.opacity;
+        style.stroke = self.stroke.clone();
+        style.effects = self.effects.clone();
+
+        style
+    }
+
+    /// Convert to layout-engine FlexStyle
+    pub fn to_flex_style(&self) -> FlexStyle {
+        FlexStyle {
+            direction: self.direction,
+            justify_content: self.justify_content,
+            align_items: self.align_items,
+            padding_left: self.padding.left,
+            padding_right: self.padding.right,
+            padding_top: self.padding.top,
+            padding_bottom: self.padding.bottom,
+            gap: self.gap,
+            width: self.width,
+            height: self.height,
+            flex_grow: self.flex_grow,
+            flex_shrink: self.flex_shrink,
+            wrap: self.wrap,
+            ..Default::default()
+        }
     }
 }
 
@@ -264,31 +397,6 @@ impl From<Color> for TokenValue {
 // style! macro
 // ============================================================================
 
-/// CSS-like style macro for declarative UI styling
-///
-/// Supports:
-/// - Base properties: `background`, `color`, `padding`, `border_radius`, `opacity`
-/// - Pseudo-states: `&:hover`, `&:focus`, `&:active`, `&:disabled`
-///
-/// # Example
-///
-/// ```ignore
-/// let s = style! {
-///     background: tokens.surface_primary.clone();
-///     color: tokens.text_primary;
-///     padding: tokens.space_md;
-///     opacity: 1.0;
-///
-///     &:hover {
-///         background: tokens.surface_secondary.clone();
-///         opacity: 0.9;
-///     }
-///
-///     &:disabled {
-///         opacity: 0.5;
-///     }
-/// };
-/// ```
 #[macro_export]
 macro_rules! style {
     ( $($body:tt)* ) => {{
@@ -298,19 +406,13 @@ macro_rules! style {
     }};
 }
 
-/// Internal macro for processing style body
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __style_impl {
-    // Base case: empty
     ($style:ident,) => {};
     ($style:ident) => {};
 
-    // ========================================================================
     // Pseudo-states
-    // ========================================================================
-
-    // &:hover { ... }
     ($style:ident, &:hover { $($inner:tt)* } $($rest:tt)*) => {
         {
             let mut overrides = $crate::StyleOverrides::default();
@@ -319,8 +421,6 @@ macro_rules! __style_impl {
         }
         $crate::__style_impl!($style, $($rest)*);
     };
-
-    // &:focus { ... }
     ($style:ident, &:focus { $($inner:tt)* } $($rest:tt)*) => {
         {
             let mut overrides = $crate::StyleOverrides::default();
@@ -329,8 +429,6 @@ macro_rules! __style_impl {
         }
         $crate::__style_impl!($style, $($rest)*);
     };
-
-    // &:active { ... }
     ($style:ident, &:active { $($inner:tt)* } $($rest:tt)*) => {
         {
             let mut overrides = $crate::StyleOverrides::default();
@@ -339,8 +437,6 @@ macro_rules! __style_impl {
         }
         $crate::__style_impl!($style, $($rest)*);
     };
-
-    // &:disabled { ... }
     ($style:ident, &:disabled { $($inner:tt)* } $($rest:tt)*) => {
         {
             let mut overrides = $crate::StyleOverrides::default();
@@ -350,193 +446,91 @@ macro_rules! __style_impl {
         $crate::__style_impl!($style, $($rest)*);
     };
 
-    // ========================================================================
-    // Base properties
-    // ========================================================================
-
-    // background: expr;
+    // Visual Properties
     ($style:ident, background: $val:expr; $($rest:tt)*) => {
-        $style.background = Some($crate::TokenValue::from($val));
+        $style = $style.background($val);
         $crate::__style_impl!($style, $($rest)*);
     };
-
-    // color: expr;
     ($style:ident, color: $val:expr; $($rest:tt)*) => {
-        $style.color = Some($val);
+        $style = $style.color($val);
         $crate::__style_impl!($style, $($rest)*);
     };
-
-    // padding: expr;
-    ($style:ident, padding: $val:expr; $($rest:tt)*) => {
-        $style.padding = Some($crate::Padding::uniform($val));
-        $crate::__style_impl!($style, $($rest)*);
-    };
-
-    // border_radius: expr;
     ($style:ident, border_radius: $val:expr; $($rest:tt)*) => {
-        $style.border_radius = Some($val);
+        $style = $style.border_radius($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, opacity: $val:expr; $($rest:tt)*) => {
+        $style = $style.opacity($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, corner_smoothing: $val:expr; $($rest:tt)*) => {
+        $style = $style.corner_smoothing($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, stroke: $val:expr; $($rest:tt)*) => {
+        $style = $style.stroke($val);
         $crate::__style_impl!($style, $($rest)*);
     };
 
-    // opacity: expr;
-    ($style:ident, opacity: $val:expr; $($rest:tt)*) => {
-        $style.opacity = Some($val);
+    // Layout Properties
+    ($style:ident, direction: $val:expr; $($rest:tt)*) => {
+        $style = $style.direction($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, justify_content: $val:expr; $($rest:tt)*) => {
+        $style = $style.justify_content($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, align_items: $val:expr; $($rest:tt)*) => {
+        $style = $style.align_items($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, padding: $val:expr; $($rest:tt)*) => {
+        $style = $style.padding($val.into());
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, gap: $val:expr; $($rest:tt)*) => {
+        $style = $style.gap($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, width: $val:expr; $($rest:tt)*) => {
+        $style = $style.width($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, height: $val:expr; $($rest:tt)*) => {
+        $style = $style.height($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, flex_grow: $val:expr; $($rest:tt)*) => {
+        $style = $style.flex_grow($val);
+        $crate::__style_impl!($style, $($rest)*);
+    };
+    ($style:ident, flex_shrink: $val:expr; $($rest:tt)*) => {
+        $style = $style.flex_shrink($val);
         $crate::__style_impl!($style, $($rest)*);
     };
 }
 
-/// Internal macro for processing style overrides (pseudo-state bodies)
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __style_overrides {
-    // Base case: empty
     ($overrides:ident,) => {};
     ($overrides:ident) => {};
 
-    // background: expr;
     ($overrides:ident, background: $val:expr; $($rest:tt)*) => {
         $overrides.background = Some($crate::TokenValue::from($val));
         $crate::__style_overrides!($overrides, $($rest)*);
     };
-
-    // color: expr;
     ($overrides:ident, color: $val:expr; $($rest:tt)*) => {
         $overrides.color = Some($val);
         $crate::__style_overrides!($overrides, $($rest)*);
     };
-
-    // opacity: expr;
     ($overrides:ident, opacity: $val:expr; $($rest:tt)*) => {
         $overrides.opacity = Some($val);
         $crate::__style_overrides!($overrides, $($rest)*);
     };
-
-    // border_radius: expr;
     ($overrides:ident, border_radius: $val:expr; $($rest:tt)*) => {
-        $overrides.border_radius = Some($val);
+        $overrides.border_radius = Some($val.into());
         $crate::__style_overrides!($overrides, $($rest)*);
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_padding_uniform() {
-        let padding = Padding::uniform(16.0);
-        assert_eq!(padding.top, 16.0);
-        assert_eq!(padding.right, 16.0);
-        assert_eq!(padding.bottom, 16.0);
-        assert_eq!(padding.left, 16.0);
-    }
-
-    #[test]
-    fn test_padding_symmetric() {
-        let padding = Padding::symmetric(8.0, 16.0);
-        assert_eq!(padding.top, 8.0);
-        assert_eq!(padding.right, 16.0);
-        assert_eq!(padding.bottom, 8.0);
-        assert_eq!(padding.left, 16.0);
-    }
-
-    #[test]
-    fn test_style_builder() {
-        let style = Style::new()
-            .background(TokenValue::Color(Color::new(1.0, 1.0, 1.0, 1.0)))
-            .padding(Padding::uniform(16.0))
-            .border_radius(8.0);
-
-        assert!(style.background.is_some());
-        assert!(style.padding.is_some());
-        assert_eq!(style.border_radius, Some(8.0));
-    }
-
-    #[test]
-    fn test_style_default() {
-        let style = Style::default();
-        assert!(style.background.is_none());
-        assert!(style.padding.is_none());
-        assert!(style.border_radius.is_none());
-        assert!(style.color.is_none());
-        assert!(style.opacity.is_none());
-        assert!(style.hover.is_none());
-        assert!(style.focus.is_none());
-        assert!(style.active.is_none());
-        assert!(style.disabled.is_none());
-    }
-
-    #[test]
-    fn test_style_overrides_default() {
-        let overrides = StyleOverrides::default();
-        assert!(overrides.background.is_none());
-        assert!(overrides.color.is_none());
-        assert!(overrides.opacity.is_none());
-        assert!(overrides.border_radius.is_none());
-    }
-
-    #[test]
-    fn test_resolve_base_only() {
-        let style = Style {
-            background: Some(TokenValue::Color(Color::new(1.0, 0.0, 0.0, 1.0))),
-            opacity: Some(0.8),
-            border_radius: Some(4.0),
-            ..Default::default()
-        };
-
-        let resolved = style.resolve(false, false, false, false);
-        assert!(resolved.background.is_some());
-        assert_eq!(resolved.opacity, 0.8);
-        assert_eq!(resolved.border_radius, Some(4.0));
-    }
-
-    #[test]
-    fn test_resolve_hover() {
-        let style = Style {
-            opacity: Some(1.0),
-            hover: Some(Box::new(StyleOverrides {
-                opacity: Some(0.9),
-                ..Default::default()
-            })),
-            ..Default::default()
-        };
-
-        let resolved = style.resolve(true, false, false, false);
-        assert_eq!(resolved.opacity, 0.9);
-    }
-
-    #[test]
-    fn test_resolve_disabled_overrides_hover() {
-        let style = Style {
-            opacity: Some(1.0),
-            hover: Some(Box::new(StyleOverrides {
-                opacity: Some(0.9),
-                ..Default::default()
-            })),
-            disabled: Some(Box::new(StyleOverrides {
-                opacity: Some(0.5),
-                ..Default::default()
-            })),
-            ..Default::default()
-        };
-
-        // With both hover and disabled, disabled takes precedence
-        let resolved = style.resolve(true, false, false, true);
-        assert_eq!(resolved.opacity, 0.5);
-    }
-
-    #[test]
-    fn test_token_value_from_color() {
-        let color = Color::new(1.0, 0.0, 0.0, 1.0);
-        let token: TokenValue = color.into();
-        assert!(matches!(token, TokenValue::Color(_)));
-    }
-
-    #[test]
-    fn test_token_value_identity() {
-        // Test that cloned TokenValue equals original (basic identity check)
-        let original = TokenValue::Color(Color::new(1.0, 0.0, 0.0, 1.0));
-        let cloned = original.clone();
-        assert_eq!(cloned, original);
-    }
 }

@@ -20,7 +20,7 @@ fn test_style_macro_basic() {
     assert!(s.background.is_some());
     assert!(s.color.is_some());
     assert_eq!(s.padding, Some(Padding::uniform(16.0)));
-    assert_eq!(s.border_radius, Some(8.0));
+    assert_eq!(s.border_radius, Some(theme_engine::CornerRadii::uniform(8.0)));
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn test_style_resolve_base_only() {
     // Resolve with no states active
     let resolved = s.resolve(false, false, false, false);
     assert_eq!(resolved.opacity, 1.0);
-    assert_eq!(resolved.border_radius, Some(8.0));
+    assert_eq!(resolved.border_radius, theme_engine::CornerRadii::uniform(8.0));
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn test_style_resolve_focus() {
 
     // Resolve with focus = true
     let resolved = s.resolve(false, true, false, false);
-    assert_eq!(resolved.border_radius, Some(8.0));
+    assert_eq!(resolved.border_radius, theme_engine::CornerRadii::uniform(8.0));
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn test_style_resolve_combined_states() {
     // Resolve with hover and focus both true
     let resolved = s.resolve(true, true, false, false);
     assert_eq!(resolved.opacity, 0.9);
-    assert_eq!(resolved.border_radius, Some(8.0));
+    assert_eq!(resolved.border_radius, theme_engine::CornerRadii::uniform(8.0));
 }
 
 #[test]

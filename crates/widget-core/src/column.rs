@@ -40,6 +40,7 @@ pub struct Column<C: WidgetTuple> {
     children: C,
     gap: f32,
     padding: f32,
+    style: Option<theme_engine::Style>,
 }
 
 impl<C: WidgetTuple> Column<C> {
@@ -62,6 +63,7 @@ impl<C: WidgetTuple> Column<C> {
             children,
             gap: 0.0,
             padding: 0.0,
+            style: None,
         }
     }
 
@@ -94,6 +96,12 @@ impl<C: WidgetTuple> Column<C> {
         self.padding = padding;
         self
     }
+
+    /// Set a high-level widget style
+    pub fn style(mut self, style: theme_engine::Style) -> Self {
+        self.style = Some(style);
+        self
+    }
 }
 
 impl<C: WidgetTuple> Widget for Column<C> {
@@ -106,7 +114,7 @@ impl<C: WidgetTuple> Widget for Column<C> {
         self.children.build_all(ctx, node_id);
 
         // Configure layout with column direction
-        let style = FlexStyle {
+        let layout = FlexStyle {
             direction: FlexDirection::Column,
             gap: self.gap,
             padding_left: self.padding,
@@ -116,7 +124,20 @@ impl<C: WidgetTuple> Widget for Column<C> {
             ..Default::default()
         };
 
-        ctx.set_layout_style(node_id, style);
+        ctx.set_layout_style(node_id, layout);
+
+        // Apply high-level style if present
+        if let Some(style) = &self.style {
+            ctx.set_widget_style(node_id, style.clone());
+
+            // Apply initial resolved style
+            let resolved = style.resolve(false, false, false, false);
+            ctx.apply_style(node_id, &resolved);
+
+            if style.hover.is_some() || style.active.is_some() || style.focus.is_some() {
+                ctx.add_hover_state(node_id);
+            }
+        }
 
         node_id
     }

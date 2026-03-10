@@ -43,6 +43,7 @@ pub struct Container<C: WidgetTuple> {
     width: Option<f32>,
     height: Option<f32>,
     flex_grow: f32,
+    style: Option<theme_engine::Style>,
 }
 
 /// Create a column container with children
@@ -142,6 +143,7 @@ impl<C: WidgetTuple> Container<C> {
             width: None,
             height: None,
             flex_grow: 0.0,
+            style: None,
         }
     }
 
@@ -155,6 +157,7 @@ impl<C: WidgetTuple> Container<C> {
             width: None,
             height: None,
             flex_grow: 0.0,
+            style: None,
         }
     }
 
@@ -187,6 +190,12 @@ impl<C: WidgetTuple> Container<C> {
         self.flex_grow = 1.0;
         self
     }
+
+    /// Set a high-level widget style
+    pub fn style(mut self, style: theme_engine::Style) -> Self {
+        self.style = Some(style);
+        self
+    }
 }
 
 impl<C: WidgetTuple> Widget for Container<C> {
@@ -199,7 +208,7 @@ impl<C: WidgetTuple> Widget for Container<C> {
         self.children.build_all(ctx, node_id);
 
         // Configure layout
-        let style = FlexStyle {
+        let layout = FlexStyle {
             direction: self.direction,
             gap: self.gap,
             padding_left: self.padding,
@@ -212,7 +221,21 @@ impl<C: WidgetTuple> Widget for Container<C> {
             ..Default::default()
         };
 
-        ctx.set_layout_style(node_id, style);
+        ctx.set_layout_style(node_id, layout);
+
+        // Apply high-level style if present
+        if let Some(style) = &self.style {
+            ctx.set_widget_style(node_id, style.clone());
+
+            // Apply initial resolved style for backwards compatibility and immediate visual feedback
+            let resolved = style.resolve(false, false, false, false);
+            ctx.apply_style(node_id, &resolved);
+
+            // If the style has pseudo-states, we need to track interactions
+            if style.hover.is_some() || style.active.is_some() || style.focus.is_some() {
+                ctx.add_hover_state(node_id);
+            }
+        }
 
         node_id
     }

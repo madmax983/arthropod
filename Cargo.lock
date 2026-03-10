@@ -229,6 +229,8 @@ dependencies = [
  "plat-core",
  "rayon",
  "render-engine",
+ "style-engine",
+ "theme-engine",
 ]
 
 [[package]]
@@ -4573,7 +4575,9 @@ name = "theme-engine"
 version = "0.1.0"
 dependencies = [
  "glam",
+ "layout-engine",
  "plat-core",
+ "style-engine",
  "thiserror 2.0.18",
  "windows",
  "windows-core",

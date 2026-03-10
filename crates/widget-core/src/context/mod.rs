@@ -101,6 +101,7 @@ pub struct WidgetContext {
 
     // Layout
     pub(crate) layout_styles: HashMap<NodeId, FlexStyle>,
+    pub(crate) widget_styles: HashMap<NodeId, theme_engine::Style>,
 
     // Interaction
     pub(crate) hover_states: HashSet<NodeId>,
@@ -134,6 +135,7 @@ impl WidgetContext {
         Self {
             scene,
             layout_styles: HashMap::new(),
+            widget_styles: HashMap::new(),
             hover_states: HashSet::new(),
             clickables: HashMap::new(),
             background_colors: HashMap::new(),
@@ -240,6 +242,14 @@ impl WidgetContext {
     /// Set layout style for a node
     pub fn set_layout_style(&mut self, node_id: NodeId, style: FlexStyle) {
         self.layout_styles.insert(node_id, style);
+    }
+
+    /// Set a high-level widget style for a node.
+    ///
+    /// This style contains pseudo-state information (hover, focus, etc.) and will be
+    /// transferred to a `WidgetStyle` ECS component for runtime resolution.
+    pub fn set_widget_style(&mut self, node_id: NodeId, style: theme_engine::Style) {
+        self.widget_styles.insert(node_id, style);
     }
 
     /// Re-parent a node from old parent to new parent
@@ -627,6 +637,11 @@ impl WidgetContext {
         &self.layout_styles
     }
 
+    /// Get all widget styles (for app-shell integration)
+    pub fn widget_styles(&self) -> &HashMap<NodeId, theme_engine::Style> {
+        &self.widget_styles
+    }
+
     /// Get all clickables (for app-shell integration)
     pub fn clickables(&self) -> &HashMap<NodeId, Arc<dyn Fn() + Send + Sync>> {
         &self.clickables
@@ -681,6 +696,28 @@ impl WidgetContext {
     /// This allows reclaiming the scene while keeping the context alive (e.g., for state access).
     pub fn take_scene(&mut self) -> Scene {
         std::mem::replace(&mut self.scene, Scene::new())
+    }
+
+    /// Apply a resolved style to a node.
+    ///
+    /// This is the "Unified Style Bridge" that converts a high-level `ResolvedStyle`
+    /// (containing both layout and visual properties) into the appropriate
+    /// low-level components.
+    pub fn apply_style(&mut self, node_id: NodeId, style: &theme_engine::ResolvedStyle) {
+        // 1. Apply Layout
+        self.set_layout_style(node_id, style.to_flex_style());
+
+        // 2. Apply Visuals to Scene Node
+        if let Some(node) = self.scene.get_node_mut(node_id) {
+            node.content = render_engine::NodeContent::Styled {
+                style: Box::new(style.to_visual_style()),
+            };
+        }
+
+        // 3. Extract background color for backwards compatibility/hit testing if needed
+        if let Some(bg) = &style.background {
+            self.set_background_color(node_id, bg.as_color());
+        }
     }
 }
 

@@ -47,10 +47,10 @@ impl<W: Widget> Widget for Center<W> {
         ctx.reparent_to(child_id, node_id);
 
         // Configure layout
-        // TODO: Once FlexStyle supports align_items and justify_content:
-        // - Set justify_content = Center
-        // - Set align_items = Center
         let style = FlexStyle {
+            justify_content: layout_engine::FlexJustifyContent::Center,
+            align_items: layout_engine::FlexAlign::Center,
+            flex_grow: 1.0, // Important: needs to grow to fill space to center its contents!
             ..Default::default()
         };
 
