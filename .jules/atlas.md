@@ -14,3 +14,6 @@
 ## 2026-06-03 - Cargo Machete False Positives
 **Tangle:** `cargo machete` aggressively flagged test dependencies like `trybuild` (for macro tests) and conditional target dependencies like `getrandom` (needed for `wasm_js` support in `hashbrown`) as unused, breaking WASM compilation and test suites.
 **Blueprint:** Reverted the removal of `trybuild` in `widget-macros` and `getrandom` in `render-engine`. Only truly unused dev dependencies like `naga` and `pollster` were removed.
+## 2026-06-05 - Figma Module Split
+**Tangle:** The `figma` module in `arthropod` was a massive 3300+ line file (`figma.rs`) mixing public domain models, Serde parsing schemas, and complex conversion logic. This violated the "Blob" anti-pattern and reduced cohesion.
+**Blueprint:** Split `figma.rs` into a `figma` directory containing `models.rs` (public types) and `schema.rs` (internal Serde schemas and import logic), re-exporting both from `mod.rs`. This enforces a clear boundary between the public API and implementation details.
