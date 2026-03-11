@@ -11,6 +11,7 @@ use plat_core::{
 use render_engine::{Color, NodeContent, Scene, backend::WgpuBackend};
 use std::cell::RefCell;
 use std::sync::Arc;
+use theme_engine::DesignTokens;
 use widget_core::{Widget, WidgetContext};
 
 // =============================================================================
@@ -39,6 +40,7 @@ pub(crate) struct WidgetAppConfig {
 /// Provides convenient access to create signals for reactive state.
 pub struct AppContext {
     pub(crate) runtime: Arc<Runtime>,
+    pub(crate) widget_ctx: WidgetContext,
 }
 
 impl AppContext {
@@ -59,6 +61,11 @@ impl AppContext {
     /// ```
     pub fn signal<T: Clone + Send + Sync + 'static>(&self, initial: T) -> Signal<T> {
         Signal::new(self.runtime.clone(), initial)
+    }
+
+    /// Set design tokens for theming.
+    pub fn set_design_tokens(&mut self, tokens: DesignTokens) {
+        self.widget_ctx.set_design_tokens(tokens);
     }
 
     /// Get the reactive runtime.
@@ -126,9 +133,6 @@ impl Application for WidgetApp {
 
         let runtime = app.runtime().clone();
 
-        // Create app context for builder
-        let mut app_ctx = AppContext { runtime };
-
         // Take scene from app to build widgets directly into it
         let scene = app
             .world_mut()
@@ -136,8 +140,16 @@ impl Application for WidgetApp {
             .expect("Scene resource missing");
 
         // Build widget tree
-        let widget = (config.builder)(&mut app_ctx);
         let mut widget_ctx = WidgetContext::new(scene);
+        let mut app_ctx = AppContext {
+            runtime,
+            widget_ctx,
+        };
+
+        let widget = (config.builder)(&mut app_ctx);
+        
+        // Take the context back from AppContext
+        let mut widget_ctx = app_ctx.widget_ctx;
         let widget_root = widget.build(&mut widget_ctx);
 
         // Detect form node (for Enter submission)

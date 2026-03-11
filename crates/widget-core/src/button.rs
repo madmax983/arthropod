@@ -37,13 +37,16 @@ pub struct Button {
     on_click: Option<Arc<dyn Fn() + Send + Sync>>,
 
     #[method_flag(primary, secondary)]
-    style: ButtonStyle,
+    style_variant: ButtonStyle,
 
     #[param(default = 12.0)]
     padding: f32,
 
     #[flag]
     disabled: bool,
+
+    #[param]
+    style: Option<theme_engine::Style>,
 }
 
 /// Visual styling tier for a `Button`.
@@ -81,9 +84,10 @@ impl Button {
         Self {
             text: text.into(),
             on_click: None,
-            style: ButtonStyle::Default,
+            style_variant: ButtonStyle::Default,
             padding: 12.0,
             disabled: false,
+            style: None,
         }
     }
 
@@ -98,13 +102,13 @@ impl Button {
 
     /// Use primary style (themed accent color)
     pub fn primary(mut self) -> Self {
-        self.style = ButtonStyle::Primary;
+        self.style_variant = ButtonStyle::Primary;
         self
     }
 
     /// Use secondary style
     pub fn secondary(mut self) -> Self {
-        self.style = ButtonStyle::Secondary;
+        self.style_variant = ButtonStyle::Secondary;
         self
     }
 
@@ -120,11 +124,21 @@ impl Button {
         self
     }
 
+    /// Set a high-level style override
+    pub fn style(mut self, style: theme_engine::Style) -> Self {
+        self.style = Some(style);
+        self
+    }
+
     /// Create high-level style for the button
     fn create_style(&self, tokens: Option<&DesignTokens>) -> Style {
+        if let Some(style) = &self.style {
+            return style.clone();
+        }
+
         match tokens {
             Some(t) => {
-                let (bg, hover_bg, pressed_bg, text_color) = match self.style {
+                let (bg, hover_bg, pressed_bg, text_color) = match self.style_variant {
                     ButtonStyle::Primary => (
                         t.accent,
                         t.accent_hover,
@@ -169,7 +183,7 @@ impl Button {
             }
             None => {
                 // Fallback style without tokens
-                let bg = match self.style {
+                let bg = match self.style_variant {
                     ButtonStyle::Primary => Vec4::new(0.0, 0.47, 0.84, 1.0),
                     ButtonStyle::Secondary => Vec4::new(0.5, 0.5, 0.5, 1.0),
                     ButtonStyle::Default => Vec4::new(0.9, 0.9, 0.9, 1.0),
@@ -195,13 +209,19 @@ impl Button {
 
     /// Get text color for current style (used for child text widget)
     fn get_text_color(&self, tokens: Option<&DesignTokens>) -> Vec4 {
+        if let Some(style) = &self.style {
+            if let Some(color) = style.color {
+                return color;
+            }
+        }
+
         match tokens {
-            Some(t) => match self.style {
+            Some(t) => match self.style_variant {
                 ButtonStyle::Primary => Vec4::new(1.0, 1.0, 1.0, 1.0),
                 ButtonStyle::Secondary => t.text_primary,
                 ButtonStyle::Default => t.text_primary,
             },
-            None => match self.style {
+            None => match self.style_variant {
                 ButtonStyle::Primary => Vec4::new(1.0, 1.0, 1.0, 1.0),
                 ButtonStyle::Secondary => Vec4::new(1.0, 1.0, 1.0, 1.0),
                 ButtonStyle::Default => Vec4::new(0.0, 0.0, 0.0, 1.0),

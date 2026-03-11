@@ -62,7 +62,9 @@ pub use render_engine::{
 };
 
 // Theme engine
-pub use theme_engine::{DesignTokens, SystemTheme};
+pub use theme_engine::{
+    CornerRadii, DesignTokens, FlexAlign, FlexJustifyContent, FlexWrap, Style, SystemTheme, style,
+};
 
 // Platform - Core types
 pub use plat_core::{
