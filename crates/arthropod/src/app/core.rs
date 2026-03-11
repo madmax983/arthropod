@@ -454,7 +454,7 @@ impl App {
 
         // Ensure all styled nodes have an InteractionState component
         // This is needed for the style resolution system to work
-        for (node_id, _) in widget_ctx.widget_styles() {
+        for node_id in widget_ctx.widget_styles().keys() {
             if let Some(mut entity) = self.get_entity_mut(*node_id) {
                 // Initialize with default state
                 entity.insert(InteractionState::default());

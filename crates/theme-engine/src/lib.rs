@@ -24,8 +24,8 @@ pub use style_macro::{Padding, ResolvedStyle, Style, StyleOverrides};
 pub use system_theme::SystemTheme;
 
 // Re-export common styling primitives for convenience
-pub use style_engine::CornerRadii;
 pub use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap};
+pub use style_engine::CornerRadii;
 
 // Re-export BackdropMaterial for convenience
 pub use plat_core::BackdropMaterial;

@@ -123,7 +123,7 @@ impl<'a> MultipassRenderer<'a> {
 
     pub(crate) fn render_multipass_effect_nodes(
         &mut self,
-        scene: &Scene,
+        scene: &'a Scene,
         multipass_node_ids: &[crate::NodeId],
         surface_texture: &wgpu::Texture,
         surface_view: &wgpu::TextureView,
@@ -299,7 +299,7 @@ impl<'a> MultipassRenderer<'a> {
 
     pub(crate) fn render_scene_in_visual_order(
         &mut self,
-        scene: &Scene,
+        scene: &'a Scene,
         surface_texture: &wgpu::Texture,
         surface_view: &wgpu::TextureView,
     ) {
@@ -337,7 +337,7 @@ impl<'a> MultipassRenderer<'a> {
 
     fn render_direct_node(
         &mut self,
-        scene: &Scene,
+        scene: &'a Scene,
         node_id: crate::NodeId,
         surface_view: &wgpu::TextureView,
     ) {
@@ -444,7 +444,7 @@ impl<'a> MultipassRenderer<'a> {
         target_view: &wgpu::TextureView,
         load_op: wgpu::LoadOp<wgpu::Color>,
         instances: &[PrimitiveInstance],
-        path_batches: &[PathBatch],
+        path_batches: &[PathBatch<'_>],
         scissor: Option<[u32; 4]>,
     ) {
         let should_skip = instances.is_empty()
@@ -682,9 +682,9 @@ impl<'a> MultipassRenderer<'a> {
 
     fn collect_frame_batches_internal(
         &mut self,
-        scene: &Scene,
+        scene: &'a Scene,
         skip_multipass: bool,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
+    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
         // Clear per-frame gradient data
         self.primitive_pipeline.clear_gradient_params();
 
@@ -818,8 +818,8 @@ impl<'a> MultipassRenderer<'a> {
 
     pub(crate) fn collect_frame_batches(
         &mut self,
-        scene: &Scene,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch>) {
+        scene: &'a Scene,
+    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
         self.collect_frame_batches_internal(scene, false)
     }
 

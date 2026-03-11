@@ -31,13 +31,12 @@ fn main() -> Result<(), AppError> {
             Column::new((
                 txt!("Cohesive DX", size: 32.0),
                 txt!("Notice how the buttons below have themed hover effects!", size: 18.0),
-                
                 Row::new((
                     btn!("Primary", primary),
                     btn!("Secondary", secondary),
                     // Demonstrate a custom hover override on a specific button
                     btn!("Custom Hover").style(style! {
-                        background: tokens.accent.clone();
+                        background: tokens.accent;
                         color: glam::Vec4::new(1.0, 1.0, 1.0, 1.0);
                         padding: 12.0;
                         border_radius: 20.0; // Extra round
@@ -47,12 +46,12 @@ fn main() -> Result<(), AppError> {
                             border_radius: 4.0; // Morph to square on hover
                         }
                     }),
-                )).gap(12.0),
-
+                ))
+                .gap(12.0),
                 txt!("The card hover was removed to focus on button interactions.", size: 14.0)
                     .color(Color::rgba(0.5, 0.5, 0.5, 1.0)),
             ))
-            .style(card_style)
+            .style(card_style),
         )
     })
 }

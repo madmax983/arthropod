@@ -140,14 +140,14 @@ impl Application for WidgetApp {
             .expect("Scene resource missing");
 
         // Build widget tree
-        let mut widget_ctx = WidgetContext::new(scene);
+        let widget_ctx = WidgetContext::new(scene);
         let mut app_ctx = AppContext {
             runtime,
             widget_ctx,
         };
 
         let widget = (config.builder)(&mut app_ctx);
-        
+
         // Take the context back from AppContext
         let mut widget_ctx = app_ctx.widget_ctx;
         let widget_root = widget.build(&mut widget_ctx);
@@ -234,9 +234,12 @@ impl Application for WidgetApp {
                 event: WindowEvent::CursorMoved { position },
                 ..
             } => {
-                let mut mouse_pos = self.app.world_mut().resource_mut::<arthropod_ecs::components::MousePosition>();
+                let mut mouse_pos = self
+                    .app
+                    .world_mut()
+                    .resource_mut::<arthropod_ecs::components::MousePosition>();
                 mouse_pos.0 = render_engine::Vec2::new(position.x as f32, position.y as f32);
-                
+
                 if let Some(window) = self.app.window() {
                     window.request_redraw();
                 }

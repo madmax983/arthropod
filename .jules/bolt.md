@@ -36,3 +36,7 @@
 **[Performance] Avoid O(d) ancestor walks on every node for opacity calculation**
 **Learning:** `inherited_node_opacity` was being called for every single node returned by the `iter_visuals` iterator. This triggers an `O(d)` ancestor lookup for every node to compute the inherited opacity, which does identical tree walks multiple times for children with the same parents, dragging down hit testing and scene traversal performance.
 **Action:** Move inherited properties like `opacity` into the traversal state directly (e.g., store them in the DFS stack in `iter_visuals`). Pass down the pre-multiplied values when iterating.
+
+**[Performance] Avoid heap allocations and clone() in hot loops with PathBatch**
+**Learning:** `PathBatch` was storing `Paint` by value, forcing a `.clone()` during batch collection. Since `Paint` can contain vectors (e.g., `ColorStop` for gradients), this led to expensive heap allocations per-node per-frame. Additionally, `resolve_path_fill_paints` returned `Cow` creating new `Vec`s for fallback cases.
+**Action:** Changed `PathBatch<'a>` to store a reference `&'a Paint` to eliminate the `.clone()`. Updated fallback logic in `resolve_path_fill_paints` and `resolve_path_stroke_paints` to return `&[Paint]` backed by a `OnceLock` instead of allocating a `Cow::Owned(Vec)`.

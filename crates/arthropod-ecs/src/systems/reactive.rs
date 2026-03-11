@@ -2,8 +2,8 @@ use bevy_ecs::prelude::*;
 use render_engine::{NodeContent, Scene};
 
 use crate::components::{
-    ReactiveColor, ReactiveComputedText, ReactiveOpacity, ReactiveText, ReactiveTransform,
-    SceneNodeRef, InteractionState, LayoutStyle, WidgetStyle, MousePosition,
+    InteractionState, LayoutStyle, MousePosition, ReactiveColor, ReactiveComputedText,
+    ReactiveOpacity, ReactiveText, ReactiveTransform, SceneNodeRef, WidgetStyle,
 };
 
 /// System that updates interaction states based on mouse position and hit testing
@@ -13,10 +13,10 @@ pub fn update_interaction_state_system(
     mut query: Query<(Entity, &SceneNodeRef, &mut InteractionState)>,
 ) {
     let hit_id = scene.hit_test(mouse_pos.0.x, mouse_pos.0.y);
-    
+
     // Create a set of interactive nodes that are actually being hovered
     let mut hovered_nodes = std::collections::HashSet::new();
-    
+
     if let Some(mut current_id) = hit_id {
         // Bubble up from the hit node to find all interactive ancestors
         // This ensures that if you hover a Text inside a Button, the Button is also considered hovered.
@@ -43,16 +43,25 @@ pub fn update_interaction_state_system(
 ///
 /// This is the core of the Unified Style System, ensuring that visual and layout properties
 /// automatically update when a widget's state (hover, focus, active, disabled) changes.
+#[allow(clippy::type_complexity)]
 pub fn update_widget_style_system(
     mut query: Query<
-        (&SceneNodeRef, &WidgetStyle, &InteractionState, Option<&mut LayoutStyle>),
+        (
+            &SceneNodeRef,
+            &WidgetStyle,
+            &InteractionState,
+            Option<&mut LayoutStyle>,
+        ),
         Or<(Changed<InteractionState>, Changed<WidgetStyle>)>,
     >,
     mut scene: ResMut<Scene>,
 ) {
     for (node_ref, widget_style, state, layout_style) in query.iter_mut() {
         // 1. Resolve style for current state
-        let resolved = widget_style.0.resolve(state.hovered, state.focused, state.active, state.disabled);
+        let resolved =
+            widget_style
+                .0
+                .resolve(state.hovered, state.focused, state.active, state.disabled);
 
         // 2. Update LayoutStyle component if present (triggers layout engine)
         if let Some(mut layout) = layout_style {

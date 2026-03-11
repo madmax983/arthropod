@@ -1,26 +1,126 @@
-   Compiling plat-core v0.1.0 (C:\Users\markm\arthropod\crates\plat-core)
-error[E0432]: unresolved import `windows::Win32::System::Threading`
-   --> crates\plat-core\src\platform\windows.rs:17:20
-    |
- 17 |     Win32::System::Threading::INFINITE,
-    |                    ^^^^^^^^^ could not find `Threading` in `System`
-    |
-note: found an item that was configured out
-   --> C:\Users\markm\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.59.0\src\Windows\Win32\System\mod.rs:140:9
-    |
-139 | #[cfg(feature = "Win32_System_Threading")]
-    |       ---------------------------------- the item is gated behind the `Win32_System_Threading` feature
-140 | pub mod Threading;
-    |         ^^^^^^^^^
+scene_hit_test/100      time:   [964.95 ns 971.54 ns 979.78 ns]
+                        change: [-36.761% -35.682% -34.536%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  7 (7.00%) high mild
+  4 (4.00%) high severe
+scene_hit_test/500      time:   [5.5875 µs 5.6145 µs 5.6504 µs]
+                        change: [+0.7310% +1.4005% +2.2336%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 17 outliers among 100 measurements (17.00%)
+  4 (4.00%) high mild
+  13 (13.00%) high severe
+scene_hit_test/1000     time:   [11.746 µs 11.762 µs 11.784 µs]
+                        change: [-12.686% -11.559% -10.434%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 16 outliers among 100 measurements (16.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  6 (6.00%) high mild
+  7 (7.00%) high severe
+scene_hit_test/5000     time:   [61.203 µs 61.278 µs 61.356 µs]
+                        change: [-5.3004% -4.2666% -3.3670%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+scene_hit_test/10000    time:   [129.82 µs 130.13 µs 130.49 µs]
+                        change: [-14.069% -11.187% -8.8661%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
 
-warning: unused variable: `hdc`
-   --> crates\plat-core\src\platform\windows.rs:269:21
-    |
-269 |                 let hdc = BeginPaint(hwnd, &mut ps);
-    |                     ^^^ help: if this is intentional, prefix it with an underscore: `_hdc`
-    |
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+scene_hit_test_miss/100 time:   [2.3303 µs 2.3327 µs 2.3352 µs]
+                        change: [-17.176% -13.895% -10.614%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+scene_hit_test_miss/1000
+                        time:   [22.818 µs 22.837 µs 22.858 µs]
+                        change: [-4.3956% -3.9430% -3.5003%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  1 (1.00%) low severe
+  6 (6.00%) low mild
+  4 (4.00%) high mild
+scene_hit_test_miss/10000
+                        time:   [357.23 µs 384.79 µs 409.73 µs]
+                        change: [+1.5668% +6.1671% +10.243%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 21 outliers among 100 measurements (21.00%)
+  21 (21.00%) high severe
 
-For more information about this error, try `rustc --explain E0432`.
-warning: `plat-core` (lib) generated 1 warning
-error: could not compile `plat-core` (lib) due to 1 previous error; 1 warning emitted
+scene_hit_test_overlapping/100
+                        time:   [34.653 ns 34.720 ns 34.790 ns]
+                        change: [-0.4708% -0.2447% -0.0367%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 7 outliers among 100 measurements (7.00%)
+  1 (1.00%) low severe
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+scene_hit_test_overlapping/500
+                        time:   [5.3136 µs 5.3236 µs 5.3375 µs]
+                        change: [-10.245% -7.7625% -5.2215%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 10 outliers among 100 measurements (10.00%)
+  4 (4.00%) high mild
+  6 (6.00%) high severe
+scene_hit_test_overlapping/1000
+                        time:   [16.173 µs 16.343 µs 16.683 µs]
+                        change: [-11.689% -11.267% -10.552%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+
+scene_node_lookup/100   time:   [5.7499 ns 5.7723 ns 5.8041 ns]
+                        change: [-9.0089% -8.7127% -8.3904%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 15 outliers among 100 measurements (15.00%)
+  5 (5.00%) high mild
+  10 (10.00%) high severe
+scene_node_lookup/1000  time:   [6.3105 ns 6.3138 ns 6.3175 ns]
+                        change: [+9.8371% +9.9971% +10.178%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+scene_node_lookup/10000 time:   [5.7521 ns 5.7790 ns 5.8201 ns]
+                        change: [-9.4263% -9.0707% -8.5485%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  6 (6.00%) high mild
+  3 (3.00%) high severe
+
+scene_add_node/single_add
+                        time:   [284.99 ns 290.31 ns 296.10 ns]
+                        change: [+22.869% +36.091% +50.946%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+scene_add_node/batch_100
+                        time:   [9.2066 µs 9.2875 µs 9.3879 µs]
+                        change: [+3.1418% +4.8491% +6.8008%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+
+scene_mark_dirty/mark_single
+                        time:   [7.6120 ns 7.9666 ns 8.3861 ns]
+                        change: [+10.461% +14.523% +19.025%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+scene_mark_dirty/take_dirty
+                        time:   [6.9559 ns 6.9800 ns 7.0133 ns]
+                        change: [+2.5846% +3.9374% +5.2314%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+

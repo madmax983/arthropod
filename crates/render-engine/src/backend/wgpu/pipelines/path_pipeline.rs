@@ -47,9 +47,9 @@ pub struct PathGpuVertex {
 
 /// Prepared path draw batch for upload.
 #[derive(Debug, Clone)]
-pub struct PathBatch {
+pub struct PathBatch<'a> {
     pub mesh: Arc<PathMesh>,
-    pub paint: Paint,
+    pub paint: &'a Paint,
     pub opacity: f32,
     pub size: [f32; 2],
     pub offset: [f32; 2],
@@ -271,7 +271,7 @@ fn image_subdivision_steps(size: glam::Vec2, base_triangle_count: usize) -> u32 
     desired.min(max_by_budget).max(1)
 }
 
-fn sample_batch_color(batch: &PathBatch, local_pos: glam::Vec2, size: glam::Vec2) -> [f32; 4] {
+fn sample_batch_color(batch: &PathBatch<'_>, local_pos: glam::Vec2, size: glam::Vec2) -> [f32; 4] {
     match &batch.paint {
         Paint::Solid(color) => {
             let mut c = *color;
@@ -280,7 +280,7 @@ fn sample_batch_color(batch: &PathBatch, local_pos: glam::Vec2, size: glam::Vec2
         }
         Paint::Image(_) => {
             let mut c = sample_paint_at_uv(
-                &batch.paint,
+                batch.paint,
                 (local_pos / size).clamp(glam::Vec2::ZERO, glam::Vec2::ONE),
                 size,
             );
@@ -294,7 +294,7 @@ fn sample_batch_color(batch: &PathBatch, local_pos: glam::Vec2, size: glam::Vec2
 }
 
 fn push_batch_vertex(
-    batch: &PathBatch,
+    batch: &PathBatch<'_>,
     vertices: &mut Vec<PathGpuVertex>,
     local_pos: glam::Vec2,
     normal: glam::Vec2,
@@ -320,7 +320,7 @@ struct ImageSampleTriangle {
 }
 
 fn append_subdivided_image_triangle(
-    batch: &PathBatch,
+    batch: &PathBatch<'_>,
     vertices: &mut Vec<PathGpuVertex>,
     indices: &mut Vec<u32>,
     size: glam::Vec2,
@@ -375,7 +375,7 @@ fn append_subdivided_image_triangle(
 }
 
 fn append_batch_geometry(
-    batch: &PathBatch,
+    batch: &PathBatch<'_>,
     vertices: &mut Vec<PathGpuVertex>,
     indices: &mut Vec<u32>,
     runtime: PaintRuntime,
@@ -1059,14 +1059,19 @@ impl PathPipeline {
         }
     }
 
-    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, batches: &[PathBatch]) {
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        batches: &[PathBatch<'_>],
+    ) {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
         self.gradient_params.clear();
 
         for batch in batches {
-            let runtime = if let Some(mut params) = gradient_params_for_paint(&batch.paint, 0) {
-                let atlas_row = match &batch.paint {
+            let runtime = if let Some(mut params) = gradient_params_for_paint(batch.paint, 0) {
+                let atlas_row = match batch.paint {
                     Paint::Linear(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
                     Paint::Radial(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
                     Paint::Angular(gradient) => self.gradient_atlas.add_gradient(&gradient.stops),
@@ -1358,13 +1363,14 @@ mod tests {
             indices: vec![0, 1, 2, 0, 2, 3],
         });
 
+        let paint = Paint::Image(ImageFill {
+            image_id,
+            scale_mode: ImageScaleMode::Fill,
+            transform: None,
+        });
         let batch = PathBatch {
             mesh,
-            paint: Paint::Image(ImageFill {
-                image_id,
-                scale_mode: ImageScaleMode::Fill,
-                transform: None,
-            }),
+            paint: &paint,
             opacity: 1.0,
             size: [120.0, 120.0],
             offset: [0.0, 0.0],
@@ -1437,16 +1443,17 @@ mod tests {
             ],
             indices: vec![0, 1, 2],
         });
+        let paint = Paint::Linear(style_engine::LinearGradient {
+            start: glam::Vec2::new(0.0, 0.0),
+            end: glam::Vec2::new(1.0, 0.0),
+            stops: vec![
+                style_engine::ColorStop::new(0.0, glam::Vec4::new(1.0, 0.0, 0.0, 1.0)),
+                style_engine::ColorStop::new(1.0, glam::Vec4::new(0.0, 0.0, 1.0, 1.0)),
+            ],
+        });
         let batch = PathBatch {
             mesh,
-            paint: Paint::Linear(style_engine::LinearGradient {
-                start: glam::Vec2::new(0.0, 0.0),
-                end: glam::Vec2::new(1.0, 0.0),
-                stops: vec![
-                    style_engine::ColorStop::new(0.0, glam::Vec4::new(1.0, 0.0, 0.0, 1.0)),
-                    style_engine::ColorStop::new(1.0, glam::Vec4::new(0.0, 0.0, 1.0, 1.0)),
-                ],
-            }),
+            paint: &paint,
             opacity: 0.5,
             size: [100.0, 100.0],
             offset: [0.0, 0.0],

@@ -358,27 +358,34 @@ fn pick_text_fill_paint(style: &style_engine::VisualStyle) -> Option<&style_engi
         .or_else(|| style.fills.first())
 }
 
+static DEFAULT_FILL: std::sync::OnceLock<Vec<style_engine::Paint>> = std::sync::OnceLock::new();
+static DEFAULT_STROKE: std::sync::OnceLock<Vec<style_engine::Paint>> = std::sync::OnceLock::new();
+
 pub(crate) fn resolve_path_fill_paints(
     style: &style_engine::VisualStyle,
-) -> std::borrow::Cow<'_, [style_engine::Paint]> {
+) -> &[style_engine::Paint] {
     if style.fills.is_empty() {
-        std::borrow::Cow::Owned(vec![style_engine::Paint::solid(glam::Vec4::new(
-            1.0, 0.0, 1.0, 1.0,
-        ))])
+        DEFAULT_FILL.get_or_init(|| {
+            vec![style_engine::Paint::solid(glam::Vec4::new(
+                1.0, 0.0, 1.0, 1.0,
+            ))]
+        })
     } else {
-        std::borrow::Cow::Borrowed(&style.fills)
+        &style.fills
     }
 }
 
 pub(crate) fn resolve_path_stroke_paints(
     stroke: &style_engine::StrokeStyle,
-) -> std::borrow::Cow<'_, [style_engine::Paint]> {
+) -> &[style_engine::Paint] {
     if stroke.paints.is_empty() {
-        std::borrow::Cow::Owned(vec![style_engine::Paint::solid(glam::Vec4::new(
-            1.0, 0.0, 1.0, 1.0,
-        ))])
+        DEFAULT_STROKE.get_or_init(|| {
+            vec![style_engine::Paint::solid(glam::Vec4::new(
+                1.0, 0.0, 1.0, 1.0,
+            ))]
+        })
     } else {
-        std::borrow::Cow::Borrowed(&stroke.paints)
+        &stroke.paints
     }
 }
 
@@ -395,7 +402,7 @@ pub(crate) fn collect_instances<'a>(
 ) -> (
     Vec<PrimitiveInstance>,
     Vec<TextNodeData<'a>>,
-    Vec<PathBatch>,
+    Vec<PathBatch<'a>>,
 ) {
     collect_instances_impl(
         Some(pipeline),
@@ -416,7 +423,7 @@ pub(crate) fn collect_instances_excluding_multipass<'a>(
 ) -> (
     Vec<PrimitiveInstance>,
     Vec<TextNodeData<'a>>,
-    Vec<PathBatch>,
+    Vec<PathBatch<'a>>,
 ) {
     collect_instances_impl(
         Some(pipeline),
@@ -434,7 +441,7 @@ pub(crate) fn collect_instances_for_tests<'a>(
 ) -> (
     Vec<PrimitiveInstance>,
     Vec<TextNodeData<'a>>,
-    Vec<PathBatch>,
+    Vec<PathBatch<'a>>,
 ) {
     let mut stack = Vec::new();
     collect_instances_impl(None, None, None, &mut stack, scene, false)
@@ -446,19 +453,19 @@ pub(crate) fn collect_instances_without_multipass_for_tests<'a>(
 ) -> (
     Vec<PrimitiveInstance>,
     Vec<TextNodeData<'a>>,
-    Vec<PathBatch>,
+    Vec<PathBatch<'a>>,
 ) {
     let mut stack = Vec::new();
     collect_instances_impl(None, None, None, &mut stack, scene, true)
 }
 
-fn collect_path_geometry_batches(
-    style: &style_engine::VisualStyle,
+fn collect_path_geometry_batches<'a>(
+    style: &'a style_engine::VisualStyle,
     render_bounds: &plat_core::Rect,
     effective_opacity: f32,
     tessellation_cache: &mut Option<&mut TessellationCache>,
     path_interner: &mut Option<&mut PathInterner>,
-    path_batches: &mut Vec<PathBatch>,
+    path_batches: &mut Vec<PathBatch<'a>>,
 ) {
     let Some(paths) = &style.fill_geometry else {
         return;
@@ -485,11 +492,11 @@ fn collect_path_geometry_batches(
         }
     }
 
-    for fill_paint in fill_paints.as_ref() {
+    for fill_paint in fill_paints {
         for mesh in &fill_meshes {
             path_batches.push(PathBatch {
                 mesh: Arc::clone(mesh),
-                paint: fill_paint.clone(),
+                paint: fill_paint,
                 opacity: effective_opacity,
                 size: [render_bounds.width, render_bounds.height],
                 offset: [render_bounds.x, render_bounds.y],
@@ -524,11 +531,11 @@ fn collect_path_geometry_batches(
                 }
             }
 
-            for stroke_paint in stroke_paints.as_ref() {
+            for stroke_paint in stroke_paints {
                 for mesh in &stroke_meshes {
                     path_batches.push(PathBatch {
                         mesh: Arc::clone(mesh),
-                        paint: stroke_paint.clone(),
+                        paint: stroke_paint,
                         opacity: effective_opacity,
                         size: [render_bounds.width, render_bounds.height],
                         offset: [render_bounds.x, render_bounds.y],
@@ -539,12 +546,12 @@ fn collect_path_geometry_batches(
     }
 }
 
-fn collect_image_fill_batches(
-    style: &style_engine::VisualStyle,
+fn collect_image_fill_batches<'a>(
+    style: &'a style_engine::VisualStyle,
     render_bounds: &plat_core::Rect,
     effective_opacity: f32,
     tessellation_cache: &mut Option<&mut TessellationCache>,
-    path_batches: &mut Vec<PathBatch>,
+    path_batches: &mut Vec<PathBatch<'a>>,
 ) {
     let fill_paints = resolve_path_fill_paints(style);
     let rect_path = rounded_rect_path_for_size(
@@ -561,10 +568,10 @@ fn collect_image_fill_batches(
     if let Ok(mesh) = mesh_result
         && !mesh.indices.is_empty()
     {
-        for fill_paint in fill_paints.as_ref() {
+        for fill_paint in fill_paints {
             path_batches.push(PathBatch {
                 mesh: Arc::clone(&mesh),
-                paint: fill_paint.clone(),
+                paint: fill_paint,
                 opacity: effective_opacity,
                 size: [render_bounds.width, render_bounds.height],
                 offset: [render_bounds.x, render_bounds.y],
@@ -583,10 +590,10 @@ fn collect_image_fill_batches(
         if let Ok(mesh) = stroke_mesh_result
             && !mesh.indices.is_empty()
         {
-            for stroke_paint in stroke_paints.as_ref() {
+            for stroke_paint in stroke_paints {
                 path_batches.push(PathBatch {
                     mesh: Arc::clone(&mesh),
-                    paint: stroke_paint.clone(),
+                    paint: stroke_paint,
                     opacity: effective_opacity,
                     size: [render_bounds.width, render_bounds.height],
                     offset: [render_bounds.x, render_bounds.y],
@@ -606,7 +613,7 @@ fn collect_instances_impl<'a>(
 ) -> (
     Vec<PrimitiveInstance>,
     Vec<TextNodeData<'a>>,
-    Vec<PathBatch>,
+    Vec<PathBatch<'a>>,
 ) {
     // We need style_requires_multipass but it is in mod.rs (or multipass_executor.rs later).
     // For now I will inline or import it.
@@ -722,14 +729,14 @@ fn collect_instances_impl<'a>(
     (instances, text_nodes_for_shaping, path_batches)
 }
 
-pub(crate) fn collect_style_batches_for_bounds(
+pub(crate) fn collect_style_batches_for_bounds<'a>(
     ctx: &mut BatchCollectionContext,
-    style: &style_engine::VisualStyle,
+    style: &'a style_engine::VisualStyle,
     effective_opacity: f32,
     render_bounds: plat_core::Rect,
     node_transform: Transform2D,
     instances: &mut Vec<PrimitiveInstance>,
-    path_batches: &mut Vec<PathBatch>,
+    path_batches: &mut Vec<PathBatch<'a>>,
 ) {
     instances.clear();
     path_batches.clear();
