@@ -47,8 +47,10 @@ impl TextRenderer {
             // placement_left: pixels from glyph origin to left edge of rasterized image
             // placement_top: pixels from glyph origin to top edge (positive = above origin)
             // In our Y-down coordinate system, subtract placement_top to move image upward.
-            let glyph_x = position.x + glyph.x_offset + coords.placement_left as f32;
-            let glyph_y = position.y + glyph.y_offset - coords.placement_top as f32;
+            //
+            // Snap to nearest integer pixel for maximum sharpness.
+            let glyph_x = (position.x + glyph.x_offset + coords.placement_left as f32).round();
+            let glyph_y = (position.y + glyph.y_offset - coords.placement_top as f32).round();
 
             instances.push(PrimitiveInstance::glyph(
                 [glyph_x, glyph_y],

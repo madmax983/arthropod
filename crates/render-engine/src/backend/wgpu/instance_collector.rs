@@ -221,13 +221,13 @@ pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
 
     let mut instances = match &node.content {
         NodeContent::Styled { style } => {
-            let pos = glam::Vec2::new(node.bounds.x, node.bounds.y);
-            let size = glam::Vec2::new(node.bounds.width, node.bounds.height);
+            let pos = glam::Vec2::new(node.bounds.x.round(), node.bounds.y.round());
+            let size = glam::Vec2::new(node.bounds.width.round(), node.bounds.height.round());
             create_primitive_instances(style, pos, size, node.opacity * style.opacity)
         }
         NodeContent::SolidColor { color } => {
-            let pos = [node.bounds.x, node.bounds.y];
-            let size = [node.bounds.width, node.bounds.height];
+            let pos = [node.bounds.x.round(), node.bounds.y.round()];
+            let size = [node.bounds.width.round(), node.bounds.height.round()];
             let mut final_color = color.to_array();
             final_color[3] *= node.opacity;
 
@@ -781,7 +781,7 @@ pub(crate) fn collect_style_batches_for_bounds(
             options,
         );
         apply_text_letter_spacing(&mut shaped, text_content.letter_spacing);
-        let position = glam::Vec2::new(render_bounds.x, render_bounds.y + text_content.font_size);
+        let position = glam::Vec2::new(render_bounds.x.round(), (render_bounds.y + text_content.font_size).round());
         let text_bounds = [
             render_bounds.x,
             render_bounds.y,

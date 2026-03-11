@@ -724,8 +724,10 @@ impl<'a> MultipassRenderer<'a> {
                             text_content.font_size,
                             options,
                         );
-                        let position =
-                            glam::Vec2::new(node.bounds.x, node.bounds.y + text_content.font_size);
+                        let position = glam::Vec2::new(
+                            node.bounds.x.round(),
+                            (node.bounds.y + text_content.font_size).round(),
+                        );
                         let text_bounds = [
                             node.bounds.x,
                             node.bounds.y,
@@ -757,8 +759,10 @@ impl<'a> MultipassRenderer<'a> {
                                 text_content.font_size,
                                 options,
                             );
-                        let position =
-                            glam::Vec2::new(node.bounds.x, node.bounds.y + text_content.font_size);
+                        let position = glam::Vec2::new(
+                            node.bounds.x.round(),
+                            (node.bounds.y + text_content.font_size).round(),
+                        );
                         let text_bounds = [
                             node.bounds.x,
                             node.bounds.y,
