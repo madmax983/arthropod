@@ -64,21 +64,18 @@ pub fn update_inspector_overlay(
     );
 
     // Let's draw an overlay over the last hit node
-    if let Some(&top_hit) = hits.last() {
-        #[allow(clippy::collapsible_if)]
-        if let Some(target_node) = scene.get_node(top_hit) {
-            let bounds = target_node.bounds;
+    if let Some(target_node) = hits.last().and_then(|&id| scene.get_node(id)) {
+        let bounds = target_node.bounds;
 
-            let mut overlay_node = SceneNode::new(NodeContent::Styled {
-                style: style.clone(),
-            });
-            overlay_node.bounds = bounds;
+        let mut overlay_node = SceneNode::new(NodeContent::Styled {
+            style: style.clone(),
+        });
+        overlay_node.bounds = bounds;
 
-            // Add the overlay as a child of the root to draw on top of everything
-            let root = scene.root();
-            let overlay_id = scene.add_node(root, overlay_node);
-            state.active_overlay_nodes.push(overlay_id);
-        }
+        // Add the overlay as a child of the root to draw on top of everything
+        let root = scene.root();
+        let overlay_id = scene.add_node(root, overlay_node);
+        state.active_overlay_nodes.push(overlay_id);
     }
 }
 

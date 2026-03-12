@@ -103,15 +103,14 @@ pub fn wand_system(
 
             // Visual feedback: Update emitter position to follow cursor
             if let Some(emitter_entity) = wand.emitter_entity {
-                // Clippy suggestion: collapse nested if block
-                #[allow(clippy::collapsible_if)]
-                if let Ok(mut emitter) = emitters.get_mut(emitter_entity) {
-                    if let WindowEvent::CursorMoved { position } = event {
-                        emitter.position = Vec2::new(position.x as f32, position.y as f32);
-                    }
-                    // Only emit while tracking (button down)
-                    emitter.active = wand.matcher.is_tracking();
+                let Ok(mut emitter) = emitters.get_mut(emitter_entity) else {
+                    continue;
+                };
+                if let WindowEvent::CursorMoved { position } = event {
+                    emitter.position = Vec2::new(position.x as f32, position.y as f32);
                 }
+                // Only emit while tracking (button down)
+                emitter.active = wand.matcher.is_tracking();
             }
         }
     }

@@ -230,7 +230,6 @@ impl App {
 }
 
 #[tokio::main]
-#[allow(clippy::collapsible_if)]
 async fn main() -> Result<()> {
     // 1. Setup Terminal
     enable_raw_mode()?;
@@ -550,7 +549,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::collapsible_if)]
 fn ui(f: &mut Frame, app: &mut App) {
     // Top level layout: Main Area vs Status Bar
     let main_layout = Layout::default()

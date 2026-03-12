@@ -204,7 +204,6 @@ fn parse_duration(val_str: &str, unit_str: &str) -> DurationVal {
     }
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
     let mut benchmarks = Vec::new();
 
@@ -235,10 +234,8 @@ fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
             let time_max = parse_duration(&caps[6], &caps[7]);
 
             let mut throughput = None;
-            if i + 1 < lines.len() {
-                if let Some(t_caps) = thrpt_re.captures(lines[i + 1]) {
-                    throughput = Some(t_caps[1].to_string());
-                }
+            if let Some(t_caps) = lines.get(i + 1).and_then(|line| thrpt_re.captures(line)) {
+                throughput = Some(t_caps[1].to_string());
             }
 
             benchmarks.push(Benchmark {
@@ -257,7 +254,6 @@ fn parse_benchmarks(content: &str) -> Vec<Benchmark> {
     benchmarks
 }
 
-#[allow(clippy::collapsible_if)]
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
 where
     <B as ratatui::backend::Backend>::Error: Send + Sync + 'static,
@@ -267,16 +263,17 @@ where
 
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                        KeyCode::Down => app.next(),
-                        KeyCode::Up => app.previous(),
-                        KeyCode::Char('n') => app.toggle_sort(SortBy::Name),
-                        KeyCode::Char('t') => app.toggle_sort(SortBy::Time),
-                        KeyCode::Char('g') => app.toggle_sort(SortBy::Group),
-                        _ => {}
-                    }
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                    KeyCode::Down => app.next(),
+                    KeyCode::Up => app.previous(),
+                    KeyCode::Char('n') => app.toggle_sort(SortBy::Name),
+                    KeyCode::Char('t') => app.toggle_sort(SortBy::Time),
+                    KeyCode::Char('g') => app.toggle_sort(SortBy::Group),
+                    _ => {}
                 }
             }
         }

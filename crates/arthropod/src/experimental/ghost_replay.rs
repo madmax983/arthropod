@@ -140,7 +140,6 @@ pub fn record_event(world: &mut World, event: &Event) {
 // Systems
 // =============================================================================
 
-#[allow(clippy::collapsible_if)]
 pub fn update_ghost_replay(
     mut commands: Commands,
     mut replayer: ResMut<GhostReplayer>,
@@ -194,24 +193,24 @@ pub fn update_ghost_replay(
                 }
             }
             GhostEventKind::Click(_) => {
-                if let Some(node) = cursor_node_id.and_then(|id| scene.get_node_mut(id)) {
-                    if let NodeContent::Styled { style } = &mut node.content {
-                        // Flash Red
-                        if !style.fills.is_empty() {
-                            style.fills[0] =
-                                Paint::Solid(Color::rgba(1.0, 0.0, 0.0, 0.8).as_vec4());
-                        }
+                if let Some(NodeContent::Styled { style }) = cursor_node_id
+                    .and_then(|id| scene.get_node_mut(id))
+                    .map(|n| &mut n.content)
+                {
+                    // Flash Red
+                    if !style.fills.is_empty() {
+                        style.fills[0] = Paint::Solid(Color::rgba(1.0, 0.0, 0.0, 0.8).as_vec4());
                     }
                 }
             }
             GhostEventKind::Release(_) => {
-                if let Some(node) = cursor_node_id.and_then(|id| scene.get_node_mut(id)) {
-                    if let NodeContent::Styled { style } = &mut node.content {
-                        // Back to Purple
-                        if !style.fills.is_empty() {
-                            style.fills[0] =
-                                Paint::Solid(Color::rgba(0.5, 0.0, 1.0, 0.5).as_vec4());
-                        }
+                if let Some(NodeContent::Styled { style }) = cursor_node_id
+                    .and_then(|id| scene.get_node_mut(id))
+                    .map(|n| &mut n.content)
+                {
+                    // Back to Purple
+                    if !style.fills.is_empty() {
+                        style.fills[0] = Paint::Solid(Color::rgba(0.5, 0.0, 1.0, 0.5).as_vec4());
                     }
                 }
             }

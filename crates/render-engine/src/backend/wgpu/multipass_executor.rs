@@ -850,11 +850,9 @@ pub(crate) fn collect_multipass_node_ids(
         if !node.visible || inherited_opacity <= 0.0 {
             continue;
         }
-        #[allow(clippy::collapsible_if)]
-        if let NodeContent::Styled { style } = &node.content {
-            if style_requires_multipass(style) {
-                buffer.push(node_id);
-            }
+        if matches!(&node.content, NodeContent::Styled { style } if style_requires_multipass(style))
+        {
+            buffer.push(node_id);
         }
     }
 }

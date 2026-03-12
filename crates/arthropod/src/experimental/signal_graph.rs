@@ -74,63 +74,65 @@ pub fn update_signal_graphs(
         let history = history.unwrap();
 
         // Get the SceneNode ID from the entity
-        #[allow(clippy::collapsible_if)]
-        if let Ok(node_ref) = node_query.get(entity) {
-            if let Some(node) = scene.get_node_mut(node_ref.0) {
-                // Generate path
-                let bounds = node.bounds;
-                if bounds.width <= 0.0 || bounds.height <= 0.0 {
-                    continue;
-                }
+        let Ok(node_ref) = node_query.get(entity) else {
+            continue;
+        };
+        let Some(node) = scene.get_node_mut(node_ref.0) else {
+            continue;
+        };
 
-                if history.values.len() < 2 {
-                    continue;
-                }
-
-                let mut path = VectorPath::new();
-                path.winding_rule = WindingRule::NonZero;
-
-                let step_x = bounds.width / (graph.history_length as f32 - 1.0);
-                let range = graph.max_value - graph.min_value;
-                let scale_y = if range != 0.0 {
-                    bounds.height / range
-                } else {
-                    1.0
-                };
-
-                // Move to first point
-                let first_val = history.values[0].clamp(graph.min_value, graph.max_value);
-                // Y is typically down in UI, but graphs usually go up.
-                // Let's assume 0,0 is top-left.
-                // Value min -> bounds.y + bounds.height (bottom)
-                // Value max -> bounds.y (top)
-                let y = bounds.height - (first_val - graph.min_value) * scale_y;
-                path.move_to(Vec2::new(0.0, y));
-
-                for (i, val) in history.values.iter().enumerate().skip(1) {
-                    let val = val.clamp(graph.min_value, graph.max_value);
-                    let x = i as f32 * step_x;
-                    let y = bounds.height - (val - graph.min_value) * scale_y;
-                    path.line_to(Vec2::new(x, y));
-                }
-
-                // Update node content
-                let style = VisualStyle::new()
-                    .stroke(StrokeStyle::solid(
-                        Paint::solid(graph.color.as_vec4()),
-                        graph.stroke_width,
-                        style_engine::StrokeAlign::Center,
-                    ))
-                    .path(path);
-
-                node.content = NodeContent::Styled {
-                    style: Box::new(style),
-                };
-
-                // Mark dirty
-                scene.mark_dirty(node_ref.0);
-            }
+        // Generate path
+        let bounds = node.bounds;
+        if bounds.width <= 0.0 || bounds.height <= 0.0 {
+            continue;
         }
+
+        if history.values.len() < 2 {
+            continue;
+        }
+
+        let mut path = VectorPath::new();
+        path.winding_rule = WindingRule::NonZero;
+
+        let step_x = bounds.width / (graph.history_length as f32 - 1.0);
+        let range = graph.max_value - graph.min_value;
+        let scale_y = if range != 0.0 {
+            bounds.height / range
+        } else {
+            1.0
+        };
+
+        // Move to first point
+        let first_val = history.values[0].clamp(graph.min_value, graph.max_value);
+        // Y is typically down in UI, but graphs usually go up.
+        // Let's assume 0,0 is top-left.
+        // Value min -> bounds.y + bounds.height (bottom)
+        // Value max -> bounds.y (top)
+        let y = bounds.height - (first_val - graph.min_value) * scale_y;
+        path.move_to(Vec2::new(0.0, y));
+
+        for (i, val) in history.values.iter().enumerate().skip(1) {
+            let val = val.clamp(graph.min_value, graph.max_value);
+            let x = i as f32 * step_x;
+            let y = bounds.height - (val - graph.min_value) * scale_y;
+            path.line_to(Vec2::new(x, y));
+        }
+
+        // Update node content
+        let style = VisualStyle::new()
+            .stroke(StrokeStyle::solid(
+                Paint::solid(graph.color.as_vec4()),
+                graph.stroke_width,
+                style_engine::StrokeAlign::Center,
+            ))
+            .path(path);
+
+        node.content = NodeContent::Styled {
+            style: Box::new(style),
+        };
+
+        // Mark dirty
+        scene.mark_dirty(node_ref.0);
     }
 }
 

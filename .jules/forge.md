@@ -19,3 +19,10 @@
 **[Unstable let chains]**
 **Learning:** Rust `let chains` (`if let ... && let ...`) are currently an unstable, nightly-only feature (tracked in #53667). While they look elegant and successfully avoid the clippy lint `collapsible_if`, using them on standard Rust will immediately break the build.
 **Action:** Do not use `&& let` to flatten `if let` blocks in stable Rust projects. Instead, use nested `if let`, `.and_then()`, or boolean condition early returns (`guard clauses`) when feasible, or accept the `#[allow(clippy::collapsible_if)]` if there is no clearer alternative.
+
+**[Flattening Pyramids of Doom]**
+**Learning:** Nested `if let` blocks or nested `if` statements with long indentation can be successfully flattened using:
+1. `let Ok(...) = ... else { continue; };` (Guard Clauses)
+2. `.and_then(|x| ...).map(|y| ...)` (Combinators)
+3. `matches!(...)` in combination with guard variables.
+**Action:** When finding `#[allow(clippy::collapsible_if)]` on functions, refactor the nested code using combinators or early returns/continues and remove the lint allowance. Also, ensure you do not commit scratchpad scripts like `patch.py` to the repository.
