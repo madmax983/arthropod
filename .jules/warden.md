@@ -100,3 +100,6 @@
 **2024-06-25 - Integer Overflow in Image Registration**
 **Threat:** The `register_image_rgba8` function calculated expected buffer length via `width * height * 4`, which on malicious or unusually large inputs could integer-overflow, bypassing length checks. This presented a potential Denial of Service (DoS) or Out-of-bounds read vulnerability when sampling.
 **Defense:** Replaced unchecked multiplication with chained `.checked_mul()` operations, returning a safe Error when an overflow is detected, enforcing correct input validation.
+**2024-10-24 - Integer Overflow in Allocation Dimensions**
+**Threat:** Integer overflow when calculating buffer sizes for texture readback (`width * height * 4`) allows out-of-bounds memory slice access and allocation DoS/panics.
+**Defense:** Replaced unchecked multiplication with `checked_mul` and explicit error mapping bounds checks via `anyhow::Context` before allocating `vec!` or initializing wgpu buffers.

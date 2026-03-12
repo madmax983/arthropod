@@ -26,7 +26,10 @@ impl FrameCapture {
         let format = texture.format();
 
         // Create a buffer to copy the texture data into
-        let buffer_size = (size.width * size.height * 4) as u64; // RGBA8
+        let buffer_size = (size.width as u64)
+            .checked_mul(size.height as u64)
+            .and_then(|a| a.checked_mul(4))
+            .context("Texture dimensions too large to capture")?; // RGBA8
         let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Frame Capture Buffer"),
             size: buffer_size,
@@ -53,7 +56,11 @@ impl FrameCapture {
                 buffer: &buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(size.width * 4),
+                    bytes_per_row: Some(
+                        size.width
+                            .checked_mul(4)
+                            .context("Width too large for bytes_per_row")?,
+                    ),
                     rows_per_image: Some(size.height),
                 },
             },
@@ -110,7 +117,10 @@ impl FrameCapture {
     pub async fn capture_texture_to_buffer(&self, texture: &wgpu::Texture) -> Result<Vec<u8>> {
         let size = texture.size();
 
-        let buffer_size = (size.width * size.height * 4) as u64;
+        let buffer_size = (size.width as u64)
+            .checked_mul(size.height as u64)
+            .and_then(|a| a.checked_mul(4))
+            .context("Texture dimensions too large to capture")?;
         let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Frame Capture Buffer"),
             size: buffer_size,
@@ -135,7 +145,11 @@ impl FrameCapture {
                 buffer: &buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(size.width * 4),
+                    bytes_per_row: Some(
+                        size.width
+                            .checked_mul(4)
+                            .context("Width too large for bytes_per_row")?,
+                    ),
                     rows_per_image: Some(size.height),
                 },
             },

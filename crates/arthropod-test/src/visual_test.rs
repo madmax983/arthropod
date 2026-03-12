@@ -1,6 +1,6 @@
 //! Visual regression testing utilities
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Compare two images pixel by pixel
@@ -9,7 +9,14 @@ pub fn compare_images(image1: &[u8], image2: &[u8], width: u32, height: u32) -> 
         anyhow::bail!("Image sizes don't match");
     }
 
-    let total_pixels = (width * height) as usize;
+    let total_pixels = (width as usize)
+        .checked_mul(height as usize)
+        .context("Image dimensions too large")?;
+    let expected_len = total_pixels.checked_mul(4).context("Image size overflow")?;
+    if image1.len() < expected_len || image2.len() < expected_len {
+        anyhow::bail!("Image buffer too small for dimensions");
+    }
+
     let mut diff_pixels = 0;
 
     for i in 0..total_pixels {
@@ -34,7 +41,14 @@ pub fn compare_images_with_tolerance(
         anyhow::bail!("Image sizes don't match");
     }
 
-    let total_pixels = (width * height) as usize;
+    let total_pixels = (width as usize)
+        .checked_mul(height as usize)
+        .context("Image dimensions too large")?;
+    let expected_len = total_pixels.checked_mul(4).context("Image size overflow")?;
+    if image1.len() < expected_len || image2.len() < expected_len {
+        anyhow::bail!("Image buffer too small for dimensions");
+    }
+
     let mut diff_pixels = 0usize;
 
     for i in 0..total_pixels {
@@ -142,5 +156,42 @@ mod tests {
             .expect("tolerant compare should work");
 
         assert_eq!(tolerant, 1.0);
+    }
+
+    #[test]
+    fn test_compare_images_overflow_returns_error() {
+        let width = u32::MAX;
+        let height = u32::MAX;
+        // The slice sizes need to match the size we would expect.
+        // Wait, if it overflows it returns an Error before iterating.
+        // But the first check is image1.len() != image2.len()
+        let a: &[u8] = &[];
+        let b: &[u8] = &[];
+
+        let result = compare_images(&a, &b, width, height);
+        assert!(
+            result.is_err(),
+            "Expected error on overflow, got {:?}",
+            result
+        );
+        let err_str = result.unwrap_err().to_string();
+        assert!(
+            err_str == "Image dimensions too large" || err_str == "Image size overflow",
+            "Got: {}",
+            err_str
+        );
+
+        let result_tol = compare_images_with_tolerance(&a, &b, width, height, 2);
+        assert!(
+            result_tol.is_err(),
+            "Expected error on overflow, got {:?}",
+            result_tol
+        );
+        let err_str = result_tol.unwrap_err().to_string();
+        assert!(
+            err_str == "Image dimensions too large" || err_str == "Image size overflow",
+            "Got: {}",
+            err_str
+        );
     }
 }

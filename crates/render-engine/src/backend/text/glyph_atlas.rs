@@ -43,7 +43,10 @@ pub struct GlyphAtlas {
 impl GlyphAtlas {
     /// Create a new glyph atlas
     pub fn new(width: u32, height: u32) -> Self {
-        let texture_data = vec![0u8; (width * height) as usize];
+        let size = (width as usize)
+            .checked_mul(height as usize)
+            .expect("Glyph atlas dimensions too large");
+        let texture_data = vec![0u8; size];
 
         Self {
             width,

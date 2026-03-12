@@ -788,7 +788,10 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
             options,
         );
         apply_text_letter_spacing(&mut shaped, text_content.letter_spacing);
-        let position = glam::Vec2::new(render_bounds.x.round(), (render_bounds.y + text_content.font_size).round());
+        let position = glam::Vec2::new(
+            render_bounds.x.round(),
+            (render_bounds.y + text_content.font_size).round(),
+        );
         let text_bounds = [
             render_bounds.x,
             render_bounds.y,
