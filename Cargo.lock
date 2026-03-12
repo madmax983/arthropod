@@ -229,7 +229,6 @@ dependencies = [
  "plat-core",
  "rayon",
  "render-engine",
- "style-engine",
  "theme-engine",
 ]
 
