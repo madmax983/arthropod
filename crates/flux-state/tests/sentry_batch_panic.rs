@@ -128,3 +128,34 @@ fn test_panic_restorer_empty() {
     write2.set(1);
     assert_eq!(*log.lock().unwrap(), vec!["Safe"]);
 }
+
+#[test]
+fn test_drop_computing_guard_panic() {
+    let runtime = Runtime::new();
+
+    let sig1 = Signal::new(runtime.clone(), 0);
+    let (read1, write1) = sig1.split();
+
+    let computed = flux_state::Computed::new(runtime.clone(), move || {
+        let val = read1.get();
+        if val == 1 {
+            panic!("Intentional panic inside computed");
+        }
+        val
+    });
+
+    // Access once to init
+    assert_eq!(computed.get(), 0);
+
+    write1.set(1);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        computed.get();
+    }));
+    assert!(result.is_err());
+
+    // Since it panicked, the ComputingGuard's drop was executed and it should have removed itself from computing list
+    // If it was removed, then next thread wouldn't deadlock
+    write1.set(2);
+    assert_eq!(computed.get(), 2);
+}

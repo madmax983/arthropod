@@ -188,6 +188,7 @@ env_logger.workspace = true
 tracing.workspace = true
 serde_json = "1.0"
 tracing-subscriber.workspace = true
+quinn-proto = "0.11.14"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arthropod = { path = "crates/arthropod" }
