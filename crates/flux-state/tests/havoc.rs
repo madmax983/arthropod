@@ -1,7 +1,6 @@
 use flux_state::{Computed, Runtime, Signal};
 
 #[test]
-#[should_panic(expected = "assertion `left == right` failed")]
 fn test_stale_flag_race_condition() {
     let runtime = Runtime::new();
 

@@ -1,7 +1,7 @@
 use loom::sync::Mutex as LoomMutex;
 
 #[test]
-#[should_panic(expected = "assertion `left == right` failed")]
+#[should_panic(expected = "Race condition: stale flag was overwritten!")]
 fn test_loom_stale_flag_model() {
     // Model the exact problem in flux-state where recompute clears the stale flag unconditionally
     loom::model(|| {
@@ -30,9 +30,6 @@ fn test_loom_stale_flag_model() {
         let final_stale = *stale.lock().unwrap();
 
         // This will panic when loom explores the permutation where T2 runs, then T1 runs and clears it.
-        assert_eq!(
-            final_stale, true,
-            "Race condition: stale flag was overwritten!"
-        );
+        assert!(final_stale, "Race condition: stale flag was overwritten!");
     });
 }

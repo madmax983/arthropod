@@ -71,6 +71,7 @@ struct RuntimeInner {
 
     // Stale tracking
     stale: HashSet<NodeId>,
+    stale_while_computing: HashSet<NodeId>,
 
     // Nodes currently being computed (to prevent concurrent recomputation)
     // Maps NodeId -> ThreadId of the thread computing it.
@@ -184,6 +185,14 @@ impl RuntimeInner {
     }
 
     fn mark_stale(&mut self, id: NodeId) -> bool {
+        // Track if it became stale while being actively computed.
+        // We must check this *before* we return early for already-stale nodes,
+        // because a dependency might update while a node is computing (which was
+        // marked stale previously).
+        if self.computing.contains_key(&id) {
+            self.stale_while_computing.insert(id);
+        }
+
         // Only process if not already stale (avoid infinite loops)
         if self.stale.contains(&id) {
             return false;
@@ -336,6 +345,7 @@ impl Runtime {
                 subscribers: HashMap::new(),
                 tracking_context: HashMap::new(),
                 stale: HashSet::new(),
+                stale_while_computing: HashSet::new(),
                 computing: HashMap::new(),
                 waiting_for: HashMap::new(),
                 pending_effects: Vec::new(),
@@ -593,7 +603,14 @@ impl Runtime {
         if let Some(computed) = inner.computeds.get_mut(&id) {
             computed.value = Some(new_value);
         }
-        inner.stale.remove(&id);
+
+        // Only remove the stale flag if it wasn't marked stale again while we were computing.
+        if inner.stale_while_computing.remove(&id) {
+            // It became stale while computing. We leave it in `stale` so the next reader recomputes.
+        } else {
+            inner.stale.remove(&id);
+        }
+
         inner.computing.remove(&id);
         self.condvar.notify_all();
     }
