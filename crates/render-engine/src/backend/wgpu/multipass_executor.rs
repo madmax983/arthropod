@@ -55,6 +55,8 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) glyph_texture: &'a wgpu::Texture,
     pub(crate) traversal_stack: &'a mut Vec<(crate::NodeId, f32)>,
     pub(crate) ordered_nodes_buffer: &'a mut Vec<OrderedRenderNode>,
+    pub(crate) effect_kinds_buffer: &'a mut Vec<EffectPassKind>,
+    pub(crate) background_capture_bounds_buffer: &'a mut Vec<[u32; 4]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,15 +76,17 @@ impl<'a> MultipassRenderer<'a> {
         // Phase 4 planner: detect effects that require offscreen multipass work.
         // Current integration reserves pooled targets and keeps the direct renderer
         // path active until full per-node effect compositing is layered in.
-        let effect_kinds = classify_scene_effect_kinds(scene, self.traversal_stack);
+        classify_scene_effect_kinds(scene, self.traversal_stack, self.effect_kinds_buffer);
         let _blur_tier = select_blur_tier(max_scene_blur_radius(scene, self.traversal_stack));
-        let _background_capture_bounds = collect_background_capture_bounds(
+        collect_background_capture_bounds(
             scene,
             self.traversal_stack,
             self.context.config.width,
             self.context.config.height,
+            self.background_capture_bounds_buffer,
         );
-        let _clip_sequence = if effect_kinds
+        let _clip_sequence = if self
+            .effect_kinds_buffer
             .iter()
             .any(|k| matches!(k, EffectPassKind::StencilPush))
         {
@@ -90,7 +94,7 @@ impl<'a> MultipassRenderer<'a> {
         } else {
             Vec::new()
         };
-        let requires_offscreen = effect_kinds.iter().any(|kind| {
+        let requires_offscreen = self.effect_kinds_buffer.iter().any(|kind| {
             matches!(
                 kind,
                 EffectPassKind::OffscreenLayer
@@ -888,13 +892,17 @@ pub(crate) fn collect_ordered_render_nodes(
     }
 }
 
+/// Populates a pre-allocated buffer with the effect pass kinds for the current scene.
+/// Passing `&mut Vec` and calling `clear()` prevents a heap allocation per frame,
+/// improving rendering latency and reducing GC overhead.
 pub(crate) fn classify_scene_effect_kinds(
     scene: &Scene,
     stack: &mut Vec<(crate::NodeId, f32)>,
-) -> Vec<EffectPassKind> {
+    buffer: &mut Vec<EffectPassKind>,
+) {
     use crate::NodeContent;
 
-    let mut kinds = Vec::new();
+    buffer.clear();
     for (_node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
         if !node.visible {
             continue;
@@ -905,9 +913,8 @@ pub(crate) fn classify_scene_effect_kinds(
         let NodeContent::Styled { style } = &node.content else {
             continue;
         };
-        kinds.extend(classify_effect_passes(style, !node.children.is_empty()));
+        buffer.extend(classify_effect_passes(style, !node.children.is_empty()));
     }
-    kinds
 }
 
 pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<(crate::NodeId, f32)>) -> f32 {
@@ -940,16 +947,20 @@ pub(crate) fn max_scene_blur_radius(scene: &Scene, stack: &mut Vec<(crate::NodeI
     max_radius
 }
 
+/// Populates a pre-allocated buffer with background capture bounds.
+/// Passing `&mut Vec` avoids dynamically allocating memory (`Vec::new()`)
+/// inside the hot path during phase 4 multipass effect planning.
 pub(crate) fn collect_background_capture_bounds(
     scene: &Scene,
     stack: &mut Vec<(crate::NodeId, f32)>,
     frame_width: u32,
     frame_height: u32,
-) -> Vec<[u32; 4]> {
+    buffer: &mut Vec<[u32; 4]>,
+) {
     use crate::NodeContent;
     use style_engine::Effect;
 
-    let mut bounds = Vec::new();
+    buffer.clear();
     let frame = [0, 0, frame_width, frame_height];
 
     for (_node_id, node, inherited_opacity) in scene.iter_visuals_custom(stack) {
@@ -974,10 +985,8 @@ pub(crate) fn collect_background_capture_bounds(
                     node.bounds.width.max(0.0) as u32,
                     node.bounds.height.max(0.0) as u32,
                 ];
-                bounds.push(backdrop_capture_bounds(node_bounds, blur.radius, frame));
+                buffer.push(backdrop_capture_bounds(node_bounds, blur.radius, frame));
             }
         }
     }
-
-    bounds
 }

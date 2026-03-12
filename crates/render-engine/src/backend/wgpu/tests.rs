@@ -1211,7 +1211,8 @@ fn test_classify_scene_effect_kinds_detects_offscreen_effects() {
     scene.add_node(root, node);
 
     let mut stack = Vec::new();
-    let kinds = multipass_executor::classify_scene_effect_kinds(&scene, &mut stack);
+    let mut kinds = Vec::new();
+    multipass_executor::classify_scene_effect_kinds(&scene, &mut stack, &mut kinds);
     assert!(kinds.contains(&effects::EffectPassKind::OffscreenLayer));
     assert!(kinds.contains(&effects::EffectPassKind::BlurHorizontal));
     assert!(kinds.contains(&effects::EffectPassKind::BlurVertical));

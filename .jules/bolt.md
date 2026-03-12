@@ -40,3 +40,7 @@
 **[Performance] Avoid heap allocations and clone() in hot loops with PathBatch**
 **Learning:** `PathBatch` was storing `Paint` by value, forcing a `.clone()` during batch collection. Since `Paint` can contain vectors (e.g., `ColorStop` for gradients), this led to expensive heap allocations per-node per-frame. Additionally, `resolve_path_fill_paints` returned `Cow` creating new `Vec`s for fallback cases.
 **Action:** Changed `PathBatch<'a>` to store a reference `&'a Paint` to eliminate the `.clone()`. Updated fallback logic in `resolve_path_fill_paints` and `resolve_path_stroke_paints` to return `&[Paint]` backed by a `OnceLock` instead of allocating a `Cow::Owned(Vec)`.
+
+## Pre-allocate buffers for phase 4 effect classifications
+**Learning:** Functions like `classify_scene_effect_kinds` and `collect_background_capture_bounds` were instantiating `Vec::new()` inside `prepare_phase4_effect_state` which runs on the hot path (per frame render pass preparation). This causes repeated heap allocations each frame.
+**Action:** Lift `Vec` declarations up to long-lived state structs like `WgpuBackend` or `MultipassRenderer` to clear and reuse their capacity. Pass `&mut Vec<T>` into helper functions to populate rather than allocating local vectors.

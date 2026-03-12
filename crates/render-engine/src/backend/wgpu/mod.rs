@@ -59,6 +59,10 @@ pub struct WgpuBackend {
     traversal_stack: Vec<(crate::NodeId, f32)>,
     ordered_nodes_buffer: Vec<multipass_executor::OrderedRenderNode>,
     multipass_node_ids_buffer: Vec<crate::NodeId>,
+    /// Pre-allocated buffer for effect pass kinds. Reused across frames via `clear()` to eliminate per-frame `Vec::new()` heap allocations on the hot path.
+    effect_kinds_buffer: Vec<effects::EffectPassKind>,
+    /// Pre-allocated buffer for background capture bounds. Reused across frames to avoid dynamic allocations during render pass planning.
+    background_capture_bounds_buffer: Vec<[u32; 4]>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -199,6 +203,8 @@ impl WgpuBackend {
             traversal_stack: Vec::with_capacity(1024),
             ordered_nodes_buffer: Vec::with_capacity(1024),
             multipass_node_ids_buffer: Vec::with_capacity(128),
+            effect_kinds_buffer: Vec::with_capacity(128),
+            background_capture_bounds_buffer: Vec::with_capacity(128),
         })
     }
 
@@ -365,6 +371,8 @@ impl WgpuBackend {
             glyph_texture: &self.glyph_texture,
             traversal_stack: &mut self.traversal_stack,
             ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
+            effect_kinds_buffer: &mut self.effect_kinds_buffer,
+            background_capture_bounds_buffer: &mut self.background_capture_bounds_buffer,
         };
 
         executor.prepare_phase4_effect_state(scene);
@@ -496,6 +504,8 @@ impl WgpuBackend {
             glyph_texture: &self.glyph_texture,
             traversal_stack: &mut self.traversal_stack,
             ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
+            effect_kinds_buffer: &mut self.effect_kinds_buffer,
+            background_capture_bounds_buffer: &mut self.background_capture_bounds_buffer,
         };
 
         executor.prepare_phase4_effect_state(scene);
