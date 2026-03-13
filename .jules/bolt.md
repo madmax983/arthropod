@@ -25,6 +25,11 @@
 ## Removed redundant clone of `style` in multipass executor
 **Learning:** `style.as_ref().clone()` was unconditionally copying a potentially large `VisualStyle` struct in a hot loop in `multipass_executor.rs`.
 **Action:** Changed to `style.as_ref()` and pass a reference to `collect_style_batches_for_bounds` and use fields natively to avoid a heap allocation per frame per node.
+**[Performance] WGPU Texture Handle Clones**\n**Learning:** Re-borrowing  and  instead of cloning them bypasses Arc increments on hot paths. To pass these correctly alongside , we split the  into required components like , , etc., inside functions like .\n**Action:** If  triggers after splitting borrows for performance, add  to maintain the zero-cost abstractions over boxing/tuple packing.
+
+**[Performance] WGPU Texture Handle Clones**
+**Learning:** Re-borrowing `TextureView` and `Texture` instead of cloning them bypasses Arc increments on hot paths. To pass these correctly alongside `&mut self`, we split the `MultipassRenderer` into required components like `context`, `primitive_pipeline`, etc., inside functions like `draw_batches_to_view`.
+**Action:** If `clippy::too_many_arguments` triggers after splitting borrows for performance, add `#[allow(clippy::too_many_arguments)]` to maintain the zero-cost abstractions over boxing/tuple packing.
 ⚡ Bolt: [Performance optimization for revalidate_form by reducing form state lookups]
 **Learning:** A single mut lookup and a guard check using `is_some_and` replaces double map lookups to compute validation state in a single pass.
 **Action:** Always favor inline condition tracking when looping over states instead of iterating twice, reducing constant overhead by 6-9% in hot validations.

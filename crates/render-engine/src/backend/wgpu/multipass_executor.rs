@@ -443,6 +443,7 @@ impl<'a> MultipassRenderer<'a> {
         let _ = self.effect_target_pool.release(handle);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_batches_to_view(
         &mut self,
         target_view: &wgpu::TextureView,
