@@ -226,6 +226,24 @@ pub struct InteractionState {
 #[derive(Component, Clone, Debug, Default)]
 pub struct WidgetStyle(pub theme_engine::Style);
 
+/// Reactive layout width - polls signal to update LayoutStyle width
+///
+/// When this component is present, the reactive layout system will poll the signal
+/// and update the corresponding LayoutStyle component's width each frame.
+#[derive(Component, Clone)]
+pub struct ReactiveLayoutWidth {
+    pub signal: ReadSignal<f32>,
+    pub last_value: f32,
+}
+
+impl ReactiveLayoutWidth {
+    /// Create a new ReactiveLayoutWidth from a ReadSignal
+    pub fn new(signal: ReadSignal<f32>) -> Self {
+        let last_value = signal.get_untracked();
+        Self { signal, last_value }
+    }
+}
+
 /// Marker for renderable entities (has visual representation)
 ///
 /// Entities with this component will be included in render queries.

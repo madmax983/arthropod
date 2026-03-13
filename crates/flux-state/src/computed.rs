@@ -288,6 +288,19 @@ impl<T: Clone + 'static + Send + Sync> Computed<T> {
     pub fn get(&self) -> T {
         self.with(|v| v.clone())
     }
+
+    /// Convert this computed value into a ReadSignal.
+    ///
+    /// This allows passing a derived value anywhere a standard ReadSignal is expected.
+    /// The resulting signal will update whenever the computed value would update.
+    pub fn to_read_signal(&self) -> crate::signal::ReadSignal<T> {
+        let handle = self.runtime.get_computed_handle(self.id);
+        let rw_lock_handle = handle
+            .downcast::<RwLock<T>>()
+            .expect("Type mismatch converting Computed to ReadSignal");
+
+        crate::signal::ReadSignal::from_computed(self.id, self.runtime.clone(), rw_lock_handle)
+    }
 }
 
 #[cfg(test)]

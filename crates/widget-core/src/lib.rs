@@ -10,6 +10,9 @@
 //! - [`Button`] - Clickable button with styles (primary, secondary, disabled)
 //! - [`TextInput`] - Single-line text input with validation
 //! - [`Checkbox`] - Boolean toggle with optional label
+//! - [`ProgressBar`] - Visual indicator of completion progress
+//! - [`Icon`] - Font or vector based icon
+//! - [`Image`] - Bitmap image display
 //!
 //! ## Layout Widgets
 //! - [`Row`] - Horizontal layout with alignment helpers
@@ -46,6 +49,9 @@
 //! | `row!` | [`Row`] | Horizontal layout container for a list of children. |
 //! | `form!` | [`Form`] | Input form container with validation logic. |
 //! | `input!` | [`TextInput`] | Text input field. |
+//! | `progress_bar!` | [`ProgressBar`] | Progress indicator. |
+//! | `icon!` | [`Icon`] | Vector or font icon. |
+//! | `img!` | [`Image`] | Bitmap image. |
 //!
 //! ## Macro Syntax
 //!
@@ -156,9 +162,12 @@ pub mod divider;
 pub mod form;
 pub mod form_state;
 pub mod grid;
+pub mod icon;
+pub mod image;
 pub mod input_state;
 pub mod list;
 pub mod padding;
+pub mod progress_bar;
 pub mod row;
 pub mod spacer;
 pub mod stack;
@@ -179,8 +188,11 @@ pub use context::WidgetContext;
 pub use divider::Divider;
 pub use form::Form;
 pub use grid::Grid;
+pub use icon::Icon;
+pub use image::Image;
 pub use list::{list_from, List};
 pub use padding::Padding;
+pub use progress_bar::ProgressBar;
 pub use row::Row;
 pub use spacer::Spacer;
 pub use stack::Stack;

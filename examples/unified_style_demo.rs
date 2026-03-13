@@ -8,16 +8,27 @@
 //! Run with: cargo run --example unified_style_demo
 
 use arthropod::prelude::*;
+use std::time::Instant;
 
 fn main() -> Result<(), AppError> {
-    App::run("Unified Style Demo", 600, 400, |ctx| {
+    App::run("Unified Style Demo", 600, 500, |ctx| {
         // 1. Query system theme and set tokens on context
-        // This enables widgets like Button to use themed hover/active states automatically
         let theme = SystemTheme::query().unwrap();
         let tokens = DesignTokens::from_system(&theme);
         ctx.set_design_tokens(tokens.clone());
 
-        // 2. Define a card style (now without its own hover)
+        // Create an animated progress signal
+        let progress_signal = ctx.signal(0.0_f32);
+        let (read_progress, write_progress) = progress_signal.split();
+
+        let start_time = Instant::now();
+        ctx.store_effect(Effect::new(ctx.runtime().clone(), move || {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            let p = (elapsed * 0.5) % 1.0;
+            write_progress.set(p);
+        }));
+
+        // 2. Define a card style
         let card_style = style! {
             background: tokens.surface_secondary.clone();
             padding: 32.0;
@@ -29,27 +40,42 @@ fn main() -> Result<(), AppError> {
         // 3. Build the UI
         Center::new(
             Column::new((
-                txt!("Cohesive DX", size: 32.0),
-                txt!("Notice how the buttons below have themed hover effects!", size: 18.0),
+                Row::new((
+                    icon!("\u{e88a}", size: 32.0, color: tokens.accent), // Home
+                    txt!("Cohesive DX", size: 32.0),
+                ))
+                .gap(12.0),
+                txt!(
+                    "Notice how the buttons below have themed hover effects!",
+                    size: 18.0
+                ),
                 Row::new((
                     btn!("Primary", primary),
                     btn!("Secondary", secondary),
-                    // Demonstrate a custom hover override on a specific button
                     btn!("Custom Hover").style(style! {
                         background: tokens.accent;
                         color: glam::Vec4::new(1.0, 1.0, 1.0, 1.0);
-                        padding: 12.0;
-                        border_radius: 20.0; // Extra round
+                        padding: theme_engine::Padding::symmetric(6.0, 12.0);
+                        border_radius: 20.0;
 
                         &:hover {
-                            background: glam::Vec4::new(1.0, 0.0, 0.5, 1.0); // Hot pink hover
-                            border_radius: 4.0; // Morph to square on hover
+                            background: glam::Vec4::new(1.0, 0.0, 0.5, 1.0);
+                            border_radius: 4.0;
                         }
                     }),
                 ))
                 .gap(12.0),
-                txt!("The card hover was removed to focus on button interactions.", size: 14.0)
-                    .color(Color::rgba(0.5, 0.5, 0.5, 1.0)),
+                // New primitive: ProgressBar
+                Column::new((
+                    txt!("Animated Progress", size: 14.0),
+                    progress_bar!(read_progress, height: 10.0),
+                ))
+                .gap(8.0),
+                txt!(
+                    "The card hover was removed to focus on button interactions.",
+                    size: 14.0
+                )
+                .color(Color::rgba(0.5, 0.5, 0.5, 1.0)),
             ))
             .style(card_style),
         )

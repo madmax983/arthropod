@@ -5552,6 +5552,7 @@ dependencies = [
  "layout-engine",
  "plat-core",
  "render-engine",
+ "style-engine",
  "theme-engine",
  "widget-macros",
 ]

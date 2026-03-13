@@ -3,7 +3,8 @@ use render_engine::{NodeContent, Scene};
 
 use crate::components::{
     InteractionState, LayoutStyle, MousePosition, ReactiveColor, ReactiveComputedText,
-    ReactiveOpacity, ReactiveText, ReactiveTransform, SceneNodeRef, WidgetStyle,
+    ReactiveLayoutWidth, ReactiveOpacity, ReactiveText, ReactiveTransform, SceneNodeRef,
+    WidgetStyle,
 };
 
 /// System that updates interaction states based on mouse position and hit testing
@@ -94,8 +95,19 @@ pub fn update_all_reactive_system(
     mut computed_text_query: Query<(&SceneNodeRef, &mut ReactiveComputedText)>,
     mut transform_query: Query<(&SceneNodeRef, &mut ReactiveTransform)>,
     mut opacity_query: Query<(&SceneNodeRef, &mut ReactiveOpacity)>,
+    mut layout_width_query: Query<(&mut LayoutStyle, &mut ReactiveLayoutWidth)>,
     mut scene: ResMut<Scene>,
 ) {
+    // Layout Width
+    for (mut layout, mut reactive) in layout_width_query.iter_mut() {
+        let new_width = reactive.signal.get_untracked();
+        if (new_width - reactive.last_value).abs() < f32::EPSILON {
+            continue;
+        }
+        reactive.last_value = new_width;
+        layout.0.width = Some(new_width);
+    }
+
     // Colors
     for (node_ref, mut reactive) in color_query.iter_mut() {
         let new_color = reactive.signal.get_untracked();

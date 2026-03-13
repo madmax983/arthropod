@@ -73,7 +73,8 @@
 
 use crate::form_state::{FormState, SubmitCallback};
 use crate::input_state::{
-    ComputedTextState, ReactiveColorState, ReactiveTextState, TextInputState,
+    ComputedTextState, ReactiveColorState, ReactiveLayoutWidthState, ReactiveTextState,
+    TextInputState,
 };
 use crate::validation::Validator;
 use crate::validation_state::ValidationState;
@@ -115,6 +116,7 @@ pub struct WidgetContext {
     pub(crate) reactive_text_states: HashMap<NodeId, ReactiveTextState>,
     pub(crate) computed_text_states: HashMap<NodeId, ComputedTextState>,
     pub(crate) reactive_color_states: HashMap<NodeId, ReactiveColorState>,
+    pub(crate) reactive_layout_width_states: HashMap<NodeId, ReactiveLayoutWidthState>,
     pub(crate) focused_node: Option<NodeId>,
     pub(crate) placeholders: HashSet<NodeId>,
 
@@ -143,6 +145,7 @@ impl WidgetContext {
             reactive_text_states: HashMap::new(),
             computed_text_states: HashMap::new(),
             reactive_color_states: HashMap::new(),
+            reactive_layout_width_states: HashMap::new(),
             focused_node: None,
             placeholders: HashSet::new(),
             validators: HashMap::new(),
@@ -395,6 +398,12 @@ impl WidgetContext {
     pub fn add_reactive_color_state(&mut self, node_id: NodeId, read_signal: ReadSignal<Color>) {
         self.reactive_color_states
             .insert(node_id, ReactiveColorState { read_signal });
+    }
+
+    /// Add reactive layout width state to a node
+    pub fn add_reactive_layout_width_state(&mut self, node_id: NodeId, read_signal: ReadSignal<f32>) {
+        self.reactive_layout_width_states
+            .insert(node_id, ReactiveLayoutWidthState { read_signal });
     }
 
     /// Add text input state to a node
@@ -674,6 +683,11 @@ impl WidgetContext {
     /// Get all reactive color states (for app-shell integration)
     pub fn reactive_color_states(&self) -> &HashMap<NodeId, ReactiveColorState> {
         &self.reactive_color_states
+    }
+
+    /// Get all reactive layout width states (for app-shell integration)
+    pub fn reactive_layout_width_states(&self) -> &HashMap<NodeId, ReactiveLayoutWidthState> {
+        &self.reactive_layout_width_states
     }
 
     /// Get all validators (for app-shell integration)

@@ -24,3 +24,13 @@ pub struct ReactiveColorState {
     /// The source signal for the color.
     pub read_signal: ReadSignal<Color>,
 }
+
+/// Reactive layout width state for a node.
+///
+/// Used by widgets that need to update their width based on a signal
+/// (e.g., progress bars, volume indicators).
+#[derive(Clone)]
+pub struct ReactiveLayoutWidthState {
+    /// The source signal for the width.
+    pub read_signal: ReadSignal<f32>,
+}

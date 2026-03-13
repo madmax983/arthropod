@@ -68,6 +68,11 @@ impl AppContext {
         self.widget_ctx.set_design_tokens(tokens);
     }
 
+    /// Store an effect to keep it alive.
+    pub fn store_effect(&mut self, effect: flux_state::Effect) {
+        self.widget_ctx.store_effect(effect);
+    }
+
     /// Get the reactive runtime.
     pub fn runtime(&self) -> &Arc<Runtime> {
         &self.runtime

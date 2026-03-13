@@ -351,6 +351,16 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     pub fn runtime(&self) -> &Arc<Runtime> {
         &self.runtime
     }
+
+    /// Internal: Create a ReadSignal from a computed node.
+    pub(crate) fn from_computed(id: NodeId, runtime: Arc<Runtime>, handle: Arc<RwLock<T>>) -> Self {
+        Self {
+            id,
+            runtime,
+            handle,
+            _marker: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<T: 'static + Send + Sync> WriteSignal<T> {

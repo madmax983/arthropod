@@ -158,6 +158,12 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
+impl From<glam::Vec4> for Color {
+    fn from(v: glam::Vec4) -> Self {
+        Self(v)
+    }
+}
+
 impl Color {
     #[inline]
     pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {

@@ -2,7 +2,7 @@ use arthropod_ecs::{
     FrameworkContext,
     components::{
         BackgroundColor, Clickable, InteractionState, LayoutStyle, ReactiveColor,
-        ReactiveComputedText, ReactiveText, SceneNodeRef, WidgetStyle,
+        ReactiveComputedText, ReactiveLayoutWidth, ReactiveText, SceneNodeRef, WidgetStyle,
     },
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
@@ -422,11 +422,19 @@ impl App {
             |color: &render_engine::Vec4| BackgroundColor(*color),
         );
 
-        // Transfer reactive colors to ReactiveColor components
+        // Transfer reactive color states to ReactiveColor components
         self.transfer_components(
             widget_ctx.reactive_color_states().iter(),
             |state: &widget_core::input_state::ReactiveColorState| {
                 ReactiveColor::new(state.read_signal.clone())
+            },
+        );
+
+        // Transfer reactive layout width states to ReactiveLayoutWidth components
+        self.transfer_components(
+            widget_ctx.reactive_layout_width_states().iter(),
+            |state: &widget_core::input_state::ReactiveLayoutWidthState| {
+                ReactiveLayoutWidth::new(state.read_signal.clone())
             },
         );
 
