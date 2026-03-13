@@ -51,7 +51,8 @@ fn test_effect_planner_classifies_layer_and_background_blur() {
         }))
         .blend_mode(BlendMode::Multiply);
 
-    let passes = classify_effect_passes(&style, false);
+    let mut passes = Vec::new();
+    classify_effect_passes(&style, false, &mut passes);
     assert!(passes.contains(&EffectPassKind::OffscreenLayer));
     assert!(passes.contains(&EffectPassKind::BackgroundCapture));
     assert!(passes.contains(&EffectPassKind::BlurHorizontal));
@@ -62,7 +63,8 @@ fn test_effect_planner_classifies_layer_and_background_blur() {
 #[test]
 fn test_effect_planner_marks_stencil_for_clips_content() {
     let style = VisualStyle::new().clips_content(true);
-    let passes = classify_effect_passes(&style, true);
+    let mut passes = Vec::new();
+    classify_effect_passes(&style, true, &mut passes);
     assert!(passes.contains(&EffectPassKind::StencilPush));
     assert!(passes.contains(&EffectPassKind::StencilPop));
 }

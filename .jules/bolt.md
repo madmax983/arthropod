@@ -49,3 +49,7 @@
 ## Pre-allocate buffers for phase 4 effect classifications
 **Learning:** Functions like `classify_scene_effect_kinds` and `collect_background_capture_bounds` were instantiating `Vec::new()` inside `prepare_phase4_effect_state` which runs on the hot path (per frame render pass preparation). This causes repeated heap allocations each frame.
 **Action:** Lift `Vec` declarations up to long-lived state structs like `WgpuBackend` or `MultipassRenderer` to clear and reuse their capacity. Pass `&mut Vec<T>` into helper functions to populate rather than allocating local vectors.
+
+**Refactoring classify_effect_passes to reuse a buffer**
+**Learning:** When refactoring a function to accept `&mut Vec` instead of creating and returning a new `Vec::new()`, replacing `passes.is_empty()` with `passes.len() == initial_len` is critical. If the buffer is reused across calls (e.g., in a loop), `passes.is_empty()` will incorrectly return `false` if earlier items were appended, causing the function to skip conditional logic (like appending a `DirectPrimitive` pass) for subsequent items.
+**Action:** Always capture the initial length of a reused buffer at the start of a function (`let initial_len = buffer.len();`) and use it to check for emptiness or to slice the newly added items.

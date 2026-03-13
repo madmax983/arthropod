@@ -399,9 +399,12 @@ pub fn composite_blend_over(mode: BlendMode, src: [f32; 4], dst: [f32; 4]) -> [f
 }
 
 /// Classify a style into the effect pass kinds required for rendering.
-#[must_use]
-pub fn classify_effect_passes(style: &VisualStyle, has_children: bool) -> Vec<EffectPassKind> {
-    let mut passes = Vec::new();
+pub fn classify_effect_passes(
+    style: &VisualStyle,
+    has_children: bool,
+    passes: &mut Vec<EffectPassKind>,
+) {
+    let initial_len = passes.len();
     let mut needs_blur = false;
     let mut needs_offscreen = false;
 
@@ -448,11 +451,9 @@ pub fn classify_effect_passes(style: &VisualStyle, has_children: bool) -> Vec<Ef
         passes.push(EffectPassKind::BlendComposite);
     }
 
-    if !needs_offscreen && passes.is_empty() {
+    if !needs_offscreen && passes.len() == initial_len {
         passes.push(EffectPassKind::DirectPrimitive);
     }
-
-    passes
 }
 
 fn clamp_bounds_to_frame(bounds: plat_core::Rect, frame_width: u32, frame_height: u32) -> [u32; 4] {
@@ -473,14 +474,13 @@ fn clamp_bounds_to_frame(bounds: plat_core::Rect, frame_width: u32, frame_height
 /// Build a deterministic pass sequence for visible styled nodes.
 ///
 /// The returned list is in frame execution order.
-#[must_use]
 pub fn plan_effect_passes(
     nodes: &[EffectPlanNode<'_>],
     frame_width: u32,
     frame_height: u32,
-) -> Vec<EffectPass> {
-    let mut planned = Vec::new();
-
+    planned: &mut Vec<EffectPass>,
+) {
+    let mut kinds = Vec::new();
     for node in nodes {
         if !node.visible || node.opacity <= 0.0 {
             continue;
@@ -489,7 +489,8 @@ pub fn plan_effect_passes(
             continue;
         };
 
-        let mut kinds = classify_effect_passes(style, node.has_children);
+        kinds.clear();
+        classify_effect_passes(style, node.has_children, &mut kinds);
         let requires_composite = kinds.iter().any(|kind| {
             matches!(
                 kind,
@@ -504,7 +505,7 @@ pub fn plan_effect_passes(
         }
 
         let bounds_px = clamp_bounds_to_frame(node.bounds, frame_width, frame_height);
-        planned.extend(kinds.into_iter().map(|kind| EffectPass {
+        planned.extend(kinds.iter().copied().map(|kind| EffectPass {
             node_id: node.node_id,
             kind,
             target: None,
@@ -512,8 +513,6 @@ pub fn plan_effect_passes(
             blend_mode: style.blend_mode,
         }));
     }
-
-    planned
 }
 
 /// Compute backdrop capture bounds for background blur.
@@ -595,7 +594,8 @@ mod tests {
     #[test]
     fn test_classify_direct_primitive_when_no_effects() {
         let style = VisualStyle::new();
-        let passes = classify_effect_passes(&style, false);
+        let mut passes = Vec::new();
+        classify_effect_passes(&style, false, &mut passes);
         assert_eq!(passes, vec![EffectPassKind::DirectPrimitive]);
     }
 
@@ -610,7 +610,8 @@ mod tests {
                 radius: 8.0,
                 visible: true,
             }));
-        let passes = classify_effect_passes(&style, false);
+        let mut passes = Vec::new();
+        classify_effect_passes(&style, false, &mut passes);
         assert!(passes.contains(&EffectPassKind::OffscreenLayer));
         assert!(passes.contains(&EffectPassKind::BackgroundCapture));
         assert!(passes.contains(&EffectPassKind::BlurHorizontal));
@@ -625,7 +626,8 @@ mod tests {
             invert: 1.0,
             visible: true,
         }));
-        let passes = classify_effect_passes(&style, false);
+        let mut passes = Vec::new();
+        classify_effect_passes(&style, false, &mut passes);
         assert!(passes.contains(&EffectPassKind::ColorFilter));
         assert!(passes.contains(&EffectPassKind::BlendComposite));
     }

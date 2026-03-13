@@ -28,7 +28,8 @@ fn test_effect_plan_orders_layer_blur_pipeline_steps() {
         .map(|(node_id, node, _)| EffectPlanNode::from_scene(node_id, node))
         .collect();
 
-    let plan = plan_effect_passes(&nodes, 1280, 720);
+    let mut plan = Vec::new();
+    plan_effect_passes(&nodes, 1280, 720, &mut plan);
     let kinds: Vec<_> = plan.iter().map(|p| p.kind).collect();
 
     assert_eq!(

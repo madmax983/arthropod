@@ -912,7 +912,7 @@ pub(crate) fn classify_scene_effect_kinds(
         let NodeContent::Styled { style } = &node.content else {
             continue;
         };
-        buffer.extend(classify_effect_passes(style, !node.children.is_empty()));
+        classify_effect_passes(style, !node.children.is_empty(), buffer);
     }
 }
 
