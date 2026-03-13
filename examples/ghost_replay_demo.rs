@@ -1,5 +1,4 @@
 #[cfg(feature = "nova")]
-#[allow(clippy::collapsible_if)]
 mod demo {
     use arthropod::experimental::ghost_replay::{
         GhostRecorder, GhostReplayer, init_ghost_replay, record_event,
@@ -58,60 +57,58 @@ mod demo {
                 Event::Window {
                     event: WindowEvent::KeyboardInput(input),
                     ..
-                } => {
-                    if input.state == ElementState::Pressed {
-                        match input.key {
-                            Key::R => {
-                                println!("Recording started...");
-                                if let Some(mut recorder) =
-                                    self.app.world_mut().get_resource_mut::<GhostRecorder>()
-                                {
-                                    recorder.start();
-                                }
+                } if input.state == ElementState::Pressed => {
+                    match input.key {
+                        Key::R => {
+                            println!("Recording started...");
+                            if let Some(mut recorder) =
+                                self.app.world_mut().get_resource_mut::<GhostRecorder>()
+                            {
+                                recorder.start();
                             }
-                            Key::S => {
-                                println!("Stopped.");
-                                if let Some(mut recorder) =
-                                    self.app.world_mut().get_resource_mut::<GhostRecorder>()
+                        }
+                        Key::S => {
+                            println!("Stopped.");
+                            if let Some(mut recorder) =
+                                self.app.world_mut().get_resource_mut::<GhostRecorder>()
+                            {
+                                recorder.stop();
+                            }
+                            if let Some(mut replayer) =
+                                self.app.world_mut().get_resource_mut::<GhostReplayer>()
+                            {
+                                replayer.stop();
+                            }
+                        }
+                        Key::P => {
+                            println!("Playback started...");
+                            // Extract events to avoid borrow conflict
+                            let events = {
+                                if let Some(recorder) =
+                                    self.app.world().get_resource::<GhostRecorder>()
                                 {
-                                    recorder.stop();
+                                    recorder.events.clone()
+                                } else {
+                                    Vec::new()
                                 }
+                            };
+
+                            if events.is_empty() {
+                                println!("No events recorded!");
+                            } else {
+                                println!("Replaying {} events...", events.len());
                                 if let Some(mut replayer) =
                                     self.app.world_mut().get_resource_mut::<GhostReplayer>()
                                 {
-                                    replayer.stop();
+                                    replayer.play(events);
+                                }
+                                // Request redraw to start animation loop
+                                if let Some(window) = self.app.window() {
+                                    window.request_redraw();
                                 }
                             }
-                            Key::P => {
-                                println!("Playback started...");
-                                // Extract events to avoid borrow conflict
-                                let events = {
-                                    if let Some(recorder) =
-                                        self.app.world().get_resource::<GhostRecorder>()
-                                    {
-                                        recorder.events.clone()
-                                    } else {
-                                        Vec::new()
-                                    }
-                                };
-
-                                if events.is_empty() {
-                                    println!("No events recorded!");
-                                } else {
-                                    println!("Replaying {} events...", events.len());
-                                    if let Some(mut replayer) =
-                                        self.app.world_mut().get_resource_mut::<GhostReplayer>()
-                                    {
-                                        replayer.play(events);
-                                    }
-                                    // Request redraw to start animation loop
-                                    if let Some(window) = self.app.window() {
-                                        window.request_redraw();
-                                    }
-                                }
-                            }
-                            _ => {}
                         }
+                        _ => {}
                     }
                 }
                 _ => {}
@@ -122,27 +119,27 @@ mod demo {
                 event: WindowEvent::MouseInput(input),
                 ..
             } = &event
+                && input.state == ElementState::Pressed
+                && input.button == MouseButton::Left
             {
-                if input.state == ElementState::Pressed && input.button == MouseButton::Left {
-                    // Use a block to limit mutable borrow of scene
-                    {
-                        let mut scene = self.app.world_mut().resource_mut::<Scene>();
-                        let root = scene.root();
-                        let mut node = SceneNode::new(NodeContent::Styled {
-                            style: Box::new(VisualStyle::new().solid_fill(Color::WHITE.as_vec4())),
-                        });
-                        node.bounds = plat_core::Rect::new(
-                            input.position.x as f32 - 2.0,
-                            input.position.y as f32 - 2.0,
-                            4.0,
-                            4.0,
-                        );
-                        scene.add_node(root, node);
-                    }
+                // Use a block to limit mutable borrow of scene
+                {
+                    let mut scene = self.app.world_mut().resource_mut::<Scene>();
+                    let root = scene.root();
+                    let mut node = SceneNode::new(NodeContent::Styled {
+                        style: Box::new(VisualStyle::new().solid_fill(Color::WHITE.as_vec4())),
+                    });
+                    node.bounds = plat_core::Rect::new(
+                        input.position.x as f32 - 2.0,
+                        input.position.y as f32 - 2.0,
+                        4.0,
+                        4.0,
+                    );
+                    scene.add_node(root, node);
+                }
 
-                    if let Some(window) = self.app.window() {
-                        window.request_redraw();
-                    }
+                if let Some(window) = self.app.window() {
+                    window.request_redraw();
                 }
             }
         }
@@ -164,7 +161,8 @@ mod demo {
                 };
 
             if is_playing {
-                if let Some(window) = self.app.window() {
+                let window_opt = self.app.window();
+                if let Some(window) = window_opt {
                     window.request_redraw();
                 }
             }

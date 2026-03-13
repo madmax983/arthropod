@@ -401,7 +401,11 @@ impl WidgetContext {
     }
 
     /// Add reactive layout width state to a node
-    pub fn add_reactive_layout_width_state(&mut self, node_id: NodeId, read_signal: ReadSignal<f32>) {
+    pub fn add_reactive_layout_width_state(
+        &mut self,
+        node_id: NodeId,
+        read_signal: ReadSignal<f32>,
+    ) {
         self.reactive_layout_width_states
             .insert(node_id, ReactiveLayoutWidthState { read_signal });
     }

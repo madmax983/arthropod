@@ -1,20 +1,20 @@
 //! Image widget - displays a bitmap image
 
 use crate::{Widget, WidgetContext};
-use render_engine::{NodeContent, NodeId, Paint, VisualStyle};
 use layout_engine::FlexStyle;
-use style_engine::{ImageId, ImageScaleMode, ImageFill};
+use render_engine::{NodeContent, NodeId, Paint, VisualStyle};
+use style_engine::{ImageFill, ImageId, ImageScaleMode};
 
 /// Image widget
-/// 
+///
 /// Displays an image asset loaded into the renderer's image store.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```no_run
 /// use widget_core::Image;
 /// use style_engine::ImageId;
-/// 
+///
 /// let widget = Image::new(ImageId(1)).width(100.0).height(100.0);
 /// ```
 #[derive(crate::Widget)]
@@ -22,13 +22,13 @@ use style_engine::{ImageId, ImageScaleMode, ImageFill};
 pub struct Image {
     #[positional]
     image_id: ImageId,
-    
+
     #[param]
     width: Option<f32>,
-    
+
     #[param]
     height: Option<f32>,
-    
+
     #[param(default = ImageScaleMode::Fit)]
     scale_mode: ImageScaleMode,
 }
@@ -69,23 +69,23 @@ impl Widget for Image {
         let node_id = ctx.create_node(
             ctx.root(),
             NodeContent::Styled {
-                style: Box::new(
-                    VisualStyle::new()
-                        .fill(Paint::Image(ImageFill {
-                            image_id: self.image_id,
-                            scale_mode: self.scale_mode,
-                            transform: None,
-                        })),
-                ),
+                style: Box::new(VisualStyle::new().fill(Paint::Image(ImageFill {
+                    image_id: self.image_id,
+                    scale_mode: self.scale_mode,
+                    transform: None,
+                }))),
             },
         );
 
         // Configure layout
-        ctx.set_layout_style(node_id, FlexStyle {
-            width: self.width,
-            height: self.height,
-            ..Default::default()
-        });
+        ctx.set_layout_style(
+            node_id,
+            FlexStyle {
+                width: self.width,
+                height: self.height,
+                ..Default::default()
+            },
+        );
 
         node_id
     }

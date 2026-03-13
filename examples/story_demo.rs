@@ -50,7 +50,6 @@ mod tui_app {
         Ok(())
     }
 
-    #[allow(clippy::collapsible_if)]
     fn run_app(
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -80,42 +79,40 @@ mod tui_app {
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Char('q') => return Ok(()),
-                            KeyCode::Enter => {
-                                if let AppState::Intro = state {
-                                    state = AppState::StoryLoop;
-                                    app.update(); // Ensure fresh state
-                                }
-                            }
-                            // Number keys for choices
-                            KeyCode::Char(c) if c.is_ascii_digit() => {
-                                if let AppState::StoryLoop = state {
-                                    let idx = c.to_digit(10).unwrap() as usize;
-                                    if idx > 0 {
-                                        // 1-based index
-                                        let mut runtime =
-                                            app.world_mut().resource_mut::<StoryRuntime>();
-                                        // Try to make a choice (0-based internally)
-                                        if runtime.choose(idx - 1).is_ok() {
-                                            // Reset scroll on new passage
-                                            scroll_offset = 0;
-                                        }
-                                    }
-                                }
-                            }
-                            KeyCode::Down | KeyCode::Char('j') => {
-                                scroll_offset = scroll_offset.saturating_add(1);
-                            }
-                            KeyCode::Up | KeyCode::Char('k') => {
-                                scroll_offset = scroll_offset.saturating_sub(1);
-                            }
-                            _ => {}
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Enter => {
+                        if let AppState::Intro = state {
+                            state = AppState::StoryLoop;
+                            app.update(); // Ensure fresh state
                         }
                     }
+                    // Number keys for choices
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
+                        if let AppState::StoryLoop = state {
+                            let idx = c.to_digit(10).unwrap() as usize;
+                            if idx > 0 {
+                                // 1-based index
+                                let mut runtime = app.world_mut().resource_mut::<StoryRuntime>();
+                                // Try to make a choice (0-based internally)
+                                if runtime.choose(idx - 1).is_ok() {
+                                    // Reset scroll on new passage
+                                    scroll_offset = 0;
+                                }
+                            }
+                        }
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        scroll_offset = scroll_offset.saturating_add(1);
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        scroll_offset = scroll_offset.saturating_sub(1);
+                    }
+                    _ => {}
                 }
             }
 
@@ -150,16 +147,21 @@ mod tui_app {
 
         // Iterate all children (Text + Choices)
         for (i, &child_id) in root_node.children.iter().enumerate() {
-            if let Some(child) = scene.get_node(child_id)
-                && let NodeContent::Styled { style } = &child.content
-                && let Some(text_content) = &style.text
-            {
-                if i == 0 {
-                    passage = text_content.text.clone();
-                } else {
-                    // Clean up choice text (remove leading newline if present)
-                    choices.push(text_content.text.trim().to_string());
-                }
+            let Some(child) = scene.get_node(child_id) else {
+                continue;
+            };
+            let NodeContent::Styled { style } = &child.content else {
+                continue;
+            };
+            let Some(text_content) = &style.text else {
+                continue;
+            };
+
+            if i == 0 {
+                passage = text_content.text.clone();
+            } else {
+                // Clean up choice text (remove leading newline if present)
+                choices.push(text_content.text.trim().to_string());
             }
         }
 

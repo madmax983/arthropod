@@ -7,18 +7,18 @@ use render_engine::{NodeContent, NodeId};
 use theme_engine::{style, DesignTokens, Style};
 
 /// ProgressBar widget
-/// 
+///
 /// Displays a horizontal track with a filled bar representing progress (0.0 to 1.0).
-/// 
+///
 /// # Example
-/// 
+///
 /// ```no_run
 /// use widget_core::ProgressBar;
 /// # use flux_state::{Runtime, Signal};
 /// # let runtime = Runtime::new();
 /// let progress = Signal::new(runtime, 0.5);
 /// let (read, _) = progress.split();
-/// 
+///
 /// let widget = ProgressBar::new(read);
 /// ```
 #[derive(crate::Widget)]
@@ -26,10 +26,10 @@ use theme_engine::{style, DesignTokens, Style};
 pub struct ProgressBar {
     #[positional]
     progress: ReadSignal<f32>,
-    
+
     #[param(default = 8.0)]
     height: f32,
-    
+
     #[param]
     style: Option<Style>,
 }
@@ -104,7 +104,7 @@ impl Widget for ProgressBar {
             .as_ref()
             .map(|t| t.accent)
             .unwrap_or_else(|| glam::Vec4::new(0.0, 0.47, 0.84, 1.0));
-        
+
         let bar_node = ctx.create_node(
             track_node,
             NodeContent::Styled {
@@ -120,18 +120,21 @@ impl Widget for ProgressBar {
         // NOTE: This assumes the track has a fixed width or we know its width.
         // For a more robust implementation, we'd need layout-relative percentage widths.
         // For now, we'll use a fixed 200px track or similar.
-        
+
         let progress_read = self.progress.clone();
         let width_computed = Computed::new(self.progress.runtime().clone(), move || {
             let p = progress_read.get().clamp(0.0, 1.0);
             p * 200.0 // Assuming 200px track for now
         });
-        
-        ctx.set_layout_style(bar_node, FlexStyle {
-            height: Some(self.height),
-            ..Default::default()
-        });
-        
+
+        ctx.set_layout_style(
+            bar_node,
+            FlexStyle {
+                height: Some(self.height),
+                ..Default::default()
+            },
+        );
+
         // Use our new reactive layout width component
         ctx.add_reactive_layout_width_state(bar_node, width_computed.to_read_signal());
 

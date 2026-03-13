@@ -67,32 +67,30 @@ const FOCUS_BORDER: Color = Color::rgba(124.0 / 255.0, 58.0 / 255.0, 237.0 / 255
 const UNFOCUS_BORDER: Color = Color::rgba(70.0 / 255.0, 70.0 / 255.0, 100.0 / 255.0, 0.6);
 
 impl ThemedFormApp {
-    #[allow(clippy::collapsible_if)]
     fn set_focus(&mut self, field: Option<usize>) {
         // Restore previous focus border
-        if let Some(prev) = self.focused_field
-            && let Some(node) = self.scene.get_node_mut(self.field_border_ids[prev])
-            && let NodeContent::Styled { ref mut style } = node.content
-        {
-            if !style.fills.is_empty() {
-                style.fills[0] = render_engine::Paint::Solid(UNFOCUS_BORDER.as_vec4());
+        if let Some(prev) = self.focused_field {
+            let node = self.scene.get_node_mut(self.field_border_ids[prev]);
+            if let Some(NodeContent::Styled { style }) = node.map(|n| &mut n.content)
+                && let Some(fill) = style.fills.first_mut()
+            {
+                *fill = render_engine::Paint::Solid(UNFOCUS_BORDER.as_vec4());
             }
         }
 
         self.focused_field = field;
 
         // Highlight new focus border
-        if let Some(idx) = field
-            && let Some(node) = self.scene.get_node_mut(self.field_border_ids[idx])
-            && let NodeContent::Styled { ref mut style } = node.content
-        {
-            if !style.fills.is_empty() {
-                style.fills[0] = render_engine::Paint::Solid(FOCUS_BORDER.as_vec4());
+        if let Some(idx) = field {
+            let node = self.scene.get_node_mut(self.field_border_ids[idx]);
+            if let Some(NodeContent::Styled { style }) = node.map(|n| &mut n.content)
+                && let Some(fill) = style.fills.first_mut()
+            {
+                *fill = render_engine::Paint::Solid(FOCUS_BORDER.as_vec4());
             }
         }
     }
 
-    #[allow(clippy::collapsible_if)]
     fn update_field_text(&mut self, idx: usize) {
         let display = if idx == 2 {
             // Password field: show dots
@@ -101,12 +99,11 @@ impl ThemedFormApp {
             self.field_texts[idx].clone()
         };
 
-        if let Some(node) = self.scene.get_node_mut(self.field_text_node_ids[idx])
-            && let NodeContent::Styled { ref mut style } = node.content
+        let node = self.scene.get_node_mut(self.field_text_node_ids[idx]);
+        if let Some(NodeContent::Styled { style }) = node.map(|n| &mut n.content)
+            && let Some(text_content) = &mut style.text
         {
-            if let Some(ref mut text_content) = style.text {
-                text_content.text = display;
-            }
+            text_content.text = display;
         }
     }
 
