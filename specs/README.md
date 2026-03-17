@@ -22,6 +22,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [013](013-text-input-widget.md) | Standard TextInput Widget | Draft |
 | [014](014-dropdown-select-widget.md) | Dropdown Select Widget | Draft |
 | [014](014-align-content.md) | Align Content (Flexbox) | Draft |
+| [015](015-tooltip-widget.md) | Tooltip Widget | Draft |
 | [015](015-gpu-text-rendering.md) | GPU Text Rendering Pipeline | Draft |
 | [016](016-drag-and-drop.md) | Drag and Drop System | Draft |
 | [016](016-advanced-rendering.md) | Advanced Rendering (Shadows and Blur) | Draft |
