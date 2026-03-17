@@ -412,58 +412,30 @@ impl WgpuBackend {
             .color_texture
             .clone();
 
-        // collect_frame_batches uses `self`. But `self` is borrowed by `executor`.
-        // So `collect_frame_batches` must be moved to `executor` or `instance_collector`.
-        // It uses `self.primitive_pipeline` etc. which are borrowed by `executor`.
-        // So `collect_frame_batches` must be called using `executor` components?
-        // Or I can't use `self` anymore.
-
-        // This confirms `collect_frame_batches` should be in `instance_collector` or `MultipassRenderer`.
-        // `collect_frame_batches` is basically `instance_collector::collect_instances` + text shaping.
-        // I can move it to `MultipassRenderer`?
-
-        // For now, I have to duplicate logic or move `collect_frame_batches` out of `WgpuBackend` (to `instance_collector`).
-        // I'll assume I can call it on `self`? No, `self` is mutably borrowed.
-
-        // I need to use `executor` to do everything.
-
-        // I'll implement `collect_frame_batches` on `MultipassRenderer` or free function in `instance_collector`.
-        // `collect_frame_batches_internal` was using `self`.
-
-        // I will use `instance_collector::collect_frame_batches` (which I need to create/move).
-
-        // Wait, `collect_frame_batches_internal` is complex.
-
-        // Let's implement `collect_frame_batches` on `MultipassRenderer`?
-        // Or just move it to `instance_collector.rs`.
-        // `instance_collector.rs` already has `collect_instances` which does most of it.
-        // The text shaping part is in `collect_frame_batches_internal`.
-
-        // I will assume `executor` has a method `collect_frame_batches`.
-        // I will add it to `MultipassRenderer` later.
-        // Or I can inline it using `executor` fields.
-
-        // This is getting complicated to do in one step.
-        // Maybe I should have moved `collect_frame_batches` first.
-
-        // I'll revert to just replacing the methods first, but keep `render_scene_to_rgba` logic commented out or broken?
-        // No, I want it to compile.
-
-        // I'll implement `collect_frame_batches` in `MultipassRenderer` in `multipass_executor.rs`.
-        // It needs access to `glyph_texture` (it has it), `text_renderer` (it has it), `queue` (via context).
-
-        // I'll assume I add `collect_frame_batches` to `MultipassRenderer`.
-
         if self.multipass_node_ids_buffer.is_empty() {
             let (base_instances, base_path_batches) = executor.collect_frame_batches(scene);
-            executor.draw_batches_to_view(
+            let clear_color = wgpu::Color {
+                r: executor.context.clear_color.r() as f64,
+                g: executor.context.clear_color.g() as f64,
+                b: executor.context.clear_color.b() as f64,
+                a: executor.context.clear_color.a() as f64,
+            };
+            let mut ctx = multipass_executor::MultipassContext {
+                device: &executor.context.device,
+                queue: &executor.context.queue,
+                config: &executor.context.config,
+                globals_bind_group: &executor.context.globals_bind_group,
+                primitive_pipeline: &mut *executor.primitive_pipeline,
+                path_pipeline: &mut *executor.path_pipeline,
+                blur_pipeline: &mut *executor.blur_pipeline,
+                blend_pipeline: &mut *executor.blend_pipeline,
+                color_filter_pipeline: &mut *executor.color_filter_pipeline,
+                effect_sampler: executor.effect_sampler,
+            };
+            multipass_executor::MultipassRenderer::draw_batches_to_view(
+                &mut ctx,
                 &frame_view,
-                wgpu::LoadOp::Clear(wgpu::Color {
-                    r: executor.context.clear_color.r() as f64,
-                    g: executor.context.clear_color.g() as f64,
-                    b: executor.context.clear_color.b() as f64,
-                    a: executor.context.clear_color.a() as f64,
-                }),
+                wgpu::LoadOp::Clear(clear_color),
                 &base_instances,
                 &base_path_batches,
                 None,

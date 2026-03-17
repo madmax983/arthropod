@@ -59,6 +59,23 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) background_capture_bounds_buffer: &'a mut Vec<[u32; 4]>,
 }
 
+/// Extracts disjoint mutable borrows from `MultipassRenderer` to allow passing down state
+/// into hot loop rendering functions without violating borrow checker aliasing rules.
+/// This prevents requiring expensive atomic `.clone()` operations on `wgpu::TextureView` and
+/// `wgpu::Texture` handles just to pass them alongside `&mut self`.
+pub(crate) struct MultipassContext<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+    pub config: &'a wgpu::SurfaceConfiguration,
+    pub globals_bind_group: &'a wgpu::BindGroup,
+    pub primitive_pipeline: &'a mut PrimitivePipeline,
+    pub path_pipeline: &'a mut PathPipeline,
+    pub blur_pipeline: &'a mut BlurPipeline,
+    pub blend_pipeline: &'a mut BlendPipeline,
+    pub color_filter_pipeline: &'a mut ColorFilterPipeline,
+    pub effect_sampler: &'a wgpu::Sampler,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OrderedRenderNodeKind {
     Direct,
@@ -192,43 +209,6 @@ impl<'a> MultipassRenderer<'a> {
             let tmp_handle = self.acquire_effect_target(frame_key);
             let dst_handle = self.acquire_effect_target(frame_key);
 
-            let src_view = self
-                .context
-                .get_render_target(src_handle)
-                .expect("missing src render target")
-                .color_view
-                .clone();
-            let tmp_view = self
-                .context
-                .get_render_target(tmp_handle)
-                .expect("missing temp render target")
-                .color_view
-                .clone();
-            let dst_view = self
-                .context
-                .get_render_target(dst_handle)
-                .expect("missing dst render target")
-                .color_view
-                .clone();
-            let src_texture = self
-                .context
-                .get_render_target(src_handle)
-                .expect("missing src render target texture")
-                .color_texture
-                .clone();
-            let tmp_texture = self
-                .context
-                .get_render_target(tmp_handle)
-                .expect("missing temp render target texture")
-                .color_texture
-                .clone();
-            let dst_texture = self
-                .context
-                .get_render_target(dst_handle)
-                .expect("missing dst render target texture")
-                .color_texture
-                .clone();
-
             let mut batch_ctx = BatchCollectionContext {
                 pipeline: self.primitive_pipeline,
                 tessellation_cache: self.tessellation_cache,
@@ -248,30 +228,77 @@ impl<'a> MultipassRenderer<'a> {
                 path_batches_buffer,
             );
 
+            let src_target = self
+                .context
+                .get_render_target(src_handle)
+                .expect("missing src render target");
+            let src_view = &src_target.color_view;
+            let src_texture = &src_target.color_texture;
+
+            let tmp_target = self
+                .context
+                .get_render_target(tmp_handle)
+                .expect("missing temp render target");
+            let tmp_view = &tmp_target.color_view;
+            let tmp_texture = &tmp_target.color_texture;
+
+            let dst_target = self
+                .context
+                .get_render_target(dst_handle)
+                .expect("missing dst render target");
+            let dst_view = &dst_target.color_view;
+            let dst_texture = &dst_target.color_texture;
+
+            let mut ctx = MultipassContext {
+                device: &self.context.device,
+                queue: &self.context.queue,
+                config: &self.context.config,
+                globals_bind_group: &self.context.globals_bind_group,
+                primitive_pipeline: &mut *self.primitive_pipeline,
+                path_pipeline: &mut *self.path_pipeline,
+                blur_pipeline: &mut *self.blur_pipeline,
+                blend_pipeline: &mut *self.blend_pipeline,
+                color_filter_pipeline: &mut *self.color_filter_pipeline,
+                effect_sampler: self.effect_sampler,
+            };
+
             if background_blur_radius.is_none() {
-                self.draw_batches_to_view(
-                    &src_view,
+                Self::draw_batches_to_view(
+                    &mut ctx,
+                    src_view,
                     wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                     instances_buffer,
                     path_batches_buffer,
                     None,
                 );
             } else {
-                self.copy_texture_full_frame(surface_texture, &src_texture);
+                Self::copy_texture_full_frame(&ctx, surface_texture, src_texture);
             }
 
             if let Some(radius) = layer_blur_radius.or(background_blur_radius) {
                 let _ = select_blur_tier(radius);
-                self.run_blur_pass(&src_view, &tmp_view, radius, BlurDirection::Horizontal);
-                self.run_blur_pass(&tmp_view, &src_view, radius, BlurDirection::Vertical);
+                Self::run_blur_pass(
+                    &mut ctx,
+                    src_view,
+                    tmp_view,
+                    radius,
+                    BlurDirection::Horizontal,
+                );
+                Self::run_blur_pass(
+                    &mut ctx,
+                    tmp_view,
+                    src_view,
+                    radius,
+                    BlurDirection::Vertical,
+                );
             }
 
             if let Some(filter) = color_filter {
-                self.run_color_filter_pass(&src_view, &tmp_view, filter);
-                self.copy_texture_full_frame(&tmp_texture, &src_texture);
+                Self::run_color_filter_pass(&mut ctx, src_view, tmp_view, filter);
+                Self::copy_texture_full_frame(&ctx, tmp_texture, src_texture);
             }
 
-            self.copy_texture_full_frame(surface_texture, &dst_texture);
+            Self::copy_texture_full_frame(&ctx, surface_texture, dst_texture);
 
             let blend_mode = if matches!(
                 style.blend_mode,
@@ -282,10 +309,18 @@ impl<'a> MultipassRenderer<'a> {
                 style.blend_mode
             };
 
-            self.run_blend_composite(&src_view, &dst_view, surface_view, blend_mode, scissor);
+            Self::run_blend_composite(
+                &mut ctx,
+                src_view,
+                dst_view,
+                surface_view,
+                blend_mode,
+                scissor,
+            );
 
             if background_blur_radius.is_some() {
-                self.draw_batches_to_view(
+                Self::draw_batches_to_view(
+                    &mut ctx,
                     surface_view,
                     wgpu::LoadOp::Load,
                     instances_buffer,
@@ -306,14 +341,29 @@ impl<'a> MultipassRenderer<'a> {
         surface_texture: &wgpu::Texture,
         surface_view: &wgpu::TextureView,
     ) {
-        self.draw_batches_to_view(
+        let clear_color = wgpu::Color {
+            r: self.context.clear_color.r() as f64,
+            g: self.context.clear_color.g() as f64,
+            b: self.context.clear_color.b() as f64,
+            a: self.context.clear_color.a() as f64,
+        };
+        let mut ctx = MultipassContext {
+            device: &self.context.device,
+            queue: &self.context.queue,
+            config: &self.context.config,
+            globals_bind_group: &self.context.globals_bind_group,
+            primitive_pipeline: &mut *self.primitive_pipeline,
+            path_pipeline: &mut *self.path_pipeline,
+            blur_pipeline: &mut *self.blur_pipeline,
+            blend_pipeline: &mut *self.blend_pipeline,
+            color_filter_pipeline: &mut *self.color_filter_pipeline,
+            effect_sampler: self.effect_sampler,
+        };
+
+        Self::draw_batches_to_view(
+            &mut ctx,
             surface_view,
-            wgpu::LoadOp::Clear(wgpu::Color {
-                r: self.context.clear_color.r() as f64,
-                g: self.context.clear_color.g() as f64,
-                b: self.context.clear_color.b() as f64,
-                a: self.context.clear_color.a() as f64,
-            }),
+            wgpu::LoadOp::Clear(clear_color),
             &[],
             &[],
             None,
@@ -404,7 +454,20 @@ impl<'a> MultipassRenderer<'a> {
                     instances_buffer,
                     path_batches_buffer,
                 );
-                self.draw_batches_to_view(
+                let mut ctx = MultipassContext {
+                    device: &self.context.device,
+                    queue: &self.context.queue,
+                    config: &self.context.config,
+                    globals_bind_group: &self.context.globals_bind_group,
+                    primitive_pipeline: &mut *self.primitive_pipeline,
+                    path_pipeline: &mut *self.path_pipeline,
+                    blur_pipeline: &mut *self.blur_pipeline,
+                    blend_pipeline: &mut *self.blend_pipeline,
+                    color_filter_pipeline: &mut *self.color_filter_pipeline,
+                    effect_sampler: self.effect_sampler,
+                };
+                Self::draw_batches_to_view(
+                    &mut ctx,
                     surface_view,
                     wgpu::LoadOp::Load,
                     instances_buffer,
@@ -428,7 +491,20 @@ impl<'a> MultipassRenderer<'a> {
                     node.transform,
                 );
                 let instances = [instance];
-                self.draw_batches_to_view(
+                let mut ctx = MultipassContext {
+                    device: &self.context.device,
+                    queue: &self.context.queue,
+                    config: &self.context.config,
+                    globals_bind_group: &self.context.globals_bind_group,
+                    primitive_pipeline: &mut *self.primitive_pipeline,
+                    path_pipeline: &mut *self.path_pipeline,
+                    blur_pipeline: &mut *self.blur_pipeline,
+                    blend_pipeline: &mut *self.blend_pipeline,
+                    color_filter_pipeline: &mut *self.color_filter_pipeline,
+                    effect_sampler: self.effect_sampler,
+                };
+                Self::draw_batches_to_view(
+                    &mut ctx,
                     surface_view,
                     wgpu::LoadOp::Load,
                     &instances,
@@ -456,9 +532,12 @@ impl<'a> MultipassRenderer<'a> {
         let _ = self.effect_target_pool.release(handle);
     }
 
+    /// Renders collected primitive and path instances to the given `target_view`.
+    /// Accepts a struct-extracted `MultipassContext` instead of `&mut self` to avoid
+    /// `wgpu::TextureView` clones in the caller's hot loop, keeping this abstraction zero-cost.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_batches_to_view(
-        &mut self,
+        ctx: &mut MultipassContext,
         target_view: &wgpu::TextureView,
         load_op: wgpu::LoadOp<wgpu::Color>,
         instances: &[PrimitiveInstance],
@@ -472,17 +551,16 @@ impl<'a> MultipassRenderer<'a> {
             return;
         }
 
-        self.primitive_pipeline
-            .prepare(&self.context.device, &self.context.queue, instances);
-        self.path_pipeline
-            .prepare(&self.context.device, &self.context.queue, path_batches);
+        ctx.primitive_pipeline
+            .prepare(ctx.device, ctx.queue, instances);
+        ctx.path_pipeline
+            .prepare(ctx.device, ctx.queue, path_batches);
 
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Draw Batches Encoder"),
-                });
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Multipass Draw Batches Encoder"),
+            });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Multipass Draw Batches"),
@@ -508,45 +586,37 @@ impl<'a> MultipassRenderer<'a> {
             render_pass.set_scissor_rect(x, y, width, height);
         }
 
-        self.primitive_pipeline.render(
+        ctx.primitive_pipeline.render(
             &mut render_pass,
-            &self.context.globals_bind_group,
+            ctx.globals_bind_group,
             instances.len() as u32,
         );
-        self.path_pipeline
-            .render(&mut render_pass, &self.context.globals_bind_group);
+        ctx.path_pipeline
+            .render(&mut render_pass, ctx.globals_bind_group);
 
         drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
+        ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
     pub(crate) fn run_blur_pass(
-        &mut self,
+        ctx: &mut MultipassContext,
         source_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
         radius: f32,
         direction: BlurDirection,
     ) {
-        let params = BlurParams::from_radius(
-            radius,
-            self.context.config.width,
-            self.context.config.height,
-            direction,
-        );
-        self.blur_pipeline
-            .update_params(&self.context.queue, &params);
-        let bind_group = self.blur_pipeline.create_bind_group(
-            &self.context.device,
-            source_view,
-            self.effect_sampler,
-        );
+        let params =
+            BlurParams::from_radius(radius, ctx.config.width, ctx.config.height, direction);
+        ctx.blur_pipeline.update_params(ctx.queue, &params);
+        let bind_group =
+            ctx.blur_pipeline
+                .create_bind_group(ctx.device, source_view, ctx.effect_sampler);
 
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Blur Encoder"),
-                });
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Multipass Blur Encoder"),
+            });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Multipass Blur Pass"),
@@ -564,35 +634,34 @@ impl<'a> MultipassRenderer<'a> {
             timestamp_writes: None,
             multiview_mask: None,
         });
-        self.blur_pipeline.render(&mut render_pass, &bind_group);
+        ctx.blur_pipeline.render(&mut render_pass, &bind_group);
 
         drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
+        ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
     pub(crate) fn run_blend_composite(
-        &mut self,
+        ctx: &mut MultipassContext,
         src_view: &wgpu::TextureView,
         dst_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
         blend_mode: style_engine::BlendMode,
         scissor: Option<[u32; 4]>,
     ) {
-        self.blend_pipeline
-            .update_params(&self.context.queue, BlendParams::new(blend_mode));
-        let bind_group = self.blend_pipeline.create_bind_group(
-            &self.context.device,
+        ctx.blend_pipeline
+            .update_params(ctx.queue, BlendParams::new(blend_mode));
+        let bind_group = ctx.blend_pipeline.create_bind_group(
+            ctx.device,
             src_view,
             dst_view,
-            self.effect_sampler,
+            ctx.effect_sampler,
         );
 
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Blend Encoder"),
-                });
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Multipass Blend Encoder"),
+            });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Multipass Blend Composite"),
@@ -618,32 +687,31 @@ impl<'a> MultipassRenderer<'a> {
             render_pass.set_scissor_rect(x, y, width, height);
         }
 
-        self.blend_pipeline.render(&mut render_pass, &bind_group);
+        ctx.blend_pipeline.render(&mut render_pass, &bind_group);
 
         drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
+        ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
     pub(crate) fn run_color_filter_pass(
-        &mut self,
+        ctx: &mut MultipassContext,
         source_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
         filter: style_engine::ColorFilter,
     ) {
-        self.color_filter_pipeline
-            .update_params(&self.context.queue, ColorFilterParams::new(filter));
-        let bind_group = self.color_filter_pipeline.create_bind_group(
-            &self.context.device,
+        ctx.color_filter_pipeline
+            .update_params(ctx.queue, ColorFilterParams::new(filter));
+        let bind_group = ctx.color_filter_pipeline.create_bind_group(
+            ctx.device,
             source_view,
-            self.effect_sampler,
+            ctx.effect_sampler,
         );
 
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Color Filter Encoder"),
-                });
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Multipass Color Filter Encoder"),
+            });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Multipass Color Filter Pass"),
@@ -662,20 +730,23 @@ impl<'a> MultipassRenderer<'a> {
             multiview_mask: None,
         });
 
-        self.color_filter_pipeline
+        ctx.color_filter_pipeline
             .render(&mut render_pass, &bind_group);
 
         drop(render_pass);
-        self.context.queue.submit(std::iter::once(encoder.finish()));
+        ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    pub(crate) fn copy_texture_full_frame(&self, src: &wgpu::Texture, dst: &wgpu::Texture) {
-        let mut encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Multipass Copy Texture Encoder"),
-                });
+    pub(crate) fn copy_texture_full_frame(
+        ctx: &MultipassContext,
+        src: &wgpu::Texture,
+        dst: &wgpu::Texture,
+    ) {
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Multipass Copy Texture Encoder"),
+            });
         encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: src,
@@ -690,12 +761,12 @@ impl<'a> MultipassRenderer<'a> {
                 aspect: wgpu::TextureAspect::All,
             },
             wgpu::Extent3d {
-                width: self.context.config.width,
-                height: self.context.config.height,
+                width: ctx.config.width,
+                height: ctx.config.height,
                 depth_or_array_layers: 1,
             },
         );
-        self.context.queue.submit(std::iter::once(encoder.finish()));
+        ctx.queue.submit(std::iter::once(encoder.finish()));
     }
 
     fn collect_frame_batches_internal(
