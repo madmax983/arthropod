@@ -125,18 +125,17 @@ impl<'a> MultipassRenderer<'a> {
         }
     }
 
-    pub(crate) fn render_multipass_effect_nodes(
+    pub(crate) fn render_multipass_effect_nodes<'b>(
         &mut self,
-        scene: &'a Scene,
+        scene: &'b Scene,
         multipass_node_ids: &[crate::NodeId],
         surface_texture: &wgpu::Texture,
         surface_view: &wgpu::TextureView,
+        instances_buffer: &mut Vec<PrimitiveInstance>,
+        path_batches_buffer: &mut Vec<PathBatch<'b>>,
     ) {
         let frame_key =
             RenderTargetKey::new(self.context.config.width, self.context.config.height, false);
-
-        let mut instances_buffer = Vec::new();
-        let mut path_batches_buffer = Vec::new();
 
         for &node_id in multipass_node_ids {
             let Some(node) = scene.get_node(node_id) else {
@@ -245,16 +244,16 @@ impl<'a> MultipassRenderer<'a> {
                 effective_opacity,
                 render_bounds,
                 node.transform,
-                &mut instances_buffer,
-                &mut path_batches_buffer,
+                instances_buffer,
+                path_batches_buffer,
             );
 
             if background_blur_radius.is_none() {
                 self.draw_batches_to_view(
                     &src_view,
                     wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    &instances_buffer,
-                    &path_batches_buffer,
+                    instances_buffer,
+                    path_batches_buffer,
                     None,
                 );
             } else {
@@ -289,8 +288,8 @@ impl<'a> MultipassRenderer<'a> {
                 self.draw_batches_to_view(
                     surface_view,
                     wgpu::LoadOp::Load,
-                    &instances_buffer,
-                    &path_batches_buffer,
+                    instances_buffer,
+                    path_batches_buffer,
                     scissor,
                 );
             }
@@ -321,11 +320,24 @@ impl<'a> MultipassRenderer<'a> {
         );
 
         collect_ordered_render_nodes(scene, self.traversal_stack, self.ordered_nodes_buffer);
+
+        let mut instances_buffer = Vec::with_capacity(64);
+        let mut path_batches_buffer = Vec::with_capacity(16);
+
         for i in 0..self.ordered_nodes_buffer.len() {
+            instances_buffer.clear();
+            path_batches_buffer.clear();
+
             let entry = self.ordered_nodes_buffer[i];
             match entry.kind {
                 OrderedRenderNodeKind::Direct => {
-                    self.render_direct_node(scene, entry.node_id, surface_view);
+                    self.render_direct_node(
+                        scene,
+                        entry.node_id,
+                        surface_view,
+                        &mut instances_buffer,
+                        &mut path_batches_buffer,
+                    );
                 }
                 OrderedRenderNodeKind::Multipass => {
                     self.render_multipass_effect_nodes(
@@ -333,21 +345,22 @@ impl<'a> MultipassRenderer<'a> {
                         std::slice::from_ref(&entry.node_id),
                         surface_texture,
                         surface_view,
+                        &mut instances_buffer,
+                        &mut path_batches_buffer,
                     );
                 }
             }
         }
     }
 
-    fn render_direct_node(
+    fn render_direct_node<'b>(
         &mut self,
-        scene: &'a Scene,
+        scene: &'b Scene,
         node_id: crate::NodeId,
         surface_view: &wgpu::TextureView,
+        instances_buffer: &mut Vec<PrimitiveInstance>,
+        path_batches_buffer: &mut Vec<PathBatch<'b>>,
     ) {
-        let mut instances_buffer = Vec::new();
-        let mut path_batches_buffer = Vec::new();
-
         let Some(node) = scene.get_node(node_id) else {
             return;
         };
@@ -388,14 +401,14 @@ impl<'a> MultipassRenderer<'a> {
                     effective_opacity,
                     render_bounds,
                     node.transform,
-                    &mut instances_buffer,
-                    &mut path_batches_buffer,
+                    instances_buffer,
+                    path_batches_buffer,
                 );
                 self.draw_batches_to_view(
                     surface_view,
                     wgpu::LoadOp::Load,
-                    &instances_buffer,
-                    &path_batches_buffer,
+                    instances_buffer,
+                    path_batches_buffer,
                     scissor,
                 );
             }
