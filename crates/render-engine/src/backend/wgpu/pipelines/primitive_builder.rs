@@ -44,9 +44,8 @@ fn create_primitive_instances_impl(
     pos: Vec2,
     size: Vec2,
     opacity: f32,
-) -> Vec<PrimitiveInstance> {
-    let mut instances = Vec::new();
-
+    instances: &mut Vec<PrimitiveInstance>,
+) {
     // For text styles, fill[0] is treated as the glyph paint.
     // Any additional visible paints are treated as sticker/background surfaces.
     let text_has_background_surface =
@@ -127,7 +126,7 @@ fn create_primitive_instances_impl(
 
     // 3. Render stroke paints bottom-to-top (on top of fills)
     if let Some(stroke) = &style.stroke {
-        let stroke_instances = if let Some(pipeline) = pipeline.as_mut() {
+        if let Some(pipeline) = pipeline.as_mut() {
             create_stroke_instances(
                 pipeline,
                 stroke,
@@ -136,6 +135,7 @@ fn create_primitive_instances_impl(
                 opacity,
                 &style.corner_radii,
                 style.blend_mode,
+                instances,
             )
         } else {
             create_stroke_instances_without_pipeline(
@@ -145,12 +145,10 @@ fn create_primitive_instances_impl(
                 opacity,
                 &style.corner_radii,
                 style.blend_mode,
+                instances,
             )
         };
-        instances.extend(stroke_instances);
     }
-
-    instances
 }
 
 pub fn create_primitive_instances(
@@ -158,8 +156,9 @@ pub fn create_primitive_instances(
     pos: Vec2,
     size: Vec2,
     opacity: f32,
-) -> Vec<PrimitiveInstance> {
-    create_primitive_instances_impl(None, style, pos, size, opacity)
+    instances: &mut Vec<PrimitiveInstance>,
+) {
+    create_primitive_instances_impl(None, style, pos, size, opacity, instances)
 }
 
 pub fn create_primitive_instances_with_pipeline(
@@ -168,11 +167,13 @@ pub fn create_primitive_instances_with_pipeline(
     pos: Vec2,
     size: Vec2,
     opacity: f32,
-) -> Vec<PrimitiveInstance> {
-    create_primitive_instances_impl(Some(pipeline), style, pos, size, opacity)
+    instances: &mut Vec<PrimitiveInstance>,
+) {
+    create_primitive_instances_impl(Some(pipeline), style, pos, size, opacity, instances)
 }
 
 /// Create one stroke instance per stroke paint layer.
+#[allow(clippy::too_many_arguments)]
 fn create_stroke_instances(
     pipeline: &mut PrimitivePipeline,
     stroke: &style_engine::StrokeStyle,
@@ -181,7 +182,8 @@ fn create_stroke_instances(
     opacity: f32,
     corner_radii: &CornerRadii,
     blend_mode: BlendMode,
-) -> Vec<PrimitiveInstance> {
+    instances: &mut Vec<PrimitiveInstance>,
+) {
     use style_engine::StrokeAlign;
 
     let stroke_width = stroke.weight;
@@ -191,7 +193,6 @@ fn create_stroke_instances(
         StrokeAlign::Outside => -1.0,
     };
 
-    let mut instances = Vec::new();
     if stroke.paints.is_empty() {
         let mut instance = PrimitiveInstance::rounded(
             [pos.x, pos.y],
@@ -204,7 +205,7 @@ fn create_stroke_instances(
         instance.flags = with_blend_mode(instance.flags, blend_mode);
         instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
         instances.push(instance);
-        return instances;
+        return;
     }
 
     for stroke_paint in &stroke.paints {
@@ -258,8 +259,6 @@ fn create_stroke_instances(
         instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
         instances.push(instance);
     }
-
-    instances
 }
 
 fn fallback_gradient_color(stops: &[ColorStop], opacity: f32) -> [f32; 4] {
@@ -275,7 +274,8 @@ fn create_stroke_instances_without_pipeline(
     opacity: f32,
     corner_radii: &CornerRadii,
     blend_mode: BlendMode,
-) -> Vec<PrimitiveInstance> {
+    instances: &mut Vec<PrimitiveInstance>,
+) {
     use style_engine::StrokeAlign;
 
     let stroke_width = stroke.weight;
@@ -285,7 +285,6 @@ fn create_stroke_instances_without_pipeline(
         StrokeAlign::Outside => -1.0,
     };
 
-    let mut instances = Vec::new();
     if stroke.paints.is_empty() {
         let mut instance = PrimitiveInstance::rounded(
             [pos.x, pos.y],
@@ -298,7 +297,7 @@ fn create_stroke_instances_without_pipeline(
         instance.flags = with_blend_mode(instance.flags, blend_mode);
         instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
         instances.push(instance);
-        return instances;
+        return;
     }
 
     for stroke_paint in &stroke.paints {
@@ -327,8 +326,6 @@ fn create_stroke_instances_without_pipeline(
         instance.flags = with_stroke_cap_join(instance.flags, stroke.cap, stroke.join);
         instances.push(instance);
     }
-
-    instances
 }
 
 /// Create a single fill instance (solid or gradient)
@@ -562,10 +559,14 @@ mod tests {
             ],
         }));
 
-        let linear_i = create_primitive_instances(&linear, Vec2::ZERO, Vec2::ONE, 1.0);
-        let radial_i = create_primitive_instances(&radial, Vec2::ZERO, Vec2::ONE, 1.0);
-        let angular_i = create_primitive_instances(&angular, Vec2::ZERO, Vec2::ONE, 1.0);
-        let diamond_i = create_primitive_instances(&diamond, Vec2::ZERO, Vec2::ONE, 1.0);
+        let mut linear_i = Vec::new();
+        create_primitive_instances(&linear, Vec2::ZERO, Vec2::ONE, 1.0, &mut linear_i);
+        let mut radial_i = Vec::new();
+        create_primitive_instances(&radial, Vec2::ZERO, Vec2::ONE, 1.0, &mut radial_i);
+        let mut angular_i = Vec::new();
+        create_primitive_instances(&angular, Vec2::ZERO, Vec2::ONE, 1.0, &mut angular_i);
+        let mut diamond_i = Vec::new();
+        create_primitive_instances(&diamond, Vec2::ZERO, Vec2::ONE, 1.0, &mut diamond_i);
 
         assert_eq!(linear_i[0].flags & FLAG_FILL_TYPE_MASK, 1);
         assert_eq!(radial_i[0].flags & FLAG_FILL_TYPE_MASK, 2);
@@ -578,7 +579,8 @@ mod tests {
         let style = VisualStyle::new()
             .solid_fill(Vec4::new(1.0, 1.0, 1.0, 1.0))
             .drop_shadow(Vec2::new(2.0, 2.0), 6.0, Vec4::new(0.0, 0.0, 0.0, 0.3));
-        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0, &mut instances);
 
         assert!(instances.iter().any(|i| (i.flags & FLAG_IS_SHADOW) != 0));
     }
@@ -597,7 +599,8 @@ mod tests {
             .solid_fill(Vec4::new(0.2, 0.2, 0.2, 1.0))
             .blend_mode(style_engine::BlendMode::Screen)
             .stroke(stroke);
-        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0, &mut instances);
         let stroke_instance = instances
             .iter()
             .find(|i| (i.flags & FLAG_HAS_STROKE) != 0)
@@ -625,7 +628,8 @@ mod tests {
         };
         let style = VisualStyle::new().stroke(stroke);
 
-        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0, &mut instances);
         let stroke_instances: Vec<_> = instances
             .iter()
             .filter(|instance| (instance.flags & FLAG_HAS_STROKE) != 0)
@@ -646,8 +650,14 @@ mod tests {
             .solid_fill(Vec4::new(1.0, 0.0, 0.0, 1.0))
             .corner_radius(12.0);
 
-        let instances =
-            create_primitive_instances(&style, Vec2::new(10.0, 20.0), Vec2::new(100.0, 50.0), 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(
+            &style,
+            Vec2::new(10.0, 20.0),
+            Vec2::new(100.0, 50.0),
+            1.0,
+            &mut instances,
+        );
 
         assert_eq!(
             instances.len(),
@@ -667,8 +677,14 @@ mod tests {
             .fill(Paint::solid(Vec4::new(0.0, 0.0, 0.0, 1.0)))
             .fill(Paint::solid(Vec4::new(1.0, 1.0, 1.0, 1.0)));
 
-        let instances =
-            create_primitive_instances(&style, Vec2::new(10.0, 20.0), Vec2::new(100.0, 50.0), 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(
+            &style,
+            Vec2::new(10.0, 20.0),
+            Vec2::new(100.0, 50.0),
+            1.0,
+            &mut instances,
+        );
 
         assert_eq!(
             instances.len(),
@@ -685,8 +701,14 @@ mod tests {
             .fill(Paint::solid(Vec4::new(0.8, 1.0, 0.0, 1.0)))
             .drop_shadow(Vec2::new(4.0, 4.0), 0.0, Vec4::new(0.8, 1.0, 0.0, 1.0));
 
-        let instances =
-            create_primitive_instances(&style, Vec2::new(10.0, 20.0), Vec2::new(100.0, 40.0), 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(
+            &style,
+            Vec2::new(10.0, 20.0),
+            Vec2::new(100.0, 40.0),
+            1.0,
+            &mut instances,
+        );
 
         assert!(
             instances.is_empty(),
@@ -698,7 +720,8 @@ mod tests {
     fn test_create_primitive_instances_with_opacity() {
         let style = VisualStyle::new().solid_fill(Vec4::new(1.0, 0.0, 0.0, 1.0));
 
-        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 0.5);
+        let mut instances = Vec::new();
+        create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 0.5, &mut instances);
 
         assert_eq!(instances.len(), 1);
         assert_eq!(
@@ -711,7 +734,8 @@ mod tests {
     fn test_create_primitive_instances_empty() {
         let style = VisualStyle::new(); // No fills
 
-        let instances = create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0);
+        let mut instances = Vec::new();
+        create_primitive_instances(&style, Vec2::ZERO, Vec2::ONE, 1.0, &mut instances);
 
         assert_eq!(instances.len(), 0, "Empty style should create 0 instances");
     }

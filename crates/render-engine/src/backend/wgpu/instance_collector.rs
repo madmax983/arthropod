@@ -214,16 +214,18 @@ fn text_has_background_surface(style: &style_engine::VisualStyle) -> bool {
 ///   but text background fills/effects may still emit primitive instances
 ///
 /// Returns empty vec if the node is invisible or has no styled content.
-pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
+pub fn create_node_instances(node: &SceneNode, instances: &mut Vec<PrimitiveInstance>) {
     if !node.visible || node.opacity <= 0.0 {
-        return Vec::new();
+        return;
     }
 
-    let mut instances = match &node.content {
+    let start_idx = instances.len();
+
+    match &node.content {
         NodeContent::Styled { style } => {
             let pos = glam::Vec2::new(node.bounds.x.round(), node.bounds.y.round());
             let size = glam::Vec2::new(node.bounds.width.round(), node.bounds.height.round());
-            create_primitive_instances(style, pos, size, node.opacity * style.opacity)
+            create_primitive_instances(style, pos, size, node.opacity * style.opacity, instances);
         }
         NodeContent::SolidColor { color } => {
             let pos = [node.bounds.x.round(), node.bounds.y.round()];
@@ -231,16 +233,14 @@ pub fn create_node_instances(node: &SceneNode) -> Vec<PrimitiveInstance> {
             let mut final_color = color.to_array();
             final_color[3] *= node.opacity;
 
-            vec![PrimitiveInstance::solid(pos, size, final_color)]
+            instances.push(PrimitiveInstance::solid(pos, size, final_color));
         }
-        NodeContent::Empty => Vec::new(),
+        NodeContent::Empty => {}
     };
 
     if node.transform != Transform2D::IDENTITY {
-        apply_node_transform_to_instances(&mut instances, node.transform);
+        apply_node_transform_to_instances(&mut instances[start_idx..], node.transform);
     }
-
-    instances
 }
 
 pub(crate) fn resolve_text_fill(
@@ -692,19 +692,20 @@ fn collect_instances_impl<'a>(
                 // Create primitive instances for this style
                 let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
                 let size = glam::Vec2::new(render_bounds.width, render_bounds.height);
-                let mut node_instances = if let Some(pipeline) = pipeline.as_deref_mut() {
+                let start_idx = instances.len();
+                if let Some(pipeline) = pipeline.as_deref_mut() {
                     create_primitive_instances_with_pipeline(
                         pipeline,
                         style,
                         pos,
                         size,
                         effective_opacity,
+                        &mut instances,
                     )
                 } else {
-                    create_primitive_instances(style, pos, size, effective_opacity)
+                    create_primitive_instances(style, pos, size, effective_opacity, &mut instances)
                 };
-                apply_node_transform_to_instances(&mut node_instances, node.transform);
-                instances.extend(node_instances);
+                apply_node_transform_to_instances(&mut instances[start_idx..], node.transform);
             }
             NodeContent::SolidColor { color } => {
                 if let Some(render_bounds) = clipped_bounds_for_node(scene, node_id, node.bounds) {
@@ -768,14 +769,14 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
     } else {
         let pos = glam::Vec2::new(render_bounds.x, render_bounds.y);
         let size = glam::Vec2::new(render_bounds.width, render_bounds.height);
-        let node_instances = create_primitive_instances_with_pipeline(
+        create_primitive_instances_with_pipeline(
             ctx.pipeline,
             style,
             pos,
             size,
             effective_opacity,
+            instances,
         );
-        instances.extend(node_instances);
     }
 
     if let Some(text_content) = &style.text

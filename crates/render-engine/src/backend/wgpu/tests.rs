@@ -475,7 +475,8 @@ fn test_create_node_instances_emits_fill_stroke_and_shadow_for_non_text_style() 
         opacity: 1.0,
     };
 
-    let instances = create_node_instances(&node);
+    let mut instances = Vec::new();
+    create_node_instances(&node, &mut instances);
 
     assert_eq!(instances.len(), 3, "expected shadow + fill + stroke");
     assert!(

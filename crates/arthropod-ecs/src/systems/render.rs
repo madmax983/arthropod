@@ -51,13 +51,17 @@ pub fn collect_renderables_system(
     if visual_nodes.len() >= RENDER_PARALLEL_THRESHOLD {
         commands.0 = visual_nodes
             .par_iter()
-            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
-            .collect();
+            .fold(Vec::new, |mut acc, (_, node, _)| {
+                render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+                acc
+            })
+            .reduce(Vec::new, |mut a, b| {
+                a.extend(b);
+                a
+            });
     } else {
         for (_, node, _) in &visual_nodes {
-            commands
-                .0
-                .extend(render_engine::backend::wgpu::create_node_instances(node));
+            render_engine::backend::wgpu::create_node_instances(node, &mut commands.0);
         }
     }
 }
@@ -102,16 +106,22 @@ mod tests {
             .collect();
 
         // Sequential
-        let sequential: Vec<_> = visual_nodes
-            .iter()
-            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
-            .collect();
+        let mut sequential = Vec::new();
+        for (_, node, _) in &visual_nodes {
+            render_engine::backend::wgpu::create_node_instances(node, &mut sequential);
+        }
 
         // Parallel
         let parallel: Vec<_> = visual_nodes
             .par_iter()
-            .flat_map(|(_, node, _)| render_engine::backend::wgpu::create_node_instances(node))
-            .collect();
+            .fold(Vec::new, |mut acc, (_, node, _)| {
+                render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+                acc
+            })
+            .reduce(Vec::new, |mut a, b| {
+                a.extend(b);
+                a
+            });
 
         assert_eq!(sequential.len(), parallel.len());
         for (seq, par) in sequential.iter().zip(parallel.iter()) {

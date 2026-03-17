@@ -170,10 +170,11 @@ impl FigmaRuntime {
     /// This collects layout nodes with visual styles (like shapes, borders, and text)
     /// into simple rendering primitives used directly by the backend wgpu renderer or headless tests.
     pub fn collect_render_instances(&self) -> Vec<PrimitiveInstance> {
-        self.scene
-            .iter_visuals()
-            .flat_map(|(_, node, _)| create_node_instances(node))
-            .collect()
+        let mut instances = Vec::new();
+        for (_, node, _) in self.scene.iter_visuals() {
+            create_node_instances(node, &mut instances);
+        }
+        instances
     }
 
     fn apply_runtime_effects(&mut self, effects: &[PrototypeRuntimeEffect]) {
