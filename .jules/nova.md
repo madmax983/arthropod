@@ -26,3 +26,8 @@
 **Concept:** A reusable horizontal layout widget to page through a list of children. Exposes the active index via `flux-state` signals, allowing external control and observation.
 **Fate:** Merged
 **Lesson:** Even without robust conditional rendering or `display: none` in the layout engine, we can construct interactive sliders using `flux-state` signals to keep state, and users can track it.
+
+## Spotlight Overlay
+**Concept:** Added a `Spotlight` feature connecting `flux-state` reactivity with `render-engine` scene graph. A fullscreen overlay is drawn, dimming everything *except* a target node. Useful for tutorials and onboarding.
+**Fate:** Merged.
+**Lesson:** `VectorPath` combined with the `EvenOdd` winding rule is a clean way to punch a hole in a solid rectangle without complex masking logic.

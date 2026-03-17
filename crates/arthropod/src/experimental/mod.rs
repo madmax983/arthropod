@@ -46,6 +46,9 @@ pub mod inspector_overlay;
 #[cfg(feature = "nova")]
 pub mod magneto;
 
+#[cfg(feature = "nova")]
+pub mod spotlight;
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
@@ -241,6 +244,47 @@ pub mod story {
         #[allow(clippy::result_unit_err)]
         pub fn choose(&mut self, _index: usize) -> Result<(), String> {
             panic!("StoryRuntime requires 'nova' feature. Enable it in Cargo.toml.");
+        }
+    }
+
+    #[cfg(not(feature = "nova"))]
+    pub mod spotlight {
+        #![allow(deprecated)]
+
+        /// ⚠️ **MISSING FEATURE** ⚠️
+        ///
+        /// The `spotlight` module requires the `nova` feature.
+        /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+        pub const MISSING_FEATURE: () = ();
+
+        #[derive(bevy_ecs::prelude::Resource, Default)]
+        #[deprecated(
+            note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        )]
+        pub struct SpotlightConfig;
+
+        #[derive(bevy_ecs::prelude::Resource, Default)]
+        #[deprecated(
+            note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        )]
+        pub struct SpotlightTarget;
+
+        #[derive(bevy_ecs::prelude::Resource, Default)]
+        #[deprecated(
+            note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        )]
+        pub struct SpotlightState;
+
+        #[deprecated(
+            note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+        )]
+        pub fn update_spotlight(
+            _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+            _config: bevy_ecs::prelude::Res<SpotlightConfig>,
+            _target: bevy_ecs::prelude::Res<SpotlightTarget>,
+            _state: bevy_ecs::prelude::ResMut<SpotlightState>,
+        ) {
+            panic!("update_spotlight requires 'nova' feature. Enable it in Cargo.toml.");
         }
     }
 
