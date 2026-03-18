@@ -73,6 +73,9 @@ pub fn sync_accessible_nodes_system(
     }
 }
 
+pub type ActionCallbacksQuery<'w> = (&'w AccessibleNode, &'w OnA11yClick);
+pub type ActionCallbacksFilter = Or<(Added<OnA11yClick>, Changed<OnA11yClick>)>;
+
 /// Register action callbacks with the ActionHandler
 ///
 /// This system uses change detection to efficiently track callback registration:
@@ -82,10 +85,9 @@ pub fn sync_accessible_nodes_system(
 /// Note: When OnA11yClick components are removed, the handlers remain registered
 /// but become no-ops since the A11yId won't match any active nodes. Full cleanup
 /// happens when entities are despawned and removed from the A11yTree.
-#[allow(clippy::type_complexity)]
 pub fn register_action_callbacks_system(
     // Only query components that were added or changed this frame
-    query: Query<(&AccessibleNode, &OnA11yClick), Or<(Added<OnA11yClick>, Changed<OnA11yClick>)>>,
+    query: Query<ActionCallbacksQuery<'_>, ActionCallbacksFilter>,
     mut action_handler: ResMut<ArthropodActionHandler>,
 ) {
     // Register callbacks for added/changed components

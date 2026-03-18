@@ -30,3 +30,7 @@
 **Refactoring AssertNodeStateTool execute**
 **Learning:** `assert_state.rs` had a long `execute` method that checked many different properties. By splitting the property checks into separate helper functions (e.g. `check_visibility`, `check_opacity`), we were able to flatten out deeply nested structures and prevent the "God Function" smell.
 **Action:** Look for repetition of `if let` blocks checking separate elements of a complex config object, and consider extracting each block into a static helper method that manipulates a shared mutable vector of failure strings.
+
+**[Fixing clippy::type_complexity in Bevy Systems]**
+**Learning:** Complex Bevy `Query` signatures with multiple components and filters trigger `clippy::type_complexity`. Instead of suppressing the lint globally or per-function, factor the query tuples and filters into named type aliases.
+**Action:** Extract query components into a type alias like `type MyQuery<'w> = (&'w CompA, &'w mut CompB);` and filters into `type MyFilter = Or<(Changed<CompA>, Added<CompB>)>;`. Then use them in the system signature as `query: Query<MyQuery<'_>, MyFilter>`.

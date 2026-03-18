@@ -39,22 +39,22 @@ pub fn update_interaction_state_system(
     }
 }
 
+pub type WidgetStyleQuery<'w> = (
+    &'w SceneNodeRef,
+    &'w WidgetStyle,
+    &'w InteractionState,
+    Option<&'w mut LayoutStyle>,
+);
+
+pub type WidgetStyleFilter = Or<(Changed<InteractionState>, Changed<WidgetStyle>)>;
+
 /// System that resolves high-level WidgetStyle into low-level SceneNode properties and LayoutStyle
 /// based on the current InteractionState.
 ///
 /// This is the core of the Unified Style System, ensuring that visual and layout properties
 /// automatically update when a widget's state (hover, focus, active, disabled) changes.
-#[allow(clippy::type_complexity)]
 pub fn update_widget_style_system(
-    mut query: Query<
-        (
-            &SceneNodeRef,
-            &WidgetStyle,
-            &InteractionState,
-            Option<&mut LayoutStyle>,
-        ),
-        Or<(Changed<InteractionState>, Changed<WidgetStyle>)>,
-    >,
+    mut query: Query<WidgetStyleQuery<'_>, WidgetStyleFilter>,
     mut scene: ResMut<Scene>,
 ) {
     for (node_ref, widget_style, state, layout_style) in query.iter_mut() {
