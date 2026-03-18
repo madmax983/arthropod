@@ -387,10 +387,11 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     /// - Panics if the internal lock is poisoned.
     ///
     pub fn set(&self, value: T) {
-        {
+        let old_value = {
             let mut guard = self.handle.write().unwrap();
-            *guard = value;
-        }
+            std::mem::replace(&mut *guard, value)
+        };
+        drop(old_value);
         self.runtime.notify(self.id);
     }
 
@@ -541,5 +542,33 @@ mod tests {
         let graph = runtime.inspect_graph();
         let node = graph.nodes.iter().find(|n| n.id == signal.id).unwrap();
         assert_eq!(node.label, "my_signal");
+    }
+
+    #[test]
+    fn test_set_drop_deadlock_prevention() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), None);
+        let (_, write) = signal.split();
+
+        #[derive(Clone)]
+        struct DropTrigger {
+            write: WriteSignal<Option<DropTrigger>>,
+        }
+
+        impl Drop for DropTrigger {
+            fn drop(&mut self) {
+                // If the value is dropped inside the write guard,
+                // this `set` call will deadlock.
+                self.write.set(None);
+            }
+        }
+
+        // Set the value that will trigger the deadlock on drop
+        write.set(Some(DropTrigger {
+            write: write.clone(),
+        }));
+
+        // Replace the value to drop it
+        write.set(None);
     }
 }
