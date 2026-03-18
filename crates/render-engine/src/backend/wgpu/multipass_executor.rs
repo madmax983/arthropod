@@ -799,88 +799,96 @@ impl<'a> MultipassRenderer<'a> {
         if !raw_text_nodes.is_empty() {
             // Step 1: Shape text in parallel if above threshold
             // Shaping is CPU-intensive and read-only (uses thread-local FontSystem)
-            let shaped_results: Vec<ShapedTextResult<'_>> =
-                if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
-                    // Parallel shaping
-                    raw_text_nodes
-                        .par_iter()
-                        .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
-                        .map(|(_, node, text_content, effective_opacity, style)| {
-                            let options = text_shape_options(text_content);
-                            let shaped = shape_text_parallel_with_options(
-                                &text_content.text,
-                                text_content.font_size,
-                                options,
-                            );
-                            let position = glam::Vec2::new(
-                                node.bounds.x.round(),
-                                (node.bounds.y + text_content.font_size).round(),
-                            );
-                            let text_bounds = [
-                                node.bounds.x,
-                                node.bounds.y,
-                                node.bounds.width,
-                                node.bounds.height,
-                            ];
-                            (
-                                position,
-                                *effective_opacity,
-                                text_bounds,
-                                *style,
-                                shaped,
-                                node.transform,
-                            )
-                        })
-                        .collect()
-                } else {
-                    // Sequential shaping for small counts
-                    raw_text_nodes
-                        .iter()
-                        .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
-                        .map(|(_, node, text_content, effective_opacity, style)| {
-                            let options = text_shape_options(text_content);
-                            let shaped = self
-                                .text_renderer
-                                .text_engine_mut()
-                                .shape_text_with_options(
-                                    &text_content.text,
-                                    text_content.font_size,
-                                    options,
-                                );
-                            let position = glam::Vec2::new(
-                                node.bounds.x.round(),
-                                (node.bounds.y + text_content.font_size).round(),
-                            );
-                            let text_bounds = [
-                                node.bounds.x,
-                                node.bounds.y,
-                                node.bounds.width,
-                                node.bounds.height,
-                            ];
-                            (
-                                position,
-                                *effective_opacity,
-                                text_bounds,
-                                *style,
-                                shaped,
-                                node.transform,
-                            )
-                        })
-                        .collect()
-                };
+            if raw_text_nodes.len() >= TEXT_PARALLEL_THRESHOLD {
+                // Parallel shaping
+                let shaped_results: Vec<ShapedTextResult<'_>> = raw_text_nodes
+                    .par_iter()
+                    .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
+                    .map(|(_, node, text_content, effective_opacity, style)| {
+                        let options = text_shape_options(text_content);
+                        let shaped = shape_text_parallel_with_options(
+                            &text_content.text,
+                            text_content.font_size,
+                            options,
+                        );
+                        let position = glam::Vec2::new(
+                            node.bounds.x.round(),
+                            (node.bounds.y + text_content.font_size).round(),
+                        );
+                        let text_bounds = [
+                            node.bounds.x,
+                            node.bounds.y,
+                            node.bounds.width,
+                            node.bounds.height,
+                        ];
+                        (
+                            position,
+                            *effective_opacity,
+                            text_bounds,
+                            *style,
+                            shaped,
+                            node.transform,
+                        )
+                    })
+                    .collect();
 
-            // Step 2: Generate glyph instances and add to primitives
-            for (position, opacity, text_bounds, style, shaped, node_transform) in shaped_results {
-                let fill = resolve_text_fill(self.primitive_pipeline, style, opacity, text_bounds);
-                let mut glyph_instances =
-                    self.text_renderer
-                        .generate_instances(&shaped, position, glam::Vec4::ONE);
-                apply_node_transform_to_instances(&mut glyph_instances, node_transform);
+                // Step 2: Generate glyph instances and add to primitives
+                for (position, opacity, text_bounds, style, shaped, node_transform) in
+                    shaped_results
+                {
+                    let fill =
+                        resolve_text_fill(self.primitive_pipeline, style, opacity, text_bounds);
+                    let mut glyph_instances =
+                        self.text_renderer
+                            .generate_instances(&shaped, position, glam::Vec4::ONE);
+                    apply_node_transform_to_instances(&mut glyph_instances, node_transform);
 
-                // Apply text fill metadata to generated glyph primitive instances
-                for mut instance in glyph_instances {
-                    apply_text_fill_to_glyph(&mut instance, fill);
-                    instances.push(instance);
+                    // Apply text fill metadata to generated glyph primitive instances
+                    for mut instance in glyph_instances {
+                        apply_text_fill_to_glyph(&mut instance, fill);
+                        instances.push(instance);
+                    }
+                }
+            } else {
+                // Sequential shaping for small counts: no intermediate allocation!
+                for (_, node, text_content, effective_opacity, style) in raw_text_nodes
+                    .iter()
+                    .filter(|(_, _, text_content, _, _)| !text_content.text.is_empty())
+                {
+                    let options = text_shape_options(text_content);
+                    let shaped = self
+                        .text_renderer
+                        .text_engine_mut()
+                        .shape_text_with_options(
+                            &text_content.text,
+                            text_content.font_size,
+                            options,
+                        );
+                    let position = glam::Vec2::new(
+                        node.bounds.x.round(),
+                        (node.bounds.y + text_content.font_size).round(),
+                    );
+                    let text_bounds = [
+                        node.bounds.x,
+                        node.bounds.y,
+                        node.bounds.width,
+                        node.bounds.height,
+                    ];
+                    let fill = resolve_text_fill(
+                        self.primitive_pipeline,
+                        style,
+                        *effective_opacity,
+                        text_bounds,
+                    );
+                    let mut glyph_instances =
+                        self.text_renderer
+                            .generate_instances(&shaped, position, glam::Vec4::ONE);
+                    apply_node_transform_to_instances(&mut glyph_instances, node.transform);
+
+                    for mut instance in glyph_instances {
+                        apply_text_fill_to_glyph(&mut instance, fill);
+                        instances.push(instance);
+                    }
                 }
             }
 
