@@ -31,3 +31,7 @@
 **Concept:** Added a `Spotlight` feature connecting `flux-state` reactivity with `render-engine` scene graph. A fullscreen overlay is drawn, dimming everything *except* a target node. Useful for tutorials and onboarding.
 **Fate:** Merged.
 **Lesson:** `VectorPath` combined with the `EvenOdd` winding rule is a clean way to punch a hole in a solid rectangle without complex masking logic.
+## 2024-03-18 - Parallax UI Effect
+**Concept:** Added a `ParallaxNode` component and `update_parallax` system to shift UI elements slightly based on `MousePosition` and `LayoutConstraintsResource` to create an Apple TV style depth effect.
+**Fate:** Merged.
+**Lesson:** Simple affine transformations combined with existing ECS resources (`MousePosition`, `LayoutConstraintsResource`) can easily create complex, dynamic visual effects without touching core widget rendering logic.

@@ -49,6 +49,47 @@ pub mod magneto;
 #[cfg(feature = "nova")]
 pub mod spotlight;
 
+#[cfg(feature = "nova")]
+pub mod parallax;
+
+#[cfg(not(feature = "nova"))]
+pub mod parallax {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `parallax` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Component, Debug, Clone)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct ParallaxNode {
+        pub strength: f32,
+        pub invert: bool,
+        pub original_translation: Option<render_engine::Vec2>,
+    }
+
+    impl Default for ParallaxNode {
+        fn default() -> Self {
+            Self {
+                strength: 0.05,
+                invert: false,
+                original_translation: None,
+            }
+        }
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_parallax(_app: &mut crate::App) {
+        super::print_missing_feature_warning("parallax");
+    }
+}
+
 // --- Stubs for missing features ---
 
 #[cfg(not(feature = "nova"))]
