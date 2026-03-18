@@ -26,3 +26,7 @@
 2. `.and_then(|x| ...).map(|y| ...)` (Combinators)
 3. `matches!(...)` in combination with guard variables.
 **Action:** When finding `#[allow(clippy::collapsible_if)]` on functions, refactor the nested code using combinators or early returns/continues and remove the lint allowance. Also, ensure you do not commit scratchpad scripts like `patch.py` to the repository.
+
+**Refactoring AssertNodeStateTool execute**
+**Learning:** `assert_state.rs` had a long `execute` method that checked many different properties. By splitting the property checks into separate helper functions (e.g. `check_visibility`, `check_opacity`), we were able to flatten out deeply nested structures and prevent the "God Function" smell.
+**Action:** Look for repetition of `if let` blocks checking separate elements of a complex config object, and consider extracting each block into a static helper method that manipulates a shared mutable vector of failure strings.

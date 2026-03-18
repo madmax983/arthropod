@@ -53,6 +53,143 @@ fn default_tolerance() -> f32 {
     0.001
 }
 
+impl AssertNodeStateTool {
+    fn check_visibility(expected: Option<bool>, actual: bool, failures: &mut Vec<String>) {
+        if let Some(expected_visible) = expected
+            && actual != expected_visible
+        {
+            failures.push(format!(
+                "visible: expected {}, got {}",
+                expected_visible, actual
+            ));
+        }
+    }
+
+    fn check_opacity(
+        expected: Option<f32>,
+        actual: f32,
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if let Some(expected_opacity) = expected
+            && (actual - expected_opacity).abs() > tolerance
+        {
+            failures.push(format!(
+                "opacity: expected {}, got {} (tolerance: {})",
+                expected_opacity, actual, tolerance
+            ));
+        }
+    }
+
+    fn check_bounds(
+        expected: &Option<BoundsSpec>,
+        bounds: &plat_core::Rect,
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if let Some(expected_bounds) = expected {
+            if (bounds.x - expected_bounds.x).abs() > tolerance {
+                failures.push(format!(
+                    "bounds.x: expected {}, got {} (tolerance: {})",
+                    expected_bounds.x, bounds.x, tolerance
+                ));
+            }
+            if (bounds.y - expected_bounds.y).abs() > tolerance {
+                failures.push(format!(
+                    "bounds.y: expected {}, got {} (tolerance: {})",
+                    expected_bounds.y, bounds.y, tolerance
+                ));
+            }
+            if (bounds.width - expected_bounds.width).abs() > tolerance {
+                failures.push(format!(
+                    "bounds.width: expected {}, got {} (tolerance: {})",
+                    expected_bounds.width, bounds.width, tolerance
+                ));
+            }
+            if (bounds.height - expected_bounds.height).abs() > tolerance {
+                failures.push(format!(
+                    "bounds.height: expected {}, got {} (tolerance: {})",
+                    expected_bounds.height, bounds.height, tolerance
+                ));
+            }
+        }
+    }
+
+    fn check_color(
+        expected: &Option<[f32; 4]>,
+        content: &NodeContent,
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if let Some(expected_color) = expected {
+            let actual_color_vec4 = match content {
+                NodeContent::Styled { style } => {
+                    if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
+                        *c
+                    } else {
+                        failures.push("Node does not have a solid fill color".to_string());
+                        return;
+                    }
+                }
+                _ => {
+                    failures.push("Node does not have a color property".to_string());
+                    return;
+                }
+            };
+
+            let actual_color = Color::rgba(
+                actual_color_vec4.x,
+                actual_color_vec4.y,
+                actual_color_vec4.z,
+                actual_color_vec4.w,
+            );
+            let expected = Color::rgba(
+                expected_color[0],
+                expected_color[1],
+                expected_color[2],
+                expected_color[3],
+            );
+
+            let mut check_channel = |name: &str, expected_val: f32, actual_val: f32| {
+                if (actual_val - expected_val).abs() > tolerance {
+                    failures.push(format!(
+                        "color.{}: expected {}, got {} (tolerance: {})",
+                        name, expected_val, actual_val, tolerance
+                    ));
+                }
+            };
+
+            check_channel("r", expected.r(), actual_color.r());
+            check_channel("g", expected.g(), actual_color.g());
+            check_channel("b", expected.b(), actual_color.b());
+            check_channel("a", expected.a(), actual_color.a());
+        }
+    }
+
+    fn check_corner_radius(
+        expected: Option<f32>,
+        content: &NodeContent,
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if let Some(expected_radius) = expected {
+            match content {
+                NodeContent::Styled { style } => {
+                    let actual_radius = style.corner_radii.top_left; // Use top_left as representative
+                    if (actual_radius - expected_radius).abs() > tolerance {
+                        failures.push(format!(
+                            "corner_radius: expected {}, got {} (tolerance: {})",
+                            expected_radius, actual_radius, tolerance
+                        ));
+                    }
+                }
+                _ => {
+                    failures.push("Node is not a Styled node".to_string());
+                }
+            }
+        }
+    }
+}
 impl Tool for AssertNodeStateTool {
     fn name(&self) -> &str {
         "test.assert_node_state"
@@ -120,135 +257,39 @@ impl Tool for AssertNodeStateTool {
         let mut failures = Vec::new();
 
         // Check visibility
-        if let Some(expected_visible) = params.expected.visible
-            && node.visible != expected_visible
-        {
-            failures.push(format!(
-                "visible: expected {}, got {}",
-                expected_visible, node.visible
-            ));
-        }
+        Self::check_visibility(params.expected.visible, node.visible, &mut failures);
 
         // Check opacity
-        if let Some(expected_opacity) = params.expected.opacity
-            && (node.opacity - expected_opacity).abs() > params.tolerance
-        {
-            failures.push(format!(
-                "opacity: expected {}, got {} (tolerance: {})",
-                expected_opacity, node.opacity, params.tolerance
-            ));
-        }
+        Self::check_opacity(
+            params.expected.opacity,
+            node.opacity,
+            params.tolerance,
+            &mut failures,
+        );
 
         // Check bounds
-        if let Some(expected_bounds) = &params.expected.bounds {
-            if (node.bounds.x - expected_bounds.x).abs() > params.tolerance {
-                failures.push(format!(
-                    "bounds.x: expected {}, got {} (tolerance: {})",
-                    expected_bounds.x, node.bounds.x, params.tolerance
-                ));
-            }
-            if (node.bounds.y - expected_bounds.y).abs() > params.tolerance {
-                failures.push(format!(
-                    "bounds.y: expected {}, got {} (tolerance: {})",
-                    expected_bounds.y, node.bounds.y, params.tolerance
-                ));
-            }
-            if (node.bounds.width - expected_bounds.width).abs() > params.tolerance {
-                failures.push(format!(
-                    "bounds.width: expected {}, got {} (tolerance: {})",
-                    expected_bounds.width, node.bounds.width, params.tolerance
-                ));
-            }
-            if (node.bounds.height - expected_bounds.height).abs() > params.tolerance {
-                failures.push(format!(
-                    "bounds.height: expected {}, got {} (tolerance: {})",
-                    expected_bounds.height, node.bounds.height, params.tolerance
-                ));
-            }
-        }
+        Self::check_bounds(
+            &params.expected.bounds,
+            &node.bounds,
+            params.tolerance,
+            &mut failures,
+        );
 
         // Check color (extract from NodeContent)
-        if let Some(expected_color) = &params.expected.color {
-            let actual_color_vec4 = match &node.content {
-                NodeContent::Styled { style } => {
-                    if let Some(render_engine::Paint::Solid(c)) = style.fills.first() {
-                        *c
-                    } else {
-                        failures.push("Node does not have a solid fill color".to_string());
-                        glam::Vec4::ZERO
-                    }
-                }
-                _ => {
-                    failures.push("Node does not have a color property".to_string());
-                    glam::Vec4::ZERO
-                }
-            };
-            let actual_color = Color::rgba(
-                actual_color_vec4.x,
-                actual_color_vec4.y,
-                actual_color_vec4.z,
-                actual_color_vec4.w,
-            );
-
-            let expected = Color::rgba(
-                expected_color[0],
-                expected_color[1],
-                expected_color[2],
-                expected_color[3],
-            );
-
-            if (actual_color.r() - expected.r()).abs() > params.tolerance {
-                failures.push(format!(
-                    "color.r: expected {}, got {} (tolerance: {})",
-                    expected.r(),
-                    actual_color.r(),
-                    params.tolerance
-                ));
-            }
-            if (actual_color.g() - expected.g()).abs() > params.tolerance {
-                failures.push(format!(
-                    "color.g: expected {}, got {} (tolerance: {})",
-                    expected.g(),
-                    actual_color.g(),
-                    params.tolerance
-                ));
-            }
-            if (actual_color.b() - expected.b()).abs() > params.tolerance {
-                failures.push(format!(
-                    "color.b: expected {}, got {} (tolerance: {})",
-                    expected.b(),
-                    actual_color.b(),
-                    params.tolerance
-                ));
-            }
-            if (actual_color.a() - expected.a()).abs() > params.tolerance {
-                failures.push(format!(
-                    "color.a: expected {}, got {} (tolerance: {})",
-                    expected.a(),
-                    actual_color.a(),
-                    params.tolerance
-                ));
-            }
-        }
+        Self::check_color(
+            &params.expected.color,
+            &node.content,
+            params.tolerance,
+            &mut failures,
+        );
 
         // Check corner_radius
-        if let Some(expected_radius) = params.expected.corner_radius {
-            match &node.content {
-                NodeContent::Styled { style } => {
-                    let actual_radius = style.corner_radii.top_left; // Use top_left as representative
-                    if (actual_radius - expected_radius).abs() > params.tolerance {
-                        failures.push(format!(
-                            "corner_radius: expected {}, got {} (tolerance: {})",
-                            expected_radius, actual_radius, params.tolerance
-                        ));
-                    }
-                }
-                _ => {
-                    failures.push("Node is not a Styled node".to_string());
-                }
-            }
-        }
-
+        Self::check_corner_radius(
+            params.expected.corner_radius,
+            &node.content,
+            params.tolerance,
+            &mut failures,
+        );
         let passed = failures.is_empty();
 
         Ok(json!({
