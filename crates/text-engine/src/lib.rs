@@ -247,52 +247,7 @@ impl TextEngine {
             .set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
-        // Collect runs to avoid double-iterating the potentially expensive layout calculation
-        let runs: Vec<_> = self.buffer.layout_runs().collect();
-        let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
-        let mut glyphs = Vec::with_capacity(total_glyphs);
-        let mut max_width = 0.0f32;
-        let mut max_height = 0.0f32;
-
-        for run in runs {
-            // Use the actual line height from font metrics
-            let run_height = run.line_height;
-
-            for glyph in run.glyphs.iter() {
-                let x_end = glyph.x + glyph.w;
-                max_width = max_width.max(x_end);
-                max_height = max_height.max(run_height);
-
-                // Construct CacheKey from glyph properties
-                let (cache_key, _x_bin, _y_bin) = CacheKey::new(
-                    glyph.font_id,
-                    glyph.glyph_id,
-                    glyph.font_size,
-                    (glyph.x_offset, glyph.y_offset),
-                    CacheKeyFlags::empty(),
-                );
-
-                glyphs.push(ShapedGlyph {
-                    cache_key,
-                    glyph_id: glyph.glyph_id,
-                    x_offset: glyph.x,
-                    y_offset: glyph.y,
-                    x_advance: glyph.w,
-                    y_advance: 0.0,
-                    cluster: glyph.start as u32,
-                });
-            }
-        }
-
-        ShapedText {
-            glyphs,
-            bounds: TextBounds {
-                x: 0.0,
-                y: 0.0,
-                width: max_width,
-                height: max_height,
-            },
-        }
+        extract_shaped_text_from_buffer(&self.buffer)
     }
 
     /// Get access to the font system for advanced operations
@@ -304,6 +259,52 @@ impl TextEngine {
 impl Default for TextEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn extract_shaped_text_from_buffer(buffer: &Buffer) -> ShapedText {
+    let runs: Vec<_> = buffer.layout_runs().collect();
+    let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
+    let mut glyphs = Vec::with_capacity(total_glyphs);
+    let mut max_width = 0.0f32;
+    let mut max_height = 0.0f32;
+
+    for run in runs {
+        let run_height = run.line_height;
+
+        for glyph in run.glyphs.iter() {
+            let x_end = glyph.x + glyph.w;
+            max_width = max_width.max(x_end);
+            max_height = max_height.max(run_height);
+
+            let (cache_key, _x_bin, _y_bin) = CacheKey::new(
+                glyph.font_id,
+                glyph.glyph_id,
+                glyph.font_size,
+                (glyph.x_offset, glyph.y_offset),
+                CacheKeyFlags::empty(),
+            );
+
+            glyphs.push(ShapedGlyph {
+                cache_key,
+                glyph_id: glyph.glyph_id,
+                x_offset: glyph.x,
+                y_offset: glyph.y,
+                x_advance: glyph.w,
+                y_advance: 0.0,
+                cluster: glyph.start as u32,
+            });
+        }
+    }
+
+    ShapedText {
+        glyphs,
+        bounds: TextBounds {
+            x: 0.0,
+            y: 0.0,
+            width: max_width,
+            height: max_height,
+        },
     }
 }
 
@@ -371,49 +372,7 @@ pub fn shape_text_parallel_with_options(
         buffer.set_text(font_system, text, attrs, Shaping::Advanced);
 
         // Extract glyphs from the shaped buffer
-        let runs: Vec<_> = buffer.layout_runs().collect();
-        let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
-        let mut glyphs = Vec::with_capacity(total_glyphs);
-        let mut max_width = 0.0f32;
-        let mut max_height = 0.0f32;
-
-        for run in runs {
-            let run_height = run.line_height;
-
-            for glyph in run.glyphs.iter() {
-                let x_end = glyph.x + glyph.w;
-                max_width = max_width.max(x_end);
-                max_height = max_height.max(run_height);
-
-                let (cache_key, _x_bin, _y_bin) = CacheKey::new(
-                    glyph.font_id,
-                    glyph.glyph_id,
-                    glyph.font_size,
-                    (glyph.x_offset, glyph.y_offset),
-                    CacheKeyFlags::empty(),
-                );
-
-                glyphs.push(ShapedGlyph {
-                    cache_key,
-                    glyph_id: glyph.glyph_id,
-                    x_offset: glyph.x,
-                    y_offset: glyph.y,
-                    x_advance: glyph.w,
-                    y_advance: 0.0,
-                    cluster: glyph.start as u32,
-                });
-            }
-        }
-
-        ShapedText {
-            glyphs,
-            bounds: TextBounds {
-                x: 0.0,
-                y: 0.0,
-                width: max_width,
-                height: max_height,
-            },
-        }
+        extract_shaped_text_from_buffer(buffer)
     })
 }
 
