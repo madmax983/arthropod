@@ -16,6 +16,18 @@ pub struct FocusManager {
 }
 
 impl FocusManager {
+    /// Creates a new, empty focus manager.
+    ///
+    /// By default, no node is focused.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use a11y_engine::focus::FocusManager;
+    ///
+    /// let manager = FocusManager::new();
+    /// assert_eq!(manager.focused_node(), None);
+    /// ```
     pub fn new() -> Self {
         Self {
             focused_node: None,

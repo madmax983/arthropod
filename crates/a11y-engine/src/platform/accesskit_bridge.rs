@@ -62,6 +62,21 @@ pub struct AccessKitBridge {
 }
 
 impl AccessKitBridge {
+    /// Creates a new bridge for the given accessibility tree.
+    ///
+    /// The bridge maintains a reference to the tree so it can extract
+    /// nodes and build `TreeUpdate`s when requested by the platform.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use a11y_engine::tree::A11yTree;
+    /// use a11y_engine::platform::accesskit_bridge::AccessKitBridge;
+    /// use std::sync::{Arc, Mutex};
+    ///
+    /// let tree = Arc::new(Mutex::new(A11yTree::new()));
+    /// let bridge = AccessKitBridge::new(tree);
+    /// ```
     pub fn new(tree: Arc<Mutex<A11yTree>>) -> Self {
         Self { tree }
     }

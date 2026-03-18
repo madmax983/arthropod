@@ -25,6 +25,17 @@ pub struct ArthropodActionHandler {
 }
 
 impl ArthropodActionHandler {
+    /// Creates a new, empty action handler.
+    ///
+    /// By default, no nodes have click handlers and there is no focus handler.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use a11y_engine::platform::action_handler::ArthropodActionHandler;
+    ///
+    /// let mut handler = ArthropodActionHandler::new();
+    /// ```
     pub fn new() -> Self {
         Self {
             click_handlers: HashMap::new(),
