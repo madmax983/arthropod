@@ -223,16 +223,30 @@ mod tests {
     fn test_effect_with_label() {
         let runtime = Runtime::new();
         let count = Signal::new(runtime.clone(), 0);
-        let (read, _) = count.split();
+        let (read, write) = count.split();
 
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let log_clone = log.clone();
         let read_clone = read.clone();
+
         let effect = Effect::new(runtime.clone(), move || {
-            let _ = read_clone.get();
-        })
-        .with_label("my_effect");
+            log_clone.lock().unwrap().push(read_clone.get());
+        });
+
+        let id_before = effect.id;
+
+        let effect = effect.with_label("my_effect");
+        assert_eq!(effect.id, id_before);
 
         let graph = runtime.inspect_graph();
         let node = graph.nodes.iter().find(|n| n.id == effect.id).unwrap();
         assert_eq!(node.label, "my_effect");
+
+        // Assert the returned effect is properly attached to the runtime
+        assert!(Arc::ptr_eq(&effect.runtime, &runtime));
+
+        // Update should trigger the effect still
+        write.set(1);
+        assert_eq!(*log.lock().unwrap(), vec![0, 1]);
     }
 }

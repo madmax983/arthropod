@@ -537,7 +537,17 @@ mod tests {
     #[cfg(feature = "nova")]
     fn test_signal_with_label() {
         let runtime = Runtime::new();
-        let signal = Signal::new(runtime.clone(), 0).with_label("my_signal");
+        let signal_initial = Signal::new(runtime.clone(), 42);
+        let id_before = signal_initial.id;
+
+        let signal = signal_initial.with_label("my_signal");
+        assert_eq!(signal.id, id_before);
+
+        let (read, _write) = signal.clone().split();
+        assert_eq!(read.get(), 42);
+
+        // ensure arc pointers are exactly the same
+        assert!(Arc::ptr_eq(&read.runtime, &runtime));
 
         let graph = runtime.inspect_graph();
         let node = graph.nodes.iter().find(|n| n.id == signal.id).unwrap();

@@ -389,11 +389,17 @@ mod tests {
     fn test_computed_with_label() {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime.clone(), 1);
-        let (read, _) = signal.split();
+        let (read, _write) = signal.split();
 
         let read_clone = read.clone();
-        let computed =
-            Computed::new(runtime.clone(), move || read_clone.get() * 2).with_label("my_computed");
+        let computed_initial = Computed::new(runtime.clone(), move || read_clone.get() * 2);
+
+        let id_before = computed_initial.id;
+        let computed = computed_initial.with_label("my_computed");
+
+        assert_eq!(computed.id, id_before);
+        assert_eq!(computed.get(), 2);
+        assert!(Arc::ptr_eq(&computed.runtime, &runtime));
 
         let graph = runtime.inspect_graph();
         let node = graph.nodes.iter().find(|n| n.id == computed.id).unwrap();
