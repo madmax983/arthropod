@@ -43,7 +43,7 @@ pub struct Container<C: WidgetTuple> {
     width: Option<f32>,
     height: Option<f32>,
     flex_grow: f32,
-    style: Option<theme_engine::Style>,
+    style: Option<crate::Style>,
 }
 
 /// Create a column container with children
@@ -192,7 +192,7 @@ impl<C: WidgetTuple> Container<C> {
     }
 
     /// Set a high-level widget style
-    pub fn style(mut self, style: theme_engine::Style) -> Self {
+    pub fn style(mut self, style: crate::Style) -> Self {
         self.style = Some(style);
         self
     }

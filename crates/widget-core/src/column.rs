@@ -40,7 +40,7 @@ pub struct Column<C: WidgetTuple> {
     children: C,
     gap: f32,
     padding: f32,
-    style: Option<theme_engine::Style>,
+    style: Option<crate::Style>,
 }
 
 impl<C: WidgetTuple> Column<C> {
@@ -98,7 +98,7 @@ impl<C: WidgetTuple> Column<C> {
     }
 
     /// Set a high-level widget style
-    pub fn style(mut self, style: theme_engine::Style) -> Self {
+    pub fn style(mut self, style: crate::Style) -> Self {
         self.style = Some(style);
         self
     }

@@ -55,7 +55,7 @@ fn main() -> Result<(), AppError> {
                     btn!("Custom Hover").style(style! {
                         background: tokens.accent;
                         color: glam::Vec4::new(1.0, 1.0, 1.0, 1.0);
-                        padding: theme_engine::Padding::symmetric(6.0, 12.0);
+                        padding: widget_core::style::Padding::symmetric(6.0, 12.0);
                         border_radius: 20.0;
 
                         &:hover {

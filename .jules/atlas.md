@@ -17,3 +17,6 @@
 ## 2026-06-05 - Figma Module Split
 **Tangle:** The `figma` module in `arthropod` was a massive 3300+ line file (`figma.rs`) mixing public domain models, Serde parsing schemas, and complex conversion logic. This violated the "Blob" anti-pattern and reduced cohesion.
 **Blueprint:** Split `figma.rs` into a `figma` directory containing `models.rs` (public types) and `schema.rs` (internal Serde schemas and import logic), re-exporting both from `mod.rs`. This enforces a clear boundary between the public API and implementation details.
+## 2026-06-10 - Style API Extraction from Theme Engine
+**Tangle:** The `theme-engine` crate acted as a 'God Struct' by owning the three-layer theming system (SystemTheme, DesignTokens) *and* the heavily-coupled `Style` struct/`style!` macro. This forced `theme-engine` to depend on `layout-engine` and `style-engine`, spreading UI dependencies and violating cohesion principles.
+**Blueprint:** Extracted the `Style` API (structs and macros) out of `theme-engine` and relocated it into `widget-core/src/style.rs`, making `widget-core` the definitive owner of the merged layout and visual properties. Stripped `layout-engine` and `style-engine` dependencies out of `theme-engine` entirely, transforming it into a strict, highly-cohesive crate solely responsible for tokens and system themes.

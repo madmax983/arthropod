@@ -10,8 +10,6 @@ description = "Three-layer theming system for Arthropod GUI framework"
 glam = "0.29"
 thiserror = "2.0"
 plat-core = { path = "../plat-core" }
-style-engine = { path = "../style-engine" }
-layout-engine = { path = "../layout-engine" }
 
 
 [target.'cfg(windows)'.dependencies]

@@ -230,6 +230,7 @@ dependencies = [
  "rayon",
  "render-engine",
  "theme-engine",
+ "widget-core",
 ]
 
 [[package]]
@@ -4588,9 +4589,7 @@ name = "theme-engine"
 version = "0.1.0"
 dependencies = [
  "glam",
- "layout-engine",
  "plat-core",
- "style-engine",
  "thiserror 2.0.18",
  "windows",
  "windows-core",

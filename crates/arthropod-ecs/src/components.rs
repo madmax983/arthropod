@@ -221,10 +221,10 @@ pub struct InteractionState {
 
 /// Unified style component - resolves pseudo-states into visual/layout properties
 ///
-/// Stores a high-level `theme_engine::Style` which contains both layout and
+/// Stores a high-level `widget_core::Style` which contains both layout and
 /// visual properties, including pseudo-state overrides.
 #[derive(Component, Clone, Debug, Default)]
-pub struct WidgetStyle(pub theme_engine::Style);
+pub struct WidgetStyle(pub widget_core::Style);
 
 /// Reactive layout width - polls signal to update LayoutStyle width
 ///

@@ -36,9 +36,9 @@
 //! let resolved = button_style.resolve(hover, focus, active, disabled);
 //! ```
 
-use crate::{Color, TokenValue};
 use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle, FlexWrap};
 use style_engine::{CornerRadii, Paint, StrokeStyle, VisualStyle};
+use theme_engine::{Color, TokenValue};
 
 /// Style properties for UI components with pseudo-state support
 ///

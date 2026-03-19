@@ -102,7 +102,7 @@ pub struct WidgetContext {
 
     // Layout
     pub(crate) layout_styles: HashMap<NodeId, FlexStyle>,
-    pub(crate) widget_styles: HashMap<NodeId, theme_engine::Style>,
+    pub(crate) widget_styles: HashMap<NodeId, crate::Style>,
 
     // Interaction
     pub(crate) hover_states: HashSet<NodeId>,
@@ -251,7 +251,7 @@ impl WidgetContext {
     ///
     /// This style contains pseudo-state information (hover, focus, etc.) and will be
     /// transferred to a `WidgetStyle` ECS component for runtime resolution.
-    pub fn set_widget_style(&mut self, node_id: NodeId, style: theme_engine::Style) {
+    pub fn set_widget_style(&mut self, node_id: NodeId, style: crate::Style) {
         self.widget_styles.insert(node_id, style);
     }
 
@@ -651,7 +651,7 @@ impl WidgetContext {
     }
 
     /// Get all widget styles (for app-shell integration)
-    pub fn widget_styles(&self) -> &HashMap<NodeId, theme_engine::Style> {
+    pub fn widget_styles(&self) -> &HashMap<NodeId, crate::Style> {
         &self.widget_styles
     }
 
@@ -721,7 +721,7 @@ impl WidgetContext {
     /// This is the "Unified Style Bridge" that converts a high-level `ResolvedStyle`
     /// (containing both layout and visual properties) into the appropriate
     /// low-level components.
-    pub fn apply_style(&mut self, node_id: NodeId, style: &theme_engine::ResolvedStyle) {
+    pub fn apply_style(&mut self, node_id: NodeId, style: &crate::ResolvedStyle) {
         // 1. Apply Layout
         self.set_layout_style(node_id, style.to_flex_style());
 

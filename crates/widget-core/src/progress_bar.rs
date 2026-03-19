@@ -1,10 +1,10 @@
 //! ProgressBar widget - visual indicator of completion progress
 
+use crate::{style, DesignTokens, Style};
 use crate::{Widget, WidgetContext};
 use flux_state::{Computed, ReadSignal};
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId};
-use theme_engine::{style, DesignTokens, Style};
 
 /// ProgressBar widget
 ///

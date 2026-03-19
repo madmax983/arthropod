@@ -457,7 +457,7 @@ impl App {
         // Transfer high-level widget styles
         self.transfer_components(
             widget_ctx.widget_styles().iter(),
-            |style: &theme_engine::Style| WidgetStyle(style.clone()),
+            |style: &widget_core::Style| WidgetStyle(style.clone()),
         );
 
         // Ensure all styled nodes have an InteractionState component

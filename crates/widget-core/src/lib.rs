@@ -171,6 +171,7 @@ pub mod progress_bar;
 pub mod row;
 pub mod spacer;
 pub mod stack;
+pub mod style;
 pub mod text;
 pub mod text_input;
 pub mod validation;
@@ -196,6 +197,7 @@ pub use progress_bar::ProgressBar;
 pub use row::Row;
 pub use spacer::Spacer;
 pub use stack::Stack;
+pub use style::{Padding as StylePadding, ResolvedStyle, Style, StyleOverrides};
 pub use text::Text;
 pub use text_input::TextInput;
 pub use widget_trait::{NamedWidgetTuple, Widget, WidgetTuple};
@@ -205,6 +207,7 @@ pub use layout_engine::{FlexDirection, FlexStyle};
 // Re-export node content for advanced use cases
 pub use render_engine::{NodeContent, NodeId};
 // Re-export theme types for theming support
+pub use theme_engine::{Color as ThemeColor, TokenValue};
 pub use theme_engine::{DesignTokens, SystemTheme};
 
 // Re-export derive macros - Widget derive coexists with Widget trait (different namespaces)

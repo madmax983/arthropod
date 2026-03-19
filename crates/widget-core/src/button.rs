@@ -1,16 +1,16 @@
 //! Button widget - interactive clickable button
 
 use crate::WidgetEnum;
+use crate::{style, DesignTokens, Style};
 use crate::{Text, Widget, WidgetContext};
 use glam::Vec4;
 use render_engine::{Color, NodeContent, NodeId};
 use std::sync::Arc;
-use theme_engine::{style, DesignTokens, Style};
 
 /// Button widget with hover and click interactions.
 ///
 /// Styles are defined by the [`ButtonStyle`] enum and can be applied via helper methods.
-/// Uses the unified [`theme_engine::Style`] system for automatic hover effects.
+/// Uses the unified [`crate::Style`] system for automatic hover effects.
 ///
 /// # Example
 ///
@@ -46,7 +46,7 @@ pub struct Button {
     disabled: bool,
 
     #[param]
-    style: Option<theme_engine::Style>,
+    style: Option<crate::Style>,
 }
 
 /// Visual styling tier for a `Button`.
@@ -125,7 +125,7 @@ impl Button {
     }
 
     /// Set a high-level style override
-    pub fn style(mut self, style: theme_engine::Style) -> Self {
+    pub fn style(mut self, style: crate::Style) -> Self {
         self.style = Some(style);
         self
     }
@@ -163,7 +163,7 @@ impl Button {
                     background: bg;
                     color: text_color;
                     border_radius: t.radius_md;
-                    padding: theme_engine::Padding::symmetric(self.padding / 2.0, self.padding);
+                    padding: crate::StylePadding::symmetric(self.padding / 2.0, self.padding);
                     direction: layout_engine::FlexDirection::Row;
                     justify_content: layout_engine::FlexJustifyContent::Center;
                     align_items: layout_engine::FlexAlign::Center;
