@@ -121,9 +121,11 @@ pub struct WindowComposition {
     pub root_visual: composition::CompositionVisual,
 }
 
-// SAFETY: HWND is thread-safe to share across threads (it's just a handle).
-// Windows API allows HWND to be used from any thread.
-unsafe impl Sync for WindowImpl {}
+// NOTE: `WindowImpl` does NOT implement `Sync` or `Send`.
+// While `HWND` is thread-safe in Win32, the `WindowComposition` objects (COM interfaces)
+// used for transparency are generally bound to the creating STA thread. Sharing `WindowImpl`
+// directly across threads can lead to Undefined Behavior or COM errors. Applications
+// must manage window lifetime on the main thread and use `WindowHandle` for cross-thread access.
 
 impl WindowImpl {
     fn new(hinstance: HINSTANCE, config: WindowConfig) -> std::result::Result<Self, PlatformError> {
