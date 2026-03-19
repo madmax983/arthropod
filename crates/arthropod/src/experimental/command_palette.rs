@@ -11,6 +11,8 @@ use widget_core::{Center, Column, Stack, Text, TextInput, Widget, WidgetContext,
 pub struct Command {
     pub id: String,
     pub label: String,
+    /// Pre-calculated lowercased label for faster search filtering
+    pub label_lowercase: String,
     pub shortcut: Option<String>,
     pub action: Arc<dyn Fn() + Send + Sync>,
 }
@@ -22,9 +24,11 @@ impl Command {
         label: impl Into<String>,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Self {
+        let label_str = label.into();
         Self {
             id: id.into(),
-            label: label.into(),
+            label_lowercase: label_str.to_lowercase(),
+            label: label_str,
             shortcut: None,
             action: Arc::new(action),
         }
@@ -119,7 +123,7 @@ impl Widget for CommandPalette {
                 cmds
             } else {
                 cmds.into_iter()
-                    .filter(|c| c.label.to_lowercase().contains(&q))
+                    .filter(|c| c.label_lowercase.contains(&q))
                     .collect()
             }
         });
@@ -350,7 +354,7 @@ mod tests {
             let q = query_read.get().to_lowercase();
             let cmds = registry_read.get();
             cmds.into_iter()
-                .filter(|c| c.label.to_lowercase().contains(&q))
+                .filter(|c| c.label_lowercase.contains(&q))
                 .collect::<Vec<_>>()
         });
 
