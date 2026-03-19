@@ -52,6 +52,51 @@ pub mod spotlight;
 #[cfg(feature = "nova")]
 pub mod parallax;
 
+#[cfg(feature = "nova")]
+pub mod mouse_trail;
+
+#[cfg(not(feature = "nova"))]
+pub mod mouse_trail {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `mouse_trail` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct MouseTrailConfig;
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct MouseTrailState;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn update_mouse_trail(
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+        _config: bevy_ecs::prelude::Res<MouseTrailConfig>,
+        _mouse_pos: bevy_ecs::prelude::Res<arthropod_ecs::components::MousePosition>,
+        _state: bevy_ecs::prelude::ResMut<MouseTrailState>,
+    ) {
+        panic!("update_mouse_trail requires 'nova' feature. Enable it in Cargo.toml.");
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_mouse_trail(_app: &mut crate::App) {
+        super::print_missing_feature_warning("mouse_trail");
+    }
+}
+
 #[cfg(not(feature = "nova"))]
 pub mod parallax {
     #![allow(deprecated)]
