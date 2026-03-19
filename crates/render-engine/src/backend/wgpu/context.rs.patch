@@ -1,0 +1,14 @@
+--- crates/render-engine/src/backend/wgpu/context.rs
++++ crates/render-engine/src/backend/wgpu/context.rs
+@@ -668,7 +668,9 @@
+         let bytes_per_pixel = 4u32;
+         let padded_bytes_per_row = aligned_bytes_per_row(width, bytes_per_pixel)?;
+-        let output_size = padded_bytes_per_row as u64 * height as u64;
++        let output_size = (padded_bytes_per_row as u64).checked_mul(height as u64).ok_or_else(|| {
++            RendererError::InitializationFailed("Overflow calculating output buffer size for texture readback".to_string())
++        })?;
+         let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+             label: Some("Texture Readback Buffer"),
+             size: output_size,
+             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+             mapped_at_creation: false,
