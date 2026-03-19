@@ -33,13 +33,15 @@ impl RenderTargetKey {
     /// Estimated texture memory footprint in bytes.
     #[must_use]
     pub fn estimated_bytes(self) -> u64 {
-        let color_bytes = self.width as u64 * self.height as u64 * 4;
+        let w = self.width as u64;
+        let h = self.height as u64;
+        let color_bytes = w.saturating_mul(h).saturating_mul(4);
         let stencil_bytes = if self.has_stencil {
-            self.width as u64 * self.height as u64
+            w.saturating_mul(h)
         } else {
             0
         };
-        color_bytes + stencil_bytes
+        color_bytes.saturating_add(stencil_bytes)
     }
 }
 
