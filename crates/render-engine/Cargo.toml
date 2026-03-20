@@ -49,11 +49,6 @@ harness = false
 default = ["native"]
 native = []
 web = []
-renderdoc = ["dep:renderdoc"]
-
-[dependencies.renderdoc]
-version = "0.11"
-optional = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
