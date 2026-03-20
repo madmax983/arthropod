@@ -44,13 +44,17 @@ pub fn layout_system(
     mut scene: ResMut<Scene>,
     constraints_res: Option<Res<LayoutConstraintsResource>>,
     query: Query<(&SceneNodeRef, &LayoutStyle)>,
+    mut layout_styles: Local<HashMap<render_engine::NodeId, FlexStyle>>,
 ) {
     // 1. Collect all layout styles into a lookup map
     // This allows us to look up styles by NodeId during recursive scene traversal
-    let layout_styles: HashMap<render_engine::NodeId, FlexStyle> = query
-        .iter()
-        .map(|(node_ref, style)| (node_ref.0, style.0.clone()))
-        .collect();
+    // We use a Local to avoid per-frame HashMap allocation.
+    layout_styles.clear();
+    layout_styles.extend(
+        query
+            .iter()
+            .map(|(node_ref, style)| (node_ref.0, style.0.clone())),
+    );
 
     if layout_styles.is_empty() {
         return;

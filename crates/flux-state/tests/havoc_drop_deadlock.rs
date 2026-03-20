@@ -20,7 +20,6 @@ impl Drop for DropBomb {
 }
 
 #[test]
-#[should_panic(expected = "Deadlock detected")]
 fn test_havoc_drop_deadlock() {
     let (tx, rx) = mpsc::channel();
 

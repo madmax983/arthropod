@@ -61,3 +61,7 @@
 **[Performance] Avoid heap allocations and clone() in hot loops with text shaping results**
 **Learning:** In `multipass_executor.rs`, text shaping results for scene nodes were collected into an intermediate `Vec<ShapedTextResult>` using `.collect()`, creating a heap allocation per frame, per text node cluster. This was unnecessary since for the sequential and parallel cases, the results could either be immediately processed in the loop (saving allocations) or the `Vec` allocation could be minimized.
 **Action:** When mapping over iterators in a hot loop (like per-frame rendering pipelines) to produce intermediate data that is immediately consumed in a following loop, fold the logic into a single loop to avoid the intermediate `Vec` and the associated `Vec::new()` / `.collect()` heap allocations.
+
+**[Eliminate Per-Frame ECS Collection Allocations]
+**Learning:** Querying components to assemble tree-like or mapped structures (like `HashMap<NodeId, FlexStyle>`) dynamically on every frame causes significant allocation churn and degrades performance.
+**Action:** Use Bevy's `Local<T>` inside ECS systems to persist these intermediate structures (`Vec` or `HashMap`) across frames, using `.clear()` and `.extend()` to completely eliminate per-frame heap allocations on the hot path.

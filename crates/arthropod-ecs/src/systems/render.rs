@@ -34,25 +34,32 @@ pub fn collect_renderables_system(
     mut renderable_nodes_cache: Local<HashSet<NodeId>>,
     // Persistent stack for scene traversal to avoid per-frame allocation
     mut traversal_stack: Local<Vec<(NodeId, f32)>>,
+    // Persistent cache for ordered visual nodes to avoid per-frame allocation
+    mut visual_nodes_cache: Local<Vec<NodeId>>,
 ) {
     commands.0.clear();
     renderable_nodes_cache.clear();
+    visual_nodes_cache.clear();
 
     // 1. Collect renderable NodeIds from ECS to filter the scene traversal
     renderable_nodes_cache.extend(query.iter().map(|r| r.0));
 
     // 2. Collect visual nodes in painter's order, filtered by renderable set
-    let visual_nodes: Vec<_> = scene
-        .iter_visuals_custom(&mut traversal_stack)
-        .filter(|(id, _, _)| renderable_nodes_cache.contains(id))
-        .collect();
+    visual_nodes_cache.extend(
+        scene
+            .iter_visuals_custom(&mut traversal_stack)
+            .filter(|(id, _, _)| renderable_nodes_cache.contains(id))
+            .map(|(id, _, _)| id),
+    );
 
     // 3. Generate instances — use threshold to choose execution path
-    if visual_nodes.len() >= RENDER_PARALLEL_THRESHOLD {
-        commands.0 = visual_nodes
+    if visual_nodes_cache.len() >= RENDER_PARALLEL_THRESHOLD {
+        commands.0 = visual_nodes_cache
             .par_iter()
-            .fold(Vec::new, |mut acc, (_, node, _)| {
-                render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+            .fold(Vec::new, |mut acc, id| {
+                if let Some(node) = scene.get_node(*id) {
+                    render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+                }
                 acc
             })
             .reduce(Vec::new, |mut a, b| {
@@ -60,8 +67,10 @@ pub fn collect_renderables_system(
                 a
             });
     } else {
-        for (_, node, _) in &visual_nodes {
-            render_engine::backend::wgpu::create_node_instances(node, &mut commands.0);
+        for id in &*visual_nodes_cache {
+            if let Some(node) = scene.get_node(*id) {
+                render_engine::backend::wgpu::create_node_instances(node, &mut commands.0);
+            }
         }
     }
 }
