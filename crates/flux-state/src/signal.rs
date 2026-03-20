@@ -581,4 +581,30 @@ mod tests {
         // Replace the value to drop it
         write.set(None);
     }
+
+    #[test]
+    fn test_signal_debug_locked() {
+        let runtime = Runtime::new();
+        let signal = Signal::new(runtime.clone(), 42);
+        let (read, write) = signal.clone().split();
+
+        // Lock the signal manually
+        let handle = runtime.get_signal_handle(signal.id);
+        let guard = handle
+            .downcast_ref::<std::sync::RwLock<i32>>()
+            .unwrap()
+            .write()
+            .unwrap();
+
+        let signal_debug = format!("{:?}", signal);
+        assert!(signal_debug.contains("value: <locked>"));
+
+        let read_debug = format!("{:?}", read);
+        assert!(read_debug.contains("value: <locked>"));
+
+        let write_debug = format!("{:?}", write);
+        assert!(write_debug.contains("value: <locked>"));
+
+        drop(guard);
+    }
 }
