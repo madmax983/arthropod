@@ -387,8 +387,8 @@ pub fn generate_helper_macro(
 
     // Catch-all for unknown properties/flags
     arms.push(quote! {
-        ($w:expr, $unknown:ident $(: $val:expr)? $(, $($rest:tt)*)?) => {
-            compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)));
+        ($w:expr, $($unknown:tt)*) => {
+            compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)));
         };
     });
 
