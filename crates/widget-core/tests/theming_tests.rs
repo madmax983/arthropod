@@ -244,27 +244,25 @@ fn test_text_uses_design_tokens_for_default_color() {
 
     // Verify the text color uses text_primary from tokens
     let node = ctx.scene().get_node(node_id).unwrap();
-    if let NodeContent::Styled { style } = &node.content {
-        if let Some(_text_content) = &style.text {
-            if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
-                let expected_color = tokens.text_primary;
-                assert!(
-                    (color.x - expected_color.x).abs() < 0.01
-                        && (color.y - expected_color.y).abs() < 0.01
-                        && (color.z - expected_color.z).abs() < 0.01,
-                    "Text color should match text_primary token. Expected: {:?}, Got: {:?}",
-                    expected_color,
-                    color
-                );
-            } else {
-                panic!("Expected solid fill color");
-            }
-        } else {
-            panic!("Expected text content");
-        }
-    } else {
+    let NodeContent::Styled { style } = &node.content else {
         panic!("Expected Styled node content");
-    }
+    };
+
+    assert!(style.text.is_some(), "Expected text content");
+
+    let Some(render_engine::Paint::Solid(color)) = style.fills.first() else {
+        panic!("Expected solid fill color");
+    };
+
+    let expected_color = tokens.text_primary;
+    assert!(
+        (color.x - expected_color.x).abs() < 0.01
+            && (color.y - expected_color.y).abs() < 0.01
+            && (color.z - expected_color.z).abs() < 0.01,
+        "Text color should match text_primary token. Expected: {:?}, Got: {:?}",
+        expected_color,
+        color
+    );
 }
 
 #[test]
@@ -283,19 +281,19 @@ fn test_text_falls_back_without_tokens() {
 
     // Verify the text color falls back to black (0.0, 0.0, 0.0, 1.0)
     let node = ctx.scene().get_node(node_id).unwrap();
-    if let NodeContent::Styled { style } = &node.content {
-        if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
-            assert!(
-                color.x.abs() < 0.01 && color.y.abs() < 0.01 && color.z.abs() < 0.01,
-                "Fallback text color should be black. Got: {:?}",
-                color
-            );
-        } else {
-            panic!("Expected solid fill color");
-        }
-    } else {
+    let NodeContent::Styled { style } = &node.content else {
         panic!("Expected Styled node content");
-    }
+    };
+
+    let Some(render_engine::Paint::Solid(color)) = style.fills.first() else {
+        panic!("Expected solid fill color");
+    };
+
+    assert!(
+        color.x.abs() < 0.01 && color.y.abs() < 0.01 && color.z.abs() < 0.01,
+        "Fallback text color should be black. Got: {:?}",
+        color
+    );
 }
 
 #[test]
@@ -315,19 +313,19 @@ fn test_text_explicit_color_overrides_tokens() {
 
     // Verify the text color is the explicit red, not the theme color
     let node = ctx.scene().get_node(node_id).unwrap();
-    if let NodeContent::Styled { style } = &node.content {
-        if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
-            assert!(
-                (color.x - 1.0).abs() < 0.01 && color.y.abs() < 0.01 && color.z.abs() < 0.01,
-                "Text color should be explicit red, not theme color. Got: {:?}",
-                color
-            );
-        } else {
-            panic!("Expected solid fill color");
-        }
-    } else {
+    let NodeContent::Styled { style } = &node.content else {
         panic!("Expected Styled node content");
-    }
+    };
+
+    let Some(render_engine::Paint::Solid(color)) = style.fills.first() else {
+        panic!("Expected solid fill color");
+    };
+
+    assert!(
+        (color.x - 1.0).abs() < 0.01 && color.y.abs() < 0.01 && color.z.abs() < 0.01,
+        "Text color should be explicit red, not theme color. Got: {:?}",
+        color
+    );
 }
 
 #[test]
@@ -355,18 +353,18 @@ fn test_text_dark_mode_uses_light_text() {
 
     // Verify the text color is light (for dark mode)
     let node = ctx.scene().get_node(node_id).unwrap();
-    if let NodeContent::Styled { style } = &node.content {
-        if let Some(render_engine::Paint::Solid(color)) = style.fills.first() {
-            // In dark mode, text should be light (high RGB values)
-            assert!(
-                color.x > 0.7 && color.y > 0.7 && color.z > 0.7,
-                "Dark mode text should be light. Got: {:?}",
-                color
-            );
-        } else {
-            panic!("Expected solid fill color");
-        }
-    } else {
+    let NodeContent::Styled { style } = &node.content else {
         panic!("Expected Styled node content");
-    }
+    };
+
+    let Some(render_engine::Paint::Solid(color)) = style.fills.first() else {
+        panic!("Expected solid fill color");
+    };
+
+    // In dark mode, text should be light (high RGB values)
+    assert!(
+        color.x > 0.7 && color.y > 0.7 && color.z > 0.7,
+        "Dark mode text should be light. Got: {:?}",
+        color
+    );
 }

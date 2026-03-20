@@ -209,10 +209,8 @@ impl Button {
 
     /// Get text color for current style (used for child text widget)
     fn get_text_color(&self, tokens: Option<&DesignTokens>) -> Vec4 {
-        if let Some(style) = &self.style {
-            if let Some(color) = style.color {
-                return color;
-            }
+        if let Some(color) = self.style.as_ref().and_then(|s| s.color) {
+            return color;
         }
 
         match tokens {

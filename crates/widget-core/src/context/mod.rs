@@ -207,15 +207,9 @@ impl WidgetContext {
 
     /// Check if node is a text node
     pub fn is_text_node(&self, node_id: NodeId) -> bool {
-        if let Some(node) = self.scene.get_node(node_id) {
-            if let NodeContent::Styled { ref style } = node.content {
-                style.text.is_some()
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+        self.scene.get_node(node_id).is_some_and(|node| {
+            matches!(node.content, NodeContent::Styled { ref style } if style.text.is_some())
+        })
     }
 
     /// Check if node has reactive text component
@@ -231,15 +225,13 @@ impl WidgetContext {
         }
 
         // Fallback to static content in node
-        if let Some(node) = self.scene.get_node(node_id) {
+        self.scene.get_node(node_id).and_then(|node| {
             if let NodeContent::Styled { ref style } = node.content {
-                if let Some(ref text_content) = style.text {
-                    return Some(text_content.text.clone());
-                }
+                style.text.as_ref().map(|t| t.text.clone())
+            } else {
+                None
             }
-        }
-
-        None
+        })
     }
 
     /// Set layout style for a node
