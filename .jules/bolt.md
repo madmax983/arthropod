@@ -65,3 +65,7 @@
 **[Eliminate Per-Frame ECS Collection Allocations]
 **Learning:** Querying components to assemble tree-like or mapped structures (like `HashMap<NodeId, FlexStyle>`) dynamically on every frame causes significant allocation churn and degrades performance.
 **Action:** Use Bevy's `Local<T>` inside ECS systems to persist these intermediate structures (`Vec` or `HashMap`) across frames, using `.clear()` and `.extend()` to completely eliminate per-frame heap allocations on the hot path.
+
+**[Eliminate Per-Frame HashSet Allocations for Interaction State]
+**Learning:** `update_interaction_state_system` created a new `HashSet` per frame to track hovered nodes during tree traversal, adding per-frame heap allocation overhead.
+**Action:** Use Bevy's `Local<HashSet<NodeId>>` to persist the allocation across frames and clear it before each use to reuse the underlying capacity.

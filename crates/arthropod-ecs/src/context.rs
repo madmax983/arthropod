@@ -6,14 +6,16 @@ use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 use crate::components::{MousePosition, SceneNodeRef};
 use crate::systems::{
     apply_a11y_bounds_system, collect_renderables_system, gather_a11y_bounds_system, layout_system,
-    update_interaction_state_system, A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
+    A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
 
 #[cfg(feature = "parallel-reactive")]
 use crate::systems::{apply_reactive_changes_system, gather_reactive_changes_system};
 
 #[cfg(not(feature = "parallel-reactive"))]
-use crate::systems::{update_all_reactive_system, update_widget_style_system};
+use crate::systems::{
+    update_all_reactive_system, update_interaction_state_system, update_widget_style_system,
+};
 
 /// Enterprise GUI framework context - wraps ECS World
 ///

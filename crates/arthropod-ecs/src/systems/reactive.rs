@@ -7,16 +7,22 @@ use crate::components::{
     WidgetStyle,
 };
 
-/// System that updates interaction states based on mouse position and hit testing
+/// System that updates interaction states based on mouse position and hit testing.
+///
+/// Optimization: Uses `Local<HashSet>` to track hovered nodes instead of allocating
+/// a new HashSet on every single frame. This prevents continuous heap allocations
+/// and improves consistent frame times.
 pub fn update_interaction_state_system(
     mouse_pos: Res<MousePosition>,
     scene: Res<Scene>,
     mut query: Query<(Entity, &SceneNodeRef, &mut InteractionState)>,
+    mut hovered_nodes: Local<std::collections::HashSet<render_engine::NodeId>>,
 ) {
     let hit_id = scene.hit_test(mouse_pos.0.x, mouse_pos.0.y);
 
-    // Create a set of interactive nodes that are actually being hovered
-    let mut hovered_nodes = std::collections::HashSet::new();
+    // Create a set of interactive nodes that are actually being hovered.
+    // By clearing the local HashSet, we reuse its allocated memory block.
+    hovered_nodes.clear();
 
     if let Some(mut current_id) = hit_id {
         // Bubble up from the hit node to find all interactive ancestors
