@@ -23,12 +23,15 @@ use widget_core::Widget;
 /// Errors that can occur during app creation or execution
 #[derive(Error, Debug)]
 pub enum AppError {
+    /// An error occurred while initializing the operating system window.
     #[error("Failed to create window: {0}")]
     WindowCreation(String),
 
+    /// An error occurred while initializing the wgpu GPU rendering context.
     #[error("Failed to create GPU backend: {0}")]
     BackendCreation(String),
 
+    /// An error occurred during the rendering pipeline execution.
     #[error("Failed to render: {0}")]
     RenderError(String),
 }

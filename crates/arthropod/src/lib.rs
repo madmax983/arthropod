@@ -88,12 +88,17 @@
 
 pub mod app;
 pub mod event_dispatcher;
+/// Experimental features, including advanced rendering and new architectures.
 pub mod experimental;
+/// Core types and schemas for importing and representing Figma documents.
 pub mod figma;
+/// Code generation tools for baking imported Figma documents directly into Rust source files.
 pub mod figma_codegen;
+/// Execution bridge connecting imported Figma layouts to the `render_engine`.
 pub mod figma_runtime;
 pub mod layout;
 pub mod prelude;
+/// Interactive execution engine for evaluating Figma prototype triggers and transitions.
 pub mod prototype_runtime;
 
 // Re-export main types

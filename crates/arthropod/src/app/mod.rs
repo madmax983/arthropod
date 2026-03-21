@@ -32,8 +32,11 @@
 //! }
 //! ```
 
+/// Core application definition, rendering loops, and ECS context management.
 pub mod core;
+/// Logic to integrate standard OS window events into the Arthropod application event model.
 pub mod integration;
+/// Event-driven controller managing dynamic behaviors such as text input focus and form state.
 pub mod widget;
 
 // Re-export main types to maintain API compatibility
