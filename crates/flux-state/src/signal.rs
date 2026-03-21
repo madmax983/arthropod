@@ -45,6 +45,7 @@ pub struct ReadSignal<T> {
     id: NodeId,
     runtime: Arc<Runtime>,
     handle: Arc<RwLock<T>>,
+    is_computed: bool,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -158,6 +159,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
                 id: self.id,
                 runtime: Arc::clone(&self.runtime),
                 handle: Arc::clone(&self.handle),
+                is_computed: false,
                 _marker: std::marker::PhantomData,
             },
             WriteSignal {
@@ -319,9 +321,27 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// - Panics if the internal lock is poisoned.
     ///
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        self.runtime.track(self.id);
-        let guard = self.handle.read().unwrap();
-        f(&*guard)
+        if self.is_computed {
+            // Optimistically try to get fresh value with tracking in one go
+            let handle = if let Some(h) = self.runtime.track_and_get_computed_if_fresh(self.id) {
+                h
+            } else {
+                // Slow path: value is stale or uninitialized
+                self.runtime.recompute(self.id);
+                self.runtime.get_computed_handle(self.id)
+            };
+
+            let guard = handle
+                .downcast_ref::<RwLock<T>>()
+                .expect("Type mismatch")
+                .read()
+                .unwrap();
+            f(&*guard)
+        } else {
+            self.runtime.track(self.id);
+            let guard = self.handle.read().unwrap();
+            f(&*guard)
+        }
     }
 
     /// Access the signal value safely with a closure, without tracking dependencies.
@@ -343,8 +363,26 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
     /// - Panics if the internal lock is poisoned.
     ///
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let guard = self.handle.read().unwrap();
-        f(&*guard)
+        if self.is_computed {
+            // Optimistically try to get fresh value without tracking
+            let handle = if let Some(h) = self.runtime.get_computed_if_fresh(self.id) {
+                h
+            } else {
+                // Slow path: value is stale or uninitialized
+                self.runtime.recompute(self.id);
+                self.runtime.get_computed_handle(self.id)
+            };
+
+            let guard = handle
+                .downcast_ref::<RwLock<T>>()
+                .expect("Type mismatch")
+                .read()
+                .unwrap();
+            f(&*guard)
+        } else {
+            let guard = self.handle.read().unwrap();
+            f(&*guard)
+        }
     }
 
     /// Get a reference to the runtime.
@@ -358,6 +396,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
             id,
             runtime,
             handle,
+            is_computed: true,
             _marker: std::marker::PhantomData,
         }
     }
