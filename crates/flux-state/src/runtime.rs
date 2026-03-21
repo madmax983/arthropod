@@ -1279,4 +1279,43 @@ mod tests_sentry {
         let runtime = Runtime::new();
         runtime.track_and_get_computed_if_fresh(NodeId(9999));
     }
+
+    #[test]
+    fn test_detect_deadlock_panic() {
+        let runtime = Runtime::new();
+
+        // Mock a deadlock scenario where:
+        // - Thread 1 is currently computing Node A
+        // - Thread 1 is waiting for Node B
+        // - Thread 2 is currently computing Node B
+        // - Thread 2 is waiting for Node A (which Thread 1 holds)
+
+        let node_a = NodeId(1);
+        let node_b = NodeId(2);
+
+        let thread_1 = std::thread::current().id();
+
+        // Create a dummy thread for thread 2
+        let thread_2 = std::thread::spawn(|| std::thread::current().id())
+            .join()
+            .unwrap();
+
+        let mut inner = runtime.inner.lock().unwrap();
+
+        inner.computing.insert(node_a, thread_1);
+        inner.waiting_for.insert(thread_1, node_b);
+
+        inner.computing.insert(node_b, thread_2);
+
+        // Complete the cycle: Thread 2 is waiting for Node A (which Thread 1 holds)
+        inner.waiting_for.insert(thread_2, node_a);
+
+        let result = inner.detect_deadlock(node_b, thread_1);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Deadlock detected: Cyclic dependency in computed values across threads."
+        );
+    }
 }
