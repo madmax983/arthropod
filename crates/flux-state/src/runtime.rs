@@ -198,6 +198,7 @@ impl RuntimeInner {
             return false;
         }
 
+        // println!("DEBUG: Marking node stale: {:?}", id);
         self.stale.insert(id);
 
         // If it's an effect, schedule it.
@@ -431,10 +432,19 @@ impl Runtime {
 
     /// Notify subscribers that a source changed.
     pub(crate) fn notify(&self, source: NodeId) {
+        // println!("DEBUG: notify called for {:?}", source);
         // Mark all transitive subscribers as stale
         self.inner.lock().unwrap().mark_subscribers_stale(source);
 
         // Flush pending effects (synchronous for now)
+        self.flush_effects();
+    }
+
+    /// Run all pending effects.
+    ///
+    /// This flushes the queue of effects that have been marked as stale due to
+    /// dependency changes.
+    pub fn run_effects(&self) {
         self.flush_effects();
     }
 
@@ -621,6 +631,7 @@ impl Runtime {
     ///
     /// Panics if the computed node does not exist.
     pub(crate) fn recompute(&self, id: NodeId) {
+        // println!("DEBUG: recompute called for {:?}", id);
         let compute_fn = {
             let mut inner = self.inner.lock().unwrap();
 

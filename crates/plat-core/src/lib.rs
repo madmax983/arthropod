@@ -62,6 +62,9 @@ pub trait Application: Sized + 'static {
 
     /// Called when a redraw is requested for a window.
     fn on_redraw(&mut self, window_id: WindowId);
+
+    /// Called every frame when the application is in Poll mode.
+    fn on_update(&mut self, _delta: std::time::Duration) {}
 }
 
 /// The event loop - manages window lifecycle and event dispatch.

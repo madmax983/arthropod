@@ -73,11 +73,12 @@
 
 use crate::form_state::{FormState, SubmitCallback};
 use crate::input_state::{
-    ComputedTextState, ReactiveColorState, ReactiveLayoutWidthState, ReactiveTextState,
-    TextInputState,
+    ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
+    ReactiveTextState, TextInputState,
 };
 use crate::validation::Validator;
 use crate::validation_state::ValidationState;
+use anim_graph::timeline::Timeline;
 use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
 use indexmap::IndexMap;
@@ -117,6 +118,9 @@ pub struct WidgetContext {
     pub(crate) computed_text_states: HashMap<NodeId, ComputedTextState>,
     pub(crate) reactive_color_states: HashMap<NodeId, ReactiveColorState>,
     pub(crate) reactive_layout_width_states: HashMap<NodeId, ReactiveLayoutWidthState>,
+    pub(crate) reactive_layout_flex_grow_states: HashMap<NodeId, ReactiveLayoutFlexGrowState>,
+    pub(crate) progress_bar_states: HashMap<NodeId, (ReadSignal<f32>, f32)>,
+    pub(crate) frame_signal: Option<ReadSignal<u64>>,
     pub(crate) focused_node: Option<NodeId>,
     pub(crate) placeholders: HashSet<NodeId>,
 
@@ -129,6 +133,16 @@ pub struct WidgetContext {
 
     /// Effects that must be kept alive for reactive synchronization
     effects: Vec<flux_state::Effect>,
+
+    // Timelines
+    pub(crate) timeline_f32_states: HashMap<NodeId, (Timeline<f32>, WriteSignal<f32>)>,
+    pub(crate) timeline_color_states: HashMap<
+        NodeId,
+        (
+            Timeline<render_engine::Color>,
+            WriteSignal<render_engine::Color>,
+        ),
+    >,
 }
 
 impl WidgetContext {
@@ -146,12 +160,17 @@ impl WidgetContext {
             computed_text_states: HashMap::new(),
             reactive_color_states: HashMap::new(),
             reactive_layout_width_states: HashMap::new(),
+            reactive_layout_flex_grow_states: HashMap::new(),
+            progress_bar_states: HashMap::new(),
+            frame_signal: None,
             focused_node: None,
             placeholders: HashSet::new(),
             validators: HashMap::new(),
             form_states: HashMap::new(),
             design_tokens: None,
             effects: Vec::new(),
+            timeline_f32_states: HashMap::new(),
+            timeline_color_states: HashMap::new(),
         }
     }
 
@@ -397,9 +416,60 @@ impl WidgetContext {
         &mut self,
         node_id: NodeId,
         read_signal: ReadSignal<f32>,
+        handle: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
     ) {
-        self.reactive_layout_width_states
-            .insert(node_id, ReactiveLayoutWidthState { read_signal });
+        self.reactive_layout_width_states.insert(
+            node_id,
+            ReactiveLayoutWidthState {
+                read_signal,
+                handle,
+            },
+        );
+    }
+
+    /// Add reactive layout flex grow state to a node
+    pub fn add_reactive_layout_flex_grow_state(
+        &mut self,
+        node_id: NodeId,
+        read_signal: ReadSignal<f32>,
+    ) {
+        self.reactive_layout_flex_grow_states
+            .insert(node_id, ReactiveLayoutFlexGrowState { read_signal });
+    }
+
+    /// Add progress bar direct state to a node
+    pub fn add_progress_bar_state(
+        &mut self,
+        node_id: NodeId,
+        progress: ReadSignal<f32>,
+        total_width: f32,
+    ) {
+        self.progress_bar_states
+            .insert(node_id, (progress, total_width));
+    }
+
+    /// Add a `Timeline<f32>` to drive a signal for a node.
+    ///
+    /// The timeline will be transferred to a `TimelineDriver<f32>` ECS component
+    /// during widget integration, and ticked each frame by `timeline_system`.
+    pub fn add_timeline_f32(
+        &mut self,
+        node_id: NodeId,
+        timeline: Timeline<f32>,
+        target: WriteSignal<f32>,
+    ) {
+        self.timeline_f32_states.insert(node_id, (timeline, target));
+    }
+
+    /// Add a `Timeline<Color>` to drive a color signal for a node.
+    pub fn add_timeline_color(
+        &mut self,
+        node_id: NodeId,
+        timeline: Timeline<render_engine::Color>,
+        target: WriteSignal<render_engine::Color>,
+    ) {
+        self.timeline_color_states
+            .insert(node_id, (timeline, target));
     }
 
     /// Add text input state to a node
@@ -686,6 +756,36 @@ impl WidgetContext {
         &self.reactive_layout_width_states
     }
 
+    /// Get all reactive layout flex grow states (for app-shell integration)
+    pub fn reactive_layout_flex_grow_states(
+        &self,
+    ) -> &HashMap<NodeId, ReactiveLayoutFlexGrowState> {
+        &self.reactive_layout_flex_grow_states
+    }
+
+    /// Get all progress bar states (for app-shell integration)
+    pub fn progress_bar_states(&self) -> &HashMap<NodeId, (ReadSignal<f32>, f32)> {
+        &self.progress_bar_states
+    }
+
+    /// Get all f32 timeline states (for app-shell integration)
+    pub fn timeline_f32_states(&self) -> &HashMap<NodeId, (Timeline<f32>, WriteSignal<f32>)> {
+        &self.timeline_f32_states
+    }
+
+    /// Get all Color timeline states (for app-shell integration)
+    pub fn timeline_color_states(
+        &self,
+    ) -> &HashMap<
+        NodeId,
+        (
+            Timeline<render_engine::Color>,
+            WriteSignal<render_engine::Color>,
+        ),
+    > {
+        &self.timeline_color_states
+    }
+
     /// Get all validators (for app-shell integration)
     pub fn validators(&self) -> &HashMap<NodeId, ValidationState> {
         &self.validators
@@ -694,6 +794,54 @@ impl WidgetContext {
     /// Get all form states (for app-shell integration)
     pub fn form_states(&self) -> &HashMap<NodeId, FormState> {
         &self.form_states
+    }
+
+    /// Get all effects (for app-shell integration)
+    pub fn effects(&self) -> &[flux_state::Effect] {
+        &self.effects
+    }
+
+    /// Take all effects, draining the context.
+    ///
+    /// Effects have RAII Drop semantics (Drop calls `dispose_effect`),
+    /// so they must be moved, not cloned, to avoid double-dispose.
+    pub fn take_effects(&mut self) -> Vec<flux_state::Effect> {
+        std::mem::take(&mut self.effects)
+    }
+
+    /// Get the frame signal if available
+    pub fn frame_signal(&self) -> ReadSignal<u64> {
+        self.frame_signal
+            .clone()
+            .expect("Frame signal not initialized in context")
+    }
+
+    /// Set the frame signal
+    pub fn set_frame_signal(&mut self, signal: ReadSignal<u64>) {
+        self.frame_signal = Some(signal);
+    }
+
+    /// Take all f32 timeline states, draining the map.
+    ///
+    /// This moves the timelines out of the context so they can be
+    /// inserted as ECS components (Timeline is not Clone).
+    pub fn take_timeline_f32_states(
+        &mut self,
+    ) -> HashMap<NodeId, (Timeline<f32>, WriteSignal<f32>)> {
+        std::mem::take(&mut self.timeline_f32_states)
+    }
+
+    /// Take all Color timeline states, draining the map.
+    pub fn take_timeline_color_states(
+        &mut self,
+    ) -> HashMap<
+        NodeId,
+        (
+            Timeline<render_engine::Color>,
+            WriteSignal<render_engine::Color>,
+        ),
+    > {
+        std::mem::take(&mut self.timeline_color_states)
     }
 
     /// Take ownership of the scene (consumes self)

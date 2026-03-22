@@ -307,3 +307,55 @@ fn test_spring_equilibrium_stability() {
     let val = anim.tick(Duration::from_millis(100));
     assert_eq!(val, 100.0, "Spring at equilibrium should not move");
 }
+
+// ==================== Easing Derivative Tests ====================
+
+#[test]
+fn test_easing_linear_derivative_is_constant() {
+    let e = Easing::Linear;
+    assert!((e.derivative(0.0) - 1.0).abs() < 1e-4);
+    assert!((e.derivative(0.5) - 1.0).abs() < 1e-4);
+    assert!((e.derivative(1.0) - 1.0).abs() < 1e-4);
+}
+
+#[test]
+fn test_easing_ease_in_derivative() {
+    let e = Easing::EaseIn;
+    // f(t) = t^2, f'(t) = 2t
+    assert!((e.derivative(0.0) - 0.0).abs() < 1e-4);
+    assert!((e.derivative(0.5) - 1.0).abs() < 1e-4);
+    assert!((e.derivative(1.0) - 2.0).abs() < 1e-4);
+}
+
+#[test]
+fn test_easing_ease_out_derivative() {
+    let e = Easing::EaseOut;
+    // f(t) = t(2-t), f'(t) = 2 - 2t
+    assert!((e.derivative(0.0) - 2.0).abs() < 1e-4);
+    assert!((e.derivative(0.5) - 1.0).abs() < 1e-4);
+    assert!((e.derivative(1.0) - 0.0).abs() < 1e-4);
+}
+
+#[test]
+fn test_easing_ease_in_out_derivative_symmetry() {
+    let e = Easing::EaseInOut;
+    // Should be symmetric around midpoint
+    let d_at_0 = e.derivative(0.0);
+    let d_at_1 = e.derivative(1.0);
+    assert!(
+        (d_at_0 - d_at_1).abs() < 1e-4,
+        "EaseInOut derivative should be symmetric: d(0)={d_at_0}, d(1)={d_at_1}"
+    );
+    // Midpoint should have maximum velocity
+    let d_mid = e.derivative(0.5);
+    assert!(d_mid > d_at_0, "EaseInOut should be fastest at midpoint");
+}
+
+#[test]
+fn test_easing_derivative_clamps_input() {
+    let e = Easing::EaseIn;
+    // Negative should clamp to 0.0, derivative of EaseIn at 0 is 0
+    assert!((e.derivative(-1.0) - 0.0).abs() < 1e-4);
+    // >1.0 should clamp to 1.0, derivative of EaseIn at 1 is 2
+    assert!((e.derivative(2.0) - 2.0).abs() < 1e-4);
+}

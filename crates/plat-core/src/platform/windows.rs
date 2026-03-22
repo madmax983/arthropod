@@ -717,6 +717,7 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
     });
 
     let mut msg = MSG::default();
+    let mut last_update = std::time::Instant::now();
 
     loop {
         if control_flow == ControlFlow::Exit {
@@ -780,6 +781,16 @@ pub fn run<A: Application>() -> std::result::Result<(), PlatformError> {
 
         for window_id in dirty_windows {
             app.on_redraw(window_id);
+        }
+
+        // Calculate delta time for update
+        let now = std::time::Instant::now();
+        let delta = now.duration_since(last_update);
+        last_update = now;
+
+        // Call on_update when in Poll mode to drive animations and background work
+        if control_flow == ControlFlow::Poll {
+            app.on_update(delta);
         }
     }
 

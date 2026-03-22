@@ -2,7 +2,7 @@
 
 use crate::{style, DesignTokens, Style};
 use crate::{Widget, WidgetContext};
-use flux_state::{Computed, ReadSignal};
+use flux_state::ReadSignal;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{NodeContent, NodeId};
 
@@ -67,7 +67,7 @@ impl ProgressBar {
             }
             None => {
                 style! {
-                    background: glam::Vec4::new(0.9, 0.9, 0.9, 1.0);
+                    background: glam::Vec4::new(0.0, 0.0, 0.0, 0.1); // Transparent black track
                     border_radius: self.height / 2.0;
                     height: self.height;
                 }
@@ -84,22 +84,29 @@ impl Widget for ProgressBar {
             .clone()
             .unwrap_or_else(|| self.create_default_style(tokens.as_ref()));
 
-        // 1. Create Track Node
-        let track_node = ctx.create_node(ctx.root(), NodeContent::Empty);
+        // 1. Create Track Node (Static Background)
+        let track_node = ctx.create_node(
+            ctx.root(),
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(glam::Vec4::new(0.0, 0.0, 0.0, 0.1)),
+                ),
+            },
+        );
         ctx.set_widget_style(track_node, track_style);
 
-        // Track must have row direction to allow the bar to be a child
         ctx.set_layout_style(
             track_node,
             FlexStyle {
                 direction: FlexDirection::Row,
-                width: Some(200.0), // Default width if not constrained
+                width: Some(200.0),
                 height: Some(self.height),
                 ..Default::default()
             },
         );
 
-        // 2. Create Bar Node (the filled part)
+        // 2. Create Progress Bar Fill Node (Styled, width driven by ECS)
         let bar_color = tokens
             .as_ref()
             .map(|t| t.accent)
@@ -116,27 +123,19 @@ impl Widget for ProgressBar {
             },
         );
 
-        // Progress-dependent width: we use a Computed signal to calculate absolute width
-        // NOTE: This assumes the track has a fixed width or we know its width.
-        // For a more robust implementation, we'd need layout-relative percentage widths.
-        // For now, we'll use a fixed 200px track or similar.
-
-        let progress_read = self.progress.clone();
-        let width_computed = Computed::new(self.progress.runtime().clone(), move || {
-            let p = progress_read.get().clamp(0.0, 1.0);
-            p * 200.0 // Assuming 200px track for now
-        });
-
+        // Initial width from current progress value
+        let initial_p = self.progress.get_untracked().clamp(0.0, 1.0);
         ctx.set_layout_style(
             bar_node,
             FlexStyle {
+                width: Some(initial_p * 200.0),
                 height: Some(self.height),
                 ..Default::default()
             },
         );
 
-        // Use our new reactive layout width component
-        ctx.add_reactive_layout_width_state(bar_node, width_computed.to_read_signal());
+        // Register progress bar state — the ECS system updates layout width each frame
+        ctx.add_progress_bar_state(bar_node, self.progress.clone(), 200.0);
 
         track_node
     }

@@ -234,13 +234,56 @@ pub struct WidgetStyle(pub widget_core::Style);
 pub struct ReactiveLayoutWidth {
     pub signal: ReadSignal<f32>,
     pub last_value: f32,
+    /// Optional handle to keep Computed alive (if the signal came from a Computed)
+    pub _handle: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl ReactiveLayoutWidth {
     /// Create a new ReactiveLayoutWidth from a ReadSignal
+    pub fn new(
+        signal: ReadSignal<f32>,
+        handle: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
+    ) -> Self {
+        let last_value = signal.get_untracked();
+        Self {
+            signal,
+            last_value,
+            _handle: handle,
+        }
+    }
+}
+
+/// Reactive layout flex grow - polls signal to update LayoutStyle flex_grow
+#[derive(Component, Clone)]
+pub struct ReactiveLayoutFlexGrow {
+    pub signal: ReadSignal<f32>,
+    pub last_value: f32,
+}
+
+impl ReactiveLayoutFlexGrow {
+    /// Create a new ReactiveLayoutFlexGrow from a ReadSignal
     pub fn new(signal: ReadSignal<f32>) -> Self {
         let last_value = signal.get_untracked();
         Self { signal, last_value }
+    }
+}
+
+/// Progress bar specific state for direct width animation
+#[derive(Component, Clone)]
+pub struct ProgressBarState {
+    pub progress: ReadSignal<f32>,
+    pub total_width: f32,
+    pub last_progress: f32,
+}
+
+impl ProgressBarState {
+    pub fn new(progress: ReadSignal<f32>, total_width: f32) -> Self {
+        let last_progress = progress.get_untracked();
+        Self {
+            progress,
+            total_width,
+            last_progress,
+        }
     }
 }
 
@@ -278,6 +321,22 @@ pub struct LayoutConstraintsResource(pub LayoutConstraints);
 /// Used by the interaction system to perform hit testing and update hover states.
 #[derive(Resource, Default, Clone, Copy, Debug)]
 pub struct MousePosition(pub glam::Vec2);
+
+/// Global resource for the frame signal
+///
+/// Contains a write handle to a signal that increments every frame.
+/// Widgets can subscribe to the read handle to drive animations.
+#[derive(Resource, Clone)]
+pub struct FrameSignalResource {
+    pub write_handle: flux_state::WriteSignal<u64>,
+    pub read_handle: flux_state::ReadSignal<u64>,
+}
+
+/// Diagnostic heartbeat resource to track component counts per frame
+#[derive(Resource, Default)]
+pub struct IntegrationHeartbeat {
+    pub frame_count: u64,
+}
 
 /// Clickable behavior - callback invoked on click
 ///

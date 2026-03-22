@@ -110,6 +110,7 @@ pub use figma_runtime::FigmaRuntime;
 pub use layout::{auto_layout, layout_widget_tree};
 
 // Re-export core crates for convenience
+pub use anim_graph;
 pub use arthropod_ecs;
 pub use flux_state;
 pub use input_engine;

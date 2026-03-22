@@ -73,7 +73,12 @@ fn figma_runtime_visibility_and_instances_match_golden() {
 
 #[test]
 fn figma_codegen_normalizes_crlf_and_lf_to_identical_output() {
-    let fixture = load_text(&manifest_path(FIXTURE_JSON_PATH));
+    let fixture_raw = load_text(&manifest_path(FIXTURE_JSON_PATH));
+    // Normalize to LF first so the CRLF conversion is clean on all platforms.
+    // On Windows, load_text may return CRLF; a naive replace('\n', "\r\n")
+    // would turn existing \r\n into \r\r\n, producing double-newlines after
+    // normalize_line_endings strips the \r characters.
+    let fixture = fixture_raw.replace("\r\n", "\n");
     let fixture_crlf = fixture.replace('\n', "\r\n");
     let options = FigmaCodegenOptions {
         module_name: "figma_pipeline_generated".to_string(),

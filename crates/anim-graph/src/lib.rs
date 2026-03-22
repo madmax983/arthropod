@@ -37,9 +37,26 @@
 //! // Create a stiff spring with low damping (bouncy)
 //! let mut spring = Animation::spring(0.0, 100.0, 300.0, 15.0);
 //!
-//! // Tick the simulation
+// Ticking the simulation
 //! let value = spring.tick(Duration::from_millis(16));
 //! ```
+
+pub mod clock;
+pub mod ecs;
+pub mod evaluable;
+pub mod hold;
+pub mod keyframe;
+pub mod sample;
+pub mod sequence;
+pub mod spring_segment;
+pub mod stagger;
+pub mod time_warp;
+pub mod timeline;
+
+// Re-exports
+pub use clock::{AnimationClock, ClockEvent, PlaybackMode};
+pub use evaluable::Evaluable;
+pub use sample::Sample;
 
 use std::time::Duration;
 
@@ -131,6 +148,46 @@ impl Easing {
                 let t2 = t * t;
                 let t3 = t2 * t;
                 3.0 * (1.0 - t) * (1.0 - t) * t * y1 + 3.0 * (1.0 - t) * t2 * y2 + t3
+            }
+        }
+    }
+
+    /// Compute the instantaneous rate of change (derivative) of the easing function.
+    ///
+    /// Used by [`Keyframe`](crate::keyframe::Keyframe) to produce velocity in [`Sample`](crate::Sample).
+    /// The derivative tells us how fast the easing curve is changing at time `t`,
+    /// which translates to the animation's velocity when scaled by `(to - from) / duration`.
+    ///
+    /// # Mathematical basis
+    ///
+    /// - **Linear**: `f(t) = t` → `f'(t) = 1`
+    /// - **EaseIn**: `f(t) = t²` → `f'(t) = 2t`
+    /// - **EaseOut**: `f(t) = t(2-t)` → `f'(t) = 2 - 2t`
+    /// - **EaseInOut**: piecewise `f'(t) = 4t` or `f'(t) = 4 - 4t`
+    /// - **CubicBezier**: numerical finite difference
+    pub fn derivative(&self, t: f32) -> f32 {
+        let t = t.clamp(0.0, 1.0);
+        match self {
+            Easing::Linear => 1.0,
+            Easing::EaseIn => 2.0 * t,
+            Easing::EaseOut => 2.0 - 2.0 * t,
+            Easing::EaseInOut => {
+                if t < 0.5 {
+                    4.0 * t
+                } else {
+                    4.0 - 4.0 * t
+                }
+            }
+            Easing::CubicBezier(..) => {
+                // Numerical derivative via central finite difference
+                let h = 0.0001;
+                let t0 = (t - h).max(0.0);
+                let t1 = (t + h).min(1.0);
+                let dt = t1 - t0;
+                if dt < f32::EPSILON {
+                    return 0.0;
+                }
+                (self.apply(t1) - self.apply(t0)) / dt
             }
         }
     }

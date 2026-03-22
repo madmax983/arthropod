@@ -2,8 +2,8 @@ use super::core::{App, AppError};
 use super::integration::integrate_widget_scene;
 use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 // use crate::layout::auto_layout; // Removed in favor of ECS system
-use arthropod_ecs::components::LayoutConstraintsResource;
-use flux_state::{Runtime, Signal};
+use arthropod_ecs::components::{FrameSignalResource, LayoutConstraintsResource};
+use flux_state::{ReadSignal, Runtime, Signal};
 use layout_engine::LayoutConstraints;
 use plat_core::{
     Application, ControlFlow, Event, EventLoop, Size, WindowConfig, WindowEvent, WindowId,
@@ -68,6 +68,13 @@ impl AppContext {
         self.widget_ctx.set_design_tokens(tokens);
     }
 
+    /// Get a signal that updates every frame.
+    ///
+    /// Useful for driving animations and time-based reactive logic.
+    pub fn frame_signal(&self) -> ReadSignal<u64> {
+        self.widget_ctx.frame_signal()
+    }
+
     /// Store an effect to keep it alive.
     pub fn store_effect(&mut self, effect: flux_state::Effect) {
         self.widget_ctx.store_effect(effect);
@@ -76,6 +83,49 @@ impl AppContext {
     /// Get the reactive runtime.
     pub fn runtime(&self) -> &Arc<Runtime> {
         &self.runtime
+    }
+
+    /// Attach a `Timeline<f32>` that drives a signal each frame.
+    ///
+    /// The timeline is ticked by the ECS `timeline_system` and writes
+    /// its sampled value to `target` every frame.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use arthropod::prelude::*;
+    /// # use std::time::Duration;
+    /// App::run("Test", 400, 300, |ctx| {
+    ///     let sig = ctx.signal(0.0_f32);
+    ///     let (read, write) = sig.split();
+    ///     ctx.add_timeline_f32(
+    ///         anim_graph::timeline::Timeline::tween(0.0, 1.0, Duration::from_secs(2)).loop_forever(),
+    ///         write,
+    ///     );
+    ///     widget_core::Text::new("Placeholder")
+    /// });
+    /// ```
+    pub fn add_timeline_f32(
+        &mut self,
+        timeline: anim_graph::timeline::Timeline<f32>,
+        target: flux_state::WriteSignal<f32>,
+    ) {
+        // Use a sentinel NodeId — the timeline isn't attached to a scene node,
+        // it drives a signal that widgets read from.
+        let count = self.widget_ctx.timeline_f32_states().len() as u64;
+        let id = render_engine::NodeId(u64::MAX.wrapping_sub(count));
+        self.widget_ctx.add_timeline_f32(id, timeline, target);
+    }
+
+    /// Attach a `Timeline<Color>` that drives a color signal each frame.
+    pub fn add_timeline_color(
+        &mut self,
+        timeline: anim_graph::timeline::Timeline<render_engine::Color>,
+        target: flux_state::WriteSignal<render_engine::Color>,
+    ) {
+        let count = self.widget_ctx.timeline_color_states().len() as u64;
+        let id = render_engine::NodeId(u64::MAX.wrapping_sub(count + 10000));
+        self.widget_ctx.add_timeline_color(id, timeline, target);
     }
 }
 
@@ -106,6 +156,9 @@ struct WidgetApp {
     widget_ctx: WidgetContext,
     dispatcher: EventDispatcher,
     viewport: (u32, u32),
+    /// True when there are active timeline drivers that need continuous ticking.
+    /// Checked in on_event to decide between ControlFlow::Poll and ControlFlow::Wait.
+    has_active_animations: bool,
 }
 
 impl Application for WidgetApp {
@@ -138,6 +191,18 @@ impl Application for WidgetApp {
 
         let runtime = app.runtime().clone();
 
+        // Initialize frame signal resource early so builders can use it
+        let frame_signal = Signal::new(runtime.clone(), 0u64);
+        let (read_frame, write_frame) = frame_signal.split();
+        app.world_mut().insert_resource(FrameSignalResource {
+            write_handle: write_frame,
+            read_handle: read_frame.clone(),
+        });
+
+        // Insert runtime resource for reactive effects runner
+        app.world_mut()
+            .insert_resource(arthropod_ecs::systems::RuntimeResource(runtime.clone()));
+
         // Take scene from app to build widgets directly into it
         let scene = app
             .world_mut()
@@ -145,9 +210,11 @@ impl Application for WidgetApp {
             .expect("Scene resource missing");
 
         // Build widget tree
-        let widget_ctx = WidgetContext::new(scene);
+        let mut widget_ctx = WidgetContext::new(scene);
+        widget_ctx.set_frame_signal(read_frame);
+
         let mut app_ctx = AppContext {
-            runtime,
+            runtime: runtime.clone(),
             widget_ctx,
         };
 
@@ -164,11 +231,16 @@ impl Application for WidgetApp {
         let scene = widget_ctx.take_scene();
         app.world_mut().insert_resource(scene);
 
-        // Integrate widget scene into app ECS (spawn entities)
+        // 1. Integrate widget scene into app ECS (spawn entities)
         integrate_widget_scene(&mut app, widget_root);
 
-        // Integrate widget components (LayoutStyle, Clickable, etc.) into ECS
+        // 2. Integrate widget components (LayoutStyle, Clickable, etc.) into ECS
+        // This must happen AFTER spawn so entities exist to receive components
         app.integrate_widgets(&widget_ctx);
+
+        // 3. Transfer timelines and effects (must move, not clone)
+        app.integrate_timelines(&mut widget_ctx);
+        app.integrate_effects(&mut widget_ctx);
 
         // Set initial layout constraints
         app.world_mut()
@@ -189,15 +261,39 @@ impl Application for WidgetApp {
         println!("  - Tab to move to next field");
         println!("  - Enter to submit form");
 
+        // Check if any timelines were spawned into the ECS
+        let has_active_animations = {
+            let f32_count = app
+                .world_mut()
+                .query::<&anim_graph::ecs::TimelineDriver<f32>>()
+                .iter(app.world())
+                .count();
+            let color_count = app
+                .world_mut()
+                .query::<&anim_graph::ecs::TimelineDriver<Color>>()
+                .iter(app.world())
+                .count();
+            f32_count + color_count > 0
+        };
+
         Self {
             app,
             widget_ctx,
             dispatcher,
             viewport: (config.width, config.height),
+            has_active_animations,
         }
     }
 
     fn on_event(&mut self, event: Event, control_flow: &mut ControlFlow) {
+        // Only poll continuously when animations are active.
+        // Static UIs use Wait to avoid wasting CPU/battery.
+        *control_flow = if self.has_active_animations {
+            ControlFlow::Poll
+        } else {
+            ControlFlow::Wait
+        };
+
         #[cfg(feature = "nova")]
         crate::experimental::ghost_replay::record_event(self.app.world_mut(), &event);
 
@@ -302,9 +398,47 @@ impl Application for WidgetApp {
         }
     }
 
-    fn on_redraw(&mut self, _window_id: WindowId) {
+    fn on_update(&mut self, delta: std::time::Duration) {
+        // Update time resource for animation system
+        if let Some(mut time) = self
+            .app
+            .world_mut()
+            .get_resource_mut::<anim_graph::ecs::TimeResource>()
+        {
+            time.set_delta(delta);
+        }
+
         // Run update systems (layout, reactive, etc.)
         self.app.update();
+
+        // Refresh animation activity flag — when the last timeline completes
+        // and is removed, switch back to Wait mode next frame.
+        self.has_active_animations = {
+            let f32_count = self
+                .app
+                .world_mut()
+                .query::<&anim_graph::ecs::TimelineDriver<f32>>()
+                .iter(self.app.world())
+                .count();
+            let color_count = self
+                .app
+                .world_mut()
+                .query::<&anim_graph::ecs::TimelineDriver<Color>>()
+                .iter(self.app.world())
+                .count();
+            f32_count + color_count > 0
+        };
+
+        // Request redraw so on_redraw renders the new frame
+        if let Some(window) = self.app.window() {
+            window.request_redraw();
+        }
+    }
+
+    fn on_redraw(&mut self, _window_id: WindowId) {
+        // Do NOT call self.app.update() here — on_update() already ran the
+        // frame schedule with the correct delta. A second update would tick
+        // animations twice per frame with stale/zero delta.
 
         // Take backend to avoid borrow conflicts
         let mut backend = self.app.world_mut().remove_resource::<WgpuBackend>();
@@ -320,6 +454,10 @@ impl Application for WidgetApp {
         if let Some(backend) = backend {
             self.app.world_mut().insert_resource(backend);
         }
+
+        // Don't request_redraw unconditionally — ControlFlow::Poll already
+        // drives continuous updates. Unconditional redraws waste CPU/GPU
+        // for static UIs with no active animations.
     }
 }
 

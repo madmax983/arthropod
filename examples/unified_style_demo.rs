@@ -3,12 +3,12 @@
 //! This example demonstrates the new cohesive DX:
 //! 1. Using the `style!` macro for declarative visuals and layout.
 //! 2. Automatic hover/active states handled by the ECS.
-//! 3. Zero manual event handling for visual feedback.
+//! 3. Reactive animations driven by the `anim-graph` integrated runner.
 //!
 //! Run with: cargo run --example unified_style_demo
 
 use arthropod::prelude::*;
-use std::time::Instant;
+use std::time::Duration;
 
 fn main() -> Result<(), AppError> {
     App::run("Unified Style Demo", 600, 500, |ctx| {
@@ -17,18 +17,20 @@ fn main() -> Result<(), AppError> {
         let tokens = DesignTokens::from_system(&theme);
         ctx.set_design_tokens(tokens.clone());
 
-        // Create an animated progress signal
+        // 2. Create an animated progress signal using Timeline
         let progress_signal = ctx.signal(0.0_f32);
         let (read_progress, write_progress) = progress_signal.split();
 
-        let start_time = Instant::now();
-        ctx.store_effect(Effect::new(ctx.runtime().clone(), move || {
-            let elapsed = start_time.elapsed().as_secs_f32();
-            let p = (elapsed * 0.5) % 1.0;
-            write_progress.set(p);
-        }));
+        // A looping 5-second tween from 0→1, driven by the ECS timeline system.
+        // Old approach: 33 lines of manual Arc<Mutex<Animation>>, frame signal Effect, manual reset.
+        // New approach: one Timeline declaration.
+        let timeline =
+            arthropod::anim_graph::timeline::Timeline::tween(0.0_f32, 1.0, Duration::from_secs(5))
+                .loop_forever();
 
-        // 2. Define a card style
+        ctx.add_timeline_f32(timeline, write_progress);
+
+        // 3. Define a card style
         let card_style = style! {
             background: tokens.surface_secondary.clone();
             padding: 32.0;
@@ -37,9 +39,14 @@ fn main() -> Result<(), AppError> {
             align_items: FlexAlign::Center;
         };
 
-        // 3. Build the UI
+        // 4. Build the UI
         Center::new(
             Column::new((
+                Column::new((
+                    txt!("Animated Progress", size: 14.0),
+                    progress_bar!(read_progress, height: 10.0),
+                ))
+                .gap(8.0),
                 Row::new((
                     icon!("\u{e88a}", size: 32.0, color: tokens.accent), // Home
                     txt!("Cohesive DX", size: 32.0),
@@ -65,17 +72,11 @@ fn main() -> Result<(), AppError> {
                     }),
                 ))
                 .gap(12.0),
-                // New primitive: ProgressBar
-                Column::new((
-                    txt!("Animated Progress", size: 14.0),
-                    progress_bar!(read_progress, height: 10.0),
-                ))
-                .gap(8.0),
                 txt!(
-                    "The card hover was removed to focus on button interactions.",
+                    "Everything is synchronized via the integrated anim-graph.",
                     size: 14.0
                 )
-                .color(Color::rgba(0.5, 0.5, 0.5, 1.0)),
+                .color(Color(tokens.text_secondary)),
             ))
             .style(card_style),
         )

@@ -2,7 +2,8 @@ use arthropod_ecs::{
     FrameworkContext,
     components::{
         BackgroundColor, Clickable, InteractionState, LayoutStyle, ReactiveColor,
-        ReactiveComputedText, ReactiveLayoutWidth, ReactiveText, SceneNodeRef, WidgetStyle,
+        ReactiveComputedText, ReactiveLayoutFlexGrow, ReactiveLayoutWidth, ReactiveText,
+        SceneNodeRef, WidgetStyle,
     },
 };
 use bevy_ecs::{prelude::*, world::EntityWorldMut};
@@ -35,6 +36,10 @@ pub enum AppError {
     #[error("Failed to render: {0}")]
     RenderError(String),
 }
+
+/// Resource to keep reactive effects alive for the duration of the application.
+#[derive(Resource, Default)]
+pub struct EffectsResource(pub Vec<flux_state::Effect>);
 
 /// Arthropod application
 ///
@@ -346,6 +351,7 @@ impl App {
     /// Helper to transfer components from widget context to ECS world
     fn transfer_components<'a, T, C, F>(
         &mut self,
+        _label: &str,
         source_data: impl Iterator<Item = (&'a NodeId, &'a T)>,
         component_factory: F,
     ) where
@@ -353,10 +359,19 @@ impl App {
         C: Component,
         F: Fn(&T) -> C,
     {
+        // 1. Build a temporary map of NodeId -> Entity for fast lookup
+        let mut node_to_entity = std::collections::HashMap::new();
+        let mut query = self.world_mut().query::<(Entity, &SceneNodeRef)>();
+        for (entity, scene_ref) in query.iter(self.world()) {
+            node_to_entity.insert(scene_ref.0, entity);
+        }
+
+        // 2. Transfer components
         for (node_id, data) in source_data {
-            // Assume widget_node_id == app_node_id
-            if let Some(mut entity) = self.get_entity_mut(*node_id) {
-                entity.insert(component_factory(data));
+            if let Some(&entity) = node_to_entity.get(node_id)
+                && let Ok(mut entity_mut) = self.world_mut().get_entity_mut(entity)
+            {
+                entity_mut.insert(component_factory(data));
             }
         }
     }
@@ -407,12 +422,14 @@ impl App {
     pub fn integrate_widgets(&mut self, widget_ctx: &WidgetContext) {
         // Transfer layout styles to LayoutStyle components
         self.transfer_components(
+            "LayoutStyle",
             widget_ctx.layout_styles().iter(),
             |style: &layout_engine::FlexStyle| LayoutStyle(style.clone()),
         );
 
         // Transfer clickables to Clickable components
         self.transfer_components(
+            "Clickable",
             widget_ctx.clickables().iter(),
             |callback: &std::sync::Arc<dyn Fn() + Send + Sync>| Clickable {
                 callback: callback.clone(),
@@ -421,12 +438,14 @@ impl App {
 
         // Transfer background colors to BackgroundColor components
         self.transfer_components(
+            "BackgroundColor",
             widget_ctx.background_colors().iter(),
             |color: &render_engine::Vec4| BackgroundColor(*color),
         );
 
         // Transfer reactive color states to ReactiveColor components
         self.transfer_components(
+            "ReactiveColor",
             widget_ctx.reactive_color_states().iter(),
             |state: &widget_core::input_state::ReactiveColorState| {
                 ReactiveColor::new(state.read_signal.clone())
@@ -435,14 +454,34 @@ impl App {
 
         // Transfer reactive layout width states to ReactiveLayoutWidth components
         self.transfer_components(
+            "ReactiveLayoutWidth",
             widget_ctx.reactive_layout_width_states().iter(),
             |state: &widget_core::input_state::ReactiveLayoutWidthState| {
-                ReactiveLayoutWidth::new(state.read_signal.clone())
+                ReactiveLayoutWidth::new(state.read_signal.clone(), state.handle.clone())
+            },
+        );
+
+        // Transfer reactive layout flex grow states to ReactiveLayoutFlexGrow components
+        self.transfer_components(
+            "ReactiveLayoutFlexGrow",
+            widget_ctx.reactive_layout_flex_grow_states().iter(),
+            |state: &widget_core::input_state::ReactiveLayoutFlexGrowState| {
+                ReactiveLayoutFlexGrow::new(state.read_signal.clone())
+            },
+        );
+
+        // Transfer progress bar direct states
+        self.transfer_components(
+            "ProgressBarState",
+            widget_ctx.progress_bar_states().iter(),
+            |(progress, total_width)| {
+                arthropod_ecs::components::ProgressBarState::new(progress.clone(), *total_width)
             },
         );
 
         // Transfer reactive text to ReactiveText components
         self.transfer_components(
+            "ReactiveText",
             widget_ctx.reactive_text_states().iter(),
             |state: &widget_core::input_state::ReactiveTextState| {
                 ReactiveText::new(state.read_signal.clone())
@@ -451,6 +490,7 @@ impl App {
 
         // Transfer computed text to ReactiveComputedText components
         self.transfer_components(
+            "ReactiveComputedText",
             widget_ctx.computed_text_states().iter(),
             |state: &widget_core::input_state::ComputedTextState| {
                 ReactiveComputedText::new(state.computed.clone())
@@ -459,6 +499,7 @@ impl App {
 
         // Transfer high-level widget styles
         self.transfer_components(
+            "WidgetStyle",
             widget_ctx.widget_styles().iter(),
             |style: &widget_core::Style| WidgetStyle(style.clone()),
         );
@@ -472,8 +513,66 @@ impl App {
             }
         }
 
+        // Note: Effects are transferred separately via integrate_effects()
+        // because they have RAII Drop semantics and must be moved, not cloned.
+
         // Note: Complex state (TextInput, Form) is handled by the higher-level
         // WidgetApp controller, not by direct ECS component transfer at this time.
+    }
+
+    /// Transfer timeline drivers from widget context to ECS.
+    ///
+    /// Timelines are moved (not cloned) because `Timeline<T>` wraps a `Box<dyn Evaluable<T>>`.
+    /// This must be called separately from `integrate_widgets` since it requires `&mut WidgetContext`.
+    pub fn integrate_timelines(&mut self, widget_ctx: &mut WidgetContext) {
+        // Build node→entity lookup
+        let mut node_to_entity = std::collections::HashMap::new();
+        let mut query = self.world_mut().query::<(Entity, &SceneNodeRef)>();
+        for (entity, scene_ref) in query.iter(self.world()) {
+            node_to_entity.insert(scene_ref.0, entity);
+        }
+
+        // Transfer f32 timelines
+        for (node_id, (timeline, target)) in widget_ctx.take_timeline_f32_states() {
+            let driver = anim_graph::ecs::TimelineDriver::new(timeline, target);
+            if let Some(&entity) = node_to_entity.get(&node_id) {
+                // Attach to existing scene node entity
+                if let Ok(mut entity_mut) = self.world_mut().get_entity_mut(entity) {
+                    entity_mut.insert(driver);
+                }
+            } else {
+                // Standalone timeline (not attached to a scene node) — spawn its own entity
+                self.world_mut().spawn(driver);
+            }
+        }
+
+        // Transfer Color timelines
+        for (node_id, (timeline, target)) in widget_ctx.take_timeline_color_states() {
+            let driver = anim_graph::ecs::TimelineDriver::new(timeline, target);
+            if let Some(&entity) = node_to_entity.get(&node_id) {
+                if let Ok(mut entity_mut) = self.world_mut().get_entity_mut(entity) {
+                    entity_mut.insert(driver);
+                }
+            } else {
+                self.world_mut().spawn(driver);
+            }
+        }
+    }
+
+    /// Transfer effects from widget context to ECS.
+    ///
+    /// Effects have RAII Drop semantics — cloning creates a double-dispose bug.
+    /// This drains them from the widget context and moves them into an ECS resource.
+    pub fn integrate_effects(&mut self, widget_ctx: &mut WidgetContext) {
+        let effects = widget_ctx.take_effects();
+        if !effects.is_empty() {
+            let mut effects_res = self
+                .world_mut()
+                .get_resource_or_insert_with(EffectsResource::default);
+            for effect in effects {
+                effects_res.0.push(effect);
+            }
+        }
     }
 
     /// Run a widget-based application.

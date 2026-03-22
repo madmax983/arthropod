@@ -104,6 +104,8 @@ checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 name = "anim-graph"
 version = "0.1.0"
 dependencies = [
+ "bevy_ecs",
+ "flux-state",
  "render-engine",
 ]
 
@@ -220,6 +222,7 @@ version = "0.1.0"
 dependencies = [
  "a11y-engine",
  "accesskit",
+ "anim-graph",
  "bevy_ecs",
  "bevy_tasks",
  "criterion",
@@ -229,6 +232,7 @@ dependencies = [
  "plat-core",
  "rayon",
  "render-engine",
+ "theme-engine",
  "widget-core",
 ]
 
@@ -5526,6 +5530,7 @@ dependencies = [
 name = "widget-core"
 version = "0.1.0"
 dependencies = [
+ "anim-graph",
  "criterion",
  "flux-state",
  "glam",

@@ -3,19 +3,31 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityWorldMut;
 use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
 
-use crate::components::{MousePosition, SceneNodeRef};
+use crate::components::{FrameSignalResource, MousePosition, SceneNodeRef};
 use crate::systems::{
     apply_a11y_bounds_system, collect_renderables_system, gather_a11y_bounds_system, layout_system,
     A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
+
+use crate::systems::RuntimeResource;
+use anim_graph::ecs::{timeline_system, TimeResource};
+use render_engine::Color;
+
+use crate::systems::run_reactive_effects_system;
 
 #[cfg(feature = "parallel-reactive")]
 use crate::systems::{apply_reactive_changes_system, gather_reactive_changes_system};
 
 #[cfg(not(feature = "parallel-reactive"))]
 use crate::systems::{
-    update_all_reactive_system, update_interaction_state_system, update_widget_style_system,
+    update_all_reactive_system, update_interaction_state_system, update_progress_bar_direct_system,
+    update_widget_style_system,
 };
+
+/// System that increments the frame signal each frame
+pub fn update_frame_signal_system(res: Res<FrameSignalResource>) {
+    res.write_handle.update(|f| *f = f.wrapping_add(1));
+}
 
 /// Enterprise GUI framework context - wraps ECS World
 ///
@@ -90,6 +102,20 @@ impl FrameworkContext {
         world.insert_resource(ReactiveChangeBuffer::default());
         world.insert_resource(A11yBoundsBuffer::default());
         world.insert_resource(MousePosition::default());
+        world.insert_resource(crate::components::IntegrationHeartbeat::default());
+        world.insert_resource(TimeResource::default());
+
+        // Create a shared runtime for reactive effects
+        let runtime = flux_state::Runtime::new();
+        world.insert_resource(RuntimeResource(runtime.clone()));
+
+        // Create frame signal (incremented each frame for animation subscriptions)
+        let frame_signal = flux_state::Signal::new(runtime, 0u64);
+        let (read_handle, write_handle) = frame_signal.split();
+        world.insert_resource(FrameSignalResource {
+            write_handle,
+            read_handle,
+        });
 
         Self {
             world,
@@ -186,7 +212,12 @@ impl FrameworkContext {
         #[cfg(feature = "parallel-reactive")]
         {
             schedule.add_systems((
-                gather_reactive_changes_system,
+                update_frame_signal_system,
+                timeline_system::<f32>.after(update_frame_signal_system),
+                timeline_system::<Color>.after(update_frame_signal_system),
+                gather_reactive_changes_system
+                    .after(timeline_system::<f32>)
+                    .after(timeline_system::<Color>),
                 apply_reactive_changes_system.after(gather_reactive_changes_system),
                 layout_system.after(apply_reactive_changes_system),
                 // These two overlap — different ResMut, same Res<Scene>
@@ -194,23 +225,36 @@ impl FrameworkContext {
                 collect_renderables_system.after(layout_system),
                 // Apply a11y bounds after gather completes
                 apply_a11y_bounds_system.after(gather_a11y_bounds_system),
+                // Run effects at the end of the frame to process any side effects
+                run_reactive_effects_system,
             ));
         }
 
         #[cfg(not(feature = "parallel-reactive"))]
         {
             schedule.add_systems((
-                update_interaction_state_system,
-                update_all_reactive_system,
+                update_frame_signal_system,
+                timeline_system::<f32>.after(update_frame_signal_system),
+                timeline_system::<Color>.after(update_frame_signal_system),
+                update_interaction_state_system.after(update_frame_signal_system),
+                // Signal readers must run AFTER timeline writers to avoid
+                // rendering stale values from the previous frame.
+                update_all_reactive_system
+                    .after(timeline_system::<f32>)
+                    .after(timeline_system::<Color>),
+                update_progress_bar_direct_system.after(timeline_system::<f32>),
                 update_widget_style_system.after(update_interaction_state_system),
                 layout_system
                     .after(update_all_reactive_system)
+                    .after(update_progress_bar_direct_system)
                     .after(update_widget_style_system),
                 // These two overlap — different ResMut, same Res<Scene>
                 gather_a11y_bounds_system.after(layout_system),
                 collect_renderables_system.after(layout_system),
                 // Apply a11y bounds after gather completes
                 apply_a11y_bounds_system.after(gather_a11y_bounds_system),
+                // Run effects at the end of the frame to process any side effects
+                run_reactive_effects_system,
             ));
         }
 

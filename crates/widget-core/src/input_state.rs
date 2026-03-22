@@ -33,4 +33,13 @@ pub struct ReactiveColorState {
 pub struct ReactiveLayoutWidthState {
     /// The source signal for the width.
     pub read_signal: ReadSignal<f32>,
+    /// Optional handle to keep Computed alive (if the signal came from a Computed)
+    pub handle: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
+}
+
+/// Reactive layout flex grow state for a node.
+#[derive(Clone)]
+pub struct ReactiveLayoutFlexGrowState {
+    /// The source signal for the flex grow factor.
+    pub read_signal: ReadSignal<f32>,
 }
