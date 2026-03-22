@@ -7,10 +7,10 @@
 
 **ComputingGuard Timeout Verdict**
 **Module:** `crates/flux-state/src/runtime.rs`
-**Severity:** 🔴 Critical
-**Finding:** A timeout mutant `replace <impl Drop for ComputingGuard<'a>>::drop with ()` shows that if the runtime fails to remove the node from `computing` and notify the condvar during panic unwinding, threads waiting for the computation hang indefinitely. While there's panic tests, they don't seem to verify that *other threads* aren't blocked when one panics, causing the test suite to hang instead of failing gracefully.
-**Evidence:** `TIMEOUT  crates/flux-state/src/runtime.rs:124:9: replace <impl Drop for ComputingGuard<'a>>::drop with ()`
-**Recommendation:** Write a specific test where one thread starts computing a node, panics (caught via `catch_unwind`), and another thread attempting to read the same node either succeeds or propagates the panic instead of deadlocking.
+**Severity:** 🟢 Acquitted
+**Finding:** `ComputingGuard::drop` was previously only notifying the condvar and cleaning up the `computing` state if `std::thread::panicking()` was true. This led to fragility where if the `if` check or the whole drop block was mutated away, threads would hang. By modifying `ComputingGuard::drop` to *always* unconditionally remove the node from `computing` and notify the condvar (and removing the manual cleanup from `finish_computation`), the logic is simpler, safer, and immune to partial drop mutations. A new test `elenchus_concurrent_panic_recovery` was also added and verifies that a panic in one thread correctly wakes up blocked threads.
+**Evidence:** `elenchus_concurrent_panic_recovery.rs` catches the hang if the drop logic is removed, and tests pass with the simplified unconditional drop logic.
+**Recommendation:** None, logic is fixed and test is green.
 
 **take_pending_effects Timeout Verdict**
 **Module:** `crates/flux-state/src/runtime.rs`
@@ -34,10 +34,10 @@
 | `sentry_graph_snapshot` | 🟢 Acquitted | `nova` features cover nodes appropriately. |
 | `detect_deadlock` | 🟢 Acquitted | Deadlock panics are successfully triggered; removing the check causes timeouts (hangs), proving the tests exercise the right paths. |
 | `take_pending_effects` | 🟢 Acquitted | Forcing loop continuation causes timeout, an expected failure mode. |
-| `ComputingGuard::drop` | 🔴 Critical | Timeout on mutant indicates that a panic during `recompute` might not wake up *other* threads waiting on the same `Condvar`, leading to a hang rather than a propagated failure or swift resolution in tests. |
+| `ComputingGuard::drop` | 🟢 Acquitted | `ComputingGuard::drop` was refactored to unconditionally remove the node from `computing` and notify `condvar`. `elenchus_concurrent_panic_recovery` test guarantees thread wakeups on panic. |
 
 **Priority Fixes:**
-1. **`ComputingGuard::drop` Missing Propagation Test:** Sentry wrote tests for `ComputingGuard` dropping correctly, but the timeout suggests no test verifies the behavior where Thread B waits on a node that Thread A is computing, and Thread A panics. The `Drop` impl of `ComputingGuard` should notify `condvar` and remove the node from `computing` so Thread B can wake up. The test needs to spawn Thread A to trigger a panic inside a `Computed`, and then Thread B attempts to read it. Thread B must not hang (which it will if `ComputingGuard` mutant survives by removing the drop logic). Thread B should either return stale data, panic itself, or retry. Currently, testing this specifically with `std::thread::spawn` and `join` will verify the `condvar.notify_all()` in the Drop impl.
+None.
 
 **Missing Coverage:**
-- Threaded Panic Recovery on Computed Nodes: Test that a thread waiting for a computed value wakes up and handles the situation if the thread currently computing that value panics.
+None.

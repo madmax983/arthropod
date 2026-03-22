@@ -122,14 +122,12 @@ struct ComputingGuard<'a> {
 
 impl<'a> Drop for ComputingGuard<'a> {
     fn drop(&mut self) {
-        if std::thread::panicking() {
-            let mut inner = match self.runtime.inner.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            inner.computing.remove(&self.id);
-            self.runtime.condvar.notify_all();
-        }
+        let mut inner = match self.runtime.inner.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        inner.computing.remove(&self.id);
+        self.runtime.condvar.notify_all();
     }
 }
 
@@ -620,9 +618,6 @@ impl Runtime {
         } else {
             inner.stale.remove(&id);
         }
-
-        inner.computing.remove(&id);
-        self.condvar.notify_all();
     }
 
     /// Recompute the value of a computed node.
