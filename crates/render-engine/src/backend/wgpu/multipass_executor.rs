@@ -31,6 +31,14 @@ use crate::primitives::PrimitiveInstance;
 use rayon::prelude::*;
 use text_engine::{ShapedText, shape_text_parallel_with_options};
 
+pub(crate) struct DrawBatchesParams<'a, 'b> {
+    pub target_view: &'a wgpu::TextureView,
+    pub load_op: wgpu::LoadOp<wgpu::Color>,
+    pub instances: &'a [PrimitiveInstance],
+    pub path_batches: &'a [PathBatch<'b>],
+    pub scissor: Option<[u32; 4]>,
+}
+
 type ShapedTextResult<'a> = (
     glam::Vec2,
     f32,
@@ -265,11 +273,13 @@ impl<'a> MultipassRenderer<'a> {
             if background_blur_radius.is_none() {
                 Self::draw_batches_to_view(
                     &mut ctx,
-                    src_view,
-                    wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                    instances_buffer,
-                    path_batches_buffer,
-                    None,
+                    DrawBatchesParams {
+                        target_view: src_view,
+                        load_op: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        instances: instances_buffer,
+                        path_batches: path_batches_buffer,
+                        scissor: None,
+                    },
                 );
             } else {
                 Self::copy_texture_full_frame(&ctx, surface_texture, src_texture);
@@ -321,11 +331,13 @@ impl<'a> MultipassRenderer<'a> {
             if background_blur_radius.is_some() {
                 Self::draw_batches_to_view(
                     &mut ctx,
-                    surface_view,
-                    wgpu::LoadOp::Load,
-                    instances_buffer,
-                    path_batches_buffer,
-                    scissor,
+                    DrawBatchesParams {
+                        target_view: surface_view,
+                        load_op: wgpu::LoadOp::Load,
+                        instances: instances_buffer,
+                        path_batches: path_batches_buffer,
+                        scissor,
+                    },
                 );
             }
 
@@ -362,11 +374,13 @@ impl<'a> MultipassRenderer<'a> {
 
         Self::draw_batches_to_view(
             &mut ctx,
-            surface_view,
-            wgpu::LoadOp::Clear(clear_color),
-            &[],
-            &[],
-            None,
+            DrawBatchesParams {
+                target_view: surface_view,
+                load_op: wgpu::LoadOp::Clear(clear_color),
+                instances: &[],
+                path_batches: &[],
+                scissor: None,
+            },
         );
 
         collect_ordered_render_nodes(scene, self.traversal_stack, self.ordered_nodes_buffer);
@@ -468,11 +482,13 @@ impl<'a> MultipassRenderer<'a> {
                 };
                 Self::draw_batches_to_view(
                     &mut ctx,
-                    surface_view,
-                    wgpu::LoadOp::Load,
-                    instances_buffer,
-                    path_batches_buffer,
-                    scissor,
+                    DrawBatchesParams {
+                        target_view: surface_view,
+                        load_op: wgpu::LoadOp::Load,
+                        instances: instances_buffer,
+                        path_batches: path_batches_buffer,
+                        scissor,
+                    },
                 );
             }
             crate::NodeContent::SolidColor { color } => {
@@ -505,11 +521,13 @@ impl<'a> MultipassRenderer<'a> {
                 };
                 Self::draw_batches_to_view(
                     &mut ctx,
-                    surface_view,
-                    wgpu::LoadOp::Load,
-                    &instances,
-                    &[],
-                    scissor,
+                    DrawBatchesParams {
+                        target_view: surface_view,
+                        load_op: wgpu::LoadOp::Load,
+                        instances: &instances,
+                        path_batches: &[],
+                        scissor,
+                    },
                 );
             }
             crate::NodeContent::Empty => {}
@@ -535,15 +553,15 @@ impl<'a> MultipassRenderer<'a> {
     /// Renders collected primitive and path instances to the given `target_view`.
     /// Accepts a struct-extracted `MultipassContext` instead of `&mut self` to avoid
     /// `wgpu::TextureView` clones in the caller's hot loop, keeping this abstraction zero-cost.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn draw_batches_to_view(
         ctx: &mut MultipassContext,
-        target_view: &wgpu::TextureView,
-        load_op: wgpu::LoadOp<wgpu::Color>,
-        instances: &[PrimitiveInstance],
-        path_batches: &[PathBatch<'_>],
-        scissor: Option<[u32; 4]>,
+        params: DrawBatchesParams<'_, '_>,
     ) {
+        let target_view = params.target_view;
+        let load_op = params.load_op;
+        let instances = params.instances;
+        let path_batches = params.path_batches;
+        let scissor = params.scissor;
         let should_skip = instances.is_empty()
             && path_batches.is_empty()
             && !matches!(load_op, wgpu::LoadOp::Clear(_));

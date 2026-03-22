@@ -434,11 +434,13 @@ impl WgpuBackend {
             };
             multipass_executor::MultipassRenderer::draw_batches_to_view(
                 &mut ctx,
-                &frame_view,
-                wgpu::LoadOp::Clear(clear_color),
-                &base_instances,
-                &base_path_batches,
-                None,
+                multipass_executor::DrawBatchesParams {
+                    target_view: &frame_view,
+                    load_op: wgpu::LoadOp::Clear(clear_color),
+                    instances: &base_instances,
+                    path_batches: &base_path_batches,
+                    scissor: None,
+                },
             );
         } else {
             executor.render_scene_in_visual_order(scene, &frame_texture, &frame_view);

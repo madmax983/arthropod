@@ -557,8 +557,7 @@ fn angle_between(u: Vec2, v: Vec2) -> f32 {
     cross.atan2(dot)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn arc_to_polyline(
+struct ArcParams {
     from: Vec2,
     to: Vec2,
     rx: f32,
@@ -567,7 +566,17 @@ fn arc_to_polyline(
     large_arc: bool,
     sweep: bool,
     max_arc_step_degrees: f32,
-) -> Vec<Vec2> {
+}
+
+fn arc_to_polyline(params: &ArcParams) -> Vec<Vec2> {
+    let from = params.from;
+    let to = params.to;
+    let rx = params.rx;
+    let ry = params.ry;
+    let x_axis_rotation_deg = params.x_axis_rotation_deg;
+    let large_arc = params.large_arc;
+    let sweep = params.sweep;
+    let max_arc_step_degrees = params.max_arc_step_degrees;
     if rx <= 0.0 || ry <= 0.0 || (from - to).length_squared() < 1e-8 {
         return vec![to];
     }
@@ -794,16 +803,16 @@ impl<'a> SvgPathParser<'a> {
                         let large_arc = self.read_number()? != 0.0;
                         let sweep = self.read_number()? != 0.0;
                         let to = self.read_point(current, abs)?;
-                        for p in arc_to_polyline(
-                            current,
+                        for p in arc_to_polyline(&ArcParams {
+                            from: current,
                             to,
-                            rx.abs(),
-                            ry.abs(),
-                            rot,
+                            rx: rx.abs(),
+                            ry: ry.abs(),
+                            x_axis_rotation_deg: rot,
                             large_arc,
                             sweep,
-                            self.options.max_arc_step_degrees.max(1.0),
-                        ) {
+                            max_arc_step_degrees: self.options.max_arc_step_degrees.max(1.0),
+                        }) {
                             path.line_to(p);
                         }
                         current = to;

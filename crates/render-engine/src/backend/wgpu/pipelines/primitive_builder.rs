@@ -127,16 +127,16 @@ fn create_primitive_instances_impl(
     // 3. Render stroke paints bottom-to-top (on top of fills)
     if let Some(stroke) = &style.stroke {
         if let Some(pipeline) = pipeline.as_mut() {
-            create_stroke_instances(
+            create_stroke_instances(StrokeParams {
                 pipeline,
                 stroke,
                 pos,
                 size,
                 opacity,
-                &style.corner_radii,
-                style.blend_mode,
+                corner_radii: &style.corner_radii,
+                blend_mode: style.blend_mode,
                 instances,
-            )
+            })
         } else {
             create_stroke_instances_without_pipeline(
                 stroke,
@@ -173,17 +173,26 @@ pub fn create_primitive_instances_with_pipeline(
 }
 
 /// Create one stroke instance per stroke paint layer.
-#[allow(clippy::too_many_arguments)]
-fn create_stroke_instances(
-    pipeline: &mut PrimitivePipeline,
-    stroke: &style_engine::StrokeStyle,
+struct StrokeParams<'a> {
+    pipeline: &'a mut PrimitivePipeline,
+    stroke: &'a style_engine::StrokeStyle,
     pos: Vec2,
     size: Vec2,
     opacity: f32,
-    corner_radii: &CornerRadii,
+    corner_radii: &'a CornerRadii,
     blend_mode: BlendMode,
-    instances: &mut Vec<PrimitiveInstance>,
-) {
+    instances: &'a mut Vec<PrimitiveInstance>,
+}
+
+fn create_stroke_instances(params: StrokeParams<'_>) {
+    let pipeline = params.pipeline;
+    let stroke = params.stroke;
+    let pos = params.pos;
+    let size = params.size;
+    let opacity = params.opacity;
+    let corner_radii = params.corner_radii;
+    let blend_mode = params.blend_mode;
+    let instances = params.instances;
     use style_engine::StrokeAlign;
 
     let stroke_width = stroke.weight;
