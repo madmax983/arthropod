@@ -833,4 +833,12 @@ mod tests {
             Err(raw_window_handle::HandleError::Unavailable)
         ));
     }
+
+    #[test]
+    fn test_get_window_id_null_hwnd() {
+        // SAFETY: We explicitly test the null check safety.
+        let hwnd = HWND(0 as _);
+        let id = unsafe { get_window_id(hwnd) };
+        assert_eq!(id, None);
+    }
 }

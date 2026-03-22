@@ -249,87 +249,61 @@ mod tests {
     };
 
     #[test]
-    fn test_composition_device_creation() {
-        // COM must be initialized for DirectComposition
-        // SAFETY: Initialize COM appropriately for testing.
+    fn test_composition_device_creation() -> windows::core::Result<()> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
 
-        let device = CompositionDevice::new();
-        assert!(device.is_ok(), "Failed to create DirectComposition device");
+        let _device = CompositionDevice::new()?;
 
-        // SAFETY: Uninitialize COM securely to avoid memory leaks after testing.
         unsafe {
             CoUninitialize();
         }
+        Ok(())
     }
 
     #[test]
-    fn test_composition_target_creation() {
-        // SAFETY: Initialize COM for test requirements.
+    fn test_composition_target_creation() -> windows::core::Result<()> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
-
-        // Create a test window (minimal Win32 window)
-        // SAFETY: Window creation utilizes safe wrapper/test utilities or safe OS calls correctly.
         let hwnd = unsafe { create_test_window() };
-
-        let device = CompositionDevice::new().unwrap();
-        let target = device.create_target_for_hwnd(hwnd, true);
-        assert!(target.is_ok(), "Failed to create composition target");
-
-        // SAFETY: The provided HWND was successfully created, ensuring safe window destruction.
+        let device = CompositionDevice::new()?;
+        let _target = device.create_target_for_hwnd(hwnd, true)?;
         unsafe {
             let _ = DestroyWindow(hwnd);
-        }
-        // SAFETY: Uninitialize COM on tear down.
-        unsafe {
             CoUninitialize();
         }
+        Ok(())
     }
 
     #[test]
-    fn test_composition_visual_creation() {
-        // SAFETY: Initialize COM before testing functionality.
+    fn test_composition_visual_creation() -> windows::core::Result<()> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
-
-        let device = CompositionDevice::new().unwrap();
-        let visual = device.create_visual();
-        assert!(visual.is_ok(), "Failed to create composition visual");
-
-        // SAFETY: Clean up COM initialized resources.
+        let device = CompositionDevice::new()?;
+        let _visual = device.create_visual()?;
         unsafe {
             CoUninitialize();
         }
+        Ok(())
     }
 
     #[test]
-    fn test_backdrop_visual_creation() {
-        // SAFETY: Safely initiate COM for DirectComposition creation usage.
+    fn test_backdrop_visual_creation() -> windows::core::Result<()> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
-
-        let device = CompositionDevice::new().unwrap();
-
-        // Test creating backdrop visuals for different materials
-        let mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica);
-        assert!(mica.is_ok(), "Failed to create Mica backdrop visual");
-
-        let acrylic = device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic);
-        assert!(acrylic.is_ok(), "Failed to create Acrylic backdrop visual");
-
-        let none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None);
-        assert!(none.is_ok(), "Failed to create None backdrop visual");
-
-        // SAFETY: Tear down COM state.
+        let device = CompositionDevice::new()?;
+        let _mica = device.create_backdrop_visual(crate::materials::BackdropMaterial::Mica)?;
+        let _acrylic =
+            device.create_backdrop_visual(crate::materials::BackdropMaterial::Acrylic)?;
+        let _none = device.create_backdrop_visual(crate::materials::BackdropMaterial::None)?;
         unsafe {
             CoUninitialize();
         }
+        Ok(())
     }
 
     // Minimal wndproc for test window
@@ -348,7 +322,7 @@ mod tests {
         let class_name = w!("TestWindow");
 
         // SAFETY: GetModuleHandleW correctly retrieves module handles for class registration.
-        let hinstance: HINSTANCE = unsafe { GetModuleHandleW(None).unwrap().into() };
+        let hinstance: HINSTANCE = unsafe { GetModuleHandleW(None).unwrap_or_default().into() };
         let wc = WNDCLASSW {
             lpfnWndProc: Some(test_wndproc),
             lpszClassName: class_name,
@@ -375,8 +349,7 @@ mod tests {
                 None,
                 Some(hinstance),
                 None,
-            )
-            .unwrap()
+            )?
         }
     }
 }
