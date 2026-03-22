@@ -87,6 +87,14 @@ macro_rules! __col_apply {
     ($w:expr, padding: $v:expr $(, $($rest:tt)*)?) => {
         $crate::__col_apply!($w.padding($v), $($($rest)*)?)
     };
+
+    // Catch-all for unknown properties
+    ($w:expr, $unknown:ident: $v:expr $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown), ": ", stringify!($v)))
+    };
+    ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
+    };
 }
 
 /// Create a row container with children
@@ -129,6 +137,14 @@ macro_rules! __row_apply {
     };
     ($w:expr, padding: $v:expr $(, $($rest:tt)*)?) => {
         $crate::__row_apply!($w.padding($v), $($($rest)*)?)
+    };
+
+    // Catch-all for unknown properties
+    ($w:expr, $unknown:ident: $v:expr $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown), ": ", stringify!($v)))
+    };
+    ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
     };
 }
 

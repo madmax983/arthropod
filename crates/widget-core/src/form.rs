@@ -222,4 +222,12 @@ macro_rules! __form_apply {
     ($w:expr, on_submit: $v:expr $(, $($rest:tt)*)?) => {
         $crate::__form_apply!($w.on_submit($v), $($($rest)*)?)
     };
+
+    // Catch-all for unknown properties
+    ($w:expr, $unknown:ident: $v:expr $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown), ": ", stringify!($v)))
+    };
+    ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+        compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
+    };
 }
