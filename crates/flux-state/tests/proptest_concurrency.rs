@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::thread;
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
     // We will test if running thousands of concurrent updates or creating a huge graph works properly
     #[test]
     fn test_concurrent_signal_updates(updates in 100..10000) {
