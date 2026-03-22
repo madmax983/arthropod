@@ -9,3 +9,9 @@ I see there are two `010` specs (`010-command-system.md` and `010-layout-engine-
 ## 2024-05-25 - [Command Palette Spec Context]
 **Spec Needed:** The user requested Vantage to step in and define a new feature spec to add to our backlog.
 **Action:** Created `docs/specs/003-command-palette.md` to define a Command Palette/Spotlight feature. This addresses the discoverability and user efficiency gaps for power users in complex applications, and gives developers a standardized way to define actionable items globally.
+
+## 2024-05-25 - [Internationalization (i18n) Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I will review the existing backlog (specs directory) and create a new, logical progression for the framework. A common enterprise requirement missing from the current specs is an **Internationalization (i18n) System**. Let's spec out a **Internationalization (i18n) System** as it enables the framework to support global markets and localization, providing a massive UX boost for non-English speakers.
+
+I see there are specs up to `016`. I will create `specs/017-internationalization-i18n.md` to define an Internationalization (i18n) System feature. This addresses the market reach and user experience gaps for global applications, and gives developers a standardized way to define translated strings globally.
