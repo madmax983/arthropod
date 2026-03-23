@@ -28,6 +28,8 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [016](016-theme-engine.md) | Theme & Design Token System | Draft |
 | [016](016-drag-and-drop.md) | Drag and Drop System | Draft |
 | [016](016-advanced-rendering.md) | Advanced Rendering (Shadows and Blur) | Draft |
+| [017](017-internationalization-i18n.md) | Internationalization (i18n) System | Draft |
+| [018](018-rich-text-editor.md) | Rich Text Editor (WYSIWYG) | Draft |
 
 ## Lifecycle
 
