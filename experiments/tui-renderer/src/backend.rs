@@ -140,7 +140,7 @@ impl<B: Backend> TuiBackend<B> {
                             }
                         }
                         NodeContent::SolidColor { color } => {
-                            let bg = map_color(color.clone());
+                            let bg = map_color(*color);
                             let block = Block::default().bg(bg);
                             frame.render_widget(block, rect);
                         }

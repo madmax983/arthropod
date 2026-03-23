@@ -168,7 +168,7 @@ mod tests {
         let a: &[u8] = &[];
         let b: &[u8] = &[];
 
-        let result = compare_images(&a, &b, width, height);
+        let result = compare_images(a, b, width, height);
         assert!(
             result.is_err(),
             "Expected error on overflow, got {:?}",
@@ -181,7 +181,7 @@ mod tests {
             err_str
         );
 
-        let result_tol = compare_images_with_tolerance(&a, &b, width, height, 2);
+        let result_tol = compare_images_with_tolerance(a, b, width, height, 2);
         assert!(
             result_tol.is_err(),
             "Expected error on overflow, got {:?}",

@@ -451,7 +451,7 @@ mod tests {
 
         // Cross into second cycle
         tl.tick(0.05); // now in reverse cycle
-        let in_reverse = tl.current_value();
+        let _in_reverse = tl.current_value();
 
         // In reverse, values should be heading back toward 0
         assert!(
@@ -476,7 +476,7 @@ mod tests {
         let mut tl = Timeline::tween(0.0_f32, 100.0, Duration::from_millis(80));
         // Advance partway
         tl.tick(0.04);
-        let before = tl.last_sample.clone();
+        let before = tl.last_sample;
         assert!(
             before.velocity.abs() > 0.0,
             "Should have non-zero velocity mid-tween"

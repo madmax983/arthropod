@@ -316,6 +316,7 @@ async fn main() -> Result<()> {
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
+            #[allow(clippy::collapsible_if)]
             if event::poll(timeout).unwrap_or(false) {
                 if let Event::Key(key) = event::read().unwrap_or(Event::FocusLost) {
                     if tx_input.send(AppEvent::Input(key)).await.is_err() {
@@ -392,28 +393,34 @@ async fn main() -> Result<()> {
                                 },
                                 KeyCode::Enter => {
                                     // Trigger selected tool with default/empty params if focused
-                                    if app.focus == Focus::ToolsList {
-                                        if let Some(idx) = app.tool_list_state.selected() {
-                                            if idx < app.tools.len() {
-                                                let tool_name = app.tools[idx].name.clone();
-                                                let id = app.next_request_id();
-                                                let req = JsonRpcRequest::new(
-                                                    id,
-                                                    "tools/call",
-                                                    serde_json::json!({
-                                                        "name": tool_name,
-                                                        "arguments": {}
-                                                    }),
-                                                );
-                                                let req_str = serde_json::to_string(&req)?;
-                                                stdin_writer
-                                                    .write_all(format!("{}\n", req_str).as_bytes())
-                                                    .await?;
-                                                stdin_writer.flush().await?;
-                                                app.add_log(req_str, LogDirection::Outgoing);
-                                            }
-                                        }
+                                    if app.focus != Focus::ToolsList {
+                                        continue;
                                     }
+
+                                    let Some(idx) = app.tool_list_state.selected() else {
+                                        continue;
+                                    };
+
+                                    if idx >= app.tools.len() {
+                                        continue;
+                                    }
+
+                                    let tool_name = app.tools[idx].name.clone();
+                                    let id = app.next_request_id();
+                                    let req = JsonRpcRequest::new(
+                                        id,
+                                        "tools/call",
+                                        serde_json::json!({
+                                            "name": tool_name,
+                                            "arguments": {}
+                                        }),
+                                    );
+                                    let req_str = serde_json::to_string(&req)?;
+                                    stdin_writer
+                                        .write_all(format!("{}\n", req_str).as_bytes())
+                                        .await?;
+                                    stdin_writer.flush().await?;
+                                    app.add_log(req_str, LogDirection::Outgoing);
                                 }
                                 KeyCode::Char('i') => {
                                     app.input_mode = InputMode::Editing;
@@ -501,29 +508,35 @@ async fn main() -> Result<()> {
                     app.add_log(content.clone(), direction);
 
                     // Try to parse message for tools list
-                    if let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(&content) {
-                        // Check if it's tools/list response
-                        if let Some(result) = resp.result {
-                            if let Some(tools_val) = result.get("tools") {
-                                if let Some(tools_arr) = tools_val.as_array() {
-                                    app.tools = tools_arr
-                                        .iter()
-                                        .filter_map(|t| {
-                                            let name =
-                                                t.get("name").and_then(|n| n.as_str())?.to_string();
-                                            let description = t
-                                                .get("description")
-                                                .and_then(|d| d.as_str())
-                                                .unwrap_or("")
-                                                .to_string();
-                                            Some(ToolInfo { name, description })
-                                        })
-                                        .collect();
-                                    app.status = format!("Connected ({} tools)", app.tools.len());
-                                }
-                            }
-                        }
-                    }
+                    let Ok(resp) = serde_json::from_str::<JsonRpcResponse>(&content) else {
+                        continue;
+                    };
+
+                    let Some(result) = resp.result else {
+                        continue;
+                    };
+
+                    let Some(tools_val) = result.get("tools") else {
+                        continue;
+                    };
+
+                    let Some(tools_arr) = tools_val.as_array() else {
+                        continue;
+                    };
+
+                    app.tools = tools_arr
+                        .iter()
+                        .filter_map(|t| {
+                            let name = t.get("name").and_then(|n| n.as_str())?.to_string();
+                            let description = t
+                                .get("description")
+                                .and_then(|d| d.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            Some(ToolInfo { name, description })
+                        })
+                        .collect();
+                    app.status = format!("Connected ({} tools)", app.tools.len());
                 }
                 AppEvent::Tick => {}
             }

@@ -34,3 +34,7 @@
 **[Fixing clippy::type_complexity in Bevy Systems]**
 **Learning:** Complex Bevy `Query` signatures with multiple components and filters trigger `clippy::type_complexity`. Instead of suppressing the lint globally or per-function, factor the query tuples and filters into named type aliases.
 **Action:** Extract query components into a type alias like `type MyQuery<'w> = (&'w CompA, &'w mut CompB);` and filters into `type MyFilter = Or<(Changed<CompA>, Added<CompB>)>;`. Then use them in the system signature as `query: Query<MyQuery<'_>, MyFilter>`.
+
+**[Unstable `let_chains` and flattening `if let`]**
+**Learning:** While `&& let Some(...) = ...` syntax neatly solves `clippy::collapsible_if` warnings by collapsing nested `if` and `if let` conditions, it relies on the `let_chains` feature, which is currently unstable in Rust (#53667). Compiling this on a stable toolchain results in hard syntax errors.
+**Action:** When refactoring deeply nested `if let` blocks or addressing `clippy::collapsible_if`, do not use `let_chains`. Instead, restructure the logic using guard clauses (`let Some(x) = y else { return; };`) to flatten the scope. If the control flow doesn't permit guard clauses easily, it is better to leave the nesting and use `#[allow(clippy::collapsible_if)]` on the outer `if` block.

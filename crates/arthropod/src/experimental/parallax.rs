@@ -120,9 +120,11 @@ mod tests {
         let mut world = World::new();
 
         // Setup Window Constraints: 1000x1000
-        let mut constraints = LayoutConstraints::default();
-        constraints.max_width = Some(1000.0);
-        constraints.max_height = Some(1000.0);
+        let constraints = LayoutConstraints {
+            max_width: Some(1000.0),
+            max_height: Some(1000.0),
+            ..Default::default()
+        };
         world.insert_resource(LayoutConstraintsResource(constraints));
 
         // Setup Mouse Position: (750, 750) -> Top Right quadrant
@@ -173,9 +175,11 @@ mod tests {
         let mut world = World::new();
 
         // Setup Window Constraints: 1000x1000
-        let mut constraints = LayoutConstraints::default();
-        constraints.max_width = Some(1000.0);
-        constraints.max_height = Some(1000.0);
+        let constraints = LayoutConstraints {
+            max_width: Some(1000.0),
+            max_height: Some(1000.0),
+            ..Default::default()
+        };
         world.insert_resource(LayoutConstraintsResource(constraints));
 
         // Setup Mouse Position: (750, 750) -> Top Right quadrant

@@ -261,21 +261,26 @@ where
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                    KeyCode::Down => app.next(),
-                    KeyCode::Up => app.previous(),
-                    KeyCode::Char('n') => app.toggle_sort(SortBy::Name),
-                    KeyCode::Char('t') => app.toggle_sort(SortBy::Time),
-                    KeyCode::Char('g') => app.toggle_sort(SortBy::Group),
-                    _ => {}
-                }
-            }
+        if !event::poll(Duration::from_millis(100))? {
+            continue;
+        }
+
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
+
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+            KeyCode::Down => app.next(),
+            KeyCode::Up => app.previous(),
+            KeyCode::Char('n') => app.toggle_sort(SortBy::Name),
+            KeyCode::Char('t') => app.toggle_sort(SortBy::Time),
+            KeyCode::Char('g') => app.toggle_sort(SortBy::Group),
+            _ => {}
         }
     }
 }

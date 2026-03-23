@@ -56,9 +56,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn sample_clone_produces_equal_copy() {
         let s = Sample::new(3.14_f32, -1.0);
-        let s2 = s.clone();
+        let s2 = s;
         assert_eq!(s, s2);
     }
 }
