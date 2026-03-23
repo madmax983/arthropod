@@ -139,100 +139,32 @@ pub mod parallax {
 
 #[cfg(not(feature = "nova"))]
 fn print_missing_feature_warning(module_name: &str) {
-    use crossterm::{
-        execute,
-        style::{Color, Print, ResetColor, SetForegroundColor},
+    use comfy_table::{
+        Cell, CellAlignment, Color, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL,
     };
-    use std::io::stderr;
 
-    let mut stderr = stderr();
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(vec![
+            Cell::new("⚠️  MISSING FEATURE DETECTED")
+                .fg(Color::Yellow)
+                .set_alignment(CellAlignment::Center),
+        ]);
 
-    let _ = execute!(
-        stderr,
-        SetForegroundColor(Color::Red),
-        Print(
-            "╭────────────────────────────────────────────────────────────────────────╮
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::Yellow),
-        Print("⚠️  MISSING FEATURE DETECTED                                           "),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print(
-            "├────────────────────────────────────────────────────────────────────────┤
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::White),
-        Print("You attempted to use the experimental '"),
-        SetForegroundColor(Color::Cyan),
-        Print(module_name),
-        SetForegroundColor(Color::White),
+    let message = format!(
+        "You attempted to use the experimental '{}' module,\n\
+but the required 'nova' feature is NOT enabled.\n\n\
+💡 Action Required:\n\
+Add `features = [\"nova\"]` to your `arthropod` dependency\n\
+in your Cargo.toml file.",
+        module_name
     );
 
-    // The inner width is 72 chars.
-    // "You attempted to use the experimental '" = 39 chars
-    // "' module," = 9 chars
-    // Fixed text = 48 chars.
-    // Padding = 72 - 48 - module_name.len() = 24 - module_name.len()
-    let len = 24_usize.saturating_sub(module_name.len());
-    let padding = " ".repeat(len);
+    table.add_row(vec![Cell::new(message).fg(Color::White)]);
 
-    let _ = execute!(
-        stderr,
-        Print("' module,"),
-        Print(padding),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::White),
-        Print("but the required 'nova' feature is NOT enabled.                         "),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print(
-            "│                                                                        │
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::Yellow),
-        Print("💡 Action Required:                                                     "),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::White),
-        Print("Add `features = [\"nova\"]` to your `arthropod` dependency                "),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print("│ "),
-        SetForegroundColor(Color::White),
-        Print("in your Cargo.toml file.                                                "),
-        SetForegroundColor(Color::Red),
-        Print(
-            "│
-"
-        ),
-        Print(
-            "╰────────────────────────────────────────────────────────────────────────╯
-"
-        ),
-        ResetColor
-    );
+    eprintln!("{}", table);
 }
 
 #[cfg(not(feature = "nova"))]
