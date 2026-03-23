@@ -189,6 +189,11 @@ impl RuntimeInner {
         // marked stale previously).
         if self.computing.contains_key(&id) {
             self.stale_while_computing.insert(id);
+
+            // If we're marking a node as stale while it's computing, we MUST
+            // still propagate the stale status to its subscribers. Even if
+            // `id` is already in the `stale` set, the subscribers might not be.
+            return self.computeds.contains_key(&id);
         }
 
         // Only process if not already stale (avoid infinite loops)
@@ -615,6 +620,7 @@ impl Runtime {
         // Only remove the stale flag if it wasn't marked stale again while we were computing.
         if inner.stale_while_computing.remove(&id) {
             // It became stale while computing. We leave it in `stale` so the next reader recomputes.
+            inner.stale.insert(id);
         } else {
             inner.stale.remove(&id);
         }
