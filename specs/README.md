@@ -30,6 +30,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [016](016-advanced-rendering.md) | Advanced Rendering (Shadows and Blur) | Draft |
 | [017](017-internationalization-i18n.md) | Internationalization (i18n) System | Draft |
 | [018](018-rich-text-editor.md) | Rich Text Editor (WYSIWYG) | Draft |
+| [019](019-multi-window-support.md) | Multi-Window Support | Proposed |
 
 ## Lifecycle
 
