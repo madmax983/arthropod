@@ -76,6 +76,7 @@ use crate::input_state::{
     ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
     ReactiveTextState, TextInputState,
 };
+use crate::layer::{Layer, LayerManager};
 use crate::validation::Validator;
 use crate::validation_state::ValidationState;
 use anim_graph::timeline::Timeline;
@@ -84,6 +85,7 @@ use glam::Vec4;
 use indexmap::IndexMap;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
+use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use theme_engine::DesignTokens;
@@ -100,6 +102,9 @@ use theme_engine::DesignTokens;
 /// runtime use.
 pub struct WidgetContext {
     scene: Scene,
+
+    /// Layer manager for z-ordered overlay system
+    layer_manager: LayerManager,
 
     // Layout
     pub(crate) layout_styles: HashMap<NodeId, FlexStyle>,
@@ -134,6 +139,10 @@ pub struct WidgetContext {
     /// Effects that must be kept alive for reactive synchronization
     effects: Vec<flux_state::Effect>,
 
+    /// Generic extension storage for theme systems and plugins.
+    /// Keyed by TypeId so any crate can store/retrieve typed data.
+    extensions: HashMap<TypeId, Box<dyn Any>>,
+
     // Timelines
     pub(crate) timeline_f32_states: HashMap<NodeId, (Timeline<f32>, WriteSignal<f32>)>,
     pub(crate) timeline_color_states: HashMap<
@@ -147,9 +156,11 @@ pub struct WidgetContext {
 
 impl WidgetContext {
     /// Create a new widget context with a given scene
-    pub fn new(scene: Scene) -> Self {
+    pub fn new(mut scene: Scene) -> Self {
+        let layer_manager = LayerManager::new(&mut scene);
         Self {
             scene,
+            layer_manager,
             layout_styles: HashMap::new(),
             widget_styles: HashMap::new(),
             hover_states: HashSet::new(),
@@ -169,6 +180,7 @@ impl WidgetContext {
             form_states: HashMap::new(),
             design_tokens: None,
             effects: Vec::new(),
+            extensions: HashMap::new(),
             timeline_f32_states: HashMap::new(),
             timeline_color_states: HashMap::new(),
         }
@@ -192,6 +204,19 @@ impl WidgetContext {
         self.design_tokens.as_ref()
     }
 
+    /// Store a typed extension value (e.g., MaterialTheme).
+    /// Overwrites any previous value of the same type.
+    pub fn set_extension<T: 'static>(&mut self, value: T) {
+        self.extensions.insert(TypeId::of::<T>(), Box::new(value));
+    }
+
+    /// Retrieve a typed extension value by type.
+    pub fn get_extension<T: 'static>(&self) -> Option<&T> {
+        self.extensions
+            .get(&TypeId::of::<T>())
+            .and_then(|v| v.downcast_ref::<T>())
+    }
+
     /// Get the scene
     pub fn scene(&self) -> &Scene {
         &self.scene
@@ -208,8 +233,14 @@ impl WidgetContext {
         self.scene.add_node(parent, node)
     }
 
-    /// Get the root node ID
+    /// Returns the content layer root -- where normal widgets are built.
+    /// For the actual scene root, use `scene_root()`.
     pub fn root(&self) -> NodeId {
+        self.layer_manager.get(Layer::Content)
+    }
+
+    /// Returns the actual scene root (parent of all layers).
+    pub fn scene_root(&self) -> NodeId {
         self.scene.root()
     }
 
@@ -280,6 +311,40 @@ impl WidgetContext {
                     .reparent_node(child_id, current_parent, new_parent);
             }
         }
+    }
+
+    // =========================================================================
+    // Layer API
+    // =========================================================================
+
+    /// Create a node in a specific layer (returns NodeId).
+    pub fn add_to_layer(&mut self, layer: Layer, content: NodeContent) -> NodeId {
+        let parent = self.layer_manager.get(layer);
+        self.scene.add_node(parent, SceneNode::new(content))
+    }
+
+    /// Reparent an existing node to a layer's root.
+    pub fn move_to_layer(&mut self, node_id: NodeId, layer: Layer) {
+        let layer_root = self.layer_manager.get(layer);
+        if let Some(current_parent) = self.scene.parent(node_id) {
+            self.scene
+                .reparent_node(node_id, current_parent, layer_root);
+        }
+    }
+
+    /// Return a node to the content layer.
+    pub fn move_to_content(&mut self, node_id: NodeId) {
+        self.move_to_layer(node_id, Layer::Content);
+    }
+
+    /// Get the root NodeId of a layer (for building children under it).
+    pub fn layer_root(&self, layer: Layer) -> NodeId {
+        self.layer_manager.get(layer)
+    }
+
+    /// Get the content layer root (convenience -- most widgets use this).
+    pub fn content_root(&self) -> NodeId {
+        self.layer_manager.get(Layer::Content)
     }
 
     /// Add hover state tracking to a node

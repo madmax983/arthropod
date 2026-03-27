@@ -40,3 +40,21 @@ pub fn integrate_widget_scene(app: &mut App, widget_root: NodeId) {
         }
     }
 }
+
+/// Integrate **all** scene nodes into the ECS, starting from the scene root.
+///
+/// Unlike [`integrate_widget_scene`] (which walks a single widget subtree),
+/// this function walks every node in the scene — including overlay nodes
+/// that widgets placed in non-Content layers (Dialog, Tooltip, Dropdown, etc.)
+/// via [`WidgetContext::add_to_layer`].
+///
+/// Without this, overlay nodes (scrims, tooltips, menus, drawers, snackbars)
+/// never receive ECS entities, making them invisible to the renderer and
+/// preventing their event handlers from being wired.
+pub fn integrate_all_scene_nodes(app: &mut App) {
+    let scene_root = {
+        let scene = app.world().resource::<Scene>();
+        scene.root()
+    };
+    integrate_widget_scene(app, scene_root);
+}

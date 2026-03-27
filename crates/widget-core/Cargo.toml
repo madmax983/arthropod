@@ -25,3 +25,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "widget_pipeline_bench"
 harness = false
+
+[[bench]]
+name = "layer_benchmarks"
+harness = false

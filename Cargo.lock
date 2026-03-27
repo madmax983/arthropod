@@ -253,6 +253,7 @@ dependencies = [
  "flux-devtools",
  "flux-state",
  "glam",
+ "material-ui",
  "plat-core",
  "ratatui",
  "render-engine",
@@ -2651,6 +2652,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
+]
+
+[[package]]
+name = "material-ui"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "flux-state",
+ "glam",
+ "layout-engine",
+ "render-engine",
+ "style-engine",
+ "theme-engine",
+ "thiserror 2.0.18",
+ "widget-core",
 ]
 
 [[package]]

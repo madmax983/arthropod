@@ -16,6 +16,7 @@ members = [
     "crates/widget-core",
     "crates/widget-macros",
     "crates/style-engine",
+    "crates/material-ui",
     "crates/input-engine",
     "experiments/chronos", 
     "experiments/spatial-graph", 
@@ -168,6 +169,10 @@ path = "examples/riot_waves_generated.rs"
 name = "carousel_demo"
 path = "examples/carousel_demo.rs"
 
+[[example]]
+name = "material_gallery"
+path = "examples/material_gallery.rs"
+
 [features]
 default = ["native"]
 native = ["plat-core/native", "render-engine/native"]
@@ -184,6 +189,7 @@ glam = "0.29"
 arthropod-ecs = { path = "crates/arthropod-ecs" }
 a11y-engine = { path = "crates/a11y-engine" }
 theme-engine = { path = "crates/theme-engine" }
+material-ui = { path = "crates/material-ui" }
 env_logger.workspace = true
 tracing.workspace = true
 serde_json = "1.0"

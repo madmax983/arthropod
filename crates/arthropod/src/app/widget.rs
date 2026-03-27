@@ -1,5 +1,5 @@
 use super::core::{App, AppError};
-use super::integration::integrate_widget_scene;
+use super::integration::integrate_all_scene_nodes;
 use crate::event_dispatcher::{DispatchResult, EventDispatcher};
 // use crate::layout::auto_layout; // Removed in favor of ECS system
 use arthropod_ecs::components::{FrameSignalResource, LayoutConstraintsResource};
@@ -222,7 +222,7 @@ impl Application for WidgetApp {
 
         // Take the context back from AppContext
         let mut widget_ctx = app_ctx.widget_ctx;
-        let widget_root = widget.build(&mut widget_ctx);
+        let _widget_root = widget.build(&mut widget_ctx);
 
         // Detect form node (for Enter submission)
         let form_node = widget_ctx.form_states().keys().next().copied();
@@ -231,8 +231,11 @@ impl Application for WidgetApp {
         let scene = widget_ctx.take_scene();
         app.world_mut().insert_resource(scene);
 
-        // 1. Integrate widget scene into app ECS (spawn entities)
-        integrate_widget_scene(&mut app, widget_root);
+        // 1. Integrate ALL scene nodes into ECS (spawn entities).
+        //    Walking from the scene root ensures overlay nodes placed in
+        //    non-Content layers (Dialog scrims, Tooltips, Menus, Drawers,
+        //    Snackbars) also receive ECS entities and become renderable.
+        integrate_all_scene_nodes(&mut app);
 
         // 2. Integrate widget components (LayoutStyle, Clickable, etc.) into ECS
         // This must happen AFTER spawn so entities exist to receive components

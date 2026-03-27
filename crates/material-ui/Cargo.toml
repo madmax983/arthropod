@@ -1,0 +1,22 @@
+[package]
+name = "material-ui"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+widget-core = { path = "../widget-core" }
+theme-engine = { path = "../theme-engine" }
+style-engine = { path = "../style-engine" }
+flux-state = { path = "../flux-state" }
+render-engine = { path = "../render-engine" }
+layout-engine = { path = "../layout-engine" }
+glam = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "material_benchmarks"
+harness = false
