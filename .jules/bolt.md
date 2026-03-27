@@ -69,3 +69,7 @@
 **[Eliminate Per-Frame HashSet Allocations for Interaction State]
 **Learning:** `update_interaction_state_system` created a new `HashSet` per frame to track hovered nodes during tree traversal, adding per-frame heap allocation overhead.
 **Action:** Use Bevy's `Local<HashSet<NodeId>>` to persist the allocation across frames and clear it before each use to reuse the underlying capacity.
+
+**[Performance] Avoid allocation churn and memory bloat in Rayon parallel reducers**
+**Learning:** Using `reduce(|| Vec::with_capacity(N), ...)` in Rayon creates `P` vectors (where `P` is the number of work chunks/threads), each pre-allocated to size `N`. This causes massive memory bloat `O(P * N)`.
+**Action:** Use `reduce_with(|mut a, b| { a.extend(b); a }).unwrap_or_default()` instead to merge chunks without allocating an initial empty identity state for every single thread.

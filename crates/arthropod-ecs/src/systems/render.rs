@@ -56,17 +56,22 @@ pub fn collect_renderables_system(
     if visual_nodes_cache.len() >= RENDER_PARALLEL_THRESHOLD {
         commands.0 = visual_nodes_cache
             .par_iter()
-            .fold(Vec::new, |mut acc, id| {
-                if let Some(node) = scene.get_node(*id) {
-                    render_engine::backend::wgpu::create_node_instances(node, &mut acc);
-                }
-                acc
-            })
-            .reduce(Vec::new, |mut a, b| {
+            .fold(
+                || Vec::with_capacity(256),
+                |mut acc, id| {
+                    if let Some(node) = scene.get_node(*id) {
+                        render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+                    }
+                    acc
+                },
+            )
+            .reduce_with(|mut a, b| {
                 a.extend(b);
                 a
-            });
+            })
+            .unwrap_or_default();
     } else {
+        commands.0.reserve(visual_nodes_cache.len());
         for id in &*visual_nodes_cache {
             if let Some(node) = scene.get_node(*id) {
                 render_engine::backend::wgpu::create_node_instances(node, &mut commands.0);
@@ -123,14 +128,18 @@ mod tests {
         // Parallel
         let parallel: Vec<_> = visual_nodes
             .par_iter()
-            .fold(Vec::new, |mut acc, (_, node, _)| {
-                render_engine::backend::wgpu::create_node_instances(node, &mut acc);
-                acc
-            })
-            .reduce(Vec::new, |mut a, b| {
+            .fold(
+                || Vec::with_capacity(256),
+                |mut acc, (_, node, _)| {
+                    render_engine::backend::wgpu::create_node_instances(node, &mut acc);
+                    acc
+                },
+            )
+            .reduce_with(|mut a, b| {
                 a.extend(b);
                 a
-            });
+            })
+            .unwrap_or_default();
 
         assert_eq!(sequential.len(), parallel.len());
         for (seq, par) in sequential.iter().zip(parallel.iter()) {
