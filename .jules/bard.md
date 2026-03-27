@@ -27,3 +27,6 @@
 ## 2025-01-24 - [Module and Enum Documentation Coverage]
 **Confusion:** The `experimental`, `figma`, `figma_codegen`, `figma_runtime`, and `prototype_runtime` modules in `crates/arthropod/src/lib.rs` and the `core`, `integration`, and `widget` modules in `crates/arthropod/src/app/mod.rs` were missing module-level documentation (`///`), which could lead to confusion about their architectural roles. Additionally, the variants of `AppError` lacked inline documentation, making failure modes opaque.
 **Clarification:** Added explicit `///` module-level documentation describing the architectural purpose of each un-documented module, and provided specific failure details for each `AppError` variant to improve error-handling clarity.
+## 2025-03-27 - [Widget Core Documentation Coverage]
+**Confusion:** The `layer` module, `Style` struct fields/methods, and `icon` mapping functions in `widget-core` lacked documentation, which triggers `missing_docs` warnings and makes the public styling APIs opaque.
+**Clarification:** Added explicit documentation to the `LayerManager` concept, `Style` builder methods, icon mappings, and provided an executable doctest for the `style!` macro to make the CSS-like syntax immediately clear to users.

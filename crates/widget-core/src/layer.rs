@@ -1,3 +1,9 @@
+//! Scene Graph Layer Management
+//!
+//! Provides a z-ordering management system (`LayerManager`) for the render engine scene graph.
+//! Layers ensure that UI elements like tooltips and dropdowns naturally render on top
+//! of base content without needing manual z-index bookkeeping on every node.
+
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
 use std::collections::HashMap;
 

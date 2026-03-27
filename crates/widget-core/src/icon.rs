@@ -51,21 +51,33 @@ impl Icon {
     }
 
     // Common Material Symbols character mappings
+
+    /// Create a "Search" icon (`\u{e8b6}`)
     pub fn search() -> Self {
         Self::new("\u{e8b6}")
     }
+
+    /// Create a "Home" icon (`\u{e88a}`)
     pub fn home() -> Self {
         Self::new("\u{e88a}")
     }
+
+    /// Create a "Settings" gear icon (`\u{e8b8}`)
     pub fn settings() -> Self {
         Self::new("\u{e8b8}")
     }
+
+    /// Create a "Check" mark icon (`\u{e5ca}`)
     pub fn check() -> Self {
         Self::new("\u{e5ca}")
     }
+
+    /// Create a "Close" (X) icon (`\u{e5cd}`)
     pub fn close() -> Self {
         Self::new("\u{e5cd}")
     }
+
+    /// Create a hamburger "Menu" icon (`\u{e5d2}`)
     pub fn menu() -> Self {
         Self::new("\u{e5d2}")
     }
