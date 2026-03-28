@@ -176,7 +176,10 @@ impl SystemTheme {
 
                 let _ = RegCloseKey(hkey);
 
-                if result.is_ok() {
+                if result.is_ok()
+                    && reg_type == windows::Win32::System::Registry::REG_DWORD
+                    && data_size == std::mem::size_of::<u32>() as u32
+                {
                     // Registry stores as ABGR
                     let a = ((data >> 24) & 0xFF) as f32 / 255.0;
                     let b = ((data >> 16) & 0xFF) as f32 / 255.0;
@@ -222,7 +225,10 @@ impl SystemTheme {
 
                 let _ = RegCloseKey(hkey);
 
-                if result.is_ok() {
+                if result.is_ok()
+                    && reg_type == windows::Win32::System::Registry::REG_DWORD
+                    && data_size == std::mem::size_of::<u32>() as u32
+                {
                     // 0 = dark mode, 1 = light mode
                     return data == 0;
                 }
@@ -274,7 +280,7 @@ impl SystemTheme {
 
                 let _ = RegCloseKey(hkey);
 
-                if result.is_ok() {
+                if result.is_ok() && reg_type == windows::Win32::System::Registry::REG_SZ {
                     // Safe parsing with bounds checking
                     // Use min(data_size, 64) to prevent reading uninitialized memory
                     // if registry somehow claimed to write more than buffer size
@@ -347,6 +353,24 @@ mod tests {
         let theme = result.unwrap();
         assert!(theme.accent_color.w > 0.0);
         assert!(!theme.available_materials.is_empty());
+    }
+
+    #[test]
+    fn test_registry_parsing_exploit() {
+        // Simulates an exploit where a malicious or broken registry entry claims to be a string
+        // but provides an incomplete or malformed buffer.
+        let empty_buf: &[u8] = &[];
+        assert!(SystemTheme::parse_build_number(empty_buf).is_none());
+
+        let malformed_buf: &[u8] = &[0, 255, 12]; // Odd length, unaligned
+        assert!(SystemTheme::parse_build_number(malformed_buf).is_none());
+
+        // Simulate an attack trying to read beyond bounds of a small buffer.
+        let oob_buf: &[u8] = &[b'1', 0, b'0', 0, b'.', 0, b'0', 0, b'.', 0, b'1', 0]; // 10.0.1
+        assert_eq!(SystemTheme::parse_build_number(oob_buf), None); // Parse returns None if it fails to convert to u32
+
+        let num_buf: &[u8] = &[b'2', 0, b'2', 0, b'0', 0, b'0', 0, b'0', 0]; // 22000
+        assert_eq!(SystemTheme::parse_build_number(num_buf), Some(22000));
     }
 
     #[test]
