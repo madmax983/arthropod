@@ -137,9 +137,11 @@ impl TextInputState {
 
         let (mut current_value, char_count) = self.ensure_cursor_valid();
 
-        if self.cursor_position < char_count
-            && let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position)
-        {
+        if self.cursor_position >= char_count {
+            return;
+        }
+
+        if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position) {
             current_value.remove(byte_idx);
             self.write_signal.set(current_value);
         }
