@@ -9,3 +9,7 @@
 **Stale While Computing Propagation**
 **Learning:** In reactive systems, if a dependency updates while a computed node is actively computing, the computed node must be marked as `stale_while_computing` so it re-evaluates next time. However, if this staleness is not propagated to its subscribers (e.g. because of an early-exit check that it's already stale), those subscribers will never know they need to recompute, leading to lost updates.
 **Action:** Always ensure that when marking a computing node as stale, the propagation logic still runs to mark its subscribers as stale, even if the node itself was already in the `stale` set.
+
+**flux-state unwrap fallback logic**
+**Learning:** `flux-state` has specific panic unwraps inside `to_read_signal()` that explicitly state `Type mismatch converting Computed to ReadSignal`. Also, `inspect_graph()` uses format strings like `Signal({:?})` when a name is missing.
+**Action:** When covering these logic paths, simulate a direct `Runtime` insertion to bypass higher-level safety checks like `Computed::new()`.

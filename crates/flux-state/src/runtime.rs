@@ -1330,4 +1330,27 @@ mod tests_sentry {
             "Deadlock detected: Cyclic dependency in computed values across threads."
         );
     }
+
+    #[test]
+    #[cfg(feature = "nova")]
+    fn test_inspect_graph_unwrap_fallback() {
+        let runtime = Runtime::new();
+
+        let signal_id = runtime.create_signal(Arc::new(0));
+        let computed_id = runtime.create_computed(Arc::new(|| {
+            Arc::new(0) as Arc<dyn std::any::Any + Send + Sync>
+        }));
+        let effect_id = runtime.create_effect(Arc::new(|| {}));
+
+        let snapshot = runtime.inspect_graph();
+
+        let sig_node = snapshot.nodes.iter().find(|n| n.id == signal_id).unwrap();
+        assert_eq!(sig_node.label, format!("Signal({:?})", signal_id));
+
+        let comp_node = snapshot.nodes.iter().find(|n| n.id == computed_id).unwrap();
+        assert_eq!(comp_node.label, format!("Computed({:?})", computed_id));
+
+        let eff_node = snapshot.nodes.iter().find(|n| n.id == effect_id).unwrap();
+        assert_eq!(eff_node.label, format!("Effect({:?})", effect_id));
+    }
 }

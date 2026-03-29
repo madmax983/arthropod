@@ -499,4 +499,28 @@ mod tests {
 
         drop(guard);
     }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch converting Computed to ReadSignal")]
+    fn test_computed_to_read_signal_type_mismatch() {
+        let runtime = Runtime::new();
+
+        // Create a computed directly with runtime that returns a String
+        let id = runtime.create_computed(Arc::new(move || {
+            Arc::new(RwLock::new(String::from("wrong type")))
+                as Arc<dyn std::any::Any + Send + Sync>
+        }));
+
+        // initialize the computed node (simulating Computed::new)
+        runtime.recompute(id);
+
+        let computed = Computed::<i32> {
+            id,
+            runtime,
+            _marker: std::marker::PhantomData,
+        };
+
+        // Calling .to_read_signal() should panic with "Type mismatch converting Computed to ReadSignal"
+        let _ = computed.to_read_signal();
+    }
 }
