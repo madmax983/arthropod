@@ -33,6 +33,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [019](019-image-widget.md) | Image Widget & Asset Pipeline | Draft |
 | [019](019-multi-window-support.md) | Multi-Window Support | Proposed |
 | [020](020-tui-fallback-mode.md) | TUI Fallback Mode | Draft |
+| [021](021-linux-desktop-support.md) | Linux Desktop Support | Draft |
 | [021](021-macos-support.md) | macOS Support | Draft |
 
 ## Lifecycle
