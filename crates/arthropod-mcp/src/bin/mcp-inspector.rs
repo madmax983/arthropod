@@ -316,12 +316,14 @@ async fn main() -> Result<()> {
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
 
-            #[allow(clippy::collapsible_if)]
-            if event::poll(timeout).unwrap_or(false) {
-                if let Event::Key(key) = event::read().unwrap_or(Event::FocusLost) {
-                    if tx_input.send(AppEvent::Input(key)).await.is_err() {
-                        return;
-                    }
+            let key_event = event::poll(timeout)
+                .unwrap_or(false)
+                .then(|| event::read().ok())
+                .flatten();
+
+            if let Some(Event::Key(key)) = key_event {
+                if tx_input.send(AppEvent::Input(key)).await.is_err() {
+                    return;
                 }
             }
 
