@@ -73,3 +73,6 @@
 **[Performance] Avoid allocation churn and memory bloat in Rayon parallel reducers**
 **Learning:** Using `reduce(|| Vec::with_capacity(N), ...)` in Rayon creates `P` vectors (where `P` is the number of work chunks/threads), each pre-allocated to size `N`. This causes massive memory bloat `O(P * N)`.
 **Action:** Use `reduce_with(|mut a, b| { a.extend(b); a }).unwrap_or_default()` instead to merge chunks without allocating an initial empty identity state for every single thread.
+**[Eliminate Per-Frame LayoutEngine Allocations]
+**Learning:** Re-creating `LayoutEngine` (which wraps `TaffyTree`) per frame within the layout system discards all previously allocated nodes and forces Taffy to reallocate from scratch.
+**Action:** Extract `clear()` functionality into `LayoutEngine` and reuse it alongside its associated NodeId `HashMap` across frames using Bevy's `Local<T>` inside the ECS `layout_system` to completely eliminate per-frame layout heap allocations.

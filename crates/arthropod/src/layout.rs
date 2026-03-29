@@ -3,7 +3,7 @@
 //! Bridges the WidgetContext layout styles to Scene node bounds using
 //! the layout-engine (taffy) for flexbox computation.
 
-use layout_engine::{FlexStyle, LayoutConstraints};
+use layout_engine::{FlexStyle, LayoutConstraints, LayoutEngine};
 use render_engine::{NodeId, Scene};
 use std::collections::HashMap;
 use widget_core::WidgetContext;
@@ -41,9 +41,19 @@ pub fn auto_layout(
         min_height: None,
     };
 
+    let mut engine = LayoutEngine::new();
+    let mut node_map = HashMap::new();
+
     // Use shared layout logic from arthropod-ecs
     // This avoids code duplication and ensures consistent behavior
-    arthropod_ecs::layout_bridge::perform_layout(scene, root, constraints, layout_styles);
+    arthropod_ecs::layout_bridge::perform_layout(
+        scene,
+        root,
+        constraints,
+        layout_styles,
+        &mut engine,
+        &mut node_map,
+    );
 }
 
 /// Convenience function to layout a widget context's scene.

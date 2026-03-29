@@ -21,7 +21,7 @@
 
 use crate::components::{LayoutConstraintsResource, LayoutStyle, SceneNodeRef};
 use bevy_ecs::prelude::*;
-use layout_engine::FlexStyle;
+use layout_engine::{FlexStyle, LayoutEngine};
 use render_engine::Scene;
 use std::collections::HashMap;
 
@@ -45,6 +45,8 @@ pub fn layout_system(
     constraints_res: Option<Res<LayoutConstraintsResource>>,
     query: Query<(&SceneNodeRef, &LayoutStyle)>,
     mut layout_styles: Local<HashMap<render_engine::NodeId, FlexStyle>>,
+    mut engine: Local<LayoutEngine>,
+    mut node_map: Local<HashMap<render_engine::NodeId, layout_engine::NodeId>>,
 ) {
     // 1. Collect all layout styles into a lookup map
     // This allows us to look up styles by NodeId during recursive scene traversal
@@ -66,7 +68,14 @@ pub fn layout_system(
     // 2. Perform layout calculation using shared bridge logic
     // This uses the optimized 2-pass approach (collect updates -> apply updates)
     // to avoid cloning children vectors during traversal.
-    crate::layout_bridge::perform_layout(&mut scene, root, constraints, &layout_styles);
+    crate::layout_bridge::perform_layout(
+        &mut scene,
+        root,
+        constraints,
+        &layout_styles,
+        &mut engine,
+        &mut node_map,
+    );
 }
 
 #[cfg(test)]

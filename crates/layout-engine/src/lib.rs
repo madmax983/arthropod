@@ -228,6 +228,12 @@ impl LayoutEngine {
         }
     }
 
+    /// Clears the layout engine, dropping all nodes.
+    /// This allows reusing the underlying memory allocation.
+    pub fn clear(&mut self) {
+        self.taffy.clear();
+    }
+
     /// Create a new layout node with the given style
     ///
     /// # Panics

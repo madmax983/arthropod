@@ -22,17 +22,21 @@ use std::collections::HashMap;
 /// * `root` - Root node to start layout from
 /// * `constraints` - Constraints for the root node
 /// * `layout_styles` - Map of NodeId to FlexStyle
+/// * `engine` - The layout engine to use (can be reused across frames)
+/// * `node_map` - Map from Scene NodeId to layout NodeId (can be reused across frames)
 pub fn perform_layout(
     scene: &mut Scene,
     root: NodeId,
     constraints: LayoutConstraints,
     layout_styles: &HashMap<NodeId, FlexStyle>,
+    engine: &mut LayoutEngine,
+    node_map: &mut HashMap<NodeId, layout_engine::NodeId>,
 ) {
-    let mut engine = LayoutEngine::new();
-    let mut node_map: HashMap<NodeId, layout_engine::NodeId> = HashMap::new();
+    engine.clear();
+    node_map.clear();
 
     // Build layout tree recursively
-    build_layout_tree(scene, root, &mut engine, &mut node_map, layout_styles);
+    build_layout_tree(scene, root, engine, node_map, layout_styles);
 
     // Get layout root
     if let Some(&layout_root) = node_map.get(&root) {
@@ -42,7 +46,7 @@ pub fn perform_layout(
         // Apply computed layouts to scene
         // We collect updates first to avoid cloning children vectors during recursion
         let mut updates = Vec::with_capacity(node_map.len());
-        collect_layout_updates(scene, root, &engine, &node_map, 0.0, 0.0, &mut updates);
+        collect_layout_updates(scene, root, engine, node_map, 0.0, 0.0, &mut updates);
 
         // Apply updates
         for (id, bounds) in updates {
