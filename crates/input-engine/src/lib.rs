@@ -27,3 +27,7 @@ pub use gestures::{
 pub use input_manager::InputManager;
 #[cfg(feature = "nova")]
 pub use mouse_gestures::{MouseGesture, StrokeMatcher};
+
+/// Unique identifier for an input node, decoupled from the rendering engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InputNodeId(pub u64);

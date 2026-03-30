@@ -2251,7 +2251,7 @@ dependencies = [
  "flux-state",
  "indexmap",
  "plat-core",
- "render-engine",
+ "serde",
 ]
 
 [[package]]

@@ -210,11 +210,14 @@ pub struct ComputedTextState {
     pub computed: Computed<String>,
 }
 
+use crate::InputNodeId;
 use indexmap::IndexMap;
-use render_engine::NodeId;
 
-fn with_focused_mut<F>(states: &mut IndexMap<NodeId, TextInputState>, focused: Option<NodeId>, f: F)
-where
+fn with_focused_mut<F>(
+    states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused: Option<InputNodeId>,
+    f: F,
+) where
     F: FnOnce(&mut TextInputState),
 {
     if let Some(state) = focused.and_then(|id| states.get_mut(&id)) {
@@ -224,8 +227,8 @@ where
 
 /// Send a character to focused input
 pub fn send_char(
-    text_input_states: &mut IndexMap<NodeId, TextInputState>,
-    focused_node: Option<NodeId>,
+    text_input_states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused_node: Option<InputNodeId>,
     c: char,
 ) {
     with_focused_mut(text_input_states, focused_node, |state| {
@@ -235,24 +238,24 @@ pub fn send_char(
 
 /// Send backspace to focused input
 pub fn send_backspace(
-    text_input_states: &mut IndexMap<NodeId, TextInputState>,
-    focused_node: Option<NodeId>,
+    text_input_states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused_node: Option<InputNodeId>,
 ) {
     with_focused_mut(text_input_states, focused_node, |state| state.backspace());
 }
 
 /// Send delete to focused input
 pub fn send_delete(
-    text_input_states: &mut IndexMap<NodeId, TextInputState>,
-    focused_node: Option<NodeId>,
+    text_input_states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused_node: Option<InputNodeId>,
 ) {
     with_focused_mut(text_input_states, focused_node, |state| state.delete());
 }
 
 /// Send left arrow key to focused input
 pub fn send_key_left(
-    text_input_states: &mut IndexMap<NodeId, TextInputState>,
-    focused_node: Option<NodeId>,
+    text_input_states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused_node: Option<InputNodeId>,
 ) {
     with_focused_mut(text_input_states, focused_node, |state| {
         state.move_cursor_left()
@@ -261,8 +264,8 @@ pub fn send_key_left(
 
 /// Send right arrow key to focused input
 pub fn send_key_right(
-    text_input_states: &mut IndexMap<NodeId, TextInputState>,
-    focused_node: Option<NodeId>,
+    text_input_states: &mut IndexMap<InputNodeId, TextInputState>,
+    focused_node: Option<InputNodeId>,
 ) {
     with_focused_mut(text_input_states, focused_node, |state| {
         state.move_cursor_right()

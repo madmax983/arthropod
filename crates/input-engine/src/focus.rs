@@ -1,8 +1,8 @@
 //! Focus navigation logic.
 
+use crate::InputNodeId;
 use crate::text::TextInputState;
 use indexmap::IndexMap;
-use render_engine::NodeId;
 
 /// Calculate the next focus index based on direction
 fn cycle_focus_index(current_idx: Option<usize>, total: usize, forward: bool) -> usize {
@@ -31,10 +31,10 @@ fn cycle_focus_index(current_idx: Option<usize>, total: usize, forward: bool) ->
 
 /// Update focus state helper
 fn update_focus(
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    focused_node: &mut Option<NodeId>,
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    focused_node: &mut Option<InputNodeId>,
     forward: bool,
-) -> Option<NodeId> {
+) -> Option<InputNodeId> {
     if text_input_states.is_empty() {
         return None;
     }
@@ -50,17 +50,17 @@ fn update_focus(
 
 /// Focus the next focusable node (Tab navigation).
 pub fn focus_next(
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    focused_node: &mut Option<NodeId>,
-) -> Option<NodeId> {
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    focused_node: &mut Option<InputNodeId>,
+) -> Option<InputNodeId> {
     update_focus(text_input_states, focused_node, true)
 }
 
 /// Focus the previous focusable node (Shift+Tab navigation).
 pub fn focus_prev(
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    focused_node: &mut Option<NodeId>,
-) -> Option<NodeId> {
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    focused_node: &mut Option<InputNodeId>,
+) -> Option<InputNodeId> {
     update_focus(text_input_states, focused_node, false)
 }
 
@@ -115,9 +115,9 @@ mod tests {
     #[test]
     fn should_focus_next_and_prev() {
         let mut states = IndexMap::new();
-        let node1 = NodeId(1);
-        let node2 = NodeId(2);
-        let node3 = NodeId(3);
+        let node1 = InputNodeId(1);
+        let node2 = InputNodeId(2);
+        let node3 = InputNodeId(3);
         states.insert(node1, create_state("1"));
         states.insert(node2, create_state("2"));
         states.insert(node3, create_state("3"));
@@ -152,8 +152,8 @@ mod tests {
     #[test]
     fn should_focus_prev_from_none() {
         let mut states = IndexMap::new();
-        let node1 = NodeId(1);
-        let node2 = NodeId(2);
+        let node1 = InputNodeId(1);
+        let node2 = InputNodeId(2);
         states.insert(node1, create_state("1"));
         states.insert(node2, create_state("2"));
 

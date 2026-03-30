@@ -255,7 +255,7 @@ impl Application for WidgetApp {
             }));
 
         // Create event dispatcher
-        let dispatcher = EventDispatcher::new(form_node);
+        let dispatcher = EventDispatcher::new(form_node.map(|id| render_engine::NodeId(id.0)));
 
         println!("=== Widget App Started ===");
         println!("Interactions:");
@@ -475,7 +475,10 @@ impl WidgetApp {
             // Since we share the scene, widget_node_id == app_node_id
             let app_node = node_id;
 
-            let Some(value) = self.widget_ctx.get_text_input_value(node_id) else {
+            let Some(value) = self
+                .widget_ctx
+                .get_text_input_value(render_engine::NodeId(node_id.0))
+            else {
                 continue;
             };
 
@@ -483,7 +486,7 @@ impl WidgetApp {
 
             // Extract text_child ID first to drop immutable borrow of scene
             let text_child = scene
-                .get_node(app_node)
+                .get_node(render_engine::NodeId(app_node.0))
                 .and_then(|n| n.children.first().copied());
 
             let Some(text_child) = text_child else {
@@ -518,7 +521,7 @@ impl WidgetApp {
             let app_node = node_id;
 
             if let Some(fill) = scene
-                .get_node_mut(app_node)
+                .get_node_mut(render_engine::NodeId(app_node.0))
                 .and_then(|n| {
                     if let NodeContent::Styled { style } = &mut n.content {
                         Some(style)

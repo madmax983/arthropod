@@ -118,7 +118,7 @@ pub struct WidgetContext {
     pub(crate) background_colors: HashMap<NodeId, Vec4>,
 
     // Input
-    pub(crate) text_input_states: IndexMap<NodeId, TextInputState>,
+    pub(crate) text_input_states: IndexMap<input_engine::InputNodeId, TextInputState>,
     pub(crate) reactive_text_states: HashMap<NodeId, ReactiveTextState>,
     pub(crate) computed_text_states: HashMap<NodeId, ComputedTextState>,
     pub(crate) reactive_color_states: HashMap<NodeId, ReactiveColorState>,
@@ -126,12 +126,12 @@ pub struct WidgetContext {
     pub(crate) reactive_layout_flex_grow_states: HashMap<NodeId, ReactiveLayoutFlexGrowState>,
     pub(crate) progress_bar_states: HashMap<NodeId, (ReadSignal<f32>, f32)>,
     pub(crate) frame_signal: Option<ReadSignal<u64>>,
-    pub(crate) focused_node: Option<NodeId>,
-    pub(crate) placeholders: HashSet<NodeId>,
+    pub(crate) focused_node: Option<input_engine::InputNodeId>,
+    pub(crate) placeholders: HashSet<input_engine::InputNodeId>,
 
     // Form
-    pub(crate) validators: HashMap<NodeId, ValidationState>,
-    pub(crate) form_states: HashMap<NodeId, FormState>,
+    pub(crate) validators: HashMap<input_engine::InputNodeId, ValidationState>,
+    pub(crate) form_states: HashMap<input_engine::InputNodeId, FormState>,
 
     /// Design tokens for theming (optional for backwards compatibility)
     design_tokens: Option<DesignTokens>,
@@ -548,7 +548,7 @@ impl WidgetContext {
     ) {
         let cursor_position = read_signal.get_untracked().chars().count();
         self.text_input_states.insert(
-            node_id,
+            input_engine::InputNodeId(node_id.0),
             TextInputState {
                 read_signal,
                 write_signal,
@@ -561,17 +561,17 @@ impl WidgetContext {
 
     /// Focus a node
     pub fn focus_node(&mut self, node_id: NodeId) {
-        self.focused_node = Some(node_id);
+        self.focused_node = Some(input_engine::InputNodeId(node_id.0));
     }
 
     /// Check if node is focused
     pub fn is_focused(&self, node_id: NodeId) -> bool {
-        self.focused_node == Some(node_id)
+        self.focused_node == Some(input_engine::InputNodeId(node_id.0))
     }
 
     /// Blur a node
     pub fn blur_node(&mut self, node_id: NodeId) {
-        if self.focused_node == Some(node_id) {
+        if self.focused_node == Some(input_engine::InputNodeId(node_id.0)) {
             self.focused_node = None;
         }
     }
@@ -579,7 +579,7 @@ impl WidgetContext {
     /// Get cursor position for a text input
     pub fn get_cursor_position(&self, node_id: NodeId) -> Option<usize> {
         self.text_input_states
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .map(|state| state.cursor_position)
     }
 
@@ -616,7 +616,7 @@ impl WidgetContext {
         initial_result: Result<(), String>,
     ) {
         self.validators.insert(
-            node_id,
+            input_engine::InputNodeId(node_id.0),
             ValidationState {
                 validator,
                 error: initial_result.err(),
@@ -627,7 +627,7 @@ impl WidgetContext {
     /// Check if node has validation error
     pub fn has_validation_error(&self, node_id: NodeId) -> bool {
         self.validators
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .and_then(|state| state.error.as_ref())
             .is_some()
     }
@@ -635,24 +635,26 @@ impl WidgetContext {
     /// Get validation error for a node
     pub fn get_validation_error(&self, node_id: NodeId) -> Option<String> {
         self.validators
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .and_then(|state| state.error.clone())
     }
 
     /// Add placeholder marker to a node
     pub fn add_placeholder(&mut self, node_id: NodeId) {
-        self.placeholders.insert(node_id);
+        self.placeholders
+            .insert(input_engine::InputNodeId(node_id.0));
     }
 
     /// Check if node has placeholder
     pub fn has_placeholder(&self, node_id: NodeId) -> bool {
-        self.placeholders.contains(&node_id)
+        self.placeholders
+            .contains(&input_engine::InputNodeId(node_id.0))
     }
 
     /// Get current value of a text input (for testing)
     pub fn get_text_input_value(&self, node_id: NodeId) -> Option<String> {
         self.text_input_states
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .map(|state| state.read_signal.get_untracked())
     }
 
@@ -663,8 +665,12 @@ impl WidgetContext {
         field_mapping: IndexMap<String, NodeId>,
         on_submit: Option<SubmitCallback>,
     ) {
+        let field_mapping = field_mapping
+            .into_iter()
+            .map(|(k, v)| (k, input_engine::InputNodeId(v.0)))
+            .collect();
         self.form_states.insert(
-            node_id,
+            input_engine::InputNodeId(node_id.0),
             FormState {
                 field_mapping,
                 is_valid: true, // Will be updated by revalidate_form
@@ -677,25 +683,29 @@ impl WidgetContext {
     /// Check if form is valid
     pub fn is_form_valid(&self, node_id: NodeId) -> bool {
         self.form_states
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .map(|state| state.is_valid)
             .unwrap_or(true)
     }
 
     /// Get all field errors for a form
     pub fn get_form_field_errors(&self, node_id: NodeId) -> HashMap<String, String> {
-        input_engine::form::get_form_field_errors(node_id, &self.form_states, &self.validators)
+        input_engine::form::get_form_field_errors(
+            input_engine::InputNodeId(node_id.0),
+            &self.form_states,
+            &self.validators,
+        )
     }
 
     /// Get form state for a form node
     pub fn get_form_state(&self, node_id: NodeId) -> Option<&FormState> {
-        self.form_states.get(&node_id)
+        self.form_states.get(&input_engine::InputNodeId(node_id.0))
     }
 
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
         input_engine::form::revalidate_form(
-            node_id,
+            input_engine::InputNodeId(node_id.0),
             &mut self.form_states,
             &self.text_input_states,
             &mut self.validators,
@@ -705,7 +715,7 @@ impl WidgetContext {
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
         input_engine::form::trigger_submit(
-            node_id,
+            input_engine::InputNodeId(node_id.0),
             &mut self.form_states,
             &self.text_input_states,
             &mut self.validators,
@@ -715,7 +725,7 @@ impl WidgetContext {
     /// Check if form has submit error
     pub fn has_submit_error(&self, node_id: NodeId) -> bool {
         self.form_states
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .and_then(|state| state.submit_error.as_ref())
             .is_some()
     }
@@ -723,13 +733,14 @@ impl WidgetContext {
     /// Get submit error for a form
     pub fn get_submit_error(&self, node_id: NodeId) -> Option<String> {
         self.form_states
-            .get(&node_id)
+            .get(&input_engine::InputNodeId(node_id.0))
             .and_then(|state| state.submit_error.clone())
     }
 
     /// Check if node is a text input
     pub fn is_text_input(&self, node_id: NodeId) -> bool {
-        self.text_input_states.contains_key(&node_id)
+        self.text_input_states
+            .contains_key(&input_engine::InputNodeId(node_id.0))
     }
 
     /// Check if node is clickable (alias for has_clickable)
@@ -739,7 +750,7 @@ impl WidgetContext {
 
     /// Get the currently focused node
     pub fn focused_node(&self) -> Option<NodeId> {
-        self.focused_node
+        self.focused_node.map(|id| NodeId(id.0))
     }
 
     /// Focus the next focusable node (Tab navigation).
@@ -753,6 +764,7 @@ impl WidgetContext {
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_next(&mut self) -> Option<NodeId> {
         input_engine::focus::focus_next(&self.text_input_states, &mut self.focused_node)
+            .map(|id| NodeId(id.0))
     }
 
     /// Focus the previous focusable node (Shift+Tab navigation).
@@ -766,6 +778,7 @@ impl WidgetContext {
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_prev(&mut self) -> Option<NodeId> {
         input_engine::focus::focus_prev(&self.text_input_states, &mut self.focused_node)
+            .map(|id| NodeId(id.0))
     }
 
     // =========================================================================
@@ -793,7 +806,9 @@ impl WidgetContext {
     }
 
     /// Get all text input states (for app-shell integration)
-    pub fn text_input_states(&self) -> &indexmap::IndexMap<NodeId, TextInputState> {
+    pub fn text_input_states(
+        &self,
+    ) -> &indexmap::IndexMap<input_engine::InputNodeId, TextInputState> {
         &self.text_input_states
     }
 
@@ -852,12 +867,12 @@ impl WidgetContext {
     }
 
     /// Get all validators (for app-shell integration)
-    pub fn validators(&self) -> &HashMap<NodeId, ValidationState> {
+    pub fn validators(&self) -> &HashMap<input_engine::InputNodeId, ValidationState> {
         &self.validators
     }
 
     /// Get all form states (for app-shell integration)
-    pub fn form_states(&self) -> &HashMap<NodeId, FormState> {
+    pub fn form_states(&self) -> &HashMap<input_engine::InputNodeId, FormState> {
         &self.form_states
     }
 

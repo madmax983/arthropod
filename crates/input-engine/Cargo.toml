@@ -8,8 +8,8 @@ description = "Input and gesture recognition engine for Arthropod GUI framework"
 [dependencies]
 flux-state = { path = "../flux-state" }
 plat-core = { path = "../plat-core" }
-render-engine = { path = "../render-engine" }
 indexmap = "2.13.0"
+serde = { version = "1.0", features = ["derive"] }
 
 [features]
 nova = []

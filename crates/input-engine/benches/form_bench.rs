@@ -1,10 +1,10 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use flux_state::{Runtime, Signal};
 use indexmap::IndexMap;
+use input_engine::InputNodeId;
 use input_engine::form::{FormState, revalidate_form};
 use input_engine::text::TextInputState;
 use input_engine::validation::ValidationState;
-use render_engine::NodeId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -26,11 +26,11 @@ fn bench_revalidate_form(c: &mut Criterion) {
     let mut text_input_states = IndexMap::new();
     let mut validators = HashMap::new();
 
-    let form_id = NodeId(10);
+    let form_id = InputNodeId(10);
     let mut field_mapping = IndexMap::new();
 
     for i in 0..100 {
-        let field_id = NodeId(100 + i);
+        let field_id = InputNodeId(100 + i);
         field_mapping.insert(format!("field_{}", i), field_id);
 
         text_input_states.insert(field_id, create_text_state("test"));

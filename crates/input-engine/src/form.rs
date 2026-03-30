@@ -1,9 +1,9 @@
 //! Form state and logic.
 
+use crate::InputNodeId;
 use crate::text::TextInputState;
 use crate::validation::ValidationState;
 use indexmap::IndexMap;
-use render_engine::NodeId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -29,7 +29,7 @@ pub struct FormState {
     /// Mapping from field name to the NodeId of the input widget.
     ///
     /// This allows the form logic to collect values from all registered inputs.
-    pub field_mapping: IndexMap<String, NodeId>,
+    pub field_mapping: IndexMap<String, InputNodeId>,
 
     /// Whether the form is currently valid.
     ///
@@ -45,9 +45,9 @@ pub struct FormState {
 
 /// Helper to validate a single field
 fn validate_field(
-    field_node_id: NodeId,
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    validators: &mut HashMap<NodeId, ValidationState>,
+    field_node_id: InputNodeId,
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    validators: &mut HashMap<InputNodeId, ValidationState>,
 ) {
     let Some(state) = text_input_states.get(&field_node_id) else {
         return;
@@ -65,7 +65,7 @@ fn validate_field(
 /// Helper to collect form data
 fn collect_form_data(
     form_state: &FormState,
-    text_input_states: &IndexMap<NodeId, TextInputState>,
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
 ) -> FormData {
     form_state
         .field_mapping
@@ -79,10 +79,10 @@ fn collect_form_data(
 
 /// Revalidate a form (check all field validators)
 pub fn revalidate_form(
-    node_id: NodeId,
-    form_states: &mut HashMap<NodeId, FormState>,
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    validators: &mut HashMap<NodeId, ValidationState>,
+    node_id: InputNodeId,
+    form_states: &mut HashMap<InputNodeId, FormState>,
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    validators: &mut HashMap<InputNodeId, ValidationState>,
 ) {
     // Re-run validators on all fields with current values and compute overall validity
     if let Some(form_state) = form_states.get_mut(&node_id) {
@@ -103,9 +103,9 @@ pub fn revalidate_form(
 
 /// Get all field errors for a form
 pub fn get_form_field_errors(
-    node_id: NodeId,
-    form_states: &HashMap<NodeId, FormState>,
-    validators: &HashMap<NodeId, ValidationState>,
+    node_id: InputNodeId,
+    form_states: &HashMap<InputNodeId, FormState>,
+    validators: &HashMap<InputNodeId, ValidationState>,
 ) -> HashMap<String, String> {
     let Some(form_state) = form_states.get(&node_id) else {
         return HashMap::new();
@@ -124,10 +124,10 @@ pub fn get_form_field_errors(
 
 /// Trigger form submission
 pub fn trigger_submit(
-    node_id: NodeId,
-    form_states: &mut HashMap<NodeId, FormState>,
-    text_input_states: &IndexMap<NodeId, TextInputState>,
-    validators: &mut HashMap<NodeId, ValidationState>,
+    node_id: InputNodeId,
+    form_states: &mut HashMap<InputNodeId, FormState>,
+    text_input_states: &IndexMap<InputNodeId, TextInputState>,
+    validators: &mut HashMap<InputNodeId, ValidationState>,
 ) {
     // Revalidate first
     revalidate_form(node_id, form_states, text_input_states, validators);
@@ -181,8 +181,8 @@ mod tests {
         let mut text_input_states = IndexMap::new();
         let mut validators = HashMap::new();
 
-        let form_id = NodeId(10);
-        let field_id = NodeId(11);
+        let form_id = InputNodeId(10);
+        let field_id = InputNodeId(11);
 
         let mut field_mapping = IndexMap::new();
         field_mapping.insert("username".to_string(), field_id);
@@ -245,8 +245,8 @@ mod tests {
 
     #[test]
     fn should_collect_form_data_correctly() {
-        let field1_id = NodeId(11);
-        let field2_id = NodeId(12);
+        let field1_id = InputNodeId(11);
+        let field2_id = InputNodeId(12);
 
         let mut field_mapping = IndexMap::new();
         field_mapping.insert("username".to_string(), field1_id);
@@ -275,8 +275,8 @@ mod tests {
         let mut text_input_states = IndexMap::new();
         let mut validators = HashMap::new();
 
-        let form_id = NodeId(10);
-        let field_id = NodeId(11);
+        let form_id = InputNodeId(10);
+        let field_id = InputNodeId(11);
 
         let mut field_mapping = IndexMap::new();
         field_mapping.insert("code".to_string(), field_id);
