@@ -112,23 +112,21 @@ pub fn update_widget_style_system(
 /// This system combines color, text, transform, and opacity reactive updates into one
 /// system, reducing scheduling overhead and acquiring `ResMut<Scene>` only once
 /// instead of multiple times.
+pub type ReactiveQuery<'w> = (
+    &'w SceneNodeRef,
+    Option<&'w mut LayoutStyle>,
+    Option<&'w mut ReactiveColor>,
+    Option<&'w mut ReactiveText>,
+    Option<&'w mut ReactiveComputedText>,
+    Option<&'w mut ReactiveTransform>,
+    Option<&'w mut ReactiveOpacity>,
+    Option<&'w mut ReactiveLayoutWidth>,
+    Option<&'w mut ReactiveLayoutFlexGrow>,
+    Option<&'w mut ProgressBarState>,
+);
+
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::type_complexity)]
-pub fn update_all_reactive_system(
-    mut query: Query<(
-        &SceneNodeRef,
-        Option<&mut LayoutStyle>,
-        Option<&mut ReactiveColor>,
-        Option<&mut ReactiveText>,
-        Option<&mut ReactiveComputedText>,
-        Option<&mut ReactiveTransform>,
-        Option<&mut ReactiveOpacity>,
-        Option<&mut ReactiveLayoutWidth>,
-        Option<&mut ReactiveLayoutFlexGrow>,
-        Option<&mut ProgressBarState>,
-    )>,
-    mut scene: ResMut<Scene>,
-) {
+pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene: ResMut<Scene>) {
     for (
         node_ref,
         mut layout,
