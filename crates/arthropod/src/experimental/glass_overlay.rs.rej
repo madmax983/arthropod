@@ -1,0 +1,12 @@
+--- glass_overlay.rs
++++ glass_overlay.rs
+@@ -9,8 +9,8 @@
+
+ #[cfg(feature = "nova")]
+ use bevy_ecs::prelude::*;
+ #[cfg(feature = "nova")]
+-use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode, Vec2};
++use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
+ #[cfg(feature = "nova")]
+-use style_engine::{Effect, VisualStyle};
++use style_engine::{BackgroundBlur, Effect, VisualStyle};

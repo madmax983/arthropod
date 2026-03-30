@@ -1,0 +1,24 @@
+--- crates/arthropod/src/experimental/glass_overlay.rs
++++ crates/arthropod/src/experimental/glass_overlay.rs
+@@ -9,8 +9,8 @@
+
+ #[cfg(feature = "nova")]
+ use bevy_ecs::prelude::*;
+ #[cfg(feature = "nova")]
+-use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode, Vec2};
++use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
+ #[cfg(feature = "nova")]
+-use style_engine::{Effect, VisualStyle};
++use style_engine::{BackgroundBlur, Effect, VisualStyle};
+
+ /// Configuration for the Glass Overlay system.
+@@ -86,9 +86,7 @@
+
+     let mut style = VisualStyle::new();
+     style.fills = vec![style_engine::Paint::Solid(config.tint.0)];
+-    style.effects = vec![Effect::BackgroundBlur {
+-        radius: config.blur_radius,
+-    }];
++    style.effects = vec![Effect::BackgroundBlur(BackgroundBlur::new(config.blur_radius))];
+
+     if let Some(overlay_id) = state.overlay_node_id {

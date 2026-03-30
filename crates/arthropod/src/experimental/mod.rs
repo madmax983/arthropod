@@ -55,6 +55,56 @@ pub mod parallax;
 #[cfg(feature = "nova")]
 pub mod mouse_trail;
 
+#[cfg(feature = "nova")]
+pub mod glass_overlay;
+
+#[cfg(not(feature = "nova"))]
+pub mod glass_overlay {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `glass_overlay` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct GlassOverlayConfig;
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct GlassOverlayTarget;
+
+    #[derive(bevy_ecs::prelude::Resource, Default)]
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub struct GlassOverlayState;
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn update_glass_overlay(
+        _scene: bevy_ecs::prelude::ResMut<render_engine::Scene>,
+        _config: bevy_ecs::prelude::Res<GlassOverlayConfig>,
+        _target: bevy_ecs::prelude::Res<GlassOverlayTarget>,
+        _state: bevy_ecs::prelude::ResMut<GlassOverlayState>,
+    ) {
+    }
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_glass_overlay(_app: &mut crate::App) {
+        super::print_missing_feature_warning("glass_overlay");
+    }
+}
+
 #[cfg(not(feature = "nova"))]
 pub mod mouse_trail {
     #![allow(deprecated)]

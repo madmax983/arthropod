@@ -1,0 +1,36 @@
+--- crates/arthropod/src/experimental/mod.rs
++++ crates/arthropod/src/experimental/mod.rs
+@@ -40,6 +40,9 @@
+ #[cfg(feature = "nova")]
+ pub mod mouse_trail;
+
++#[cfg(feature = "nova")]
++pub mod glass_overlay;
++
+ // ============================================================================
+ // MISSING FEATURE FALLBACKS
+ // ============================================================================
+@@ -62,6 +65,22 @@
+     }
+ }
+
++#[cfg(not(feature = "nova"))]
++pub mod glass_overlay {
++    #![allow(deprecated)]
++    use bevy_ecs::prelude::Resource;
++
++    pub const MISSING_FEATURE: () = ();
++
++    #[derive(Resource, Default)]
++    pub struct GlassOverlayConfig;
++    #[derive(Resource, Default)]
++    pub struct GlassOverlayTarget;
++    #[derive(Resource, Default)]
++    pub struct GlassOverlayState;
++    pub fn register_glass_overlay(_app: &mut crate::App) {
++        super::print_missing_feature_warning("glass_overlay");
++    }
++}
++
+ #[cfg(not(feature = "nova"))]
+ pub mod mouse_trail {

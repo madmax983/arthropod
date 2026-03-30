@@ -35,3 +35,7 @@
 **Concept:** Added a `ParallaxNode` component and `update_parallax` system to shift UI elements slightly based on `MousePosition` and `LayoutConstraintsResource` to create an Apple TV style depth effect.
 **Fate:** Merged.
 **Lesson:** Simple affine transformations combined with existing ECS resources (`MousePosition`, `LayoutConstraintsResource`) can easily create complex, dynamic visual effects without touching core widget rendering logic.
+## [Glass Overlay]
+**Concept:** Added an experimental `glass_overlay` system connecting `flux-state` reactivity with `render-engine` blur effects (`Effect::BackgroundBlur`). It provides a fullscreen or node-specific "frosted glass" visual layer that dims and blurs elements underneath it.
+**Fate:** Merged.
+**Lesson:** Applying `Effect::BackgroundBlur` directly onto a new overlay node cleanly achieves the visual frosted glass effect over arbitrary content beneath it without modifying existing nodes.
