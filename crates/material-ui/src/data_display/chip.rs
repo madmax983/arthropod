@@ -7,7 +7,7 @@ use render_engine::node::NodeContent;
 use render_engine::{NodeId, Paint, StrokeStyle, VisualStyle};
 use std::sync::Arc;
 use style_engine::StrokeAlign;
-use widget_core::widget_trait::Widget;
+use widget_core::Widget;
 use widget_core::{Text, WidgetContext};
 
 // ---------------------------------------------------------------------------

@@ -5,8 +5,8 @@ use glam::Vec4;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{NodeId, VisualStyle};
+use widget_core::Widget;
 use widget_core::WidgetContext;
-use widget_core::widget_trait::Widget;
 
 // ---------------------------------------------------------------------------
 // MD3 fallback colors

@@ -5,8 +5,8 @@ use flux_state::Signal;
 use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{CornerRadii, NodeId};
+use widget_core::Widget;
 use widget_core::WidgetContext;
-use widget_core::widget_trait::Widget;
 
 /// Selection mode for a [`ToggleButtonGroup`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

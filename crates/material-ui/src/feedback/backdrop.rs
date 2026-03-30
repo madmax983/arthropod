@@ -3,9 +3,9 @@
 use render_engine::NodeId;
 use render_engine::node::NodeContent;
 use std::sync::Arc;
+use widget_core::Layer;
+use widget_core::Widget;
 use widget_core::WidgetContext;
-use widget_core::layer::Layer;
-use widget_core::widget_trait::Widget;
 
 /// MD3 Backdrop -- full-screen scrim overlay.
 ///

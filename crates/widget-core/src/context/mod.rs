@@ -71,14 +71,14 @@
 //! }
 //! ```
 
-use crate::form_state::{FormState, SubmitCallback};
+use crate::form::form_state::{FormState, SubmitCallback};
+use crate::form::validation::Validator;
+use crate::form::validation_state::ValidationState;
 use crate::input_state::{
     ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
     ReactiveTextState, TextInputState,
 };
 use crate::layer::{Layer, LayerManager};
-use crate::validation::Validator;
-use crate::validation_state::ValidationState;
 use anim_graph::timeline::Timeline;
 use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;

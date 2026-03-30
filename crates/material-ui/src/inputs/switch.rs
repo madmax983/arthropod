@@ -7,7 +7,7 @@ use layout_engine::{FlexAlign, FlexDirection, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{Color, NodeId};
 use std::sync::Arc;
-use widget_core::widget_trait::Widget;
+use widget_core::Widget;
 use widget_core::{Text, WidgetContext};
 
 // ---------------------------------------------------------------------------

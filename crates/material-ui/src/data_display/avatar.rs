@@ -5,7 +5,7 @@ use glam::Vec4;
 use layout_engine::{FlexAlign, FlexJustifyContent, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{NodeId, VisualStyle};
-use widget_core::widget_trait::Widget;
+use widget_core::Widget;
 use widget_core::{Text, WidgetContext};
 
 // ---------------------------------------------------------------------------

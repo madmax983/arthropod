@@ -7,8 +7,8 @@ use layout_engine::{FlexDirection, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{NodeId, Paint, StrokeStyle, TextContent, VisualStyle};
 use style_engine::StrokeAlign;
+use widget_core::Widget;
 use widget_core::WidgetContext;
-use widget_core::widget_trait::Widget;
 
 // ---------------------------------------------------------------------------
 // MD3 fallback colors

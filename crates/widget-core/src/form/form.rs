@@ -1,6 +1,6 @@
 //! Form widget - container for input fields with validation and submission
 
-pub use crate::form_state::{FormData, SubmitCallback};
+pub use crate::form::form_state::{FormData, SubmitCallback};
 use crate::{NamedWidgetTuple, Widget, WidgetContext};
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};

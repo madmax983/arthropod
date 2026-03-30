@@ -23,3 +23,6 @@
 ## 2026-06-15 - Unused Dependency Removal using Cargo Machete
 **Tangle:** The workspace had several unused dependencies across multiple crates that increased build times and dependency graph complexity. Examples include `quinn-proto` in the workspace root, `theme-engine` in `arthropod-ecs`, and `renderdoc` in `render-engine`.
 **Blueprint:** Removed unused dependencies using `cargo machete` and `cargo rm`, specifically `quinn-proto`, `theme-engine` from `arthropod-ecs`, and `renderdoc` from `render-engine` along with its associated feature flags. Cleaned up redundant code related to `renderdoc` in the workspace `Cargo.toml`.
+## 2026-06-25 - Widget Core Module Unification
+**Tangle:** `widget-core/src/lib.rs` exposed 28 public submodules (The Sprawl anti-pattern), making internal refactoring difficult, leaking internal structure, and increasing coupling across crates.
+**Blueprint:** Created logical subdirectories (`layout`, `primitive`, `form`) and moved all related widget files into them. Changed internal `pub mod` exports to `pub(crate) mod` (where feasible) or explicitly wrapped them in internal submodules, while exposing a clean flat public API using `pub use`. This encapsulates the structure and reduces the API surface area.

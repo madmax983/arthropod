@@ -150,58 +150,39 @@
 //!
 //! See [`trait@Widget`] for a detailed guide and complete examples.
 
-pub mod button;
-pub mod card;
-pub mod carousel;
-pub mod center;
-pub mod checkbox;
-pub mod column;
-pub mod container;
-pub mod context;
-pub mod divider;
 pub mod form;
-pub mod form_state;
-pub mod grid;
-pub mod icon;
-pub mod image;
+pub mod layout;
+pub mod primitive;
+
+pub mod context;
 pub mod input_state;
 pub mod layer;
-pub mod list;
-pub mod padding;
-pub mod progress_bar;
-pub mod row;
-pub mod spacer;
-pub mod stack;
 pub mod style;
-pub mod text;
-pub mod text_input;
-pub mod validation;
-pub mod validation_state;
 pub mod widget_trait;
 
-pub use button::{Button, ButtonStyle};
-pub use card::Card;
-pub use carousel::Carousel;
-pub use center::Center;
-pub use checkbox::Checkbox;
-pub use column::Column;
-pub use container::Container;
 pub use context::WidgetContext;
-pub use divider::Divider;
-pub use form::Form;
-pub use grid::Grid;
-pub use icon::Icon;
-pub use image::Image;
+pub use form::form::Form;
 pub use layer::{Layer, LayerManager};
-pub use list::{list_from, List};
-pub use padding::Padding;
-pub use progress_bar::ProgressBar;
-pub use row::Row;
-pub use spacer::Spacer;
-pub use stack::Stack;
+pub use layout::center::Center;
+pub use layout::column::Column;
+pub use layout::container::Container;
+pub use layout::divider::Divider;
+pub use layout::grid::Grid;
+pub use layout::list::{list_from, List};
+pub use layout::padding::Padding;
+pub use layout::row::Row;
+pub use layout::spacer::Spacer;
+pub use layout::stack::Stack;
+pub use primitive::button::{Button, ButtonStyle};
+pub use primitive::card::Card;
+pub use primitive::carousel::Carousel;
+pub use primitive::checkbox::Checkbox;
+pub use primitive::icon::Icon;
+pub use primitive::image::Image;
+pub use primitive::progress_bar::ProgressBar;
+pub use primitive::text::Text;
+pub use primitive::text_input::TextInput;
 pub use style::{Padding as StylePadding, ResolvedStyle, Style, StyleOverrides};
-pub use text::Text;
-pub use text_input::TextInput;
 pub use widget_trait::{NamedWidgetTuple, Widget, WidgetTuple};
 
 // Re-export layout types for advanced use cases (manual container construction)
