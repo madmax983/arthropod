@@ -23,7 +23,6 @@ use crate::backend::wgpu::pipelines::color_filter_pipeline::{
 };
 use crate::backend::wgpu::pipelines::path_pipeline::{PathBatch, PathPipeline, TessellationCache};
 use crate::backend::wgpu::pipelines::primitive_pipeline::PrimitivePipeline;
-use crate::backend::wgpu::pipelines::stencil_pipeline::plan_clip_sequence_for_nested_clips;
 use crate::backend::wgpu::render_target_pool::{
     RenderTargetHandle, RenderTargetKey, RenderTargetPool,
 };
@@ -110,15 +109,6 @@ impl<'a> MultipassRenderer<'a> {
             self.context.config.height,
             self.background_capture_bounds_buffer,
         );
-        let _clip_sequence = if self
-            .effect_kinds_buffer
-            .iter()
-            .any(|k| matches!(k, EffectPassKind::StencilPush))
-        {
-            plan_clip_sequence_for_nested_clips()
-        } else {
-            Vec::new()
-        };
         let requires_offscreen = self.effect_kinds_buffer.iter().any(|kind| {
             matches!(
                 kind,

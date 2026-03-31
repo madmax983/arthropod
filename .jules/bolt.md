@@ -76,3 +76,10 @@
 **[Eliminate Per-Frame LayoutEngine Allocations]
 **Learning:** Re-creating `LayoutEngine` (which wraps `TaffyTree`) per frame within the layout system discards all previously allocated nodes and forces Taffy to reallocate from scratch.
 **Action:** Extract `clear()` functionality into `LayoutEngine` and reuse it alongside its associated NodeId `HashMap` across frames using Bevy's `Local<T>` inside the ECS `layout_system` to completely eliminate per-frame layout heap allocations.
+**[Performance] Avoid per-frame PathPipeline allocations**
+**Learning:** `PathPipeline::prepare` was unconditionally creating `let mut vertices = Vec::new();` and `indices = Vec::new();` each frame, causing unnecessary heap pressure on scenes with paths.
+**Action:** Always hoist hot-loop `Vec` creations to struct fields (`cpu_vertices`, `cpu_indices`) and call `.clear()` to retain and reuse capacity.
+
+**[Performance] Avoid allocating unused unused variables**
+**Learning:** An unused variable `_clip_sequence` checked for nested clips and unconditionally called `plan_clip_sequence_for_nested_clips()` or `Vec::new()`, making a useless heap allocation every frame.
+**Action:** Audit and remove all unused code, especially variables returning collections on a hot path.

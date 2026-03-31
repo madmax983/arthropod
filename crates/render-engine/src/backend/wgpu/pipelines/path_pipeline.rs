@@ -113,6 +113,10 @@ pub struct PathPipeline {
     gradient_params: Vec<GradientParams>,
     gradient_bind_group: Option<wgpu::BindGroup>,
     gradient_bind_group_layout: wgpu::BindGroupLayout,
+    /// Pre-allocated buffer for CPU vertices.
+    cpu_vertices: Vec<PathGpuVertex>,
+    /// Pre-allocated buffer for CPU indices.
+    cpu_indices: Vec<u32>,
 }
 
 const INITIAL_VERTEX_CAPACITY: usize = 4096;
@@ -1056,6 +1060,8 @@ impl PathPipeline {
             gradient_params: Vec::new(),
             gradient_bind_group,
             gradient_bind_group_layout,
+            cpu_vertices: Vec::with_capacity(INITIAL_VERTEX_CAPACITY),
+            cpu_indices: Vec::with_capacity(INITIAL_INDEX_CAPACITY),
         }
     }
 
@@ -1065,8 +1071,8 @@ impl PathPipeline {
         queue: &wgpu::Queue,
         batches: &[PathBatch<'_>],
     ) {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
+        self.cpu_vertices.clear();
+        self.cpu_indices.clear();
         self.gradient_params.clear();
 
         for batch in batches {
@@ -1088,7 +1094,12 @@ impl PathPipeline {
             } else {
                 PaintRuntime::default()
             };
-            append_batch_geometry(batch, &mut vertices, &mut indices, runtime);
+            append_batch_geometry(
+                batch,
+                &mut self.cpu_vertices,
+                &mut self.cpu_indices,
+                runtime,
+            );
         }
 
         self.gradient_atlas.upload_to_gpu(queue);
@@ -1131,23 +1142,23 @@ impl PathPipeline {
             queue.write_buffer(&self.gradient_params_buffer, 0, params_bytes);
         }
 
-        self.index_count = indices.len() as u32;
+        self.index_count = self.cpu_indices.len() as u32;
         if self.index_count == 0 {
             return;
         }
 
         self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Path Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(&self.cpu_vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         self.index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Path Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
+            contents: bytemuck::cast_slice(&self.cpu_indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        self.vertex_capacity = vertices.len();
-        self.index_capacity = indices.len();
+        self.vertex_capacity = self.cpu_vertices.len();
+        self.index_capacity = self.cpu_indices.len();
     }
 
     pub fn render(
