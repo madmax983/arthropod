@@ -68,6 +68,15 @@ impl AppContext {
         self.widget_ctx.set_design_tokens(tokens);
     }
 
+    /// Store a typed extension in the underlying [`WidgetContext`].
+    ///
+    /// This enables app-level configuration of widget plugin systems, such as
+    /// registering a `material_ui::theme::MaterialTheme` for Material Design 3
+    /// components.
+    pub fn set_extension<T: 'static>(&mut self, value: T) {
+        self.widget_ctx.set_extension(value);
+    }
+
     /// Get a signal that updates every frame.
     ///
     /// Useful for driving animations and time-based reactive logic.
