@@ -65,6 +65,7 @@ C4Container
     Rel(widget, theme, "Uses", "Resolves tokens")
     Rel(widget, text, "Uses", "Measures text")
     Rel(widget, macros, "Uses", "Expands macros")
+    Rel(widget, input, "Delegates to", "Input processing")
 
     Rel(render, text, "Uses", "Rasterizes glyphs")
     Rel(render, style, "Uses", "Tessellates paths")
@@ -160,7 +161,7 @@ sequenceDiagram
 
 ## Widget System Structure
 
-The widget system follows a "Functional Core, Imperative Shell" approach. `WidgetContext` acts as a flattened state container, while complex logic is delegated to pure functional modules. See [ADR 0028](./adr/0028-widget-state-delegation.md).
+The widget system follows a "Functional Core, Imperative Shell" approach. `WidgetContext` acts as a flattened state container, while complex logic is delegated to pure functional modules. See [ADR 0028](./adr/0028-widget-state-delegation.md) and [ADR 0037](./adr/0037-input-engine-unification.md).
 
 ```mermaid
 classDiagram

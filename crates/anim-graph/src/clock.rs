@@ -48,7 +48,7 @@ pub enum ClockEvent {
 ///
 /// # Self-healing
 ///
-/// Delta time is clamped to [`MAX_DELTA_SECS`] to prevent time bombs when
+/// Delta time is clamped to `MAX_DELTA_SECS` to prevent time bombs when
 /// the application resumes from a background state.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnimationClock {
@@ -72,7 +72,7 @@ impl AnimationClock {
     /// `duration` is the total duration of one cycle in seconds.
     ///
     /// Returns a [`ClockEvent`] indicating whether a cycle boundary was crossed.
-    /// The caller (typically [`Timeline`](crate::Timeline)) uses this event to
+    /// The caller (typically `Timeline`) uses this event to
     /// decide loop behavior.
     pub fn tick(&mut self, delta_secs: f32, duration: f32) -> ClockEvent {
         debug_assert!(duration > 0.0, "Clock duration must be positive");

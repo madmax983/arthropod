@@ -154,7 +154,7 @@ impl Easing {
 
     /// Compute the instantaneous rate of change (derivative) of the easing function.
     ///
-    /// Used by [`Keyframe`](crate::keyframe::Keyframe) to produce velocity in [`Sample`](crate::Sample).
+    /// Used by [`Keyframe`](crate::keyframe::Keyframe) to produce velocity in [`Sample`].
     /// The derivative tells us how fast the easing curve is changing at time `t`,
     /// which translates to the animation's velocity when scaled by `(to - from) / duration`.
     ///

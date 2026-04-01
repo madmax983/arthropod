@@ -54,7 +54,7 @@ enum TimelineState<T: Animatable> {
 /// integration layer. It owns:
 /// - An [`AnimationClock`] for drift-free time tracking
 /// - A `Box<dyn Evaluable<T>>` for the animation definition
-/// - A [`TimelineState`] for playback/interruption management
+/// - A `TimelineState` for playback/interruption management
 ///
 /// # Interruption model
 ///
