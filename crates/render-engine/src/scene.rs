@@ -359,19 +359,22 @@ impl Scene {
 
             // Start with root
             let root_node = self.nodes.get(&self.root)?;
+
+            // OPTIMIZATION: Check visibility at root to avoid processing tree if hidden.
+            // This avoids pushing the root node onto the stack, preventing unnecessary stack usage.
+            if !root_node.visible {
+                return None;
+            }
+
             stack.push((self.root, root_node.children.len()));
 
             while let Some(&(node_id, child_index)) = stack.last() {
+                // We assume node_id is valid to avoid an extra lookup since we only
+                // push valid IDs onto the stack. However, for safety we still check.
                 let Some(node) = self.nodes.get(&node_id) else {
-                    // Should not happen in a valid scene, but handle safely
                     stack.pop();
                     continue;
                 };
-
-                if !node.visible {
-                    stack.pop();
-                    continue;
-                }
 
                 if child_index > 0 {
                     // Visit next child. We iterate in reverse order (back to front).
@@ -384,7 +387,12 @@ impl Scene {
 
                     // Push child to stack
                     if let Some(child_node) = self.nodes.get(&child_id) {
-                        stack.push((child_id, child_node.children.len()));
+                        // OPTIMIZATION: Check visibility BEFORE pushing to avoid a full
+                        // iteration cycle of pop->check->continue for invisible branches.
+                        // This prevents expensive stack operations and Hash Map lookups.
+                        if child_node.visible {
+                            stack.push((child_id, child_node.children.len()));
+                        }
                     }
                 } else {
                     // All children visited (and none returned a hit).
