@@ -26,3 +26,7 @@
 ## 2026-06-25 - Widget Core Module Unification
 **Tangle:** `widget-core/src/lib.rs` exposed 28 public submodules (The Sprawl anti-pattern), making internal refactoring difficult, leaking internal structure, and increasing coupling across crates.
 **Blueprint:** Created logical subdirectories (`layout`, `primitive`, `form`) and moved all related widget files into them. Changed internal `pub mod` exports to `pub(crate) mod` (where feasible) or explicitly wrapped them in internal submodules, while exposing a clean flat public API using `pub use`. This encapsulates the structure and reduces the API surface area.
+
+## 2026-06-25 - Unused Dependency Removal using Cargo Machete
+**Tangle:** The project had several unused dependencies across multiple crates that increased build times and dependency graph complexity. `material-ui` depended on `thiserror`, `arthropod` depended on `crossterm`, and `arthropod-ecs` depended on `theme-engine`.
+**Blueprint:** Removed unused dependencies using `cargo rm`, specifically `thiserror` from `material-ui`, `crossterm` from `arthropod`, and `theme-engine` from `arthropod-ecs`.

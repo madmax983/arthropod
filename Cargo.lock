@@ -199,7 +199,6 @@ dependencies = [
  "bevy_ecs",
  "comfy-table",
  "criterion",
- "crossterm 0.29.0",
  "env_logger",
  "flux-state",
  "glam",
@@ -233,7 +232,6 @@ dependencies = [
  "plat-core",
  "rayon",
  "render-engine",
- "theme-engine",
  "widget-core",
 ]
 
@@ -2665,7 +2663,6 @@ dependencies = [
  "render-engine",
  "style-engine",
  "theme-engine",
- "thiserror 2.0.18",
  "widget-core",
 ]
 

@@ -19,7 +19,6 @@ render-engine = { path = "../render-engine" }
 flux-state = { path = "../flux-state" }
 a11y-engine = { path = "../a11y-engine" }
 layout-engine = { path = "../layout-engine" }
-theme-engine = { path = "../theme-engine" }
 anim-graph = { path = "../anim-graph" }
 plat-core = { path = "../plat-core" }
 glam = "0.29"

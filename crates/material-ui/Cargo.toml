@@ -12,7 +12,6 @@ flux-state = { path = "../flux-state" }
 render-engine = { path = "../render-engine" }
 layout-engine = { path = "../layout-engine" }
 glam = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"
