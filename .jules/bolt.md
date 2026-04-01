@@ -83,6 +83,9 @@
 **[Performance] Avoid allocating unused unused variables**
 **Learning:** An unused variable `_clip_sequence` checked for nested clips and unconditionally called `plan_clip_sequence_for_nested_clips()` or `Vec::new()`, making a useless heap allocation every frame.
 **Action:** Audit and remove all unused code, especially variables returning collections on a hot path.
+**[Font Loading Optimization]**
+**Learning:** Parsing font data bytes using `Arc<[u8]>` (or rather `Arc<Vec<u8>>` converted to `Arc<dyn AsRef<[u8]> + Sync + Send>`) is incredibly faster than repeatedly cloning large byte vectors to load them into `cosmic-text`'s `Database`.
+**Action:** Always prefer using Arc wrappers or reference counted types when passing large data collections (like font binaries) to third party libraries that expect ownership or support shared ownership (via traits like `AsRef<[u8]>`).
 **[Eliminate Per-Frame LayoutEngine Allocations]
 **Learning:** Re-creating `LayoutEngine` (which wraps `TaffyTree`) per frame within the layout system discards all previously allocated nodes and forces Taffy to reallocate from scratch.
 **Action:** Extract `clear()` functionality into `LayoutEngine` and reuse it alongside its associated NodeId `HashMap` across frames using Bevy's `Local<T>` inside the ECS `layout_system` to completely eliminate per-frame layout heap allocations.

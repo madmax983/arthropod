@@ -10,13 +10,13 @@ use cosmic_text::{
     Weight,
 };
 use std::cell::RefCell;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 pub use web_loader::{
     load_font_source, load_font_url, versioned_cache_key, FontCache, FontSource, WebFontLoadError,
 };
 
-fn global_font_registry() -> &'static Mutex<Vec<Vec<u8>>> {
-    static REGISTRY: OnceLock<Mutex<Vec<Vec<u8>>>> = OnceLock::new();
+fn global_font_registry() -> &'static Mutex<Vec<Arc<Vec<u8>>>> {
+    static REGISTRY: OnceLock<Mutex<Vec<Arc<Vec<u8>>>>> = OnceLock::new();
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
@@ -24,10 +24,13 @@ fn register_global_font_bytes(bytes: Vec<u8>) -> bool {
     let mut registry = global_font_registry()
         .lock()
         .expect("font registry lock poisoned");
-    if registry.iter().any(|existing| existing == &bytes) {
+
+    let arc_bytes = Arc::new(bytes);
+
+    if registry.iter().any(|existing| **existing == *arc_bytes) {
         return false;
     }
-    registry.push(bytes);
+    registry.push(arc_bytes);
     true
 }
 
@@ -41,7 +44,11 @@ fn apply_global_fonts(font_system: &mut FontSystem, applied_count: &mut usize) -
     }
 
     for bytes in registry.iter().skip(start) {
-        font_system.db_mut().load_font_data(bytes.clone());
+        font_system
+            .db_mut()
+            .load_font_source(cosmic_text::fontdb::Source::Binary(
+                Arc::clone(bytes) as Arc<dyn AsRef<[u8]> + Sync + Send>
+            ));
     }
 
     let added = registry.len().saturating_sub(start);
