@@ -39,3 +39,7 @@
 **Concept:** Added an experimental `glass_overlay` system connecting `flux-state` reactivity with `render-engine` blur effects (`Effect::BackgroundBlur`). It provides a fullscreen or node-specific "frosted glass" visual layer that dims and blurs elements underneath it.
 **Fate:** Merged.
 **Lesson:** Applying `Effect::BackgroundBlur` directly onto a new overlay node cleanly achieves the visual frosted glass effect over arbitrary content beneath it without modifying existing nodes.
+## [Chaos Monkey Simulator]
+**Concept:** Added a `chaos_monkey` system connecting `flux-state` reactivity with `arthropod-ecs`'s `Clickable` components. It automatically finds visible clickables and triggers them pseudo-randomly to simulate user interactions and fuzz UI state changes.
+**Fate:** Merged.
+**Lesson:** Isolating simulation logic inside an ECS system allows us to fuzz UI state without having to simulate raw input events at the OS level, making it extremely lightweight and deterministic.

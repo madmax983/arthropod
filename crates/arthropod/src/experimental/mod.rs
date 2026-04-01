@@ -58,6 +58,9 @@ pub mod mouse_trail;
 #[cfg(feature = "nova")]
 pub mod glass_overlay;
 
+#[cfg(feature = "nova")]
+pub mod chaos_monkey;
+
 #[cfg(not(feature = "nova"))]
 pub mod glass_overlay {
     #![allow(deprecated)]
@@ -182,6 +185,24 @@ pub mod parallax {
     )]
     pub fn register_parallax(_app: &mut crate::App) {
         super::print_missing_feature_warning("parallax");
+    }
+}
+
+#[cfg(not(feature = "nova"))]
+pub mod chaos_monkey {
+    #![allow(deprecated)]
+
+    /// ⚠️ **MISSING FEATURE** ⚠️
+    ///
+    /// The `chaos_monkey` module requires the `nova` feature.
+    /// Add `features = ["nova"]` to your `arthropod` dependency in `Cargo.toml`.
+    pub const MISSING_FEATURE: () = ();
+
+    #[deprecated(
+        note = "This feature is EXPERIMENTAL and requires the 'nova' feature. Enable it in Cargo.toml."
+    )]
+    pub fn register_chaos_monkey(_app: &mut crate::App) {
+        super::print_missing_feature_warning("chaos_monkey");
     }
 }
 
