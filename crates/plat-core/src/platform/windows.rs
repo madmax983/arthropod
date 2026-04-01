@@ -461,6 +461,9 @@ impl HasDisplayHandle for WindowImpl {
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_NCCREATE => {
+            if lparam.0 == 0 {
+                return LRESULT(0); // Error: Invalid creation parameters
+            }
             // Extract WindowId from lpCreateParams and store in GWLP_USERDATA
             // SAFETY: lparam is a pointer to CREATESTRUCTW during WM_NCCREATE
             let create_struct = unsafe { &*(lparam.0 as *const CREATESTRUCTW) };
