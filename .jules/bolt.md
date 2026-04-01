@@ -92,3 +92,7 @@
 **[Eliminate Per-Frame Copy Allocations]
 **Learning:** Primitive structs holding strictly enums, floats, and `Option`s (like `FlexStyle` and `LayoutConstraints`) can and should derive `Copy`. Passing these large structures via `.clone()` across ECS mappings forces expensive unneeded copies during every frame update loop.
 **Action:** Always derive `Copy` for pure data primitives involved in the layout synchronization hot-path, replacing `.clone()` with simple `Copy` semantics for zero-cost propagation.
+
+**[Performance] Avoid redundant hashmap allocations when iterating and extending style maps**
+**Learning:** `merged_class_styles` in `stitch_scene.rs` was iterating through class names and inserting elements directly without checking for key existence, which resulted in N redundant hash lookups and clones per style property.
+**Action:** Iterate through the sources in reverse order and conditionally use `!map.contains_key(key)` and `.insert()` to ensure properties are only cloned once, reducing memory allocation pressure significantly on the layout pipeline hot path.

@@ -649,15 +649,21 @@ fn parse_inline_styles(raw: &str) -> HashMap<String, String> {
     map
 }
 
+/// Merges CSS class styles together based on the provided list of class names.
+/// Later classes override earlier classes.
+/// Iterates in reverse to only clone the final applicable property strings,
+/// saving redundant allocations on overwritten styles.
 fn merged_class_styles(
     classes: &[String],
     class_styles: &ClassStyleMap,
 ) -> HashMap<String, String> {
     let mut merged = HashMap::new();
-    for class_name in classes {
+    for class_name in classes.iter().rev() {
         if let Some(styles) = class_styles.get(class_name) {
             for (key, value) in styles {
-                merged.insert(key.clone(), value.clone());
+                if !merged.contains_key(key) {
+                    merged.insert(key.clone(), value.clone());
+                }
             }
         }
     }
