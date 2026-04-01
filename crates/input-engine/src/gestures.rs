@@ -240,7 +240,7 @@ where
     let effect = Effect::new(cx.clone(), move || {
         let event = input.get();
         if let Some(event) = event {
-            let mut pattern = pattern.lock().unwrap();
+            let mut pattern = pattern.lock().expect("Mutex poisoned");
             if let Some(gesture) = pattern.update(&event) {
                 write_out.set(Some(gesture));
             } else {
@@ -349,6 +349,7 @@ mod tests {
 
         #[derive(Clone, Debug, PartialEq)]
         enum Chord {
+            #[allow(dead_code)]
             CtrlS,
         }
 
@@ -384,5 +385,60 @@ mod tests {
         // Release S
         release(Key::S);
         assert_eq!(gesture_signal.get_untracked(), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Mutex poisoned")]
+    fn test_gesture_signal_mutex_poisoning() {
+        let runtime = Runtime::new();
+        let input = Signal::new(runtime.clone(), None);
+        let (read_input, write_input) = input.split();
+
+        #[derive(Clone, Debug, PartialEq)]
+        enum Chord {
+            #[allow(dead_code)]
+            CtrlS,
+        }
+
+        struct PoisoningMatcher;
+
+        impl InputPattern for PoisoningMatcher {
+            type Gesture = Chord;
+
+            fn update(&mut self, _event: &WindowEvent) -> Option<Self::Gesture> {
+                panic!("Intentional panic to poison mutex");
+            }
+        }
+
+        let matcher = PoisoningMatcher;
+        let _gesture_signal = create_gesture_signal(runtime.clone(), read_input, matcher);
+
+        let press = |key: Key| {
+            write_input.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
+                key,
+                state: ElementState::Pressed,
+                modifiers: Default::default(),
+                repeat: false,
+            })));
+        };
+
+        // First event panics and poisons the mutex. We run this in a separate thread
+        // to avoid polluting the main test thread's panic hook, but we catch it
+        // so we can trigger the actual expect() panic we want to test.
+        let write_input_clone = write_input.clone();
+        let handle = std::thread::spawn(move || {
+            write_input_clone.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
+                key: Key::A,
+                state: ElementState::Pressed,
+                modifiers: Default::default(),
+                repeat: false,
+            })));
+        });
+
+        // Ignore the panic from the thread
+        let _ = handle.join();
+
+        // Second event triggers the expect("Mutex poisoned") panic on the main thread
+        press(Key::B);
     }
 }

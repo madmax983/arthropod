@@ -1,15 +1,7 @@
-**Drop-based deadlocks in signals**
-**Learning:** In `WriteSignal::set`, replacing the inner value using `*guard = value` drops the old value while the `RwLockWriteGuard` is still held. If the old value has a `Drop` implementation that attempts to write to the same signal, it will cause a deadlock because the current thread already holds the write lock.
-**Action:** Always extract the old value using `std::mem::replace` inside the write guard, then explicitly drop it *outside* the guard scope so its `Drop` implementation cannot trigger reentrant lock acquisitions.
+**Empty Slice Panics in Array Extractor Methods**
+**Learning:** Functions that implicitly assume a collection is populated, like calling `.first().unwrap()` or `.last().unwrap()` on an array of `Point` data parsed from input gestures, will unconditionally panic when processing an empty sequence.
+**Action:** Replace `unwrap()` calls on slice accessors with `?` to gracefully exit the function or return `None` when dealing with potentially empty data sets, and always write a test case verifying the empty input scenario.
 
-**Proptest Concurrency Timeouts**
-**Learning:** `proptest!` runs tests for 256 iterations by default. For concurrency checks spanning thousands of updates and iterations this takes around 15 seconds to run locally, causing downstream `cargo-mutants` to fail baseline testing due to timeouts.
-**Action:** For heavy test setups, explicitly limit iterations via `#![proptest_config(ProptestConfig::with_cases(10))]`.
-
-**Stale While Computing Propagation**
-**Learning:** In reactive systems, if a dependency updates while a computed node is actively computing, the computed node must be marked as `stale_while_computing` so it re-evaluates next time. However, if this staleness is not propagated to its subscribers (e.g. because of an early-exit check that it's already stale), those subscribers will never know they need to recompute, leading to lost updates.
-**Action:** Always ensure that when marking a computing node as stale, the propagation logic still runs to mark its subscribers as stale, even if the node itself was already in the `stale` set.
-
-**flux-state unwrap fallback logic**
-**Learning:** `flux-state` has specific panic unwraps inside `to_read_signal()` that explicitly state `Type mismatch converting Computed to ReadSignal`. Also, `inspect_graph()` uses format strings like `Signal({:?})` when a name is missing.
-**Action:** When covering these logic paths, simulate a direct `Runtime` insertion to bypass higher-level safety checks like `Computed::new()`.
+**Testing Mutex Poisoning**
+**Learning:** Testing `expect("Mutex poisoned")` panics requires deliberately poisoning a lock by panicking on a background thread that holds it, then attempting to acquire it on the main thread. However, intentionally panicking inside an inline closure on the main thread and suppressing its output via `std::panic::set_hook` is unsafe, as it alters global state and pollutes the concurrent test runner execution.
+**Action:** When testing lock poisoning pathways, always spawn an isolated background thread to acquire the lock and execute the deliberate `panic!`. The main thread can then safely `join()` the thread, ignore the resulting `Err`, and proceed to trigger the targeted `expect()` panic cleanly without altering global test runner hooks.

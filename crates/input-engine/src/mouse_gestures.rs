@@ -268,7 +268,7 @@ mod tests {
         matcher: &mut StrokeMatcher,
         points: Vec<Point<f64>>,
     ) -> Option<MouseGesture> {
-        let start = points.first().unwrap();
+        let start = points.first()?;
 
         // Press
         matcher.update(&make_mouse_event(
@@ -283,7 +283,7 @@ mod tests {
         }
 
         // Release (at last point)
-        let end = points.last().unwrap();
+        let end = points.last()?;
         matcher.update(&make_mouse_event(
             ElementState::Released,
             MouseButton::Right,
@@ -319,6 +319,15 @@ mod tests {
 
         let gesture = simulate_stroke(&mut matcher, points);
         assert_eq!(gesture, Some(MouseGesture::SwipeDown));
+    }
+
+    #[test]
+    fn test_empty_stroke_ignored() {
+        let mut matcher = StrokeMatcher::new(MouseButton::Right);
+        let points = vec![];
+
+        let gesture = simulate_stroke(&mut matcher, points);
+        assert_eq!(gesture, None);
     }
 
     #[test]
