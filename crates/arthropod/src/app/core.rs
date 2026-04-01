@@ -424,7 +424,7 @@ impl App {
         self.transfer_components(
             "LayoutStyle",
             widget_ctx.layout_styles().iter(),
-            |style: &layout_engine::FlexStyle| LayoutStyle(style.clone()),
+            |style: &layout_engine::FlexStyle| LayoutStyle(*style),
         );
 
         // Transfer clickables to Clickable components

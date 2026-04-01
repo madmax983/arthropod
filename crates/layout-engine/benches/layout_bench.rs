@@ -35,7 +35,7 @@ fn bench_flexbox_layout(c: &mut Criterion) {
             };
 
             b.iter(|| {
-                engine.compute_layout(black_box(root), black_box(constraints.clone()));
+                engine.compute_layout(black_box(root), black_box(constraints));
             });
         });
     }

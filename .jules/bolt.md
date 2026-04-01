@@ -83,3 +83,9 @@
 **[Performance] Avoid allocating unused unused variables**
 **Learning:** An unused variable `_clip_sequence` checked for nested clips and unconditionally called `plan_clip_sequence_for_nested_clips()` or `Vec::new()`, making a useless heap allocation every frame.
 **Action:** Audit and remove all unused code, especially variables returning collections on a hot path.
+**[Eliminate Per-Frame LayoutEngine Allocations]
+**Learning:** Re-creating `LayoutEngine` (which wraps `TaffyTree`) per frame within the layout system discards all previously allocated nodes and forces Taffy to reallocate from scratch.
+**Action:** Extract `clear()` functionality into `LayoutEngine` and reuse it alongside its associated NodeId `HashMap` across frames using Bevy's `Local<T>` inside the ECS `layout_system` to completely eliminate per-frame layout heap allocations.
+**[Eliminate Per-Frame Copy Allocations]
+**Learning:** Primitive structs holding strictly enums, floats, and `Option`s (like `FlexStyle` and `LayoutConstraints`) can and should derive `Copy`. Passing these large structures via `.clone()` across ECS mappings forces expensive unneeded copies during every frame update loop.
+**Action:** Always derive `Copy` for pure data primitives involved in the layout synchronization hot-path, replacing `.clone()` with simple `Copy` semantics for zero-cost propagation.

@@ -24,8 +24,9 @@ pub struct LayoutEngine {
 
 /// Flexbox style properties
 ///
+/// ⚡ Bolt: Derived Copy to avoid per-frame allocations during layout system traversal.
 /// Defines how a widget should be laid out relative to its parent and siblings.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct FlexStyle {
     /// Direction of the main axis (Row or Column)
     pub direction: FlexDirection,
@@ -172,7 +173,9 @@ pub enum ItemAlignSelf {
 ///     min_height: None,
 /// };
 /// ```
-#[derive(Debug, Clone, Default)]
+///
+/// ⚡ Bolt: Derived Copy to avoid per-frame allocations when resolving constraints.
+#[derive(Debug, Clone, Copy, Default)]
 pub struct LayoutConstraints {
     /// The maximum horizontal space this container is permitted to occupy.
     /// Overrides internal flex-grow requests if they exceed this limit. Typically matches the OS Window width for the root node.

@@ -51,7 +51,6 @@ pub fn layout_system(
     // 1. Collect all layout styles into a lookup map
     // This allows us to look up styles by NodeId during recursive scene traversal
     // We use a Local to avoid per-frame HashMap allocation.
-    // ⚡ Bolt: Mapping style.0 avoids expensive .clone() heap operations per frame since FlexStyle is now Copy.
     layout_styles.clear();
     layout_styles.extend(query.iter().map(|(node_ref, style)| (node_ref.0, style.0)));
 
