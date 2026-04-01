@@ -480,39 +480,48 @@ pub fn plan_effect_passes(
     frame_height: u32,
     planned: &mut Vec<EffectPass>,
 ) {
-    let mut kinds = Vec::new();
-    for node in nodes {
-        if !node.visible || node.opacity <= 0.0 {
-            continue;
-        }
-        let Some(style) = &node.style else {
-            continue;
-        };
-
-        kinds.clear();
-        classify_effect_passes(style, node.has_children, &mut kinds);
-        let requires_composite = kinds.iter().any(|kind| {
-            matches!(
-                kind,
-                EffectPassKind::OffscreenLayer
-                    | EffectPassKind::BackgroundCapture
-                    | EffectPassKind::InnerShadow
-            )
-        });
-
-        if requires_composite && !kinds.contains(&EffectPassKind::BlendComposite) {
-            kinds.push(EffectPassKind::BlendComposite);
-        }
-
-        let bounds_px = clamp_bounds_to_frame(node.bounds, frame_width, frame_height);
-        planned.extend(kinds.iter().copied().map(|kind| EffectPass {
-            node_id: node.node_id,
-            kind,
-            target: None,
-            bounds_px,
-            blend_mode: style.blend_mode,
-        }));
+    thread_local! {
+        /// Thread-local buffer for effect pass classification to avoid per-node heap allocations.
+        /// Re-using this capacity eliminates `Vec::new()` overhead on the hot path while maintaining
+        /// the existing public API signature.
+        static KINDS_BUFFER: std::cell::RefCell<Vec<EffectPassKind>> = std::cell::RefCell::new(Vec::with_capacity(16));
     }
+
+    KINDS_BUFFER.with(|buffer| {
+        let mut kinds = buffer.borrow_mut();
+        for node in nodes {
+            if !node.visible || node.opacity <= 0.0 {
+                continue;
+            }
+            let Some(style) = &node.style else {
+                continue;
+            };
+
+            kinds.clear();
+            classify_effect_passes(style, node.has_children, &mut kinds);
+            let requires_composite = kinds.iter().any(|kind| {
+                matches!(
+                    kind,
+                    EffectPassKind::OffscreenLayer
+                        | EffectPassKind::BackgroundCapture
+                        | EffectPassKind::InnerShadow
+                )
+            });
+
+            if requires_composite && !kinds.contains(&EffectPassKind::BlendComposite) {
+                kinds.push(EffectPassKind::BlendComposite);
+            }
+
+            let bounds_px = clamp_bounds_to_frame(node.bounds, frame_width, frame_height);
+            planned.extend(kinds.iter().copied().map(|kind| EffectPass {
+                node_id: node.node_id,
+                kind,
+                target: None,
+                bounds_px,
+                blend_mode: style.blend_mode,
+            }));
+        }
+    });
 }
 
 /// Compute backdrop capture bounds for background blur.
