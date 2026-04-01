@@ -286,7 +286,7 @@ fn test_get_dirty_nodes() {
         node.state.disabled = true;
     });
 
-    let dirty = tree.get_dirty_nodes();
+    let dirty: std::collections::HashSet<_> = tree.get_dirty_nodes().collect();
     assert_eq!(dirty.len(), 1);
     assert!(dirty.contains(&button1));
     assert!(!dirty.contains(&button2));

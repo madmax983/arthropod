@@ -124,7 +124,7 @@ fn bench_get_dirty_nodes(c: &mut Criterion) {
             &dirty_count,
             |b, _| {
                 b.iter(|| {
-                    let dirty = tree.get_dirty_nodes();
+                    let dirty: std::collections::HashSet<_> = tree.get_dirty_nodes().collect();
                     black_box(dirty);
                 });
             },
@@ -256,7 +256,7 @@ fn bench_sync_to_platform(c: &mut Criterion) {
                     .collect();
 
                 // Get all dirty nodes
-                let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+                let dirty: Vec<_> = tree.get_dirty_nodes().collect();
 
                 // Create bridge
                 let tree_arc = Arc::new(Mutex::new(tree));
@@ -369,7 +369,7 @@ fn bench_frame_a11y_overhead(c: &mut Criterion) {
                     }
 
                     // Get dirty nodes
-                    let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+                    let dirty: Vec<_> = tree.get_dirty_nodes().collect();
 
                     // Sync to platform
                     let tree_arc = Arc::new(Mutex::new(tree));

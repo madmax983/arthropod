@@ -180,7 +180,7 @@ fn verify_a11y_sync(context: &FrameworkContext) {
     let a11y_tree = context.world().resource::<A11yTree>();
 
     // Check that dirty tracking works
-    let dirty_count = a11y_tree.get_dirty_nodes().len();
+    let dirty_count = a11y_tree.get_dirty_nodes().count();
     println!(
         "   ✓ {} nodes marked dirty (will be sent to AccessKit)",
         dirty_count

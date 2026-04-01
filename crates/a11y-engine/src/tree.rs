@@ -174,9 +174,9 @@ impl A11yTree {
 
     /// Get all dirty nodes
     ///
-    /// Returns clone of dirty set. Used by platform bridges for incremental sync.
-    pub fn get_dirty_nodes(&self) -> HashSet<A11yId> {
-        self.dirty_nodes.clone()
+    /// Returns an iterator of dirty set. Used by platform bridges for incremental sync.
+    pub fn get_dirty_nodes(&self) -> impl Iterator<Item = A11yId> + '_ {
+        self.dirty_nodes.iter().copied()
     }
 
     /// Clear all dirty flags

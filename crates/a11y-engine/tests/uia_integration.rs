@@ -37,7 +37,7 @@ fn test_accesskit_bridge_full_integration() {
     let checkbox_id = tree.add_node(root_id, checkbox_node);
 
     // Get dirty nodes (newly added nodes are dirty)
-    let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+    let dirty: Vec<_> = tree.get_dirty_nodes().collect();
     assert_eq!(
         dirty.len(),
         2,
@@ -108,7 +108,7 @@ fn test_accesskit_node_conversion_preserves_hierarchy() {
     let child_id = tree.add_node(parent_id, child_node);
 
     // Get dirty nodes before moving tree
-    let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+    let dirty: Vec<_> = tree.get_dirty_nodes().collect();
 
     // Create bridge and update
     let tree_arc = Arc::new(Mutex::new(tree));
@@ -186,7 +186,7 @@ fn test_accesskit_only_dirty_nodes_in_update() {
     });
 
     // Get dirty nodes
-    let dirty_set = tree.get_dirty_nodes();
+    let dirty_set: std::collections::HashSet<_> = tree.get_dirty_nodes().collect();
     assert_eq!(dirty_set.len(), 2, "Only 2 nodes should be dirty");
     assert!(dirty_set.contains(&node1), "node1 should be dirty");
     assert!(dirty_set.contains(&node3), "node3 should be dirty");
@@ -332,7 +332,7 @@ fn test_accesskit_bridge_handles_node_removal() {
     );
 
     // Get dirty nodes before moving tree
-    let dirty: Vec<_> = tree.get_dirty_nodes().into_iter().collect();
+    let dirty: Vec<_> = tree.get_dirty_nodes().collect();
 
     // Create bridge and update - node2 should not appear
     let tree_arc = Arc::new(Mutex::new(tree));
@@ -372,7 +372,7 @@ fn test_accesskit_bridge_multiple_updates() {
 
     let dirty1: Vec<_> = {
         let tree_lock = tree_arc.lock().unwrap();
-        tree_lock.get_dirty_nodes().into_iter().collect()
+        tree_lock.get_dirty_nodes().collect()
     };
     let update1 = bridge.create_tree_update(&dirty1);
     assert_eq!(
@@ -392,7 +392,7 @@ fn test_accesskit_bridge_multiple_updates() {
 
     let dirty2: Vec<_> = {
         let tree_lock = tree_arc.lock().unwrap();
-        tree_lock.get_dirty_nodes().into_iter().collect()
+        tree_lock.get_dirty_nodes().collect()
     };
     let update2 = bridge.create_tree_update(&dirty2);
     assert_eq!(
@@ -416,7 +416,7 @@ fn test_accesskit_bridge_multiple_updates() {
 
     let dirty3: Vec<_> = {
         let tree_lock = tree_arc.lock().unwrap();
-        tree_lock.get_dirty_nodes().into_iter().collect()
+        tree_lock.get_dirty_nodes().collect()
     };
     let update3 = bridge.create_tree_update(&dirty3);
     assert_eq!(
