@@ -701,15 +701,20 @@ fn parse_css_class_rules(source: &str) -> ClassStyleMap {
             continue;
         }
 
-        for selector in selectors.split(',') {
-            let selector = selector.trim();
-            let Some(class_name) = class_selector_name(selector) else {
-                continue;
-            };
-            let entry = map.entry(class_name.to_string()).or_default();
-            for (key, value) in &declarations {
-                entry.insert(key.clone(), value.clone());
+        let mut class_names = selectors
+            .split(',')
+            .map(str::trim)
+            .filter_map(class_selector_name);
+        if let Some(mut current) = class_names.next() {
+            for next in class_names {
+                let entry = map.entry(current.to_string()).or_default();
+                for (key, value) in &declarations {
+                    entry.insert(key.clone(), value.clone());
+                }
+                current = next;
             }
+            let entry = map.entry(current.to_string()).or_default();
+            entry.extend(declarations);
         }
     }
     map
