@@ -35,6 +35,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [020](020-tui-fallback-mode.md) | TUI Fallback Mode | Draft |
 | [021](021-linux-desktop-support.md) | Linux Desktop Support | Draft |
 | [021](021-macos-support.md) | macOS Support | Draft |
+| [022](022-data-visualization-charts.md) | Data Visualization (Charts & Graphs) | Draft |
 
 ## Lifecycle
 
