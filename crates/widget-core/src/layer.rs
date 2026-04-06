@@ -5,7 +5,6 @@
 //! of base content without needing manual z-index bookkeeping on every node.
 
 use render_engine::{NodeContent, NodeId, Scene, SceneNode};
-use std::collections::HashMap;
 
 /// Named layers with guaranteed z-ordering in the scene tree.
 /// Inspired by Flash/Flex's SystemManager display list architecture.
@@ -24,6 +23,7 @@ use std::collections::HashMap;
 /// | `Tooltip` | 4 | Tooltips (always on top of UI content) |
 /// | `Cursor` | 5 | Drag previews, custom cursors |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(usize)]
 pub enum Layer {
     /// z=0 — Normal widget tree (default)
     Content,
@@ -70,7 +70,8 @@ impl Layer {
 /// let content_root = layers.get(Layer::Content);
 /// ```
 pub struct LayerManager {
-    layers: HashMap<Layer, NodeId>,
+    /// ⚡ Bolt: Uses a fixed-size array instead of HashMap for zero-allocation O(1) access.
+    layers: [NodeId; 6],
 }
 
 impl LayerManager {
@@ -80,13 +81,13 @@ impl LayerManager {
     /// Creates one `NodeContent::Empty` child per layer variant, in z-order.
     pub fn new(scene: &mut Scene) -> Self {
         let root = scene.root();
-        let mut layers = HashMap::new();
 
-        for layer in Layer::ALL {
+        let layers = std::array::from_fn(|i| {
+            // Layer::ALL is ordered correctly matching the enum variants
+            let _layer = Layer::ALL[i];
             let node = SceneNode::new(NodeContent::Empty);
-            let node_id = scene.add_node(root, node);
-            layers.insert(layer, node_id);
-        }
+            scene.add_node(root, node)
+        });
 
         Self { layers }
     }
@@ -98,7 +99,7 @@ impl LayerManager {
     /// Panics if the layer doesn't exist. This should never happen after
     /// initialization since all variants are created in [`LayerManager::new`].
     pub fn get(&self, layer: Layer) -> NodeId {
-        self.layers[&layer]
+        self.layers[layer as usize]
     }
 }
 
