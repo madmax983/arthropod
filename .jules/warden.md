@@ -7,3 +7,7 @@
 **2025-02-23 - Handle null pointer dereference in WM_NCCREATE message**
 **Threat:** Null pointers (like `lparam.0 == 0`) could be passed to unsafe FFI functions in `wndproc` in `plat-core` during window creation `WM_NCCREATE`, and dereferencing it as `*const CREATESTRUCTW` causes a null pointer dereference leading to undefined behavior or a crash (DoS).
 **Defense:** Added explicit `== 0` validation to Windows `lparam.0` when handling `WM_NCCREATE` to safely return an error (`LRESULT(0)`) instead of blindly dereferencing the pointer.
+
+**2025-02-23 - Handle null HWND in DirectComposition target creation**
+**Threat:** A null window handle (`HWND(0)`) could be passed to the unsafe COM API `CreateTargetForHwnd` in `plat-core` (`create_target_for_hwnd`), causing undefined behavior or crashes (DoS) when attempting to access the underlying window surface.
+**Defense:** Added an explicit `is_null()` validation to the `HWND` parameter before entering the `unsafe` FFI block, returning a safe `Error::from(E_HANDLE)` to gracefully handle the failure.

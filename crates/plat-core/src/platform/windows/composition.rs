@@ -43,7 +43,11 @@ impl CompositionDevice {
     /// If `topmost` is true, the visual tree is rendered on top of the window's children.
     /// If `topmost` is false, it is rendered behind the window's children (but in front of the window background).
     pub fn create_target_for_hwnd(&self, hwnd: HWND, topmost: bool) -> Result<CompositionTarget> {
-        // SAFETY: The provided HWND must be valid. `self.device` guarantees it is properly initialized.
+        if hwnd.0.is_null() {
+            return Err(Error::from(E_HANDLE));
+        }
+
+        // SAFETY: The provided HWND is checked to be non-null and `self.device` guarantees it is properly initialized.
         let target = unsafe { self.device.CreateTargetForHwnd(hwnd, topmost)? };
         Ok(CompositionTarget { target })
     }
@@ -272,6 +276,23 @@ mod tests {
         let _target = device.create_target_for_hwnd(hwnd, true)?;
         unsafe {
             let _ = DestroyWindow(hwnd);
+            CoUninitialize();
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_target_for_null_hwnd() -> windows::core::Result<()> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let device = CompositionDevice::new()?;
+        // This is the exploit: Passing a null HWND to the COM API.
+        // It currently crashes the application with access violation or similar UB.
+        // We expect it to return an error safely.
+        let result = device.create_target_for_hwnd(HWND(0 as _), true);
+        assert!(result.is_err());
+        unsafe {
             CoUninitialize();
         }
         Ok(())
