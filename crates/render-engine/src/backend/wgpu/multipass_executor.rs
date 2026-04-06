@@ -846,15 +846,18 @@ impl<'a> MultipassRenderer<'a> {
                 {
                     let fill =
                         resolve_text_fill(self.primitive_pipeline, style, opacity, text_bounds);
-                    let mut glyph_instances =
-                        self.text_renderer
-                            .generate_instances(&shaped, position, glam::Vec4::ONE);
-                    apply_node_transform_to_instances(&mut glyph_instances, node_transform);
+                    let start_idx = instances.len();
+                    self.text_renderer.generate_instances_into(
+                        &shaped,
+                        position,
+                        glam::Vec4::ONE,
+                        &mut instances,
+                    );
+                    apply_node_transform_to_instances(&mut instances[start_idx..], node_transform);
 
                     // Apply text fill metadata to generated glyph primitive instances
-                    for mut instance in glyph_instances {
-                        apply_text_fill_to_glyph(&mut instance, fill);
-                        instances.push(instance);
+                    for instance in &mut instances[start_idx..] {
+                        apply_text_fill_to_glyph(instance, fill);
                     }
                 }
             } else {
@@ -888,14 +891,17 @@ impl<'a> MultipassRenderer<'a> {
                         *effective_opacity,
                         text_bounds,
                     );
-                    let mut glyph_instances =
-                        self.text_renderer
-                            .generate_instances(&shaped, position, glam::Vec4::ONE);
-                    apply_node_transform_to_instances(&mut glyph_instances, node.transform);
+                    let start_idx = instances.len();
+                    self.text_renderer.generate_instances_into(
+                        &shaped,
+                        position,
+                        glam::Vec4::ONE,
+                        &mut instances,
+                    );
+                    apply_node_transform_to_instances(&mut instances[start_idx..], node.transform);
 
-                    for mut instance in glyph_instances {
-                        apply_text_fill_to_glyph(&mut instance, fill);
-                        instances.push(instance);
+                    for instance in &mut instances[start_idx..] {
+                        apply_text_fill_to_glyph(instance, fill);
                     }
                 }
             }

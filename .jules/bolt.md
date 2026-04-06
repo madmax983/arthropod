@@ -96,3 +96,7 @@
 **[Performance] Avoid redundant hashmap allocations when iterating and extending style maps**
 **Learning:** `merged_class_styles` in `stitch_scene.rs` was iterating through class names and inserting elements directly without checking for key existence, which resulted in N redundant hash lookups and clones per style property.
 **Action:** Iterate through the sources in reverse order and conditionally use `!map.contains_key(key)` and `.insert()` to ensure properties are only cloned once, reducing memory allocation pressure significantly on the layout pipeline hot path.
+
+**[Performance] Avoid heap allocations inside text renderer hot loops**
+**Learning:** `generate_instances` inside `TextRenderer` was unconditionally creating `Vec::with_capacity()` each frame for shaped glyphs. When called inside per-frame nested loops (like `multipass_executor`), this forced repeated heap allocations for every single text run across the entire scene graph.
+**Action:** Changed the signature to `generate_instances_into` passing an `&mut Vec<PrimitiveInstance>`. By capturing the `start_idx = instances.len()` before populating, caller code can slice and mutate the newly appended instances while reusing a single monolithic pre-allocated buffer across the entire rendering pipeline.

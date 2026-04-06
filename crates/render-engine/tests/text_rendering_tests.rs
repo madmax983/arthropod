@@ -18,7 +18,8 @@ fn test_text_renderer_instance_generation() {
     // Generate instances
     let position = glam::Vec2::new(100.0, 100.0);
     let color = glam::Vec4::new(1.0, 1.0, 1.0, 1.0);
-    let instances = renderer.generate_instances(&shaped, position, color);
+    let mut instances = Vec::new();
+    renderer.generate_instances_into(&shaped, position, color, &mut instances);
 
     // Zero-size glyphs (spaces, missing) are skipped, so instance count <= glyph count.
     // "Hello" has no spaces so all visible glyphs should produce instances.
@@ -70,7 +71,8 @@ fn test_text_renderer_empty_text() {
     let mut engine = TextEngine::new();
     let shaped = engine.shape_text("", 16.0);
 
-    let instances = renderer.generate_instances(&shaped, glam::Vec2::ZERO, glam::Vec4::ONE);
+    let mut instances = Vec::new();
+    renderer.generate_instances_into(&shaped, glam::Vec2::ZERO, glam::Vec4::ONE, &mut instances);
 
     // Empty text should produce no instances
     assert_eq!(instances.len(), 0);

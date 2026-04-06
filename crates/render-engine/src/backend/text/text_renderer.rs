@@ -19,15 +19,14 @@ impl TextRenderer {
         }
     }
 
-    /// Generate glyph instances for shaped text
-    pub fn generate_instances(
+    /// Generate glyph instances for shaped text directly into a pre-allocated vector
+    pub fn generate_instances_into(
         &mut self,
         shaped: &ShapedText,
         position: glam::Vec2,
         color: glam::Vec4,
-    ) -> Vec<PrimitiveInstance> {
-        let mut instances = Vec::with_capacity(shaped.glyphs.len());
-
+        out_instances: &mut Vec<PrimitiveInstance>,
+    ) {
         for glyph in &shaped.glyphs {
             // Get texture coordinates from atlas using cosmic-text cache key
             let coords = self
@@ -52,15 +51,13 @@ impl TextRenderer {
             let glyph_x = (position.x + glyph.x_offset + coords.placement_left as f32).round();
             let glyph_y = (position.y + glyph.y_offset - coords.placement_top as f32).round();
 
-            instances.push(PrimitiveInstance::glyph(
+            out_instances.push(PrimitiveInstance::glyph(
                 [glyph_x, glyph_y],
                 [glyph_width, glyph_height],
                 color.to_array(),
                 [coords.u0, coords.v0, coords.u1, coords.v1],
             ));
         }
-
-        instances
     }
 
     /// Get the glyph atlas

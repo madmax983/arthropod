@@ -804,21 +804,23 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
             let shadow_layers = text_shadow_layers(style, effective_opacity);
             for (offset, shadow_fill) in shadow_layers {
                 let shadow_position = position + offset;
-                let shadow_instances =
-                    ctx.text_renderer
-                        .generate_instances(&shaped, shadow_position, glam::Vec4::ONE);
-                for mut instance in shadow_instances {
-                    apply_text_fill_to_glyph(&mut instance, shadow_fill);
-                    instances.push(instance);
+                let start_idx = instances.len();
+                ctx.text_renderer.generate_instances_into(
+                    &shaped,
+                    shadow_position,
+                    glam::Vec4::ONE,
+                    instances,
+                );
+                for instance in &mut instances[start_idx..] {
+                    apply_text_fill_to_glyph(instance, shadow_fill);
                 }
             }
         }
-        let glyph_instances =
-            ctx.text_renderer
-                .generate_instances(&shaped, position, glam::Vec4::ONE);
-        for mut instance in glyph_instances {
-            apply_text_fill_to_glyph(&mut instance, fill);
-            instances.push(instance);
+        let start_idx = instances.len();
+        ctx.text_renderer
+            .generate_instances_into(&shaped, position, glam::Vec4::ONE, instances);
+        for instance in &mut instances[start_idx..] {
+            apply_text_fill_to_glyph(instance, fill);
         }
 
         ctx.queue.write_texture(
