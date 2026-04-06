@@ -96,10 +96,24 @@ impl StrokeMatcher {
         self.is_tracking
     }
 
+    /// Calculates the stroke metrics (length, angle, distances) from the currently
+    /// collected points, used to determine if the path matches a gesture profile.
+    ///
+    /// This function avoids memory allocation by processing path points directly
+    /// into a bounded stack array, dropping identical consecutive points instead
+    /// of cloning the backing vector and calling `.dedup()`.
     fn calculate_metrics(&self) -> Option<StrokeMetrics> {
-        // Filter out sequential duplicates to ensure robust angle calculation
-        let mut clean_points = self.points.clone();
-        clean_points.dedup();
+        let mut clean_points_buf = [Point::default(); MAX_STROKE_POINTS];
+        let mut clean_len = 0;
+        for &p in &self.points {
+            if clean_len < MAX_STROKE_POINTS
+                && (clean_len == 0 || clean_points_buf[clean_len - 1] != p)
+            {
+                clean_points_buf[clean_len] = p;
+                clean_len += 1;
+            }
+        }
+        let clean_points = &clean_points_buf[..clean_len];
 
         if clean_points.len() < 3 {
             return None;
