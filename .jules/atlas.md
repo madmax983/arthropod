@@ -30,3 +30,6 @@
 ## 2026-06-25 - Unused Dependency Removal using Cargo Machete
 **Tangle:** The project had several unused dependencies across multiple crates that increased build times and dependency graph complexity. `material-ui` depended on `thiserror`, `arthropod` depended on `crossterm`, and `arthropod-ecs` depended on `theme-engine`.
 **Blueprint:** Removed unused dependencies using `cargo rm`, specifically `thiserror` from `material-ui`, `crossterm` from `arthropod`, and `theme-engine` from `arthropod-ecs`.
+## 2026-06-26 - State Types Extraction from Input Engine
+**Tangle:** 'ReactiveTextState' and 'ComputedTextState' were placed in 'input-engine', despite not being related to user input or gestures. These types are UI reactive state used by widgets, causing 'input-engine' to hold logic that rightfully belongs in 'widget-core'.
+**Blueprint:** Moved `ReactiveTextState` and `ComputedTextState` to `widget-core/src/input_state.rs` where similar reactive states (like `ReactiveColorState`) live, enforcing proper domain boundaries while keeping `TextInputState` in `input-engine`.
