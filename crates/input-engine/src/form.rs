@@ -48,18 +48,20 @@ fn validate_field(
     field_node_id: InputNodeId,
     text_input_states: &IndexMap<InputNodeId, TextInputState>,
     validators: &mut HashMap<InputNodeId, ValidationState>,
-) {
+) -> bool {
     let Some(state) = text_input_states.get(&field_node_id) else {
-        return;
+        return true;
     };
 
     let Some(validator_state) = validators.get_mut(&field_node_id) else {
-        return;
+        return true;
     };
 
     let value = state.read_signal.get_untracked();
     let result = (validator_state.validator)(&value);
     validator_state.error = result.err();
+
+    validator_state.error.is_none()
 }
 
 /// Helper to collect form data
@@ -88,12 +90,7 @@ pub fn revalidate_form(
     if let Some(form_state) = form_states.get_mut(&node_id) {
         let mut is_valid = true;
         for &field_node_id in form_state.field_mapping.values() {
-            validate_field(field_node_id, text_input_states, validators);
-
-            if validators
-                .get(&field_node_id)
-                .is_some_and(|v| v.error.is_some())
-            {
+            if !validate_field(field_node_id, text_input_states, validators) {
                 is_valid = false;
             }
         }
