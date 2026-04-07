@@ -36,6 +36,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [021](021-linux-desktop-support.md) | Linux Desktop Support | Draft |
 | [021](021-macos-support.md) | macOS Support | Draft |
 | [022](022-data-visualization-charts.md) | Data Visualization (Charts & Graphs) | Draft |
+| [023](023-webassembly-target.md) | WebAssembly (Wasm) Web Target Support | Draft |
 
 ## Lifecycle
 
