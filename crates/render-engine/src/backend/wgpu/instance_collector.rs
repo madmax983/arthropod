@@ -158,11 +158,21 @@ fn apply_text_letter_spacing(shaped: &mut ShapedText, letter_spacing: f32) {
     shaped.bounds.width = (shaped.bounds.width + accumulated_shift).max(0.0);
 }
 
-fn text_shadow_layers(
+/// Emits text shadow layers directly to a provided closure.
+///
+/// **Optimization Details:**
+/// This replaces an older implementation that allocated a `Vec<(glam::Vec2, TextFill)>`
+/// per frame, per text node. By passing an `FnMut` closure, we yield values directly to
+/// the consumer on the hot path.
+///
+/// **Impact:**
+/// Removes 1 heap allocation (`Vec::new()`) per frame for every text node with a drop shadow,
+/// improving per-frame traversal performance and lowering memory pressure.
+fn emit_text_shadow_layers<F: FnMut(glam::Vec2, TextFill)>(
     style: &style_engine::VisualStyle,
     effective_opacity: f32,
-) -> Vec<(glam::Vec2, TextFill)> {
-    let mut layers = Vec::new();
+    mut emit: F,
+) {
     for effect in &style.effects {
         let style_engine::Effect::DropShadow(shadow) = effect else {
             continue;
@@ -189,15 +199,14 @@ fn text_shadow_layers(
                         glam::Vec2::new(0.0, -spread),
                         glam::Vec2::new(0.0, spread),
                     ] {
-                        layers.push((shadow.offset + extra, TextFill::Solid(halo_color)));
+                        emit(shadow.offset + extra, TextFill::Solid(halo_color));
                     }
                 }
             }
         }
 
-        layers.push((shadow.offset, TextFill::Solid(core_color)));
+        emit(shadow.offset, TextFill::Solid(core_color));
     }
-    layers
 }
 
 fn text_has_background_surface(style: &style_engine::VisualStyle) -> bool {
@@ -801,8 +810,7 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
         ];
         let fill = resolve_text_fill(ctx.pipeline, style, effective_opacity, text_bounds);
         if !text_has_background_surface(style) {
-            let shadow_layers = text_shadow_layers(style, effective_opacity);
-            for (offset, shadow_fill) in shadow_layers {
+            emit_text_shadow_layers(style, effective_opacity, |offset, shadow_fill| {
                 let shadow_position = position + offset;
                 let start_idx = instances.len();
                 ctx.text_renderer.generate_instances_into(
@@ -814,7 +822,7 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
                 for instance in &mut instances[start_idx..] {
                     apply_text_fill_to_glyph(instance, shadow_fill);
                 }
-            }
+            });
         }
         let start_idx = instances.len();
         ctx.text_renderer
@@ -846,7 +854,7 @@ pub(crate) fn collect_style_batches_for_bounds<'a>(
 mod tests {
     use super::{
         TextFill, apply_node_transform_to_instances, apply_text_letter_spacing,
-        pick_text_fill_paint, text_has_background_surface, text_shadow_layers, text_shape_options,
+        pick_text_fill_paint, text_has_background_surface, text_shape_options,
     };
     use crate::Transform2D;
     use crate::primitives::PrimitiveInstance;
@@ -924,7 +932,11 @@ mod tests {
             .text(TextContent::new("THE PIT", 20.0))
             .drop_shadow(Vec2::new(4.0, 4.0), 5.0, Vec4::new(0.8, 1.0, 0.0, 1.0));
 
-        let layers = text_shadow_layers(&style, 0.5);
+        let mut layers = Vec::new();
+        super::emit_text_shadow_layers(&style, 0.5, |offset, fill| {
+            layers.push((offset, fill));
+        });
+
         assert_eq!(layers.len(), 5, "expected 4 halo layers plus core layer");
 
         let core = layers

@@ -100,3 +100,6 @@
 **[Performance] Avoid heap allocations inside text renderer hot loops**
 **Learning:** `generate_instances` inside `TextRenderer` was unconditionally creating `Vec::with_capacity()` each frame for shaped glyphs. When called inside per-frame nested loops (like `multipass_executor`), this forced repeated heap allocations for every single text run across the entire scene graph.
 **Action:** Changed the signature to `generate_instances_into` passing an `&mut Vec<PrimitiveInstance>`. By capturing the `start_idx = instances.len()` before populating, caller code can slice and mutate the newly appended instances while reusing a single monolithic pre-allocated buffer across the entire rendering pipeline.
+**[Performance] Eliminate Vec allocation via closure yielding**
+**Learning:** Returning `Vec<T>` from small helper functions like `text_shadow_layers` causes heap allocations (`Vec::new()`) on hot paths (e.g., per-frame rendering).
+**Action:** To eliminate heap allocations in hot paths where elements are accumulated and iterated over, consider refactoring functions to accept an `FnMut` closure that yields elements directly to the consumer, rather than returning a newly allocated `Vec`.
