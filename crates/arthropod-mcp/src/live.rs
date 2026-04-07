@@ -13,7 +13,7 @@ use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 /// Default port for MCP server to listen on
@@ -72,20 +72,20 @@ pub struct ConnectedApp {
 
 /// Start the TCP server that listens for app connections
 ///
-/// Returns an `Arc<Mutex<Option<ConnectedApp>>>` that MCP tools can use
-pub fn start_tcp_server() -> Arc<Mutex<Option<ConnectedApp>>> {
+/// Returns an `Arc<RwLock<Option<ConnectedApp>>>` that MCP tools can use
+pub fn start_tcp_server() -> Arc<RwLock<Option<ConnectedApp>>> {
     let (app, _) = start_tcp_server_with_port(MCP_PORT);
     app
 }
 
 /// Start the TCP server on a specific port.
 /// Returns the shared app state and the bound port.
-pub fn start_tcp_server_with_port(port: u16) -> (Arc<Mutex<Option<ConnectedApp>>>, u16) {
+pub fn start_tcp_server_with_port(port: u16) -> (Arc<RwLock<Option<ConnectedApp>>>, u16) {
     let listener =
         TcpListener::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind MCP server");
     let local_port = listener.local_addr().unwrap().port();
 
-    let connected_app = Arc::new(Mutex::new(None));
+    let connected_app = Arc::new(RwLock::new(None));
     let connected_app_clone = connected_app.clone();
     let active_connections = Arc::new(AtomicUsize::new(0));
 
@@ -192,7 +192,7 @@ fn read_line_bounded(
 }
 
 /// Handle a connection from an Arthropod app
-fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<ConnectedApp>>>) {
+fn handle_app_connection(stream: TcpStream, connected_app: Arc<RwLock<Option<ConnectedApp>>>) {
     let mut reader = BufReader::new(stream.try_clone().expect("Failed to clone stream"));
     let mut line = String::new();
 
@@ -206,7 +206,7 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<Conn
                         tracing::info!("App registered: {} (PID: {})", name, pid);
 
                         // Replace any existing connected app
-                        *connected_app.lock().unwrap() = Some(ConnectedApp {
+                        *connected_app.write().unwrap() = Some(ConnectedApp {
                             name: name.clone(),
                             pid,
                             scene: None,
@@ -221,7 +221,7 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<Conn
                         );
                     }
                     Ok(AppMessage::SceneUpdate { scene }) => {
-                        if let Some(app) = connected_app.lock().unwrap().as_mut() {
+                        if let Some(app) = connected_app.write().unwrap().as_mut() {
                             let node_count = scene
                                 .get("node_count")
                                 .and_then(|v| v.as_u64())
@@ -247,7 +247,7 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<Mutex<Option<Conn
 
     // Connection closed
     tracing::info!("App disconnected");
-    *connected_app.lock().unwrap() = None;
+    *connected_app.write().unwrap() = None;
 }
 
 /// Helper for apps to connect to the MCP server

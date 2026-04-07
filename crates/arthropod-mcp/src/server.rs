@@ -12,7 +12,7 @@ use rmcp::{ErrorData as McpError, ServerHandler, tool, tool_handler, tool_router
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 // ============================================================================
 // Parameter Types
@@ -147,7 +147,7 @@ pub struct SetupReactiveChainParams {
 #[derive(Clone)]
 pub struct ArthropodServer {
     context: Arc<Mutex<McpFrameworkContext>>,
-    connected_app: Arc<Mutex<Option<ConnectedApp>>>,
+    connected_app: Arc<RwLock<Option<ConnectedApp>>>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -162,7 +162,7 @@ impl ArthropodServer {
     pub fn new() -> Self {
         Self {
             context: Arc::new(Mutex::new(McpFrameworkContext::new())),
-            connected_app: Arc::new(Mutex::new(None)),
+            connected_app: Arc::new(RwLock::new(None)),
             tool_router: Self::tool_router(),
         }
     }
@@ -170,14 +170,14 @@ impl ArthropodServer {
     pub fn with_context(context: McpFrameworkContext) -> Self {
         Self {
             context: Arc::new(Mutex::new(context)),
-            connected_app: Arc::new(Mutex::new(None)),
+            connected_app: Arc::new(RwLock::new(None)),
             tool_router: Self::tool_router(),
         }
     }
 
     pub fn with_live_app(
         context: McpFrameworkContext,
-        connected_app: Arc<Mutex<Option<ConnectedApp>>>,
+        connected_app: Arc<RwLock<Option<ConnectedApp>>>,
     ) -> Self {
         Self {
             context: Arc::new(Mutex::new(context)),
@@ -192,7 +192,7 @@ impl ArthropodServer {
 
     /// Check if a live app is connected and return its info
     fn get_connected_app_info(&self) -> Option<(String, u32)> {
-        let app_guard = self.connected_app.lock().unwrap();
+        let app_guard = self.connected_app.read().unwrap();
         app_guard.as_ref().map(|app| (app.name.clone(), app.pid))
     }
 
@@ -237,7 +237,7 @@ impl ArthropodServer {
         let mut output = self.get_source_banner();
 
         // Check if we have live scene data
-        if let Some(app) = self.connected_app.lock().unwrap().as_ref()
+        if let Some(app) = self.connected_app.read().unwrap().as_ref()
             && let Some(scene_json) = &app.scene
         {
             // Use live scene data
