@@ -3,11 +3,26 @@
 use hashbrown::HashMap;
 use std::collections::VecDeque;
 
-/// Pool key for offscreen render targets.
+/// Identity passport for an offscreen texture allocation.
 ///
-/// Format is represented as a compact, backend-independent code so this type
-/// remains unit-testable without constructing wgpu objects.
+/// The `RenderTargetKey` provides a lightweight, backend-independent signature that describes
+/// the fundamental properties of a required render target. It allows the `RenderTargetPool`
+/// to recycle exact matches without unnecessarily churning VRAM allocations or dragging in
+/// heavy `wgpu` backend structures during unit tests.
+///
+/// ## Examples
+///
+/// ```rust
+/// use render_engine::backend::wgpu::render_target_pool::RenderTargetKey;
+///
+/// // Create a key requesting a 1080p target without a stencil buffer
+/// let key = RenderTargetKey::new(1920, 1080, false);
+///
+/// assert_eq!(key.width, 1920);
+/// assert_eq!(key.has_stencil, false);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub struct RenderTargetKey {
     pub width: u32,
     pub height: u32,

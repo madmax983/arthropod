@@ -19,8 +19,6 @@ use tracing::{Level, instrument, span};
 
 pub use crate::primitives::PrimitiveInstance;
 use context::WgpuContext;
-#[cfg(not(target_arch = "wasm32"))]
-use effects::RenderTargetKey;
 use effects::RenderTargetPool;
 use pipelines::blend_pipeline::BlendPipeline;
 use pipelines::blur_pipeline::BlurPipeline;
@@ -29,6 +27,8 @@ pub use pipelines::path_pipeline::TessellationCacheStats;
 use pipelines::path_pipeline::{PathPipeline, TessellationCache};
 use pipelines::primitive_pipeline::PrimitivePipeline;
 use pipelines::stencil_pipeline::ClipStack;
+#[cfg(not(target_arch = "wasm32"))]
+use render_target_pool::RenderTargetKey;
 
 pub(crate) const GLYPH_ATLAS_SIZE: u32 = 1024;
 pub(crate) const GRADIENT_ATLAS_SIZE: f32 = 1024.0;

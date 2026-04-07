@@ -9,6 +9,7 @@ pub struct ClipStack {
 }
 
 impl ClipStack {
+    /// Creates a new, empty clip stack.
     #[must_use]
     pub fn new() -> Self {
         Self { depth: 0 }
@@ -36,6 +37,9 @@ impl ClipStack {
         Some(self.depth)
     }
 
+    /// Reports how many levels deep the renderer is currently clipping.
+    ///
+    /// The maximum supported depth in hardware is 255 (the limit of an 8-bit stencil buffer).
     #[must_use]
     pub fn depth(&self) -> u8 {
         self.depth

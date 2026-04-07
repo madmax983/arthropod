@@ -10,11 +10,16 @@ use style_engine::{ColorStop, Paint};
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GradientParams {
-    pub start: [f32; 2],    // 8 bytes: Gradient start point (normalized 0-1)
-    pub end: [f32; 2],      // 8 bytes: Gradient end point (normalized 0-1)
-    pub atlas_row: f32,     // 4 bytes: Row in atlas (normalized v coord)
-    pub gradient_type: u32, // 4 bytes: 0=linear, 1=radial, 2=angular, 3=diamond
-    pub _padding: [f32; 2], // 8 bytes: Padding to 32 bytes
+    /// 8 bytes: Gradient start point (normalized 0-1)
+    pub start: [f32; 2],
+    /// 8 bytes: Gradient end point (normalized 0-1)
+    pub end: [f32; 2],
+    /// 4 bytes: Row in atlas (normalized v coord)
+    pub atlas_row: f32,
+    /// 4 bytes: 0=linear, 1=radial, 2=angular, 3=diamond
+    pub gradient_type: u32,
+    /// 8 bytes: Padding to 32 bytes
+    pub _padding: [f32; 2],
 }
 
 impl GradientParams {
@@ -99,7 +104,9 @@ impl Default for GradientAtlas {
 }
 
 impl GradientAtlas {
+    /// The number of rows (gradients) the atlas can store.
     pub const ATLAS_SIZE: usize = 1024;
+    /// The number of texels (resolution) per gradient row.
     pub const TEXELS_PER_ROW: usize = 1024;
 
     /// Initialize GPU resources (must be called after construction)

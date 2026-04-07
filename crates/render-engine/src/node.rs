@@ -44,6 +44,22 @@ pub struct SceneNode {
 }
 
 impl SceneNode {
+    /// Creates a new foundational anchor for a scene hierarchy.
+    ///
+    /// The root node is uniquely positioned as the origin of all layout and rendering
+    /// traversals. It carries no visual content (`NodeContent::Empty`) and serves
+    /// strictly as the structural container for your application's top-level components.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::{Scene, SceneNode};
+    ///
+    /// let mut scene = Scene::new();
+    /// // The Scene already creates a root for us internally,
+    /// // but if we were building our own tree:
+    /// let custom_root = SceneNode::new_root();
+    /// ```
     pub fn new_root() -> Self {
         Self {
             content: NodeContent::Empty,
@@ -56,6 +72,20 @@ impl SceneNode {
         }
     }
 
+    /// Forges a new visual element ready to be injected into the scene graph.
+    ///
+    /// This is the primary constructor for anything that appears on screen,
+    /// from text blocks to solid color backgrounds. The node starts at the origin
+    /// with an identity transform until explicitly positioned or layout is applied.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::{SceneNode, NodeContent, Color};
+    ///
+    /// // Create a node that renders as pure red
+    /// let node = SceneNode::new(NodeContent::SolidColor { color: Color::RED });
+    /// ```
     pub fn new(content: NodeContent) -> Self {
         Self {
             content,
@@ -165,50 +195,74 @@ impl From<glam::Vec4> for Color {
 }
 
 impl Color {
+    /// Mixes a new custom color from raw component values.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::Color;
+    ///
+    /// let hot_pink = Color::rgba(1.0, 0.41, 0.71, 1.0);
+    /// assert_eq!(hot_pink.r(), 1.0);
+    /// ```
     #[inline]
     pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self(glam::Vec4::from_array([r, g, b, a]))
     }
 
+    #[allow(missing_docs)]
     #[inline]
     pub fn r(&self) -> f32 {
         self.0.x
     }
 
+    #[allow(missing_docs)]
     #[inline]
     pub fn g(&self) -> f32 {
         self.0.y
     }
 
+    #[allow(missing_docs)]
     #[inline]
     pub fn b(&self) -> f32 {
         self.0.z
     }
 
+    #[allow(missing_docs)]
     #[inline]
     pub fn a(&self) -> f32 {
         self.0.w
     }
 
+    /// Exposes the underlying hardware-accelerated SIMD vector.
+    ///
+    /// This allows for advanced bulk mathematical operations natively via `glam`.
     #[inline]
     pub fn as_vec4(&self) -> glam::Vec4 {
         self.0
     }
 
+    /// Converts a hardware-accelerated SIMD vector back into a framework color.
     #[inline]
     pub fn from_vec4(v: glam::Vec4) -> Self {
         Self(v)
     }
 
+    /// Extracts the raw contiguous floats, useful for directly uploading to a shader buffer.
     #[inline]
     pub fn to_array(&self) -> [f32; 4] {
         self.0.to_array()
     }
 
+    #[allow(missing_docs)]
     pub const RED: Self = Self::rgba(1.0, 0.0, 0.0, 1.0);
+    #[allow(missing_docs)]
     pub const GREEN: Self = Self::rgba(0.0, 1.0, 0.0, 1.0);
+    #[allow(missing_docs)]
     pub const BLUE: Self = Self::rgba(0.0, 0.0, 1.0, 1.0);
+    #[allow(missing_docs)]
     pub const WHITE: Self = Self::rgba(1.0, 1.0, 1.0, 1.0);
+    #[allow(missing_docs)]
     pub const BLACK: Self = Self::rgba(0.0, 0.0, 0.0, 1.0);
 }
 
@@ -254,39 +308,54 @@ impl<'de> Deserialize<'de> for Transform2D {
 }
 
 impl Transform2D {
+    /// A neutral matrix that leaves coordinates completely unchanged when applied.
     pub const IDENTITY: Self = Self(glam::Affine2::IDENTITY);
 
+    /// Constructs a neutral matrix that does not affect positioning.
     #[inline]
     pub fn identity() -> Self {
         Self::IDENTITY
     }
 
+    /// Creates a spatial shift operator that moves the entire coordinate system.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::Transform2D;
+    ///
+    /// let shift_down_right = Transform2D::translate(10.0, 20.0);
+    /// ```
     #[inline]
     pub fn translate(x: f32, y: f32) -> Self {
         Self(glam::Affine2::from_translation(glam::Vec2::new(x, y)))
     }
 
+    /// Creates a stretching operator to expand or compress coordinates on the X or Y axes.
     #[inline]
     pub fn scale(sx: f32, sy: f32) -> Self {
         Self(glam::Affine2::from_scale(glam::Vec2::new(sx, sy)))
     }
 
+    /// Creates a pivoting operator to spin coordinates around the mathematical origin (0, 0).
     #[inline]
     pub fn rotate_radians(angle: f32) -> Self {
         Self(glam::Affine2::from_angle(angle))
     }
 
+    /// Peels back the abstraction to expose the raw SIMD 2D affine matrix for advanced math.
     #[inline]
     pub fn as_affine2(&self) -> glam::Affine2 {
         self.0
     }
 
+    /// Encapsulates a raw SIMD 2D affine matrix into our safer abstraction.
     #[inline]
     pub fn from_affine2(affine: glam::Affine2) -> Self {
         Self(affine)
     }
 
-    /// Transform a point.
+    /// Computes the new absolute coordinates of a relative position under this matrix.
     #[inline]
     pub fn transform_point(&self, point: glam::Vec2) -> glam::Vec2 {
         self.0.transform_point2(point)

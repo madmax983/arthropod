@@ -51,6 +51,19 @@ impl Default for Scene {
 }
 
 impl Scene {
+    /// Initializes a pristine scene graph universe.
+    ///
+    /// Every new `Scene` automatically boots up with an empty root node (ID 0).
+    /// This ensures there is always a foundational anchor to attach incoming visual trees.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::Scene;
+    ///
+    /// let scene = Scene::new();
+    /// assert_eq!(scene.node_count(), 1); // The root node always exists
+    /// ```
     pub fn new() -> Self {
         let root_id = NodeId(0);
         let mut nodes = HashMap::new();
@@ -65,6 +78,22 @@ impl Scene {
         }
     }
 
+    /// Retrieves the permanent identifier of the scene's master container.
+    ///
+    /// This is the anchor point for hit testing, traversal, and coordinate spaces.
+    /// The root cannot be removed or reparented.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust
+    /// use render_engine::{Scene, NodeContent, SceneNode};
+    ///
+    /// let mut scene = Scene::new();
+    /// let root = scene.root();
+    ///
+    /// // Directly attach new elements to the root
+    /// scene.add_node(root, SceneNode::new(NodeContent::Empty));
+    /// ```
     pub fn root(&self) -> NodeId {
         self.root
     }
