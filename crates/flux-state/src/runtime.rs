@@ -50,6 +50,7 @@ pub struct Runtime {
     condvar: Condvar,
 }
 
+#[derive(Default)]
 struct RuntimeInner {
     next_id: u64,
 
@@ -333,33 +334,22 @@ impl RuntimeInner {
     }
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self {
+            inner: Mutex::new(RuntimeInner::default()),
+            condvar: Condvar::new(),
+        }
+    }
+}
+
 impl Runtime {
     /// Create a new reactive runtime.
     ///
     /// Returns an `Arc<Runtime>` because the runtime must be shared between
     /// all signals, effects, and computed values it manages.
     pub fn new() -> std::sync::Arc<Self> {
-        std::sync::Arc::new(Self {
-            inner: Mutex::new(RuntimeInner {
-                next_id: 0,
-                signals: HashMap::new(),
-                computeds: HashMap::new(),
-                effects: HashMap::new(),
-                dependencies: HashMap::new(),
-                subscribers: HashMap::new(),
-                tracking_context: HashMap::new(),
-                stale: HashSet::new(),
-                stale_while_computing: HashSet::new(),
-                computing: HashMap::new(),
-                waiting_for: HashMap::new(),
-                pending_effects: Vec::new(),
-                spare_pending_effects: Vec::new(),
-                traversal_buffer: Vec::new(),
-                #[cfg(feature = "nova")]
-                labels: HashMap::new(),
-            }),
-            condvar: Condvar::new(),
-        })
+        std::sync::Arc::new(Self::default())
     }
 
     pub(crate) fn create_signal(&self, value: Arc<dyn Any + Send + Sync>) -> NodeId {
