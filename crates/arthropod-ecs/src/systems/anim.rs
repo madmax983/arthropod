@@ -3,8 +3,8 @@
 //! Provides [`TimelineDriver`] and [`timeline_system`] for driving
 //! [`Timeline<T>`](crate::timeline::Timeline) animations via bevy_ecs.
 
-use crate::Animatable;
-use crate::timeline::Timeline;
+use anim_graph::timeline::Timeline;
+use anim_graph::Animatable;
 use bevy_ecs::prelude::*;
 use flux_state::WriteSignal;
 use std::time::Duration;
@@ -34,7 +34,7 @@ impl TimeResource {
 /// # Example
 ///
 /// ```no_run
-/// use anim_graph::ecs::TimelineDriver;
+/// use arthropod_ecs::TimelineDriver;
 /// use anim_graph::timeline::Timeline;
 /// use std::time::Duration;
 /// # use flux_state::{Runtime, Signal};

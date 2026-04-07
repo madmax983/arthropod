@@ -42,7 +42,6 @@
 //! ```
 
 pub mod clock;
-pub mod ecs;
 pub mod evaluable;
 pub mod hold;
 pub mod keyframe;

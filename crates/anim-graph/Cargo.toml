@@ -7,5 +7,3 @@ description = "Animation system for Arthropod GUI framework"
 
 [dependencies]
 render-engine = { path = "../render-engine" }
-bevy_ecs = { version = "0.15" }
-flux-state = { path = "../flux-state" }

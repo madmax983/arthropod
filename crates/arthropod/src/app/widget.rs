@@ -277,12 +277,12 @@ impl Application for WidgetApp {
         let has_active_animations = {
             let f32_count = app
                 .world_mut()
-                .query::<&anim_graph::ecs::TimelineDriver<f32>>()
+                .query::<&arthropod_ecs::TimelineDriver<f32>>()
                 .iter(app.world())
                 .count();
             let color_count = app
                 .world_mut()
-                .query::<&anim_graph::ecs::TimelineDriver<Color>>()
+                .query::<&arthropod_ecs::TimelineDriver<Color>>()
                 .iter(app.world())
                 .count();
             f32_count + color_count > 0
@@ -415,7 +415,7 @@ impl Application for WidgetApp {
         if let Some(mut time) = self
             .app
             .world_mut()
-            .get_resource_mut::<anim_graph::ecs::TimeResource>()
+            .get_resource_mut::<arthropod_ecs::TimeResource>()
         {
             time.set_delta(delta);
         }
@@ -429,13 +429,13 @@ impl Application for WidgetApp {
             let f32_count = self
                 .app
                 .world_mut()
-                .query::<&anim_graph::ecs::TimelineDriver<f32>>()
+                .query::<&arthropod_ecs::TimelineDriver<f32>>()
                 .iter(self.app.world())
                 .count();
             let color_count = self
                 .app
                 .world_mut()
-                .query::<&anim_graph::ecs::TimelineDriver<Color>>()
+                .query::<&arthropod_ecs::TimelineDriver<Color>>()
                 .iter(self.app.world())
                 .count();
             f32_count + color_count > 0

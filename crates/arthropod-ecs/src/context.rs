@@ -9,8 +9,8 @@ use crate::systems::{
     A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
 };
 
+use crate::systems::anim::{timeline_system, TimeResource};
 use crate::systems::RuntimeResource;
-use anim_graph::ecs::{timeline_system, TimeResource};
 use render_engine::Color;
 
 use crate::systems::run_reactive_effects_system;

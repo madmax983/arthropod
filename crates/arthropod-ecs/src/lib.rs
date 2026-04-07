@@ -82,7 +82,7 @@ pub use context::FrameworkContext;
 pub use systems::{
     apply_a11y_bounds_system, apply_reactive_changes_system, collect_renderables_system,
     gather_a11y_bounds_system, gather_reactive_changes_system, update_all_reactive_system,
-    A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands,
+    A11yBoundsBuffer, ReactiveChangeBuffer, RenderCommands, TimeResource, TimelineDriver,
 };
 
 // Re-export accessibility types

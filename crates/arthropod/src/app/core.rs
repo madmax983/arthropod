@@ -534,7 +534,7 @@ impl App {
 
         // Transfer f32 timelines
         for (node_id, (timeline, target)) in widget_ctx.take_timeline_f32_states() {
-            let driver = anim_graph::ecs::TimelineDriver::new(timeline, target);
+            let driver = arthropod_ecs::TimelineDriver::new(timeline, target);
             if let Some(&entity) = node_to_entity.get(&node_id) {
                 // Attach to existing scene node entity
                 if let Ok(mut entity_mut) = self.world_mut().get_entity_mut(entity) {
@@ -548,7 +548,7 @@ impl App {
 
         // Transfer Color timelines
         for (node_id, (timeline, target)) in widget_ctx.take_timeline_color_states() {
-            let driver = anim_graph::ecs::TimelineDriver::new(timeline, target);
+            let driver = arthropod_ecs::TimelineDriver::new(timeline, target);
             if let Some(&entity) = node_to_entity.get(&node_id) {
                 if let Ok(mut entity_mut) = self.world_mut().get_entity_mut(entity) {
                     entity_mut.insert(driver);
