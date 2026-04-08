@@ -90,6 +90,9 @@ struct RuntimeInner {
     // Reusable buffer for graph traversal to avoid allocations
     traversal_buffer: Vec<NodeId>,
 
+    // Thread currently flushing effects, if any
+    flushing_thread: Option<std::thread::ThreadId>,
+
     #[cfg(feature = "nova")]
     labels: HashMap<NodeId, String>,
 }
@@ -442,19 +445,65 @@ impl Runtime {
     }
 
     fn flush_effects(&self) {
+        let current_thread = std::thread::current().id();
+
+        // 1) Wait until no other thread is flushing.
+        // If we are already flushing (reentrant flush), we just proceed (or we don't block ourselves).
+        let mut inner = self.inner.lock().unwrap();
+        while let Some(flushing) = inner.flushing_thread {
+            if flushing == current_thread {
+                // We are already the flushing thread. This means a set() was called
+                // inside an effect. We can proceed to take pending effects.
+                break;
+            } else {
+                // Another thread is flushing. Wait for it to finish.
+                inner = self.condvar.wait(inner).unwrap();
+            }
+        }
+
+        // Mark ourselves as the flushing thread if we aren't already.
+        let was_flushing = inner.flushing_thread == Some(current_thread);
+        inner.flushing_thread = Some(current_thread);
+
+        // Use a drop guard to ensure panic safety. If process_effect_batch panics,
+        // we must release the flushing lock and notify waiting threads.
+        struct FlushingGuard<'a> {
+            runtime: &'a Runtime,
+            was_flushing: bool,
+        }
+
+        impl<'a> Drop for FlushingGuard<'a> {
+            fn drop(&mut self) {
+                if !self.was_flushing
+                    && let Ok(mut inner) = self.runtime.inner.lock()
+                {
+                    inner.flushing_thread = None;
+                    self.runtime.condvar.notify_all();
+                }
+            }
+        }
+
+        let _guard = FlushingGuard {
+            runtime: self,
+            was_flushing,
+        };
+
         // Optimization: Process effects in batches to reduce lock contention.
         // Instead of locking for every single effect (N locks), we lock once
         // to grab all pending effects, then run them.
         let mut local_effects = Vec::new();
 
-        while self
-            .inner
-            .lock()
-            .unwrap()
-            .take_pending_effects(&mut local_effects)
-        {
+        while inner.take_pending_effects(&mut local_effects) {
+            // Drop lock while executing effect batch
+            drop(inner);
             self.process_effect_batch(&mut local_effects);
+            // Re-acquire lock to check for more pending effects
+            inner = self.inner.lock().unwrap();
         }
+
+        // Let the FlushingGuard release the lock when dropped
+        // We must drop `inner` first, otherwise the Guard will deadlock trying to lock `inner`
+        drop(inner);
     }
 
     fn process_effect_batch(&self, batch: &mut Vec<NodeId>) {
