@@ -84,14 +84,15 @@ pub fn apply_reactive_changes_system(buffer: Res<ReactiveChangeBuffer>, mut scen
         match change {
             ReactiveChange::Color(node_id, new_color) => {
                 if let Some(node) = scene.get_mut(*node_id) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if !style.fills.is_empty() {
-                            style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
-                        } else {
-                            style
-                                .fills
-                                .push(render_engine::Paint::Solid(new_color.as_vec4()));
-                        }
+                    let NodeContent::Styled { ref mut style } = node.content else {
+                        continue;
+                    };
+                    if !style.fills.is_empty() {
+                        style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                    } else {
+                        style
+                            .fills
+                            .push(render_engine::Paint::Solid(new_color.as_vec4()));
                     }
                 }
             }

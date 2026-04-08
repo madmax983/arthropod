@@ -181,14 +181,15 @@ pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene
                 reactive.last_value = new_color;
 
                 if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if !style.fills.is_empty() {
-                            style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
-                        } else {
-                            style
-                                .fills
-                                .push(render_engine::Paint::Solid(new_color.as_vec4()));
-                        }
+                    let NodeContent::Styled { ref mut style } = node.content else {
+                        continue;
+                    };
+                    if !style.fills.is_empty() {
+                        style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                    } else {
+                        style
+                            .fills
+                            .push(render_engine::Paint::Solid(new_color.as_vec4()));
                     }
                 }
             }
@@ -201,11 +202,13 @@ pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene
                 reactive.last_value = new_text.clone();
 
                 if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if let Some(ref mut text_content) = style.text {
-                            text_content.text = new_text;
-                        }
-                    }
+                    let NodeContent::Styled { ref mut style } = node.content else {
+                        continue;
+                    };
+                    let Some(ref mut text_content) = style.text else {
+                        continue;
+                    };
+                    text_content.text = new_text;
                 }
             }
         }
@@ -217,11 +220,13 @@ pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene
                 reactive.last_value = new_text.clone();
 
                 if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if let Some(ref mut text_content) = style.text {
-                            text_content.text = new_text;
-                        }
-                    }
+                    let NodeContent::Styled { ref mut style } = node.content else {
+                        continue;
+                    };
+                    let Some(ref mut text_content) = style.text else {
+                        continue;
+                    };
+                    text_content.text = new_text;
                 }
             }
         }
@@ -269,14 +274,15 @@ pub fn update_reactive_colors_system(
     for (node_ref, reactive) in query.iter() {
         if let Some(node) = scene.get_mut(node_ref.0) {
             let new_color = reactive.signal.get_untracked();
-            if let NodeContent::Styled { ref mut style } = node.content {
-                if !style.fills.is_empty() {
-                    style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
-                } else {
-                    style
-                        .fills
-                        .push(render_engine::Paint::Solid(new_color.as_vec4()));
-                }
+            let NodeContent::Styled { ref mut style } = node.content else {
+                continue;
+            };
+            if !style.fills.is_empty() {
+                style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+            } else {
+                style
+                    .fills
+                    .push(render_engine::Paint::Solid(new_color.as_vec4()));
             }
         }
     }
