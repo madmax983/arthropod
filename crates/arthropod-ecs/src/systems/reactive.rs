@@ -48,7 +48,9 @@ pub fn update_interaction_state_system(
         // Bubble up from the hit node to find all interactive ancestors
         // This ensures that if you hover a Text inside a Button, the Button is also considered hovered.
         loop {
-            hovered_nodes.insert(current_id);
+            if !hovered_nodes.insert(current_id) {
+                break; // Prevent infinite loop DoS in case of cyclic parent structures
+            }
             if let Some(parent_id) = scene.parent(current_id) {
                 current_id = parent_id;
             } else {
@@ -410,6 +412,62 @@ mod tests {
 
         // Opacity should be 0.5
         assert!((node.opacity - 0.5).abs() < 0.001, "Opacity mismatch");
+    }
+
+    #[test]
+    fn test_update_interaction_state_prevents_cyclic_dos() {
+        use crate::components::MousePosition;
+
+        let mut world = World::new();
+
+        let mut scene = Scene::new();
+        let root = scene.root();
+
+        // Create a malicious cycle manually by subverting typical add_node rules,
+        // to mimic an exploit condition. We make two nodes and cross-parent them.
+        let node1 = scene.add_node(
+            root,
+            SceneNode {
+                content: NodeContent::Empty,
+                transform: Transform2D::identity(),
+                bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
+                children: vec![],
+                parent: None,
+                visible: true,
+                opacity: 1.0,
+            },
+        );
+
+        let node2 = scene.add_node(
+            node1,
+            SceneNode {
+                content: NodeContent::Empty,
+                transform: Transform2D::identity(),
+                bounds: Rect::new(0.0, 0.0, 100.0, 100.0),
+                children: vec![],
+                parent: Some(node1), // node2's parent is node1
+                visible: true,
+                opacity: 1.0,
+            },
+        );
+
+        // Subvert the Scene API to create the cycle directly
+        // Make node1's parent node2
+        scene.get_node_mut(node1).unwrap().parent = Some(node2);
+
+        world.insert_resource(scene);
+        world.insert_resource(MousePosition(glam::Vec2::new(50.0, 50.0))); // Overlaps the bounds
+
+        // Create entity with InteractionState
+        world.spawn((SceneNodeRef(node1), InteractionState::default()));
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_interaction_state_system);
+
+        // This will hang in an infinite loop without the cycle prevention fix
+        schedule.run(&mut world);
+
+        // If it finishes, the cycle prevention worked
     }
 
     /// Test merged system with entities having only some reactive components
