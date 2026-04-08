@@ -41,3 +41,8 @@ I see there are specs up to `021` in the backlog index. I created `specs/022-dat
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and the missing features. A very common and expected feature for cross-platform Rust GUI frameworks (like Egui, Iced, Dioxus) is being able to compile and target the web. Let's spec out a **WebAssembly (Wasm) Web Target Support** feature. It gives developers the immense reach of the browser without rewriting the UI logic.
 Created `specs/023-webassembly-target.md` to define the WebAssembly Target Support. This addresses the "build once, run anywhere (including browsers)" capability, dramatically boosting the potential adoption of the Arthropod framework.
+
+## 2024-05-25 - [State Persistence Engine Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A common requirement for desktop applications missing from the current specs is **State Persistence** (saving window bounds, user preferences, etc.). Let's spec out a **State Persistence Engine**.
+Created `specs/024-state-persistence.md` to define a State Persistence Engine. This addresses a core UX requirement for modern desktop applications and eliminates repetitive boilerplate for developers.
