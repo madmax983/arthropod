@@ -33,3 +33,9 @@
 ## 2026-06-26 - State Types Extraction from Input Engine
 **Tangle:** 'ReactiveTextState' and 'ComputedTextState' were placed in 'input-engine', despite not being related to user input or gestures. These types are UI reactive state used by widgets, causing 'input-engine' to hold logic that rightfully belongs in 'widget-core'.
 **Blueprint:** Moved `ReactiveTextState` and `ComputedTextState` to `widget-core/src/input_state.rs` where similar reactive states (like `ReactiveColorState`) live, enforcing proper domain boundaries while keeping `TextInputState` in `input-engine`.
+**2026-06-27 - Extract Layout Bridge to Widget Core**
+**Tangle:**  contained , which is a pure domain interface between  and . This forced  to depend on the ECS layer merely to use the layout engine, creating a leaky abstraction and increasing coupling.
+**Blueprint:** Moved  into . Since  already depends on both  and , and both  and  already depend on , this creates a clean, acyclic dependency graph and centralizes pure UI logic.
+## 2026-06-27 - Extract Layout Bridge to Widget Core
+**Tangle:** `arthropod_ecs` contained `layout_bridge::perform_layout`, which is a pure domain interface between `render-engine` and `layout-engine`. This forced `arthropod` to depend on the ECS layer merely to use the layout engine, creating a leaky abstraction and increasing coupling.
+**Blueprint:** Moved `layout_bridge.rs` into `widget-core`. Since `widget-core` already depends on both `layout-engine` and `render-engine`, and both `arthropod` and `arthropod-ecs` already depend on `widget-core`, this creates a clean, acyclic dependency graph and centralizes pure UI logic.

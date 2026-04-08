@@ -17,6 +17,7 @@ style-engine = { path = "../style-engine" }
 anim-graph = { path = "../anim-graph" }
 glam = "0.29"
 indexmap = "2.13.0"
+plat-core = { version = "0.1.0", path = "../plat-core" }
 
 [dev-dependencies]
 plat-core = { path = "../plat-core" }

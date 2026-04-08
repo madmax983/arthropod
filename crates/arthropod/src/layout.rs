@@ -44,9 +44,9 @@ pub fn auto_layout(
     let mut engine = LayoutEngine::new();
     let mut node_map = HashMap::new();
 
-    // Use shared layout logic from arthropod-ecs
+    // Use shared layout logic from widget-core
     // This avoids code duplication and ensures consistent behavior
-    arthropod_ecs::layout_bridge::perform_layout(
+    widget_core::layout_bridge::perform_layout(
         scene,
         root,
         constraints,

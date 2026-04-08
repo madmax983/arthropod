@@ -65,7 +65,7 @@ pub fn layout_system(
     // 2. Perform layout calculation using shared bridge logic
     // This uses the optimized 2-pass approach (collect updates -> apply updates)
     // to avoid cloning children vectors during traversal.
-    crate::layout_bridge::perform_layout(
+    widget_core::layout_bridge::perform_layout(
         &mut scene,
         root,
         constraints,
