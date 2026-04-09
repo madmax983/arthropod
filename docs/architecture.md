@@ -67,6 +67,7 @@ C4Container
     Rel(widget, text, "Uses", "Measures text")
     Rel(widget, macros, "Uses", "Expands macros")
     Rel(widget, input, "Delegates to", "Input processing")
+    Rel(widget, render, "Provides layout bridge for", "Scene graph")
 
     Rel(app, material, "Uses", "Material components")
     Rel(material, widget, "Builds on", "Widget traits")
