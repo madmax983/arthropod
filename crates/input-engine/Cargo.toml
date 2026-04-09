@@ -18,6 +18,7 @@ nova = []
 flux-state = { path = "../flux-state" }
 plat-core = { path = "../plat-core" }
 criterion = "0.5"
+proptest = "1.11.0"
 
 [[bench]]
 name = "form_bench"

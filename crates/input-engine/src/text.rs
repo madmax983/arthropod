@@ -113,11 +113,15 @@ impl TextInputState {
     /// If `readonly` is true or cursor is at the start, does nothing.
     /// Updates the `write_signal` and moves the cursor back.
     pub fn backspace(&mut self) {
-        if self.readonly || self.cursor_position == 0 {
+        if self.readonly {
             return;
         }
 
         let (mut current_value, _) = self.ensure_cursor_valid();
+
+        if self.cursor_position == 0 {
+            return;
+        }
 
         if let Some(byte_idx) = char_idx_to_byte_idx(&current_value, self.cursor_position - 1) {
             current_value.remove(byte_idx);
