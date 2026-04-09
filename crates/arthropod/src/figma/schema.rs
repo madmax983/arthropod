@@ -17,6 +17,15 @@ use style_engine::{
     TextOverflow, VectorPath, VisualStyle, WindingRule,
 };
 
+/// Parses a raw Figma JSON export string into an [`ImportedFigmaDocument`].
+///
+/// This function attempts to deserialize the JSON into an intermediate representation,
+/// and then normalizes and resolves the node hierarchy, styles, and interactions into
+/// the domain structures needed by the engine.
+///
+/// # Errors
+/// Returns a [`FigmaImportError`] if the provided string is not valid JSON,
+/// or if it does not match the expected schema shape (e.g. missing nodes array).
 pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaImportError> {
     let document = parse_figma_document(json)?;
 

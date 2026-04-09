@@ -5,10 +5,31 @@ use thiserror::Error;
 
 use crate::figma::{FigmaImportError, import_figma_document};
 
+/// Configuration options for the Figma Rust codegen process.
+///
+/// This dictates the names of the generated Rust module and the
+/// functions exposed within it.
+///
+/// ## Examples
+///
+/// ```
+/// use arthropod::figma_codegen::FigmaCodegenOptions;
+///
+/// let options = FigmaCodegenOptions {
+///     module_name: "my_figma_module".to_string(),
+///     document_fn: "load_figma_doc".to_string(),
+///     runtime_fn: "create_figma_runtime".to_string(),
+/// };
+///
+/// assert_eq!(options.module_name, "my_figma_module");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FigmaCodegenOptions {
+    /// The name of the generated Rust module (e.g. `"generated_figma"`).
     pub module_name: String,
+    /// The name of the function that returns the [`ImportedFigmaDocument`].
     pub document_fn: String,
+    /// The name of the function that returns a `FigmaRuntime` instance.
     pub runtime_fn: String,
 }
 
@@ -22,16 +43,32 @@ impl Default for FigmaCodegenOptions {
     }
 }
 
+/// Errors that can occur during Figma code generation.
 #[derive(Debug, Error)]
 pub enum FigmaCodegenError {
+    /// An error occurred while parsing the provided Figma JSON.
     #[error("failed to import figma json before codegen: {0}")]
     Import(#[from] FigmaImportError),
+    /// An error occurred while writing the generated module file to disk.
     #[error("failed to write generated rust module: {0}")]
     Io(#[from] std::io::Error),
 }
 
 /// Generate a deterministic Rust module that embeds Figma JSON and provides
 /// runtime/document entrypoints.
+///
+/// ## Examples
+///
+/// ```
+/// use arthropod::figma_codegen::{FigmaCodegenOptions, generate_rust_module_from_json};
+///
+/// let json = r#"{ "document": { "id": "0:0", "type": "DOCUMENT" } }"#;
+/// let options = FigmaCodegenOptions::default();
+///
+/// // In a real scenario, this requires a valid Figma JSON export format
+/// // let code = generate_rust_module_from_json(json, &options).unwrap();
+/// // assert!(code.contains("pub mod generated_figma"));
+/// ```
 pub fn generate_rust_module_from_json(
     figma_json: &str,
     options: &FigmaCodegenOptions,

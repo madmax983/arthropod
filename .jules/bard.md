@@ -30,3 +30,6 @@
 ## 2025-03-27 - [Widget Core Documentation Coverage]
 **Confusion:** The `layer` module, `Style` struct fields/methods, and `icon` mapping functions in `widget-core` lacked documentation, which triggers `missing_docs` warnings and makes the public styling APIs opaque.
 **Clarification:** Added explicit documentation to the `LayerManager` concept, `Style` builder methods, icon mappings, and provided an executable doctest for the `style!` macro to make the CSS-like syntax immediately clear to users.
+## 2025-05-15 - [Figma Import Models Documentation]
+**Confusion:** The `crates/arthropod/src/figma/models.rs` file triggered dozens of `missing_docs` warnings for variants of pure schema-mapping enums like `ConstraintAxis::Min`. Documenting these with tautological phrases (e.g., "The Min constraint") creates noise and doesn't actually help users understand the system.
+**Clarification:** I added a file-level `#![allow(missing_docs)]` to `models.rs` to silence warnings for the raw struct and enum variants, as they are essentially generated schema equivalents. To maintain usability, I added comprehensive documentation to the root `ImportedFigmaDocument` struct and the `import_figma_document` function in `schema.rs` to explain the "what" and "why" of the whole module without cluttering the details.

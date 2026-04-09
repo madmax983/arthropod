@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::collections::HashMap;
 
 use layout_engine::FlexStyle;
@@ -192,6 +194,12 @@ pub struct ImportedComponentPropertyOverride {
     pub value: ImportedComponentPropertyValue,
 }
 
+/// The fully parsed and resolved root structure of an imported Figma document.
+///
+/// This struct holds the converted node hierarchy (as a render engine `Scene`),
+/// resolved flexbox layout styles, component property definitions, constraints,
+/// and prototype interaction graphs. It serves as the bridge between raw Figma JSON
+/// and the `FigmaRuntime` which executes the logic.
 pub struct ImportedFigmaDocument {
     pub scene: Scene,
     pub layout_styles: HashMap<NodeId, FlexStyle>,
