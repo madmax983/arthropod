@@ -342,6 +342,58 @@ mod tests {
     }
 
     #[test]
+    fn test_sequence_matcher_reset_with_start_key() {
+        let runtime = Runtime::new();
+        let input = Signal::new(runtime.clone(), None);
+        let (read_input, write_input) = input.split();
+
+        // Sequence: A, B, C
+        let sequence = vec![Key::A, Key::B, Key::C];
+        let matcher = SequenceMatcher::new(sequence, MyGesture::Konami);
+        let gesture_signal = create_gesture_signal(runtime.clone(), read_input, matcher);
+
+        let press = |key: Key| {
+            write_input.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
+                key,
+                state: ElementState::Pressed,
+                modifiers: Default::default(),
+                repeat: false,
+            })));
+            write_input.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
+                key,
+                state: ElementState::Released,
+                modifiers: Default::default(),
+                repeat: false,
+            })));
+        };
+
+        let press_only = |key: Key| {
+            write_input.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
+                key,
+                state: ElementState::Pressed,
+                modifiers: Default::default(),
+                repeat: false,
+            })));
+        };
+
+        // Press A, B, then A
+        press(Key::A); // index = 1
+        press(Key::B); // index = 2
+        press(Key::A); // Expects C, gets A. Resets to 0, but A matches start, so index = 1.
+
+        assert_eq!(gesture_signal.get_untracked(), None);
+
+        // Now press B, C to complete the new sequence
+        press(Key::B); // index = 2
+
+        assert_eq!(gesture_signal.get_untracked(), None);
+
+        press_only(Key::C);
+
+        assert_eq!(gesture_signal.get_untracked(), Some(MyGesture::Konami));
+    }
+
+    #[test]
     fn test_chord_matcher() {
         let runtime = Runtime::new();
         let input = Signal::new(runtime.clone(), None);
