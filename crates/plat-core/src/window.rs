@@ -15,47 +15,81 @@ impl WindowId {
     }
 }
 
-/// Size in physical pixels.
+/// A 2D spatial dimension container representing a bounding box's physical limits.
+///
+/// We decouple `Size` from native OS APIs (like `winit`'s PhysicalSize) so our core
+/// platform traits can remain independent of backend windowing implementations.
+///
+/// ## Examples
+/// ```
+/// use plat_core::Size;
+/// let screen_bounds = Size::new(1920, 1080);
+/// assert_eq!(screen_bounds.width, 1920);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(missing_docs)]
 pub struct Size<T> {
     pub width: T,
     pub height: T,
 }
 
 impl<T> Size<T> {
+    /// Creates a new `Size` with the given width and height.
     pub fn new(width: T, height: T) -> Self {
         Self { width, height }
     }
 }
 
-/// Position in physical pixels.
+/// A 2D integer-based spatial coordinate representing physical pixels on a monitor.
+///
+/// Used for OS-level window placement where sub-pixel rendering is impossible
+/// (e.g., "Place the window at exactly monitor pixel 100, 100").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(missing_docs)]
 pub struct Position<T> {
     pub x: T,
     pub y: T,
 }
 
 impl<T> Position<T> {
+    /// Creates a new `Position` with the given X and Y coordinates.
     pub fn new(x: T, y: T) -> Self {
         Self { x, y }
     }
 }
 
-/// Point (position with floating point coordinates).
+/// A 2D floating-point coordinate for sub-pixel precision.
+///
+/// Used internally for high-DPI (Retina) cursor tracking and gesture math
+/// where a physical mouse movement might cross fractional logic points.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[allow(missing_docs)]
 pub struct Point<T> {
     pub x: T,
     pub y: T,
 }
 
 impl<T> Point<T> {
+    /// Creates a new `Point` with the given X and Y coordinates.
     pub fn new(x: T, y: T) -> Self {
         Self { x, y }
     }
 }
 
-/// Rectangle with position and size.
+/// A 2D bounding box representing an axis-aligned rectangle.
+///
+/// Used extensively in hit-testing, layout clipping, and dirty region tracking.
+/// By maintaining our own `Rect` type, we ensure it maps exactly to our rendering
+/// backend's coordinate system (origin Top-Left).
+///
+/// ## Examples
+/// ```
+/// use plat_core::Rect;
+/// let bounds = Rect::new(0.0, 0.0, 100.0, 100.0);
+/// assert!(bounds.contains(50.0, 50.0));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[allow(missing_docs)]
 pub struct Rect {
     pub x: f32,
     pub y: f32,
@@ -64,6 +98,7 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// Creates a new `Rect` with the given position and size.
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         Self {
             x,
@@ -88,8 +123,26 @@ impl Rect {
     }
 }
 
-/// Window configuration for creation.
+/// A declarative builder payload for configuring an OS window before creation.
+///
+/// Because OS windows are expensive and context-heavy (requiring COM on Windows
+/// or NSWindow on Mac), we package all desired state into this configuration struct
+/// rather than making dozens of individual `set_foo()` calls over the FFI boundary
+/// after creation.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{WindowConfig, Size};
+///
+/// let config = WindowConfig {
+///     title: "Arthropod App".into(),
+///     size: Size::new(1024, 768),
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub struct WindowConfig {
     pub title: String,
     pub size: Size<u32>,
@@ -175,10 +228,16 @@ impl HasDisplayHandle for Window {
 }
 
 impl Window {
+    /// Modifies the OS-level rendering material for the window background.
+    ///
+    /// This is what allows effects like "Mica" or "Acrylic" on Windows, or
+    /// "Vibrancy" on macOS. The material is composited by the desktop window
+    /// manager behind the application's rendered content.
     pub fn set_backdrop_material(&self, material: BackdropMaterial) {
         self.inner.set_backdrop_material(material);
     }
 
+    /// Gets the current backdrop material configured for the window.
     pub fn backdrop_material(&self) -> BackdropMaterial {
         self.inner.backdrop_material()
     }

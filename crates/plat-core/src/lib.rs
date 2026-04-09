@@ -28,14 +28,39 @@ pub use window::*;
 use thiserror::Error;
 
 /// Errors that can occur in plat-core operations.
+///
+/// These errors represent fundamental failures in the underlying operating system
+/// abstraction, such as being unable to allocate a window surface or start the event
+/// loop. These are typically fatal application errors that cannot be easily recovered
+/// from at runtime.
+///
+/// ## Examples
+///
+/// ```
+/// use plat_core::{EventLoop, PlatformError};
+///
+/// fn try_init() -> Result<EventLoop, PlatformError> {
+///     // This might fail if the OS denies the windowing context
+///     EventLoop::new()
+/// }
+/// ```
 #[derive(Error, Debug)]
 pub enum PlatformError {
+    /// Represents a failure to ask the OS to allocate a new window surface.
+    /// This happens when passing invalid `WindowConfig` constraints (like impossible
+    /// dimensions) or when the OS window manager is out of resources.
     #[error("Failed to create window: {0}")]
     WindowCreation(String),
 
+    /// Represents a failure to bootstrap the platform's core graphics or event APIs.
+    /// On Windows, this might mean COM initialization failed. On Web, it might mean
+    /// the browser environment is missing critical APIs (like `web_sys::window`).
     #[error("Platform initialization failed: {0}")]
     Initialization(String),
 
+    /// Represents a critical failure while pumping events from the OS.
+    /// This usually indicates the OS has forcibly severed the application's connection
+    /// to the display server (e.g. Wayland compositor crash).
     #[error("Event loop error: {0}")]
     EventLoop(String),
 }

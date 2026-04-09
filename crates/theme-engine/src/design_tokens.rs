@@ -59,33 +59,47 @@ impl From<Color> for TokenValue {
 /// - Radius tokens: Border radius values
 #[derive(Debug, Clone)]
 pub struct DesignTokens {
-    // Surface tokens (backgrounds)
+    /// The primary surface background, typically the main application window background.
     pub surface_primary: TokenValue,
+    /// The secondary surface background, used for sidebars, panels, or distinct areas.
     pub surface_secondary: TokenValue,
+    /// The elevated surface background, used for dialogs, popovers, or floating elements.
     pub surface_elevated: TokenValue,
 
-    // Text tokens
+    /// The primary text color, used for main body text and headings.
     pub text_primary: Color,
+    /// The secondary text color, used for less prominent text (e.g. subtitles).
     pub text_secondary: Color,
+    /// The tertiary text color, used for disabled or very subtle text.
     pub text_tertiary: Color,
 
-    // Accent tokens
+    /// The main accent/brand color, used for primary actions.
     pub accent: Color,
+    /// The accent color when hovered.
     pub accent_hover: Color,
+    /// The accent color when actively pressed.
     pub accent_pressed: Color,
 
-    // Spacing tokens (8px base scale)
+    /// Extra small spacing (typically 4px).
     pub space_xs: f32,
+    /// Small spacing (typically 8px).
     pub space_sm: f32,
+    /// Medium spacing (typically 16px).
     pub space_md: f32,
+    /// Large spacing (typically 24px).
     pub space_lg: f32,
+    /// Extra large spacing (typically 32px).
     pub space_xl: f32,
+    /// Double extra large spacing (typically 48px).
     pub space_2xl: f32,
 
-    // Border radius tokens
+    /// Small border radius.
     pub radius_sm: f32,
+    /// Medium border radius.
     pub radius_md: f32,
+    /// Large border radius.
     pub radius_lg: f32,
+    /// Extra large border radius.
     pub radius_xl: f32,
 }
 

@@ -1,3 +1,8 @@
+//! Terminal-based DevTools for inspecting flux-state graphs.
+//!
+//! This crate provides a TUI interface built with ratatui to visualize,
+//! inspect, and debug the reactive state graph managed by `flux-state`.
+
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},

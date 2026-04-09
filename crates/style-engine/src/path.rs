@@ -40,20 +40,33 @@ pub enum PathCommand {
     Close,
 }
 
-/// Boolean operation type for vector paths.
+/// Boolean operation types for constructive solid geometry (CSG) on 2D vector paths.
+///
+/// These operations allow you to dynamically build complex shapes (like a donut)
+/// by mathematically combining simpler primitives (like two circles).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BooleanOp {
+    /// Merges two overlapping paths into a single continuous outline.
+    /// Internal overlapping boundaries are dissolved.
     Union,
+    /// Punches a hole. Subtracts the area of the second path from the first path.
     Subtract,
+    /// Yields only the area where both paths overlap.
     Intersect,
+    /// Yields the area of both paths *except* where they overlap (an exclusive OR).
     Exclude,
 }
 
-/// Errors produced by vector path parsing/operations.
+/// Errors produced during vector path parsing, serialization, or boolean geometry operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VectorPathError {
+    /// Thrown when an SVG path string (`d="..."`) contains invalid syntax, such as missing coordinates
+    /// or malformed floating-point numbers.
     InvalidSvgPathData(String),
+    /// Thrown when the SVG parser encounters a command letter it does not support yet.
     UnsupportedSvgCommand(char),
+    /// Thrown when a `BooleanOp` fails mathematically, usually because one of the operand
+    /// paths is degenerate (zero area, zero length, or self-intersecting in unresolvable ways).
     InvalidBooleanOperands,
 }
 

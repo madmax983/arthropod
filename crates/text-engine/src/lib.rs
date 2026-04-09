@@ -79,11 +79,16 @@ pub struct TextEngine {
     applied_global_fonts: usize,
 }
 
-/// A shaped glyph with position and metrics
+/// Represents a single character (or ligature) that has gone through HarfBuzz shaping.
+///
+/// The shaping process converts logical characters (like "fi") into physical raster
+/// instructions (a single "fi" ligature glyph). This struct holds the offset instructions
+/// so the GPU pipeline knows exactly where to place the texture quad.
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub struct ShapedGlyph {
-    pub cache_key: CacheKey, // cosmic-text cache key for rasterization
-    pub glyph_id: u16,       // kept for compatibility
+    pub cache_key: CacheKey,
+    pub glyph_id: u16,
     pub x_offset: f32,
     pub y_offset: f32,
     pub x_advance: f32,
@@ -94,15 +99,26 @@ pub struct ShapedGlyph {
 // Re-export CacheKey for convenience
 pub use cosmic_text::CacheKey;
 
-/// Shaped text result
+/// The final artifact of the text shaping pipeline.
+///
+/// Contains an ordered list of `ShapedGlyph`s ready to be uploaded to the GPU,
+/// alongside the computed `TextBounds` which determines the exact physical pixel
+/// footprint of the text. This is critical for layout engines (like Yoga or Taffy)
+/// to perform accurate text-wrapping.
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub struct ShapedText {
     pub glyphs: Vec<ShapedGlyph>,
     pub bounds: TextBounds,
 }
 
-/// Text bounding box
+/// The physical, pixel-aligned boundary of a block of text.
+///
+/// Unlike raw CSS layouts, text rendering often overhangs its logical bounding box
+/// due to font ascenders/descenders (like the tail of a 'y') or italics leaning
+/// outside the box. This struct represents the *visual* footprint.
 #[derive(Debug, Clone, Copy, Default)]
+#[allow(missing_docs)]
 pub struct TextBounds {
     pub x: f32,
     pub y: f32,
@@ -110,17 +126,29 @@ pub struct TextBounds {
     pub height: f32,
 }
 
-/// Font style override for text shaping.
+/// Typographic slant configurations.
+///
+/// Used to instruct the underlying font matcher (e.g., Fontconfig) to prefer
+/// specific font faces within a font family. Note that if a font does not
+/// contain a true `Italic` face, the system may synthesize an `Oblique` slant automatically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextFontStyle {
+    /// Standard upright letterforms.
     #[default]
     Normal,
+    /// Cursive or stylized letterforms designed explicitly by the typographer.
     Italic,
+    /// Mechanically slanted letterforms.
     Oblique,
 }
 
-/// Optional text shaping overrides used to select a specific font face.
+/// Overrides for font face selection during the shaping process.
+///
+/// By default, the `TextEngine` will use the system's default UI font.
+/// Passing this struct allows you to request specific weights or families.
+/// If the requested family cannot be found, it gracefully falls back to the system default.
 #[derive(Debug, Clone, Copy, Default)]
+#[allow(missing_docs)]
 pub struct TextShapeOptions<'a> {
     pub family: Option<&'a str>,
     pub weight: Option<u16>,

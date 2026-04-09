@@ -76,17 +76,47 @@ pub async fn load_font_url(
     Ok(bytes)
 }
 
-/// Errors returned by web font loader.
+/// Represents failures that occur while attempting to fetch font files via HTTP in a browser.
+///
+/// Because browsers cannot access the local filesystem (`C:\Windows\Fonts`), Arthropod
+/// running in WASM must download fonts over the network. These errors represent network
+/// interruptions, CORS failures, or corrupted font files.
+///
+/// ## Recovery
+/// If loading a remote font fails, `TextEngine` will automatically fallback to
+/// standard system-safe web fonts (like "sans-serif").
+///
+/// ## Examples
+/// ```rust,ignore
+/// // Inside a wasm_bindgen async function:
+/// match load_font_url("https://fonts.com/MyFont.ttf", None, &mut cache).await {
+///     Ok(bytes) => engine.register_font_bytes(bytes),
+///     Err(WebFontLoadError::HttpStatus(404)) => log::warn!("Font not found, using fallback"),
+///     Err(e) => log::error!("Failed to load font: {}", e),
+/// }
+/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum WebFontLoadError {
+    /// Thrown if this function is called on a native build (like Windows or Mac) instead of WASM.
+    /// To load fonts natively, use standard file I/O instead.
     #[error("web font loading is only available on wasm32 targets")]
     UnsupportedPlatform,
+
+    /// Thrown if the WASM module is executing outside of a DOM context (e.g., inside a Web Worker
+    /// that does not have access to the global `window` object).
     #[error("web_sys::window() is unavailable")]
     MissingWindow,
+
+    /// Thrown when the browser's `fetch` API rejects the request entirely.
+    /// This is most commonly caused by CORS (Cross-Origin Resource Sharing) policy violations.
     #[error("failed to fetch font bytes: {0}")]
     Fetch(String),
+
+    /// Thrown when the server responds, but with a failure status code (e.g. 404 Not Found, 500 Server Error).
     #[error("font request failed with HTTP status {0}")]
     HttpStatus(u16),
+
+    /// Thrown when the bytes are successfully downloaded, but fail to parse as a valid ArrayBuffer.
     #[error("failed to decode fetched font bytes: {0}")]
     Decode(String),
 }

@@ -1,7 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-/// Corner radii for a rectangle (top-left, top-right, bottom-right, bottom-left)
+/// Defines independent border radii for the four corners of a rectangle.
+///
+/// Used to create pills, circles, or asymmetric rounded containers.
+/// In CSS, this corresponds to `border-radius: <top-left> <top-right> <bottom-right> <bottom-left>;`.
+///
+/// ## Examples
+/// ```
+/// use style_engine::CornerRadii;
+/// // Create a uniform pill shape (e.g. for a button)
+/// let uniform = CornerRadii::uniform(999.0);
+///
+/// // Create a chat bubble tail effect (sharp bottom-right corner)
+/// let chat_bubble = CornerRadii::new(12.0, 12.0, 0.0, 12.0);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct CornerRadii {
     pub top_left: f32,
     pub top_right: f32,

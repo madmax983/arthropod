@@ -63,6 +63,9 @@ pub fn wheel_event_from_input(delta_x: f64, delta_y: f64, delta_mode: u32) -> Wi
     }
 }
 
+/// Bridges a WASM `web_sys::MouseEvent`'s `mousemove` position into Arthropod's internal
+/// `WindowEvent::CursorMoved`. We do this manually rather than relying on `winit` because
+/// Arthropod handles its own Web canvas mounting and DOM event subscriptions.
 #[must_use]
 pub fn map_pointer_move(x: f64, y: f64) -> WindowEvent {
     WindowEvent::CursorMoved {
@@ -70,16 +73,23 @@ pub fn map_pointer_move(x: f64, y: f64) -> WindowEvent {
     }
 }
 
+/// Bridges a WASM `web_sys::MouseEvent`'s `mousedown` into Arthropod's internal
+/// `WindowEvent::MouseInput`. Transforms the browser's raw integer button ID
+/// (0=left, 1=middle, 2=right) into our semantic `MouseButton` enum.
 #[must_use]
 pub fn map_pointer_down(button: i16, x: f64, y: f64) -> WindowEvent {
     map_pointer_with_state(button, ElementState::Pressed, x, y, Modifiers::default())
 }
 
+/// Bridges a WASM `web_sys::MouseEvent`'s `mouseup` into Arthropod's internal
+/// `WindowEvent::MouseInput`.
 #[must_use]
 pub fn map_pointer_up(button: i16, x: f64, y: f64) -> WindowEvent {
     map_pointer_with_state(button, ElementState::Released, x, y, Modifiers::default())
 }
 
+/// Same as `map_pointer_down`, but injects modifier key states (Shift, Ctrl, Alt, Meta)
+/// which are read synchronously from the originating Javascript DOM event.
 #[must_use]
 pub fn map_pointer_down_with_modifiers(
     button: i16,
@@ -90,6 +100,7 @@ pub fn map_pointer_down_with_modifiers(
     map_pointer_with_state(button, ElementState::Pressed, x, y, modifiers)
 }
 
+/// Same as `map_pointer_up`, but injects modifier key states (Shift, Ctrl, Alt, Meta).
 #[must_use]
 pub fn map_pointer_up_with_modifiers(
     button: i16,
@@ -100,6 +111,8 @@ pub fn map_pointer_up_with_modifiers(
     map_pointer_with_state(button, ElementState::Released, x, y, modifiers)
 }
 
+/// Packs the four boolean modifier flags extracted from a Javascript DOM event
+/// (`shiftKey`, `ctrlKey`, `altKey`, `metaKey`) into a single `Modifiers` struct.
 #[must_use]
 pub fn map_modifiers(shift: bool, ctrl: bool, alt: bool, meta: bool) -> Modifiers {
     Modifiers {
@@ -110,11 +123,15 @@ pub fn map_modifiers(shift: bool, ctrl: bool, alt: bool, meta: bool) -> Modifier
     }
 }
 
+/// Bridges a WASM `web_sys::KeyboardEvent` into Arthropod's `KeyboardInput`.
+/// The `code` maps to physical key positions (e.g. "KeyW" regardless of layout),
+/// while the `key` maps to the printed character (for fallback resolution).
 #[must_use]
 pub fn map_key_input(code: &str, key: &str, state: ElementState, repeat: bool) -> KeyboardInput {
     map_key_input_with_modifiers(code, key, state, repeat, Modifiers::default())
 }
 
+/// Same as `map_key_input`, but injects modifier key states.
 #[must_use]
 pub fn map_key_input_with_modifiers(
     code: &str,

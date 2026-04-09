@@ -34,14 +34,18 @@ pub type Color = glam::Vec4;
 /// Error types for theme operations
 #[derive(Debug, thiserror::Error)]
 pub enum ThemeError {
+    /// Failed to query theme details from the underlying OS/platform.
     #[error("Platform theme query failed: {0}")]
     PlatformError(String),
 
+    /// The requested theme operation is not supported on this platform.
     #[error("Unsupported platform")]
     UnsupportedPlatform,
 
+    /// A provided theme token value was invalid.
     #[error("Invalid token value: {0}")]
     InvalidToken(String),
 }
 
+/// A specialized Result type for theme engine operations.
 pub type Result<T> = std::result::Result<T, ThemeError>;
