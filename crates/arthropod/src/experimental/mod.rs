@@ -60,3 +60,6 @@ pub mod glass_overlay;
 
 #[cfg(feature = "nova")]
 pub mod chaos_monkey;
+
+#[cfg(feature = "nova")]
+pub mod gesture_feedback;
