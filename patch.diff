@@ -1,0 +1,13 @@
+<<<<<<< SEARCH
+mod computed;
+mod effect;
+mod runtime;
+mod signal;
+=======
+mod computed;
+mod effect;
+mod runtime;
+mod signal;
+#[cfg(feature = "nova")]
+mod value_inspector;
+>>>>>>> REPLACE

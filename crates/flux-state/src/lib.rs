@@ -101,6 +101,8 @@ mod computed;
 mod effect;
 mod runtime;
 mod signal;
+#[cfg(feature = "nova")]
+pub(crate) mod value_inspector;
 
 pub use computed::Computed;
 pub use effect::Effect;

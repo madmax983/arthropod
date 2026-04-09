@@ -1116,6 +1116,8 @@ pub struct NodeInfo {
     /// A human-readable debug label assigned to the node, or a fallback string
     /// like `Signal(NodeId(1))` if no label was provided.
     pub label: String,
+    /// A stringified representation of the node's current value, if available and inspectable.
+    pub value: Option<String>,
 }
 
 /// The type of a reactive node.
@@ -1186,7 +1188,7 @@ impl Runtime {
         let mut stale_nodes = Vec::new();
 
         // Collect Signals
-        for id in inner.signals.keys() {
+        for (id, value_arc) in &inner.signals {
             let label = inner
                 .labels
                 .get(id)
@@ -1196,20 +1198,26 @@ impl Runtime {
                 id: *id,
                 node_type: NodeType::Signal,
                 label,
+                value: crate::value_inspector::try_inspect_value(value_arc),
             });
         }
 
         // Collect Computeds
-        for id in inner.computeds.keys() {
+        for (id, computed) in &inner.computeds {
             let label = inner
                 .labels
                 .get(id)
                 .cloned()
                 .unwrap_or_else(|| format!("Computed({:?})", id));
+            let value = computed
+                .value
+                .as_ref()
+                .and_then(crate::value_inspector::try_inspect_value);
             nodes.push(NodeInfo {
                 id: *id,
                 node_type: NodeType::Computed,
                 label,
+                value,
             });
         }
 
@@ -1224,6 +1232,7 @@ impl Runtime {
                 id: *id,
                 node_type: NodeType::Effect,
                 label,
+                value: None,
             });
         }
 
