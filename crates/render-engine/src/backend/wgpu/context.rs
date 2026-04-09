@@ -898,6 +898,22 @@ fn unpack_readback_pixels(
 
     let padded = padded_bytes_per_row as usize;
     // Use try_reserve to prevent panic on OOM for large allocations
+    // Validate buffer size early before trying to reserve gigabytes of memory
+    let min_required_src_len = (height as usize)
+        .saturating_sub(1)
+        .checked_mul(padded)
+        .and_then(|h| h.checked_add(row_len))
+        .ok_or_else(|| {
+            RendererError::InitializationFailed(
+                "Overflow calculating required buffer size".to_string(),
+            )
+        })?;
+    if readback.len() < min_required_src_len {
+        return Err(RendererError::InitializationFailed(
+            "Readback buffer too small for requested dimensions".to_string(),
+        ));
+    }
+
     let mut out = Vec::new();
     if out.try_reserve(total_size).is_err() {
         return Err(RendererError::InitializationFailed(
@@ -1180,7 +1196,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_unpack_readback_pixels_oom() {
         // Request allocation of ~4GB buffer (should fail on most CI runners or return error)
         // width = 32768, height = 32768 -> 1073741824 pixels * 4 bytes = 4GB

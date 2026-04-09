@@ -396,4 +396,11 @@ mod tests {
             matcher.points.len()
         );
     }
+
+    #[test]
+    fn test_calculate_metrics_empty() {
+        let matcher = StrokeMatcher::new(MouseButton::Right);
+        let metrics = matcher.calculate_metrics();
+        assert!(metrics.is_none(), "Metrics should be None for empty points");
+    }
 }
