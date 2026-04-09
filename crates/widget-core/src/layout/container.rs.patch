@@ -1,0 +1,24 @@
+--- crates/widget-core/src/layout/container.rs
++++ crates/widget-core/src/layout/container.rs
+@@ -88,6 +88,10 @@
+     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
+     };
++
++    ($w:expr, $($unknown:tt)*) => {
++        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
++    };
+ }
+
+ /// Create a row container with children
+@@ -134,6 +138,10 @@
+     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
+     };
++
++    ($w:expr, $($unknown:tt)*) => {
++        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
++    };
+ }
+
+ impl<C: WidgetTuple> Container<C> {

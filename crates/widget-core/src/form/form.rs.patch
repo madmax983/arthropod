@@ -1,0 +1,11 @@
+--- crates/widget-core/src/form/form.rs
++++ crates/widget-core/src/form/form.rs
+@@ -231,5 +231,9 @@
+     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
+         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
+     };
++
++    ($w:expr, $($unknown:tt)*) => {
++        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
++    };
+ }

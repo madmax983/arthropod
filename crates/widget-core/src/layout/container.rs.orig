@@ -95,10 +95,6 @@ macro_rules! __col_apply {
     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
     };
-
-    ($w:expr, $($unknown:tt)*) => {
-        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
-    };
 }
 
 /// Create a row container with children
@@ -149,10 +145,6 @@ macro_rules! __row_apply {
     };
     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
-    };
-
-    ($w:expr, $($unknown:tt)*) => {
-        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
     };
 }
 

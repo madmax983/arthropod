@@ -230,8 +230,4 @@ macro_rules! __form_apply {
     ($w:expr, $unknown:ident $(, $($rest:tt)*)?) => {
         compile_error!(concat!("Unknown property or flag: ", stringify!($unknown)))
     };
-
-    ($w:expr, $($unknown:tt)*) => {
-        compile_error!(concat!("Unknown property or flag: ", stringify!($($unknown)*)))
-    };
 }
