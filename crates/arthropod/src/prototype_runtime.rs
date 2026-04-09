@@ -159,13 +159,12 @@ impl PrototypeRuntime {
     ///
     /// Returns `Err(PrototypeRuntimeError::EmptyDocument)` if the document defines no valid screens.
     pub fn new(imported: &ImportedFigmaDocument) -> Result<Self, PrototypeRuntimeError> {
-        let mut root = imported
+        let current_screen = imported
             .figma_to_scene
             .values()
             .copied()
-            .collect::<Vec<_>>();
-        root.sort_by_key(|id| id.0);
-        let current_screen = root.first().copied();
+            .min_by_key(|id| id.0);
+
         if current_screen.is_none() {
             return Err(PrototypeRuntimeError::EmptyDocument);
         }
