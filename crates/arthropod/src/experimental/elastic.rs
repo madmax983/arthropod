@@ -1,7 +1,7 @@
 use anim_graph::{Animatable, Animation};
 use bevy_ecs::prelude::*;
 use flux_state::{ReadSignal, Runtime, Signal, WriteSignal};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// Internal state for an elastic signal.
@@ -10,31 +10,14 @@ struct ElasticState<T: Animatable> {
     target_signal: WriteSignal<T>,
 }
 
-/// A handle to an elastic signal that can be ticked.
-trait Tickable: Send + Sync {
-    /// Update the animation state by dt. Returns true if active, false if can be dropped.
-    fn tick(&self, dt: Duration) -> bool;
+/// A type-erased closure that ticks an elastic signal.
+pub struct Ticker {
+    tick_fn: Box<dyn Fn(Duration) -> bool + Send + Sync>,
 }
 
-impl<T: Animatable + Send + Sync + 'static> Tickable for Mutex<ElasticState<T>> {
+impl Ticker {
     fn tick(&self, dt: Duration) -> bool {
-        let (new_value, target_signal) = {
-            let mut guard = match self.lock() {
-                Ok(g) => g,
-                Err(_) => return false, // Poisoned
-            };
-
-            // Tick the animation
-            let new_value = guard.animation.tick(dt);
-            (new_value, guard.target_signal.clone())
-        };
-
-        // Update the signal (this triggers effects)
-        // We do this outside the lock to avoid deadlocks if subscribers call back into us
-        target_signal.set(new_value);
-
-        // Keep alive as long as we exist (Weak ref controls lifetime in registry)
-        true
+        (self.tick_fn)(dt)
     }
 }
 
@@ -119,16 +102,38 @@ impl<T: Animatable + Send + Sync + 'static> ElasticSignal<T> {
 /// Resource to manage active elastic signals.
 #[derive(Resource, Default, Clone)]
 pub struct ElasticRegistry {
-    signals: Arc<Mutex<Vec<Weak<dyn Tickable>>>>,
+    signals: Arc<Mutex<Vec<Ticker>>>,
 }
 
 impl ElasticRegistry {
     pub fn register<T: Animatable + Send + Sync + 'static>(&self, signal: &ElasticSignal<T>) {
         if let Ok(mut signals) = self.signals.lock() {
-            // Coerce Arc<Mutex<ElasticState<T>>> to Weak<dyn Tickable>
-            // Use Arc::downgrade and type erasure
-            let weak = Arc::downgrade(&signal.state) as Weak<dyn Tickable>;
-            signals.push(weak);
+            let weak = Arc::downgrade(&signal.state);
+            let tick_fn = Box::new(move |dt: Duration| {
+                if let Some(state) = weak.upgrade() {
+                    let (new_value, target_signal) = {
+                        let mut guard = match state.lock() {
+                            Ok(g) => g,
+                            Err(_) => return false, // Poisoned
+                        };
+
+                        // Tick the animation
+                        let new_value = guard.animation.tick(dt);
+                        (new_value, guard.target_signal.clone())
+                    };
+
+                    // Update the signal (this triggers effects)
+                    // We do this outside the lock to avoid deadlocks if subscribers call back into us
+                    target_signal.set(new_value);
+
+                    // Keep alive as long as we exist
+                    true
+                } else {
+                    false
+                }
+            });
+
+            signals.push(Ticker { tick_fn });
         }
     }
 }
@@ -164,13 +169,7 @@ pub fn elastic_tick_system(registry: Res<ElasticRegistry>, time: Res<ElasticTime
         let dt = time.delta;
 
         // Retain only signals that are still alive (returns true)
-        signals.retain(|weak| {
-            if let Some(arc) = weak.upgrade() {
-                arc.tick(dt)
-            } else {
-                false // Dropped signal, remove from registry
-            }
-        });
+        signals.retain(|ticker| ticker.tick(dt));
     }
 }
 
@@ -223,10 +222,8 @@ mod tests {
         // (In a real app, systems run via ECS)
         {
             let signals = registry.signals.lock().unwrap();
-            for weak in signals.iter() {
-                if let Some(arc) = weak.upgrade() {
-                    arc.tick(time.delta);
-                }
+            for ticker in signals.iter() {
+                ticker.tick(time.delta);
             }
         }
 
@@ -238,10 +235,8 @@ mod tests {
         // Tick again
         {
             let signals = registry.signals.lock().unwrap();
-            for weak in signals.iter() {
-                if let Some(arc) = weak.upgrade() {
-                    arc.tick(time.delta);
-                }
+            for ticker in signals.iter() {
+                ticker.tick(time.delta);
             }
         }
 
@@ -264,7 +259,7 @@ mod tests {
         // Run cleanup logic (retain)
         {
             let mut signals = registry.signals.lock().unwrap();
-            signals.retain(|weak| weak.upgrade().is_some());
+            signals.retain(|ticker| ticker.tick(Duration::from_millis(16)));
         }
 
         assert_eq!(registry.signals.lock().unwrap().len(), 0);

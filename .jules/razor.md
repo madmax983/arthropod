@@ -54,3 +54,8 @@
 **Bloat:** `WidgetBoxed` trait (Single-implementation trait mirroring `Widget`)
 **Cut:** Removed `WidgetBoxed` entirely, replaced with `Box<dyn Widget>` since `Widget` is already object-safe.
 **Saved:** 1 trait definition, ~15 lines of boilerplate, simplified usage in `List`, `Carousel`, and App shell layers.
+
+## [Reduction]
+**Bloat:** `Tickable` trait in `arthropod`'s `elastic.rs` (Single-implementation trait used only for type erasure)
+**Cut:** Removed `Tickable` trait entirely and replaced it with a concrete `Ticker` struct wrapping a `Box<dyn Fn(Duration) -> bool>`.
+**Saved:** 1 trait definition, simplified component type bounds, and removed unnecessary abstraction complexity without compromising the homogeneous `ElasticRegistry` collection.
