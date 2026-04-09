@@ -140,9 +140,7 @@ impl A11yTree {
         };
 
         // Remove from parent's children
-        if let Some(parent_id) = node.parent
-            && let Some(parent) = self.nodes.get_mut(&parent_id)
-        {
+        if let Some(parent) = node.parent.and_then(|pid| self.nodes.get_mut(&pid)) {
             parent.children.retain(|child_id| *child_id != id);
         }
 
