@@ -46,6 +46,7 @@ C4Container
     Container(macros, "Widget Macros", "Rust Crate", "Procedural macros for declarative widget definition.")
     Container(mcp, "Arthropod MCP", "Rust Crate", "Model Context Protocol server for live debugging.")
     Container(test, "Arthropod Test", "Rust Crate", "Test harness and debugging tools.")
+    Container(material, "Material UI", "Rust Crate", "Material Design 3 component library.")
 
     Rel(app, plat, "Uses", "Runs event loop")
     Rel(app, ecs, "Manages", "Updates systems")
@@ -66,6 +67,11 @@ C4Container
     Rel(widget, text, "Uses", "Measures text")
     Rel(widget, macros, "Uses", "Expands macros")
     Rel(widget, input, "Delegates to", "Input processing")
+
+    Rel(app, material, "Uses", "Material components")
+    Rel(material, widget, "Builds on", "Widget traits")
+    Rel(material, theme, "Uses", "Theme tokens")
+    Rel(material, flux, "Uses", "Reactive state")
 
     Rel(render, text, "Uses", "Rasterizes glyphs")
     Rel(render, style, "Uses", "Tessellates paths")
