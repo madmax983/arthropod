@@ -240,12 +240,11 @@ where
     let effect = Effect::new(cx.clone(), move || {
         let event = input.get();
         if let Some(event) = event {
-            let mut pattern = pattern.lock().expect("Mutex poisoned");
-            if let Some(gesture) = pattern.update(&event) {
-                write_out.set(Some(gesture));
-            } else {
-                write_out.set(None);
-            }
+            let gesture_result = {
+                let mut pattern = pattern.lock().expect("Mutex poisoned");
+                pattern.update(&event)
+            };
+            write_out.set(gesture_result);
         }
     });
 
