@@ -191,8 +191,21 @@ fn register_generated_fonts(backend: &mut WgpuBackend) {
     let mut loaded_files = 0usize;
     let mut loaded_faces = 0usize;
     let mut failed = 0usize;
-    for path in font_paths {
-        match std::fs::read(&path) {
+
+    // Read files in parallel
+    let read_results = std::thread::scope(|s| {
+        let mut handles = Vec::with_capacity(font_paths.len());
+        for path in &font_paths {
+            handles.push(s.spawn(move || (path, std::fs::read(path))));
+        }
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+
+    for (path, result) in read_results {
+        match result {
             Ok(bytes) => {
                 let faces = backend.register_font_bytes(bytes);
                 if faces > 0 {

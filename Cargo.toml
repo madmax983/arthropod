@@ -218,3 +218,9 @@ anyhow = "1.0"
 ratatui = "0.30"
 crossterm = "0.28"
 flux-devtools = { path = "experiments/flux-devtools" }
+
+[profile.test]
+debug = 0
+
+[profile.dev]
+debug = 0
