@@ -133,10 +133,9 @@ impl A11yTree {
             return;
         }
 
-        // Get node to find parent and children
-        let node = match self.nodes.get(&id) {
-            Some(n) => n.clone(), // Clone to avoid borrow issues
-            None => return,
+        // Remove the node immediately to take ownership and avoid cloning
+        let Some(node) = self.nodes.remove(&id) else {
+            return;
         };
 
         // Remove from parent's children
@@ -145,12 +144,10 @@ impl A11yTree {
         }
 
         // Recursively remove children
-        for child_id in &node.children {
-            self.remove_node(*child_id);
+        for child_id in node.children {
+            self.remove_node(child_id);
         }
 
-        // Remove node itself
-        self.nodes.remove(&id);
         self.dirty_nodes.remove(&id);
     }
 
