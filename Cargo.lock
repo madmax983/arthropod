@@ -195,7 +195,6 @@ dependencies = [
  "anim-graph",
  "arthropod-ecs",
  "bevy_ecs",
- "comfy-table",
  "criterion",
  "env_logger",
  "flux-state",
@@ -755,17 +754,6 @@ name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
-
-[[package]]
-name = "comfy-table"
-version = "7.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "958c5d6ecf1f214b4c2bbbbf6ab9523a864bd136dcf71a7e8904799acfe1ad47"
-dependencies = [
- "crossterm 0.29.0",
- "unicode-segmentation",
- "unicode-width",
-]
 
 [[package]]
 name = "compact_str"
