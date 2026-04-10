@@ -1,8 +1,7 @@
 //! Text shaping benchmarks
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
-use text_engine::TextEngine;
 
 fn bench_font_loading(c: &mut Criterion) {
     let mut group = c.benchmark_group("font_loading");

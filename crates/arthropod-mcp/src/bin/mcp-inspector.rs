@@ -380,6 +380,7 @@ async fn main() -> Result<()> {
                 .then(|| event::read().ok())
                 .flatten();
 
+            #[allow(clippy::collapsible_if)]
             if let Some(Event::Key(key)) = key_event {
                 if tx_input.send(AppEvent::Input(key)).await.is_err() {
                     return;

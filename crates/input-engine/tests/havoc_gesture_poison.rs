@@ -8,7 +8,7 @@ enum MyGesture {
 }
 
 struct PoisonMatcher {
-    gesture: MyGesture,
+    _gesture: MyGesture,
 }
 
 impl InputPattern for PoisonMatcher {
@@ -25,7 +25,7 @@ fn test_havoc_gesture_poison() {
     let (read_input, write_input) = input.split();
 
     let matcher = PoisonMatcher {
-        gesture: MyGesture::Hit,
+        _gesture: MyGesture::Hit,
     };
 
     let _gesture_sig = create_gesture_signal(runtime.clone(), read_input, matcher);

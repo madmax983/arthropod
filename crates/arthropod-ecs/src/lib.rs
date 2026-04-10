@@ -69,7 +69,7 @@
 //! ```
 
 pub mod components;
-pub mod context;
+pub(crate) mod context;
 pub mod systems;
 
 // Re-export main types for convenience

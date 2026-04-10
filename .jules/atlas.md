@@ -39,3 +39,7 @@
 ## 2026-06-27 - Extract Layout Bridge to Widget Core
 **Tangle:** `arthropod_ecs` contained `layout_bridge::perform_layout`, which is a pure domain interface between `render-engine` and `layout-engine`. This forced `arthropod` to depend on the ECS layer merely to use the layout engine, creating a leaky abstraction and increasing coupling.
 **Blueprint:** Moved `layout_bridge.rs` into `widget-core`. Since `widget-core` already depends on both `layout-engine` and `render-engine`, and both `arthropod` and `arthropod-ecs` already depend on `widget-core`, this creates a clean, acyclic dependency graph and centralizes pure UI logic.
+
+## 2026-06-28 - Restrict Module Visibility
+**Tangle:** Several crates exposed internal modules as `pub mod` unnecessarily, increasing the public API surface area and allowing potential misuse of internal structures. This affected `arthropod-ecs`.
+**Blueprint:** Refactored unnecessary `pub mod` declarations to `pub(crate) mod` to enforce clear module boundaries and encapsulation.

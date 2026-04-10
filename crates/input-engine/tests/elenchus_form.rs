@@ -2,10 +2,10 @@
 mod tests {
     use flux_state::{Runtime, Signal};
     use indexmap::IndexMap;
-    use input_engine::{InputNodeId, form::*, text::*, validation::*};
+    use input_engine::{InputNodeId, form::*, text::*};
     use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
 
+    #[allow(dead_code)]
     fn create_text_state(initial: &str) -> TextInputState {
         let runtime = Runtime::new();
         let signal = Signal::new(runtime, initial.to_string());
