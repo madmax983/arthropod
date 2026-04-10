@@ -27,7 +27,7 @@ use crate::figma::{FigmaImportError, import_figma_document};
 pub struct FigmaCodegenOptions {
     /// The name of the generated Rust module (e.g. `"generated_figma"`).
     pub module_name: String,
-    /// The name of the function that returns the [`ImportedFigmaDocument`].
+    /// The name of the function that returns the [`ImportedFigmaDocument`](crate::figma::ImportedFigmaDocument).
     pub document_fn: String,
     /// The name of the function that returns a `FigmaRuntime` instance.
     pub runtime_fn: String,

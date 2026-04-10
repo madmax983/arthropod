@@ -1,7 +1,7 @@
 //! ECS integration for the animation system.
 //!
 //! Provides [`TimelineDriver`] and [`timeline_system`] for driving
-//! [`Timeline<T>`](crate::timeline::Timeline) animations via bevy_ecs.
+//! [`Timeline<T>`](anim_graph::timeline::Timeline) animations via bevy_ecs.
 
 use anim_graph::timeline::Timeline;
 use anim_graph::Animatable;
