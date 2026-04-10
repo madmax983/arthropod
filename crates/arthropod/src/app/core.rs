@@ -22,19 +22,34 @@ use crate::app::widget::run_widget_app;
 use widget_core::Widget;
 
 /// Errors that can occur during app creation or execution
-#[derive(Error, Debug)]
+#[derive(Error)]
 pub enum AppError {
     /// An error occurred while initializing the operating system window.
-    #[error("Failed to create window: {0}")]
+    #[error(
+        "\n\n❌ Initialization Error\n────────────────────────\nCannot open a window on this operating system.\n\nDetails: {0}\n\nNote: Arthropod currently supports Windows and macOS native windows.\nFor Linux or server environments, use `App::new_headless()` instead.\n\n"
+    )]
     WindowCreation(String),
 
     /// An error occurred while initializing the wgpu GPU rendering context.
-    #[error("Failed to create GPU backend: {0}")]
+    #[error(
+        "\n\n❌ Graphics Error\n────────────────────────\nFailed to initialize the GPU backend.\n\nDetails: {0}\n\nTip: Ensure your system has compatible graphics drivers installed.\n\n"
+    )]
     BackendCreation(String),
 
     /// An error occurred during the rendering pipeline execution.
-    #[error("Failed to render: {0}")]
+    #[error(
+        "\n\n❌ Rendering Error\n────────────────────────\nThe rendering pipeline encountered a critical failure.\n\nDetails: {0}\n\n"
+    )]
     RenderError(String),
+}
+
+// Implement Debug manually to proxy to Display, because standard Rust bin execution
+// prints errors returned from `main` using `Debug`. By delegating Debug to Display,
+// the CLI output becomes human-readable.
+impl std::fmt::Debug for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 /// Resource to keep reactive effects alive for the duration of the application.
