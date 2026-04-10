@@ -481,7 +481,7 @@ fn collect_path_geometry_batches<'a>(
     };
 
     let fill_paints = resolve_path_fill_paints(style);
-    let mut fill_meshes = Vec::new();
+    let mut fill_meshes = Vec::with_capacity(paths.len());
     for path in paths {
         let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
             interner.hash_for(path)
@@ -520,7 +520,7 @@ fn collect_path_geometry_batches<'a>(
             .as_ref()
             .or(style.fill_geometry.as_ref())
         {
-            let mut stroke_meshes = Vec::new();
+            let mut stroke_meshes = Vec::with_capacity(stroke_paths.len());
             for path in stroke_paths {
                 let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
                     interner.hash_for(path)
