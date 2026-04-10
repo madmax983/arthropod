@@ -46,3 +46,10 @@
 **[Flattening Nested Option Combinators]**
 **Learning:** When using `.and_then()` on an `Option` to pass into a method expecting a mutable reference (e.g., `Option<&mut T>`), `.and_then(|pid| self.nodes.get_mut(&pid))` works perfectly and resolves `clippy::collapsible_if` warnings without needing unstable `let_chains`.
 **Action:** Use `.and_then` combined with `if let` to flatten nested option evaluations into a single line, rather than using nested `if let` statements or `#[allow(clippy::collapsible_if)]`.
+## Refactoring update_all_reactive_system
+**Learning:** Repetitive polling of reactive signals inside large  blocks or matches causes functions to grow quickly and obscures the control flow.
+**Action:** Extract the logic for updating each individual property type (Layout Width, Colors, Text, etc.) into its own static helper function. These helpers can take  for the specific reactive components they care about, allowing the main system to just call each helper sequentially.
+
+**[Refactoring update_all_reactive_system]**
+**Learning:** Repetitive polling of reactive signals inside large `if let` blocks or matches causes functions to grow quickly and obscures the control flow.
+**Action:** Extract the logic for updating each individual property type (Layout Width, Colors, Text, etc.) into its own static helper function. These helpers can take `Option<&mut T>` for the specific reactive components they care about, allowing the main system to just call each helper sequentially.

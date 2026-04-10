@@ -1,12 +1,7 @@
-💡 **What:**
-Moved string `format!` operations out of the `0..100` inner build loops in the `widget_gallery` example. Replaced inline formatting with pre-allocation of `Vec<String>` before iterating loops.
+🚮 Smell: The `update_all_reactive_system` function in `crates/arthropod-ecs/src/systems/reactive.rs` had grown into a "God Function" (~140 lines) by manually polling and updating 8 different types of reactive components (Layout Width, ProgressBar, Flex Grow, Colors, Text, Computed Text, Transforms, Opacity) in one giant loop with deeply nested `if let` blocks. This made the function hard to read and modify.
 
-🎯 **Why:**
-The layout loops were running `format!` on every iteration inside the UI builder, accumulating repeated memory allocation and formatting overhead which could be trivially done upfront. Eliminating repeated memory allocations reduces execution time.
+✨ Solution: Extracted the logic for updating each individual property type into its own dedicated, static helper function (e.g., `update_color`, `update_text`, `update_layout_width`). Each helper takes `Option<&mut T>` for the specific reactive components it cares about, allowing the main system loop to simply call each helper sequentially. Used `.and_then` and `.map` to flatten the nested options where possible.
 
-📊 **Measured Improvement:**
-A standalone benchmark measuring overhead shows an improvement:
-* `format!` in loop: ~95-100ms
-* Using pre-collected array strings: ~36-40ms
+🧼 Benefit: Dramatically reduces the cognitive load of `update_all_reactive_system`, flattening the structure and isolating the update logic for each component type into easily testable and readable units.
 
-The change yields around ~2.5x speedup for the data formatting segment of those specific rendering loops.
+🛡️ Verification: Tests passed. No logic changed.

@@ -127,128 +127,175 @@ pub type ReactiveQuery<'w> = (
     Option<&'w mut ProgressBarState>,
 );
 
+fn update_layout_width(layout: Option<&mut LayoutStyle>, width: Option<&mut ReactiveLayoutWidth>) {
+    if let (Some(layout), Some(reactive)) = (layout, width) {
+        let new_width = reactive.signal.get_untracked();
+        let delta = (new_width - reactive.last_value).abs();
+
+        if delta >= 0.0001 {
+            reactive.last_value = new_width;
+            layout.0.width = Some(new_width);
+        }
+    }
+}
+
+fn update_progress_bar_width(
+    layout: Option<&mut LayoutStyle>,
+    progress_bar: Option<&mut ProgressBarState>,
+) {
+    if let (Some(layout), Some(state)) = (layout, progress_bar) {
+        let p = state.progress.get_untracked();
+        let delta = (p - state.last_progress).abs();
+        if delta >= 0.0001 {
+            state.last_progress = p;
+            layout.0.width = Some(p * state.total_width);
+        }
+    }
+}
+
+fn update_layout_flex_grow(
+    layout: Option<&mut LayoutStyle>,
+    flex_grow: Option<&mut ReactiveLayoutFlexGrow>,
+) {
+    if let (Some(layout), Some(reactive)) = (layout, flex_grow) {
+        let new_grow = reactive.signal.get_untracked();
+        if (new_grow - reactive.last_value).abs() >= f32::EPSILON {
+            reactive.last_value = new_grow;
+            layout.0.flex_grow = new_grow;
+        }
+    }
+}
+
+fn update_color(
+    scene: &mut Scene,
+    node_id: render_engine::NodeId,
+    color: Option<&mut ReactiveColor>,
+) {
+    if let Some(reactive) = color {
+        let new_color = reactive.signal.get_untracked();
+        if new_color != reactive.last_value {
+            reactive.last_value = new_color;
+
+            if let Some(style) = scene
+                .get_mut(node_id)
+                .and_then(|node| match &mut node.content {
+                    NodeContent::Styled { style } => Some(style),
+                    _ => None,
+                })
+            {
+                if !style.fills.is_empty() {
+                    style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
+                } else {
+                    style
+                        .fills
+                        .push(render_engine::Paint::Solid(new_color.as_vec4()));
+                }
+            }
+        }
+    }
+}
+
+fn update_text(scene: &mut Scene, node_id: render_engine::NodeId, text: Option<&mut ReactiveText>) {
+    if let Some(reactive) = text {
+        let new_text = reactive.signal.get_untracked();
+        if new_text != reactive.last_value {
+            reactive.last_value = new_text.clone();
+
+            if let Some(text_content) = scene
+                .get_mut(node_id)
+                .and_then(|node| match &mut node.content {
+                    NodeContent::Styled { style } => Some(style),
+                    _ => None,
+                })
+                .and_then(|style| style.text.as_mut())
+            {
+                text_content.text = new_text;
+            }
+        }
+    }
+}
+
+fn update_computed_text(
+    scene: &mut Scene,
+    node_id: render_engine::NodeId,
+    computed_text: Option<&mut ReactiveComputedText>,
+) {
+    if let Some(reactive) = computed_text {
+        let new_text = reactive.computed.get();
+        if new_text != reactive.last_value {
+            reactive.last_value = new_text.clone();
+
+            if let Some(text_content) = scene
+                .get_mut(node_id)
+                .and_then(|node| match &mut node.content {
+                    NodeContent::Styled { style } => Some(style),
+                    _ => None,
+                })
+                .and_then(|style| style.text.as_mut())
+            {
+                text_content.text = new_text;
+            }
+        }
+    }
+}
+
+fn update_transform(
+    scene: &mut Scene,
+    node_id: render_engine::NodeId,
+    transform: Option<&mut ReactiveTransform>,
+) {
+    if let Some(reactive) = transform {
+        let new_transform = reactive.signal.get_untracked();
+        if new_transform != reactive.last_value {
+            reactive.last_value = new_transform;
+
+            if let Some(node) = scene.get_mut(node_id) {
+                node.transform = new_transform;
+            }
+        }
+    }
+}
+
+fn update_opacity(
+    scene: &mut Scene,
+    node_id: render_engine::NodeId,
+    opacity: Option<&mut ReactiveOpacity>,
+) {
+    if let Some(reactive) = opacity {
+        let new_opacity = reactive.signal.get_untracked();
+        if (new_opacity - reactive.last_value).abs() >= f32::EPSILON {
+            reactive.last_value = new_opacity;
+
+            if let Some(node) = scene.get_mut(node_id) {
+                node.opacity = new_opacity;
+            }
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene: ResMut<Scene>) {
     for (
         node_ref,
         mut layout,
-        color,
-        text,
-        computed_text,
-        transform,
-        opacity,
+        mut color,
+        mut text,
+        mut computed_text,
+        mut transform,
+        mut opacity,
         mut width,
         mut flex_grow,
         mut progress_bar,
     ) in query.iter_mut()
     {
-        // 1. Layout Width
-        if let (Some(ref mut layout), Some(ref mut reactive)) = (&mut layout, &mut width) {
-            let new_width = reactive.signal.get_untracked();
-            let delta = (new_width - reactive.last_value).abs();
-
-            if delta >= 0.0001 {
-                reactive.last_value = new_width;
-                layout.0.width = Some(new_width);
-            }
-        }
-
-        // 2. ProgressBar Direct Width
-        if let Some(ref mut layout) = layout {
-            if let Some(ref mut state) = progress_bar {
-                let p = state.progress.get_untracked();
-                let delta = (p - state.last_progress).abs();
-                if delta >= 0.0001 {
-                    state.last_progress = p;
-                    layout.0.width = Some(p * state.total_width);
-                }
-            }
-        }
-
-        // 3. Layout Flex Grow
-        if let (Some(ref mut layout), Some(ref mut reactive)) = (&mut layout, &mut flex_grow) {
-            let new_grow = reactive.signal.get_untracked();
-            if (new_grow - reactive.last_value).abs() >= f32::EPSILON {
-                reactive.last_value = new_grow;
-                layout.0.flex_grow = new_grow;
-            }
-        }
-
-        // 4. Colors
-        if let Some(mut reactive) = color {
-            let new_color = reactive.signal.get_untracked();
-            if new_color != reactive.last_value {
-                reactive.last_value = new_color;
-
-                if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if !style.fills.is_empty() {
-                            style.fills[0] = render_engine::Paint::Solid(new_color.as_vec4());
-                        } else {
-                            style
-                                .fills
-                                .push(render_engine::Paint::Solid(new_color.as_vec4()));
-                        }
-                    }
-                }
-            }
-        }
-
-        // 5. Text content
-        if let Some(mut reactive) = text {
-            let new_text = reactive.signal.get_untracked();
-            if new_text != reactive.last_value {
-                reactive.last_value = new_text.clone();
-
-                if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if let Some(ref mut text_content) = style.text {
-                            text_content.text = new_text;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 6. Computed text content
-        if let Some(mut reactive) = computed_text {
-            let new_text = reactive.computed.get();
-            if new_text != reactive.last_value {
-                reactive.last_value = new_text.clone();
-
-                if let Some(node) = scene.get_mut(node_ref.0) {
-                    if let NodeContent::Styled { ref mut style } = node.content {
-                        if let Some(ref mut text_content) = style.text {
-                            text_content.text = new_text;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 7. Transforms
-        if let Some(mut reactive) = transform {
-            let new_transform = reactive.signal.get_untracked();
-            if new_transform != reactive.last_value {
-                reactive.last_value = new_transform;
-
-                if let Some(node) = scene.get_mut(node_ref.0) {
-                    node.transform = new_transform;
-                }
-            }
-        }
-
-        // 8. Opacity
-        if let Some(mut reactive) = opacity {
-            let new_opacity = reactive.signal.get_untracked();
-            if (new_opacity - reactive.last_value).abs() >= f32::EPSILON {
-                reactive.last_value = new_opacity;
-
-                if let Some(node) = scene.get_mut(node_ref.0) {
-                    node.opacity = new_opacity;
-                }
-            }
-        }
+        update_layout_width(layout.as_deref_mut(), width.as_deref_mut());
+        update_progress_bar_width(layout.as_deref_mut(), progress_bar.as_deref_mut());
+        update_layout_flex_grow(layout.as_deref_mut(), flex_grow.as_deref_mut());
+        update_color(&mut scene, node_ref.0, color.as_deref_mut());
+        update_text(&mut scene, node_ref.0, text.as_deref_mut());
+        update_computed_text(&mut scene, node_ref.0, computed_text.as_deref_mut());
+        update_transform(&mut scene, node_ref.0, transform.as_deref_mut());
+        update_opacity(&mut scene, node_ref.0, opacity.as_deref_mut());
     }
 }
 
