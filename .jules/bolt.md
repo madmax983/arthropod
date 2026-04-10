@@ -103,6 +103,9 @@
 **[Performance] Eliminate Vec allocation via closure yielding**
 **Learning:** Returning `Vec<T>` from small helper functions like `text_shadow_layers` causes heap allocations (`Vec::new()`) on hot paths (e.g., per-frame rendering).
 **Action:** To eliminate heap allocations in hot paths where elements are accumulated and iterated over, consider refactoring functions to accept an `FnMut` closure that yields elements directly to the consumer, rather than returning a newly allocated `Vec`.
+**Remove per-node Vec allocations**
+**Learning:** `Vec::new()` allocations inside recursive scene traversal functions (`collect_instances_impl` -> `collect_path_geometry_batches`) can cause significant heap allocation overhead per frame.
+**Action:** Hoist the allocation to a single, top-level buffer (`let mut mesh_buffer = Vec::new();`) and pass `&mut mesh_buffer` through the call stack to `clear()` and reuse it across nodes, effectively eliminating `Vec::new()` calls on the hot path.
 **Optimize loop format string overhead**
 **Learning:** Pre-collecting string representations (`format!`) inside arrays (e.g. `Vec<String>`) out of the inner UI builder loop removes repeated unnecessary allocation and increases speed. Using `std::borrow::Cow` can also be considered but pre-allocating handles loop allocations completely. Using pre-collected array + `.clone()` or `.into()` inside the loop reduces format time overhead by ~2x to ~2.6x on simple strings.
 **Action:** Always pre-allocate static arrays containing string results of simple iterations if those items are repeatedly iterated or needed.
