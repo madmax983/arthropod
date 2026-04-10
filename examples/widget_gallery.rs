@@ -194,8 +194,9 @@ fn main() {
     };
     ctx.set_layout_style(large_id, column_style);
 
-    for i in 0..100 {
-        let row = Container::row((Text::new(format!("Item {}", i)), Button::new("Click")));
+    let items: Vec<String> = (0..100).map(|i| format!("Item {}", i)).collect();
+    for item in items.iter() {
+        let row = Container::row((Text::new(item.clone()), Button::new("Click")));
         let row_id = row.build(&mut ctx);
         ctx.reparent_to(row_id, large_id);
     }
@@ -479,9 +480,10 @@ fn main() {
     println!("\n25. List - Large Dynamic Content");
     println!("    - Performance test with 50-item list");
     let start_list = std::time::Instant::now();
-    let large_list = list_from((0..50).map(|i| {
+    let list_items: Vec<String> = (0..50).map(|i| format!("Item #{}", i)).collect();
+    let large_list = list_from(list_items.into_iter().map(|item| {
         Row::new((
-            Text::new(format!("Item #{}", i)),
+            Text::new(item),
             Spacer::flex(),
             Button::new("Delete").secondary(),
         ))
