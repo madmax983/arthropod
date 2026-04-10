@@ -150,9 +150,10 @@ mod tests {
             click_interval: Duration::from_millis(100),
         });
 
-        let mut state = ChaosMonkeyState::default();
-        // Force the last click to be long ago
-        state.last_click = Instant::now() - Duration::from_secs(1);
+        let state = ChaosMonkeyState {
+            last_click: Instant::now() - Duration::from_secs(1),
+            ..Default::default()
+        };
         world.insert_resource(state);
 
         let clicked = Arc::new(Mutex::new(false));
@@ -200,8 +201,10 @@ mod tests {
             click_interval: Duration::from_millis(100),
         });
 
-        let mut state = ChaosMonkeyState::default();
-        state.last_click = Instant::now() - Duration::from_secs(1);
+        let state = ChaosMonkeyState {
+            last_click: Instant::now() - Duration::from_secs(1),
+            ..Default::default()
+        };
         world.insert_resource(state);
 
         let clicked = Arc::new(Mutex::new(false));

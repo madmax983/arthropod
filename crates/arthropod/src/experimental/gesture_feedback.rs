@@ -184,7 +184,7 @@ mod tests {
         let mut schedule = Schedule::default();
         schedule.add_systems(update_gesture_feedback);
 
-        let points = vec![
+        let points = [
             Point::new(10.0, 10.0),
             Point::new(20.0, 10.0),
             Point::new(30.0, 10.0),

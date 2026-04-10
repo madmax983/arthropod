@@ -222,6 +222,65 @@ impl App {
         self.details_scroll = 0;
     }
 
+    async fn handle_tool_call(
+        &mut self,
+        stdin_writer: &mut tokio::io::BufWriter<tokio::process::ChildStdin>,
+    ) -> Result<()> {
+        let Some(idx) = self.tool_list_state.selected() else {
+            return Ok(());
+        };
+
+        if idx >= self.tools.len() {
+            return Ok(());
+        }
+
+        let tool_name = self.tools[idx].name.clone();
+        let id = self.next_request_id();
+        let req = JsonRpcRequest::new(
+            id,
+            "tools/call",
+            serde_json::json!({
+                "name": tool_name,
+                "arguments": {}
+            }),
+        );
+        let req_str = serde_json::to_string(&req)?;
+        stdin_writer
+            .write_all(format!("{}\n", req_str).as_bytes())
+            .await?;
+        let _ = stdin_writer.flush().await;
+        self.add_log(req_str, LogDirection::Outgoing);
+        Ok(())
+    }
+
+    async fn handle_input_cmd(
+        &mut self,
+        stdin_writer: &mut tokio::io::BufWriter<tokio::process::ChildStdin>,
+        input_cmd: String,
+    ) -> Result<()> {
+        let parts: Vec<&str> = input_cmd.trim().splitn(2, ' ').collect();
+        if !parts.is_empty() {
+            let method = parts[0];
+            let params_str = if parts.len() > 1 { parts[1] } else { "{}" };
+
+            match serde_json::from_str::<serde_json::Value>(params_str) {
+                Ok(params) => {
+                    let id = self.next_request_id();
+                    let req = JsonRpcRequest::new(id, method, params);
+                    if let Ok(req_str) = serde_json::to_string(&req) {
+                        stdin_writer
+                            .write_all(format!("{}\n", req_str).as_bytes())
+                            .await?;
+                        let _ = stdin_writer.flush().await;
+                        self.add_log(req_str, LogDirection::Outgoing);
+                    }
+                }
+                Err(e) => self.add_log(format!("Error parsing params: {}", e), LogDirection::Error),
+            }
+        }
+        Ok(())
+    }
+
     fn next_request_id(&mut self) -> u64 {
         let id = self.request_id;
         self.request_id += 1;
@@ -398,31 +457,7 @@ async fn main() -> Result<()> {
                                     if app.focus != Focus::ToolsList {
                                         continue;
                                     }
-
-                                    let Some(idx) = app.tool_list_state.selected() else {
-                                        continue;
-                                    };
-
-                                    if idx >= app.tools.len() {
-                                        continue;
-                                    }
-
-                                    let tool_name = app.tools[idx].name.clone();
-                                    let id = app.next_request_id();
-                                    let req = JsonRpcRequest::new(
-                                        id,
-                                        "tools/call",
-                                        serde_json::json!({
-                                            "name": tool_name,
-                                            "arguments": {}
-                                        }),
-                                    );
-                                    let req_str = serde_json::to_string(&req)?;
-                                    stdin_writer
-                                        .write_all(format!("{}\n", req_str).as_bytes())
-                                        .await?;
-                                    stdin_writer.flush().await?;
-                                    app.add_log(req_str, LogDirection::Outgoing);
+                                    let _ = app.handle_tool_call(&mut stdin_writer).await;
                                 }
                                 KeyCode::Char('i') => {
                                     app.input_mode = InputMode::Editing;
@@ -454,36 +489,8 @@ async fn main() -> Result<()> {
                                     app.input_mode = InputMode::Normal;
                                     app.focus = Focus::ToolsList; // Return focus to tools
 
-                                    // Parse input: "method json_params"
-                                    let parts: Vec<&str> =
-                                        input_cmd.trim().splitn(2, ' ').collect();
-                                    if !parts.is_empty() {
-                                        let method = parts[0];
-                                        let params_str =
-                                            if parts.len() > 1 { parts[1] } else { "{}" };
-
-                                        match serde_json::from_str::<Value>(params_str) {
-                                            Ok(params) => {
-                                                let id = app.next_request_id();
-                                                let req = JsonRpcRequest::new(id, method, params);
-                                                if let Ok(req_str) = serde_json::to_string(&req) {
-                                                    stdin_writer
-                                                        .write_all(
-                                                            format!("{}\n", req_str).as_bytes(),
-                                                        )
-                                                        .await?;
-                                                    stdin_writer.flush().await?;
-                                                    app.add_log(req_str, LogDirection::Outgoing);
-                                                }
-                                            }
-                                            Err(e) => {
-                                                app.add_log(
-                                                    format!("Error parsing params: {}", e),
-                                                    LogDirection::Error,
-                                                );
-                                            }
-                                        }
-                                    }
+                                    let _ =
+                                        app.handle_input_cmd(&mut stdin_writer, input_cmd).await;
                                 }
                                 KeyCode::Esc => {
                                     app.input_mode = InputMode::Normal;

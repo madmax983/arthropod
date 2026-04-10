@@ -1,8 +1,6 @@
-use flux_state::{Effect, Runtime, Signal};
-use input_engine::gestures::{InputPattern, SequenceMatcher, create_gesture_signal};
+use flux_state::{Runtime, Signal};
+use input_engine::gestures::{InputPattern, create_gesture_signal};
 use plat_core::{ElementState, Key, KeyboardInput, WindowEvent};
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 #[derive(Clone, Debug, PartialEq)]
 enum MyGesture {
@@ -15,7 +13,7 @@ struct PoisonMatcher {
 
 impl InputPattern for PoisonMatcher {
     type Gesture = MyGesture;
-    fn update(&mut self, event: &WindowEvent) -> Option<Self::Gesture> {
+    fn update(&mut self, _event: &WindowEvent) -> Option<Self::Gesture> {
         panic!("Die!");
     }
 }
@@ -30,7 +28,7 @@ fn test_havoc_gesture_poison() {
         gesture: MyGesture::Hit,
     };
 
-    let gesture_sig = create_gesture_signal(runtime.clone(), read_input, matcher);
+    let _gesture_sig = create_gesture_signal(runtime.clone(), read_input, matcher);
 
     // Trigger the gesture - this should panic and poison the mutex
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

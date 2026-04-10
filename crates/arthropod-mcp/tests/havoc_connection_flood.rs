@@ -35,9 +35,8 @@ async fn test_connection_flood_protection() {
                     loop {
                         let read = stream.read(&mut buf).await;
                         match read {
-                            Ok(0) => break, // EOF
+                            Ok(0) | Err(_) => break,
                             Ok(_) => {}
-                            Err(_) => break,
                         }
                     }
                     active.fetch_sub(1, Ordering::SeqCst);

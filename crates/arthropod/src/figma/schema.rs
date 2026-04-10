@@ -2141,6 +2141,22 @@ enum FigmaPaint {
 }
 
 impl FigmaPaint {
+    fn resolve_gradient_handles(
+        start: &Option<[f32; 2]>,
+        end: &Option<[f32; 2]>,
+        handles: &Option<Vec<[f32; 2]>>,
+    ) -> Option<([f32; 2], [f32; 2])> {
+        if let (Some(s), Some(e)) = (start, end) {
+            return Some((*s, *e));
+        }
+        if let Some(h) = handles
+            && let [s, e, ..] = h.as_slice()
+        {
+            return Some((*s, *e));
+        }
+        None
+    }
+
     fn to_paint(&self) -> Option<Paint> {
         match self {
             Self::Solid {
@@ -2167,16 +2183,8 @@ impl FigmaPaint {
                 if !*visible {
                     return None;
                 }
-                let (start, end) = if let (Some(start), Some(end)) = (start, end) {
-                    (*start, *end)
-                } else if let Some(handles) = gradient_handle_positions {
-                    match handles.as_slice() {
-                        [start, end, ..] => (*start, *end),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
-                };
+                let (start, end) =
+                    Self::resolve_gradient_handles(start, end, gradient_handle_positions)?;
                 let stops = map_color_stops(stops);
                 if stops.is_empty() {
                     return None;

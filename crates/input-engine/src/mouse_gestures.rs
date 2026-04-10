@@ -216,6 +216,28 @@ impl StrokeMatcher {
 
         None
     }
+
+    fn handle_mouse_input(&mut self, input: &plat_core::MouseInput) -> Option<MouseGesture> {
+        match input.state {
+            ElementState::Pressed => {
+                self.is_tracking = true;
+                self.points.clear();
+                self.points.push(input.position);
+                None
+            }
+            ElementState::Released => {
+                if self.is_tracking {
+                    self.is_tracking = false;
+                    if self.points.len() < MAX_STROKE_POINTS {
+                        self.points.push(input.position);
+                    }
+                    self.analyze_stroke()
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl InputPattern for StrokeMatcher {
@@ -223,31 +245,10 @@ impl InputPattern for StrokeMatcher {
 
     fn update(&mut self, event: &WindowEvent) -> Option<Self::Gesture> {
         match event {
-            WindowEvent::MouseInput(input) => {
-                if input.button == self.trigger_button {
-                    match input.state {
-                        ElementState::Pressed => {
-                            self.is_tracking = true;
-                            self.points.clear();
-                            self.points.push(input.position);
-                            None
-                        }
-                        ElementState::Released => {
-                            if self.is_tracking {
-                                self.is_tracking = false;
-                                if self.points.len() < MAX_STROKE_POINTS {
-                                    self.points.push(input.position);
-                                }
-                                self.analyze_stroke()
-                            } else {
-                                None
-                            }
-                        }
-                    }
-                } else {
-                    None
-                }
+            WindowEvent::MouseInput(input) if input.button == self.trigger_button => {
+                self.handle_mouse_input(input)
             }
+            WindowEvent::MouseInput(_) => None,
             WindowEvent::CursorMoved { position } => {
                 if self.is_tracking && self.points.len() < MAX_STROKE_POINTS {
                     // Simple sampling: add point

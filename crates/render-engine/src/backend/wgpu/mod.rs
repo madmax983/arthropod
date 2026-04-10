@@ -212,7 +212,6 @@ impl WgpuBackend {
     ///
     /// Call this after large scene/style loads to bias toward cache-hit rendering.
     pub fn warm_path_cache(&mut self, scene: &Scene) -> PathCacheWarmupReport {
-        use crate::NodeContent;
         let mut report = PathCacheWarmupReport::default();
 
         for (_node_id, node, _) in scene.iter_visuals() {
@@ -220,58 +219,64 @@ impl WgpuBackend {
                 continue;
             }
 
-            let NodeContent::Styled { style } = &node.content else {
-                continue;
-            };
+            if let crate::NodeContent::Styled { style } = &node.content {
+                self.warm_node_style_paths(style, &mut report);
+            }
+        }
 
-            if let Some(paths) = &style.fill_geometry {
-                for path in paths {
-                    report.fill_paths = report.fill_paths.saturating_add(1);
-                    let key = self.path_interner.hash_for(path);
-                    match self
-                        .tessellation_cache
-                        .get_or_tessellate_fill_with_key(key, path)
-                    {
-                        Ok(mesh) => {
-                            if !mesh.indices.is_empty() {
-                                report.warmed_meshes = report.warmed_meshes.saturating_add(1);
-                            }
-                        }
-                        Err(_) => {
-                            report.failed = report.failed.saturating_add(1);
+        report
+    }
+
+    fn warm_node_style_paths(
+        &mut self,
+        style: &crate::VisualStyle,
+        report: &mut PathCacheWarmupReport,
+    ) {
+        if let Some(paths) = &style.fill_geometry {
+            for path in paths {
+                report.fill_paths = report.fill_paths.saturating_add(1);
+                let key = self.path_interner.hash_for(path);
+                match self
+                    .tessellation_cache
+                    .get_or_tessellate_fill_with_key(key, path)
+                {
+                    Ok(mesh) => {
+                        if !mesh.indices.is_empty() {
+                            report.warmed_meshes = report.warmed_meshes.saturating_add(1);
                         }
                     }
-                }
-            }
-
-            if let Some(stroke) = &style.stroke
-                && let Some(stroke_paths) = style
-                    .stroke_geometry
-                    .as_ref()
-                    .or(style.fill_geometry.as_ref())
-            {
-                for path in stroke_paths {
-                    report.stroke_paths = report.stroke_paths.saturating_add(1);
-                    let path_hash = self.path_interner.hash_for(path);
-                    let key = TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
-                    match self
-                        .tessellation_cache
-                        .get_or_tessellate_stroke_with_key(key, path, stroke)
-                    {
-                        Ok(mesh) => {
-                            if !mesh.indices.is_empty() {
-                                report.warmed_meshes = report.warmed_meshes.saturating_add(1);
-                            }
-                        }
-                        Err(_) => {
-                            report.failed = report.failed.saturating_add(1);
-                        }
+                    Err(_) => {
+                        report.failed = report.failed.saturating_add(1);
                     }
                 }
             }
         }
 
-        report
+        if let Some(stroke) = &style.stroke
+            && let Some(stroke_paths) = style
+                .stroke_geometry
+                .as_ref()
+                .or(style.fill_geometry.as_ref())
+        {
+            for path in stroke_paths {
+                report.stroke_paths = report.stroke_paths.saturating_add(1);
+                let path_hash = self.path_interner.hash_for(path);
+                let key = TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
+                match self
+                    .tessellation_cache
+                    .get_or_tessellate_stroke_with_key(key, path, stroke)
+                {
+                    Ok(mesh) => {
+                        if !mesh.indices.is_empty() {
+                            report.warmed_meshes = report.warmed_meshes.saturating_add(1);
+                        }
+                    }
+                    Err(_) => {
+                        report.failed = report.failed.saturating_add(1);
+                    }
+                }
+            }
+        }
     }
 
     pub fn tessellation_cache_stats(&self) -> TessellationCacheStats {
