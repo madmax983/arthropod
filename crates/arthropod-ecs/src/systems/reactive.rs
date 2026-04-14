@@ -22,8 +22,10 @@ pub fn update_progress_bar_direct_system(
 ) {
     for (_node_ref, mut layout, mut state) in query.iter_mut() {
         let p = state.progress.get_untracked().clamp(0.0, 1.0);
-        state.last_progress = p;
-        layout.0.width = Some(p * state.total_width);
+        if (p - state.last_progress).abs() >= 0.0001 {
+            state.last_progress = p;
+            layout.0.width = Some(p * state.total_width);
+        }
     }
 }
 

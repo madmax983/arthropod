@@ -15,3 +15,12 @@
 2.  Update the inner logic of these helpers to first use `.as_deref()` to read values and compare them.
 3.  Only call `.as_deref_mut()` when an update is actually necessary.
 4.  Update the `update_all_reactive_system` call sites to pass mutable references to the options (e.g., `&mut layout` instead of `layout.as_deref_mut()`).
+
+## 2026-05-18 - [Change Detection Storm Fix]
+**Findings:**
+- **Severity:** High
+- **File reference:** `crates/arthropod-ecs/src/systems/reactive.rs:25`
+- **What can break:** Downstream systems (e.g. layout or rendering) are triggered continuously every frame.
+- **Why it breaks:** The `update_progress_bar_direct_system` unconditionally assigned to `state.last_progress` and `layout.0.width` even when the new value was identical to the old one. In Bevy ECS, mutably accessing these fields triggers change tracking automatically.
+- **Minimal fix:** Wrapped the assignments in an epsilon check `if (p - state.last_progress).abs() >= 0.0001 { ... }`.
+- **Required tests:** Wrote `sentry_progress_bar.rs` to verify that unchanged progress values do not flag the `ProgressBarState` component as `Changed`.
