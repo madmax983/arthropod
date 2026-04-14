@@ -179,9 +179,9 @@ classDiagram
 
     class WidgetContext {
         +Scene scene
-        -IndexMap~NodeId, TextInputState~ text_input_states
-        -HashMap~NodeId, FormState~ form_states
-        -HashMap~NodeId, ValidationState~ validators
+        -IndexMap~InputNodeId, TextInputState~ text_input_states
+        -HashMap~InputNodeId, FormState~ form_states
+        -HashMap~InputNodeId, ValidationState~ validators
         +create_node()
         +focus_next()
     }
@@ -209,6 +209,7 @@ classDiagram
 - **Hybrid ECS**: We use a custom `Scene` graph (HashMap-based tree) for hierarchical operations (layout, event bubbling) while using `bevy_ecs` for bulk operations (rendering, animation). See [ADR 0001](./adr/0001-hybrid-ecs-architecture.md).
 - **Reactive State**: State is managed via `flux-state` signals. We use `ReadSignal<T>` directly (which is thread-safe) to propagate changes from the UI to the ECS. See [ADR 0027](./adr/0027-reactive-signal-simplification.md) and [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
 - **Platform Abstraction**: `plat-core` isolates OS-specific code, allowing the rest of the engine to remain platform-agnostic.
+- **Input Engine Decoupling**: The `input-engine` operates independently of the rendering layer by utilizing `InputNodeId` instead of rendering `NodeId`. See [ADR 0039](./adr/0039-decouple-input-engine.md).
 
 ## Experimental Subsystems (Nova)
 
