@@ -23,7 +23,7 @@ fn global_font_registry() -> &'static Mutex<Vec<Arc<Vec<u8>>>> {
 fn register_global_font_bytes(bytes: Vec<u8>) -> bool {
     let mut registry = global_font_registry()
         .lock()
-        .expect("font registry lock poisoned");
+        .unwrap_or_else(|e| e.into_inner());
 
     let arc_bytes = Arc::new(bytes);
 
@@ -37,7 +37,7 @@ fn register_global_font_bytes(bytes: Vec<u8>) -> bool {
 fn apply_global_fonts(font_system: &mut FontSystem, applied_count: &mut usize) -> usize {
     let registry = global_font_registry()
         .lock()
-        .expect("font registry lock poisoned");
+        .unwrap_or_else(|e| e.into_inner());
     let start = *applied_count;
     if start >= registry.len() {
         return 0;
@@ -420,6 +420,39 @@ mod tests {
     fn test_create_engine() {
         let engine = TextEngine::new();
         // Just verify it can be created
+        drop(engine);
+    }
+
+    #[test]
+    fn test_font_registry_poison_recovery() {
+        use std::thread;
+
+        // Clone the registry Arc so we can poison it in a thread
+        let registry_arc = global_font_registry();
+
+        // Spawn a thread to deliberately poison the lock
+        let handle = thread::spawn(move || {
+            let _guard = registry_arc.lock().unwrap();
+            panic!("Intentional panic to poison the Mutex");
+        });
+
+        // Wait for the thread to finish and ignore the panic
+        let _ = handle.join();
+
+        // Verify the lock is indeed poisoned
+        assert!(registry_arc.lock().is_err());
+
+        // Call our public-facing method that touches the poisoned lock.
+        // If it handles the poison gracefully, this will not panic.
+        let bytes = vec![0x00, 0x01, 0x02];
+        let added = register_global_font_bytes(bytes);
+
+        // Should return true since the mock data is new and not in the registry yet
+        assert!(added);
+
+        // Let's also verify apply_global_fonts handles it correctly without panic.
+        // Note: Creating a new TextEngine triggers apply_global_fonts
+        let engine = TextEngine::new();
         drop(engine);
     }
 
