@@ -83,7 +83,10 @@ impl AccessKitBridge {
 
     /// Create a TreeUpdate for the given dirty nodes
     pub fn create_tree_update(&self, dirty_nodes: &[A11yId]) -> TreeUpdate {
-        let tree = self.tree.lock().unwrap();
+        let tree = self
+            .tree
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // Convert dirty nodes to AccessKit format
         let nodes: Vec<(AccessKitNodeId, Node)> = dirty_nodes
