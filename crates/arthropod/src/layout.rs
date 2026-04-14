@@ -43,6 +43,7 @@ pub fn auto_layout(
 
     let mut engine = LayoutEngine::new();
     let mut node_map = HashMap::new();
+    let mut updates = Vec::new();
 
     // Use shared layout logic from widget-core
     // This avoids code duplication and ensures consistent behavior
@@ -53,6 +54,7 @@ pub fn auto_layout(
         layout_styles,
         &mut engine,
         &mut node_map,
+        &mut updates,
     );
 }
 

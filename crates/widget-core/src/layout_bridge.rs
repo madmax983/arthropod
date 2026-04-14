@@ -31,6 +31,7 @@ pub fn perform_layout(
     layout_styles: &HashMap<NodeId, FlexStyle>,
     engine: &mut LayoutEngine,
     node_map: &mut HashMap<NodeId, layout_engine::NodeId>,
+    updates: &mut Vec<(NodeId, Rect)>,
 ) {
     engine.clear();
     node_map.clear();
@@ -45,11 +46,12 @@ pub fn perform_layout(
 
         // Apply computed layouts to scene
         // We collect updates first to avoid cloning children vectors during recursion
-        let mut updates = Vec::with_capacity(node_map.len());
-        collect_layout_updates(scene, root, engine, node_map, 0.0, 0.0, &mut updates);
+        // ⚡ Bolt: Passes reusable updates buffer to eliminate Vec allocation per layout pass.
+        updates.clear();
+        collect_layout_updates(scene, root, engine, node_map, 0.0, 0.0, updates);
 
         // Apply updates
-        for (id, bounds) in updates {
+        for (id, bounds) in updates.drain(..) {
             if let Some(node) = scene.get_node_mut(id) {
                 node.bounds = bounds;
             }

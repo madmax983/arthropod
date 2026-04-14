@@ -117,3 +117,6 @@
 **Parallelize font I/O during startup**
 **Learning:** Sequential `std::fs::read` in a loop can become a significant bottleneck when loading multiple large assets (like fonts) sequentially during application startup.
 **Action:** Use `std::thread::scope` to easily spawn scoped threads for concurrent I/O operations without needing a full async runtime or heavy external dependencies like `rayon` for simple file reads.
+**Eliminate vector allocations in layout_system**
+**Learning:** In recursive collection algorithms that run per-frame (like flexbox layout bridge), initializing a new Vec or Vec::with_capacity creates a recurrent heap allocation that can be easily avoided by hoisting the buffer up to the ECS system state using `Local<Vec<T>>` and passing it down.
+**Action:** Next time I see a `Vec::with_capacity` or `Vec::new()` inside a function called by a Bevy system on every frame, I will try to lift that allocation into a `Local` parameter to reuse its capacity.

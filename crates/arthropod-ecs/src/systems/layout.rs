@@ -47,6 +47,7 @@ pub fn layout_system(
     mut layout_styles: Local<HashMap<render_engine::NodeId, FlexStyle>>,
     mut engine: Local<LayoutEngine>,
     mut node_map: Local<HashMap<render_engine::NodeId, layout_engine::NodeId>>,
+    mut updates: Local<Vec<(render_engine::NodeId, plat_core::Rect)>>,
 ) {
     // 1. Collect all layout styles into a lookup map
     // This allows us to look up styles by NodeId during recursive scene traversal
@@ -72,6 +73,7 @@ pub fn layout_system(
         &layout_styles,
         &mut engine,
         &mut node_map,
+        &mut updates,
     );
 }
 
