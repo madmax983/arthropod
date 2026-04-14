@@ -1,8 +1,9 @@
 //! TextInput widget - single-line text input field
 
-use crate::{form::validation::Validator, Text, Widget, WidgetContext};
+use crate::{Text, Widget, WidgetContext};
 use flux_state::{ReadSignal, Signal, WriteSignal};
 use glam::Vec4;
+use input_engine::validation::Validator;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
 use theme_engine::DesignTokens;

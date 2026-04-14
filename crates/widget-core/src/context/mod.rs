@@ -72,7 +72,6 @@
 //! ```
 
 use crate::form::form_state::{FormState, SubmitCallback};
-use crate::form::validation::Validator;
 use crate::form::validation_state::ValidationState;
 use crate::input_state::{
     ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
@@ -83,7 +82,8 @@ use anim_graph::timeline::Timeline;
 use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
 use indexmap::IndexMap;
-use layout_engine::{FlexDirection, FlexStyle};
+use input_engine::validation::Validator;
+use layout_engine::FlexStyle;
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
@@ -957,11 +957,6 @@ impl WidgetContext {
             self.set_background_color(node_id, bg.as_color());
         }
     }
-}
-
-/// Helper to check if a FlexStyle is a row layout
-pub fn is_row_layout(style: &FlexStyle) -> bool {
-    style.direction == FlexDirection::Row
 }
 
 #[cfg(test)]

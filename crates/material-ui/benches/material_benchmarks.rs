@@ -8,7 +8,7 @@ use material_ui::{
     navigation::{Tab, Tabs},
     theme::MaterialTheme,
 };
-use widget_core::{WidgetContext, widget_trait::Widget};
+use widget_core::{Widget, WidgetContext};
 
 // ---------------------------------------------------------------------------
 // Theme benchmarks

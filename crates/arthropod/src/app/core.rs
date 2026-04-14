@@ -462,16 +462,14 @@ impl App {
         self.transfer_components(
             "ReactiveColor",
             widget_ctx.reactive_color_states().iter(),
-            |state: &widget_core::input_state::ReactiveColorState| {
-                ReactiveColor::new(state.read_signal.clone())
-            },
+            |state: &widget_core::ReactiveColorState| ReactiveColor::new(state.read_signal.clone()),
         );
 
         // Transfer reactive layout width states to ReactiveLayoutWidth components
         self.transfer_components(
             "ReactiveLayoutWidth",
             widget_ctx.reactive_layout_width_states().iter(),
-            |state: &widget_core::input_state::ReactiveLayoutWidthState| {
+            |state: &widget_core::ReactiveLayoutWidthState| {
                 ReactiveLayoutWidth::new(state.read_signal.clone(), state.handle.clone())
             },
         );
@@ -480,7 +478,7 @@ impl App {
         self.transfer_components(
             "ReactiveLayoutFlexGrow",
             widget_ctx.reactive_layout_flex_grow_states().iter(),
-            |state: &widget_core::input_state::ReactiveLayoutFlexGrowState| {
+            |state: &widget_core::ReactiveLayoutFlexGrowState| {
                 ReactiveLayoutFlexGrow::new(state.read_signal.clone())
             },
         );
@@ -498,16 +496,14 @@ impl App {
         self.transfer_components(
             "ReactiveText",
             widget_ctx.reactive_text_states().iter(),
-            |state: &widget_core::input_state::ReactiveTextState| {
-                ReactiveText::new(state.read_signal.clone())
-            },
+            |state: &widget_core::ReactiveTextState| ReactiveText::new(state.read_signal.clone()),
         );
 
         // Transfer computed text to ReactiveComputedText components
         self.transfer_components(
             "ReactiveComputedText",
             widget_ctx.computed_text_states().iter(),
-            |state: &widget_core::input_state::ComputedTextState| {
+            |state: &widget_core::ComputedTextState| {
                 ReactiveComputedText::new(state.computed.clone())
             },
         );

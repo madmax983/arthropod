@@ -61,7 +61,7 @@ impl Layer {
 ///
 /// ```no_run
 /// use render_engine::Scene;
-/// use widget_core::layer::{Layer, LayerManager};
+/// use widget_core::{Layer, LayerManager};
 ///
 /// let mut scene = Scene::new();
 /// let layers = LayerManager::new(&mut scene);

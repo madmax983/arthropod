@@ -150,19 +150,23 @@
 //!
 //! See [`trait@Widget`] for a detailed guide and complete examples.
 
-pub mod form;
-pub mod layout;
-pub mod layout_bridge;
-pub mod primitive;
+pub(crate) mod form;
+pub(crate) mod layout;
+pub(crate) mod layout_bridge;
+pub(crate) mod primitive;
 
-pub mod context;
-pub mod input_state;
-pub mod layer;
-pub mod style;
-pub mod widget_trait;
+pub(crate) mod context;
+pub(crate) mod input_state;
+pub(crate) mod layer;
+pub(crate) mod style;
+pub(crate) mod widget_trait;
 
 pub use context::WidgetContext;
 pub use form::form::Form;
+pub use input_state::{
+    ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
+    ReactiveTextState, TextInputState,
+};
 pub use layer::{Layer, LayerManager};
 pub use layout::center::Center;
 pub use layout::column::Column;
@@ -174,6 +178,7 @@ pub use layout::padding::Padding;
 pub use layout::row::Row;
 pub use layout::spacer::Spacer;
 pub use layout::stack::Stack;
+pub use layout_bridge::perform_layout;
 pub use primitive::button::{Button, ButtonStyle};
 pub use primitive::card::Card;
 pub use primitive::carousel::Carousel;

@@ -1,13 +1,10 @@
-<<<<<<< SEARCH
-mod computed;
-mod effect;
-mod runtime;
-mod signal;
-=======
-mod computed;
-mod effect;
-mod runtime;
-mod signal;
-#[cfg(feature = "nova")]
-mod value_inspector;
->>>>>>> REPLACE
+--- a/crates/widget-core/src/lib.rs
++++ b/crates/widget-core/src/lib.rs
+@@ -165,6 +165,7 @@
+ pub use form::form::Form;
+ pub use input_state::{
+     ComputedTextState, ReactiveColorState, ReactiveLayoutFlexGrowState, ReactiveLayoutWidthState,
+-    ReactiveTextState,
++    ReactiveTextState, TextInputState,
+ };
+ pub use layer::{Layer, LayerManager};

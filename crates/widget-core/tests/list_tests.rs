@@ -49,7 +49,7 @@ fn test_list_row_with_items() {
     // Verify it's a row layout
     let layout = ctx.get_layout_style(node_id).unwrap();
     assert!(
-        widget_core::context::is_row_layout(&layout),
+        layout.direction == layout_engine::FlexDirection::Row,
         "Should be row layout"
     );
 }

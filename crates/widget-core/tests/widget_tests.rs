@@ -39,7 +39,7 @@ fn test_container_row_layout() {
     // Verify it's a row layout
     let layout = ctx.get_layout_style(node_id).unwrap();
     assert!(
-        widget_core::context::is_row_layout(&layout),
+        layout.direction == layout_engine::FlexDirection::Row,
         "Should be row layout"
     );
     assert_eq!(layout.gap, 10.0, "Gap should be 10.0");

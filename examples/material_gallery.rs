@@ -27,7 +27,7 @@ use material_ui::{
     surfaces::{Accordion, Paper},
     theme::MaterialTheme,
 };
-use widget_core::{Text, WidgetContext, widget_trait::Widget};
+use widget_core::{Text, Widget, WidgetContext};
 
 fn main() {
     let runtime = Runtime::new();

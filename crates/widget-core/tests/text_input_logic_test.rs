@@ -1,6 +1,6 @@
 use flux_state::{Runtime, Signal};
 use std::sync::Arc;
-use widget_core::input_state::TextInputState;
+use widget_core::TextInputState;
 
 // Helper to create a state wrapper for testing
 fn create_state(initial_text: &str) -> (TextInputState, Arc<Runtime>) {

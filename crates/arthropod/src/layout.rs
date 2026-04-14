@@ -46,7 +46,7 @@ pub fn auto_layout(
 
     // Use shared layout logic from widget-core
     // This avoids code duplication and ensures consistent behavior
-    widget_core::layout_bridge::perform_layout(
+    widget_core::perform_layout(
         scene,
         root,
         constraints,

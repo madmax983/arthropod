@@ -1,6 +1,6 @@
 //! Material Design 3 component wrappers.
 //!
-//! MD3-styled widgets that implement the [`Widget`](widget_core::widget_trait::Widget)
+//! MD3-styled widgets that implement the [`Widget`](widget_core::Widget)
 //! trait directly, applying Material Design 3 colors, typography, and shape
 //! from [`MaterialTheme`](crate::theme::MaterialTheme).
 

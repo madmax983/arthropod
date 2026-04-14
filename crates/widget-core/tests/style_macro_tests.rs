@@ -5,7 +5,8 @@
 use glam::Vec4;
 use style_engine::CornerRadii;
 use theme_engine::{DesignTokens, SystemTheme, TokenValue};
-use widget_core::{style, style::Padding, Style, StyleOverrides};
+use widget_core::style;
+use widget_core::{Style, StyleOverrides, StylePadding};
 
 #[test]
 fn test_style_macro_basic() {
@@ -21,7 +22,7 @@ fn test_style_macro_basic() {
 
     assert!(s.background.is_some());
     assert!(s.color.is_some());
-    assert_eq!(s.padding, Some(Padding::uniform(16.0)));
+    assert_eq!(s.padding, Some(StylePadding::uniform(16.0)));
     assert_eq!(s.border_radius, Some(CornerRadii::uniform(8.0)));
 }
 

@@ -224,7 +224,7 @@ mod tests {
         let row_layout = ctx.get_layout_style(row_id).unwrap();
 
         assert!(
-            crate::context::is_row_layout(&row_layout),
+            row_layout.direction == layout_engine::FlexDirection::Row,
             "Row should use row layout"
         );
     }
