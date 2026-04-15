@@ -70,6 +70,17 @@ macro_rules! col {
         let widget = $crate::Container::column(($($children,)*));
         $crate::__col_apply!(widget, $($rest)*)
     }};
+
+    // Fallback for missing children array
+    ($($unknown:tt)*) => {{
+        compile_error!(concat!(
+            "Invalid syntax for col! macro. Expected an array of children first.\n\n",
+            "Correct usage:\n",
+            "  col!([child1, child2], property: val)\n\n",
+            "You wrote:\n",
+            "  col!(", stringify!($($unknown)*), ")"
+        ));
+    }};
 }
 
 /// Helper macro for applying col! parameters
@@ -124,6 +135,17 @@ macro_rules! row {
     ([$($children:expr),* $(,)?], $($rest:tt)*) => {{
         let widget = $crate::Container::row(($($children,)*));
         $crate::__row_apply!(widget, $($rest)*)
+    }};
+
+    // Fallback for missing children array
+    ($($unknown:tt)*) => {{
+        compile_error!(concat!(
+            "Invalid syntax for row! macro. Expected an array of children first.\n\n",
+            "Correct usage:\n",
+            "  row!([child1, child2], property: val)\n\n",
+            "You wrote:\n",
+            "  row!(", stringify!($($unknown)*), ")"
+        ));
     }};
 }
 

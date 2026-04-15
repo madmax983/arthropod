@@ -156,6 +156,17 @@ pub fn generate_main_macro(
                     let widget = $crate::#struct_name::#constructor_ident(($(($field_name, $field_widget),)*));
                     $crate::#helper_name!(widget, $($rest)*)
                 }};
+
+                // Fallback for missing children array
+                ($($unknown:tt)*) => {{
+                    compile_error!(concat!(
+                        "Invalid syntax for ", stringify!(#macro_name), "! macro. Expected an array of named children first.\n\n",
+                        "Correct usage:\n",
+                        "  ", stringify!(#macro_name), "!([(\"name\", widget)], property: val)\n\n",
+                        "You wrote:\n",
+                        "  ", stringify!(#macro_name), "!(", stringify!($($unknown)*), ")"
+                    ));
+                }};
             }
         }
     } else if is_container {
@@ -182,6 +193,17 @@ pub fn generate_main_macro(
                 ([$($children:expr),* $(,)?], $($rest:tt)*) => {{
                     let widget = $crate::#struct_name::#constructor_ident(($($children,)*));
                     $crate::#helper_name!(widget, $($rest)*)
+                }};
+
+                // Fallback for missing children array
+                ($($unknown:tt)*) => {{
+                    compile_error!(concat!(
+                        "Invalid syntax for ", stringify!(#macro_name), "! macro. Expected an array of children first.\n\n",
+                        "Correct usage:\n",
+                        "  ", stringify!(#macro_name), "!([child1, child2], property: val)\n\n",
+                        "You wrote:\n",
+                        "  ", stringify!(#macro_name), "!(", stringify!($($unknown)*), ")"
+                    ));
                 }};
             }
         }

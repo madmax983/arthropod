@@ -202,6 +202,17 @@ macro_rules! form {
         let widget = $crate::Form::new(($(($name, $widget),)*));
         $crate::__form_apply!(widget, $($rest)*)
     }};
+
+    // Fallback for missing fields array
+    ($($unknown:tt)*) => {{
+        compile_error!(concat!(
+            "Invalid syntax for form! macro. Expected an array of named fields first.\n\n",
+            "Correct usage:\n",
+            "  form!([\"name\": widget], property: val)\n\n",
+            "You wrote:\n",
+            "  form!(", stringify!($($unknown)*), ")"
+        ));
+    }};
 }
 
 /// Helper macro for applying form! parameters
