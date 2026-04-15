@@ -55,3 +55,7 @@ Created `specs/024-state-persistence.md` to define a State Persistence Engine. T
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A common requirement for complex enterprise applications and IDEs missing from the current specs is a **Docking & Split Layout Manager**. Let's spec out a **Docking & Split Layout Manager**.
 Created `specs/026-docking-layout-manager.md` to define a Docking & Split Layout Manager. This addresses a core UX requirement for modern professional software tools and eliminates complex boilerplate for developers building IDE-like interfaces.
+## 2024-05-25 - [Notifications & Toast Engine Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A common requirement for interactive applications missing from the current specs is a **Notifications & Toast Engine**. Let's spec out a **Notifications & Toast Engine**.
+Created `specs/027-notifications-engine.md` to define a Notifications & Toast Engine. This addresses a core UX requirement for modern web and desktop applications, providing standard, non-blocking feedback to users.
