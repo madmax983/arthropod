@@ -1,3 +1,5 @@
+#![cfg(feature = "nova")]
+
 #[cfg(test)]
 mod tests {
     use input_engine::InputPattern;

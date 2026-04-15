@@ -1,3 +1,5 @@
+#![cfg(feature = "nova")]
+
 use input_engine::gestures::InputPattern;
 use input_engine::mouse_gestures::StrokeMatcher;
 use plat_core::{ElementState, MouseButton, MouseInput, Point, WindowEvent};
