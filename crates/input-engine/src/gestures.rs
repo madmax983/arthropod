@@ -241,7 +241,9 @@ where
         let event = input.get();
         if let Some(event) = event {
             let gesture_result = {
-                let mut pattern = pattern.lock().expect("Mutex poisoned");
+                let mut pattern = pattern
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 pattern.update(&event)
             };
             write_out.set(gesture_result);
@@ -439,7 +441,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Mutex poisoned")]
     fn test_gesture_signal_mutex_poisoning() {
         let runtime = Runtime::new();
         let input = Signal::new(runtime.clone(), None);
@@ -474,8 +475,7 @@ mod tests {
         };
 
         // First event panics and poisons the mutex. We run this in a separate thread
-        // to avoid polluting the main test thread's panic hook, but we catch it
-        // so we can trigger the actual expect() panic we want to test.
+        // to avoid polluting the main test thread's panic hook, but we catch it.
         let write_input_clone = write_input.clone();
         let handle = std::thread::spawn(move || {
             write_input_clone.set(Some(WindowEvent::KeyboardInput(KeyboardInput {
@@ -489,7 +489,16 @@ mod tests {
         // Ignore the panic from the thread
         let _ = handle.join();
 
-        // Second event triggers the expect("Mutex poisoned") panic on the main thread
-        press(Key::B);
+        // Second event triggers the gesture logic again, which should recover the mutex guard
+        // and panic again in PoisoningMatcher::update (because it always panics).
+        // Since it runs on the main thread, we must catch it so the test passes.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            press(Key::B);
+        }));
+
+        assert!(
+            result.is_err(),
+            "Expected the recovered mutex guard to let the matcher panic again"
+        );
     }
 }
