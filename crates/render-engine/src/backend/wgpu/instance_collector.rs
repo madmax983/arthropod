@@ -482,29 +482,60 @@ fn collect_path_geometry_batches<'a>(
         return;
     };
 
-    thread_local! {
-        static MESH_BUFFER: std::cell::RefCell<Vec<Arc<crate::backend::wgpu::pipelines::path_pipeline::PathMesh>>> = std::cell::RefCell::new(Vec::with_capacity(8));
+    let fill_paints = resolve_path_fill_paints(style);
+    let mut fill_meshes = Vec::with_capacity(paths.len());
+
+    for path in paths {
+        let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
+            interner.hash_for(path)
+        } else {
+            TessellationCache::fill_key(path)
+        };
+        let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
+            cache.get_or_tessellate_fill_with_key(path_hash, path)
+        } else {
+            tessellate_fill(path).map(Arc::new)
+        };
+
+        if let Ok(mesh) = mesh_result
+            && !mesh.indices.is_empty()
+        {
+            fill_meshes.push(mesh);
+        }
     }
 
-    let fill_paints = resolve_path_fill_paints(style);
-    MESH_BUFFER.with(
-        |buffer: &std::cell::RefCell<
-            Vec<Arc<crate::backend::wgpu::pipelines::path_pipeline::PathMesh>>,
-        >| {
-            let mut fill_meshes = buffer.borrow_mut();
-            fill_meshes.clear();
-            for path in paths {
+    for fill_paint in fill_paints {
+        for mesh in &fill_meshes {
+            path_batches.push(PathBatch {
+                mesh: Arc::clone(mesh),
+                paint: fill_paint,
+                opacity: effective_opacity,
+                size: [render_bounds.width, render_bounds.height],
+                offset: [render_bounds.x, render_bounds.y],
+            });
+        }
+    }
+
+    if let Some(stroke) = &style.stroke {
+        let stroke_paints = resolve_path_stroke_paints(stroke);
+        if let Some(stroke_paths) = style
+            .stroke_geometry
+            .as_ref()
+            .or(style.fill_geometry.as_ref())
+        {
+            fill_meshes.clear(); // reuse buffer for stroke meshes
+            for path in stroke_paths {
                 let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
                     interner.hash_for(path)
                 } else {
                     TessellationCache::fill_key(path)
                 };
+                let stroke_key = TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
                 let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-                    cache.get_or_tessellate_fill_with_key(path_hash, path)
+                    cache.get_or_tessellate_stroke_with_key(stroke_key, path, stroke)
                 } else {
-                    tessellate_fill(path).map(Arc::new)
+                    tessellate_stroke(path, stroke).map(Arc::new)
                 };
-
                 if let Ok(mesh) = mesh_result
                     && !mesh.indices.is_empty()
                 {
@@ -512,61 +543,19 @@ fn collect_path_geometry_batches<'a>(
                 }
             }
 
-            for fill_paint in fill_paints {
-                for mesh in &*fill_meshes {
+            for stroke_paint in stroke_paints {
+                for mesh in &fill_meshes {
                     path_batches.push(PathBatch {
                         mesh: Arc::clone(mesh),
-                        paint: fill_paint,
+                        paint: stroke_paint,
                         opacity: effective_opacity,
                         size: [render_bounds.width, render_bounds.height],
                         offset: [render_bounds.x, render_bounds.y],
                     });
                 }
             }
-
-            if let Some(stroke) = &style.stroke {
-                let stroke_paints = resolve_path_stroke_paints(stroke);
-                if let Some(stroke_paths) = style
-                    .stroke_geometry
-                    .as_ref()
-                    .or(style.fill_geometry.as_ref())
-                {
-                    fill_meshes.clear(); // reuse buffer for stroke meshes
-                    for path in stroke_paths {
-                        let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
-                            interner.hash_for(path)
-                        } else {
-                            TessellationCache::fill_key(path)
-                        };
-                        let stroke_key =
-                            TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
-                        let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-                            cache.get_or_tessellate_stroke_with_key(stroke_key, path, stroke)
-                        } else {
-                            tessellate_stroke(path, stroke).map(Arc::new)
-                        };
-                        if let Ok(mesh) = mesh_result
-                            && !mesh.indices.is_empty()
-                        {
-                            fill_meshes.push(mesh);
-                        }
-                    }
-
-                    for stroke_paint in stroke_paints {
-                        for mesh in &*fill_meshes {
-                            path_batches.push(PathBatch {
-                                mesh: Arc::clone(mesh),
-                                paint: stroke_paint,
-                                opacity: effective_opacity,
-                                size: [render_bounds.width, render_bounds.height],
-                                offset: [render_bounds.x, render_bounds.y],
-                            });
-                        }
-                    }
-                }
-            }
-        },
-    );
+        }
+    }
 }
 
 fn collect_image_fill_batches<'a>(
