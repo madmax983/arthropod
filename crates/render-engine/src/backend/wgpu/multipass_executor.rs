@@ -61,6 +61,7 @@ pub(crate) struct MultipassRenderer<'a> {
     pub(crate) text_renderer: &'a mut TextRenderer,
     pub(crate) glyph_texture: &'a wgpu::Texture,
     pub(crate) traversal_stack: &'a mut Vec<(crate::NodeId, f32)>,
+    pub(crate) instances_buffer: &'a mut Vec<PrimitiveInstance>,
     pub(crate) ordered_nodes_buffer: &'a mut Vec<OrderedRenderNode>,
     pub(crate) effect_kinds_buffer: &'a mut Vec<EffectPassKind>,
     pub(crate) background_capture_bounds_buffer: &'a mut Vec<[u32; 4]>,
@@ -129,7 +130,9 @@ impl<'a> MultipassRenderer<'a> {
                 let h = context.create_render_target(pool_key);
                 let bytes = context
                     .get_render_target(h)
-                    .map(|target| target.estimated_bytes())
+                    .map(|target: &crate::backend::wgpu::context::RenderTarget| {
+                        target.estimated_bytes()
+                    })
                     .unwrap_or_else(|| pool_key.estimated_bytes());
                 (h, bytes)
             });
@@ -530,7 +533,9 @@ impl<'a> MultipassRenderer<'a> {
             let handle = context.create_render_target(pool_key);
             let bytes = context
                 .get_render_target(handle)
-                .map(|target| target.estimated_bytes())
+                .map(|target: &crate::backend::wgpu::context::RenderTarget| {
+                    target.estimated_bytes()
+                })
                 .unwrap_or_else(|| pool_key.estimated_bytes());
             (handle, bytes)
         })
@@ -781,16 +786,17 @@ impl<'a> MultipassRenderer<'a> {
         &mut self,
         scene: &'a Scene,
         skip_multipass: bool,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
+    ) -> (&mut Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
         // Clear per-frame gradient data
         self.primitive_pipeline.clear_gradient_params();
 
-        let (mut instances, raw_text_nodes, path_batches) = if skip_multipass {
+        let (raw_text_nodes, path_batches) = if skip_multipass {
             collect_instances_excluding_multipass(
                 self.primitive_pipeline,
                 self.tessellation_cache,
                 self.path_interner,
                 self.traversal_stack,
+                self.instances_buffer,
                 scene,
             )
         } else {
@@ -799,6 +805,7 @@ impl<'a> MultipassRenderer<'a> {
                 self.tessellation_cache,
                 self.path_interner,
                 self.traversal_stack,
+                self.instances_buffer,
                 scene,
             )
         };
@@ -846,17 +853,20 @@ impl<'a> MultipassRenderer<'a> {
                 {
                     let fill =
                         resolve_text_fill(self.primitive_pipeline, style, opacity, text_bounds);
-                    let start_idx = instances.len();
+                    let start_idx = self.instances_buffer.len();
                     self.text_renderer.generate_instances_into(
                         &shaped,
                         position,
                         glam::Vec4::ONE,
-                        &mut instances,
+                        self.instances_buffer,
                     );
-                    apply_node_transform_to_instances(&mut instances[start_idx..], node_transform);
+                    apply_node_transform_to_instances(
+                        &mut self.instances_buffer[start_idx..],
+                        node_transform,
+                    );
 
                     // Apply text fill metadata to generated glyph primitive instances
-                    for instance in &mut instances[start_idx..] {
+                    for instance in &mut self.instances_buffer[start_idx..] {
                         apply_text_fill_to_glyph(instance, fill);
                     }
                 }
@@ -891,16 +901,19 @@ impl<'a> MultipassRenderer<'a> {
                         *effective_opacity,
                         text_bounds,
                     );
-                    let start_idx = instances.len();
+                    let start_idx = self.instances_buffer.len();
                     self.text_renderer.generate_instances_into(
                         &shaped,
                         position,
                         glam::Vec4::ONE,
-                        &mut instances,
+                        self.instances_buffer,
                     );
-                    apply_node_transform_to_instances(&mut instances[start_idx..], node.transform);
+                    apply_node_transform_to_instances(
+                        &mut self.instances_buffer[start_idx..],
+                        node.transform,
+                    );
 
-                    for instance in &mut instances[start_idx..] {
+                    for instance in &mut self.instances_buffer[start_idx..] {
                         apply_text_fill_to_glyph(instance, fill);
                     }
                 }
@@ -923,13 +936,13 @@ impl<'a> MultipassRenderer<'a> {
             );
         }
 
-        (instances, path_batches)
+        (self.instances_buffer, path_batches)
     }
 
     pub(crate) fn collect_frame_batches(
         &mut self,
         scene: &'a Scene,
-    ) -> (Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
+    ) -> (&mut Vec<PrimitiveInstance>, Vec<PathBatch<'a>>) {
         self.collect_frame_batches_internal(scene, false)
     }
 

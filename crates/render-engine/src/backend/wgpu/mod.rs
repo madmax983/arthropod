@@ -57,6 +57,7 @@ pub struct WgpuBackend {
     clip_stack: ClipStack,
     effect_sampler: wgpu::Sampler,
     traversal_stack: Vec<(crate::NodeId, f32)>,
+    instances_buffer: Vec<PrimitiveInstance>,
     ordered_nodes_buffer: Vec<multipass_executor::OrderedRenderNode>,
     multipass_node_ids_buffer: Vec<crate::NodeId>,
     /// Pre-allocated buffer for effect pass kinds. Reused across frames via `clear()` to eliminate per-frame `Vec::new()` heap allocations on the hot path.
@@ -201,6 +202,7 @@ impl WgpuBackend {
             clip_stack: ClipStack::default(),
             effect_sampler,
             traversal_stack: Vec::with_capacity(1024),
+            instances_buffer: Vec::with_capacity(4096),
             ordered_nodes_buffer: Vec::with_capacity(1024),
             multipass_node_ids_buffer: Vec::with_capacity(128),
             effect_kinds_buffer: Vec::with_capacity(128),
@@ -374,7 +376,9 @@ impl WgpuBackend {
             path_interner: &mut self.path_interner,
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
+
             traversal_stack: &mut self.traversal_stack,
+            instances_buffer: &mut self.instances_buffer,
             ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
             effect_kinds_buffer: &mut self.effect_kinds_buffer,
             background_capture_bounds_buffer: &mut self.background_capture_bounds_buffer,
@@ -418,13 +422,15 @@ impl WgpuBackend {
             .clone();
 
         if self.multipass_node_ids_buffer.is_empty() {
-            let (base_instances, base_path_batches) = executor.collect_frame_batches(scene);
             let clear_color = wgpu::Color {
                 r: executor.context.clear_color.r() as f64,
                 g: executor.context.clear_color.g() as f64,
                 b: executor.context.clear_color.b() as f64,
                 a: executor.context.clear_color.a() as f64,
             };
+
+            let (_, base_path_batches) = executor.collect_frame_batches(scene);
+
             let mut ctx = multipass_executor::MultipassContext {
                 device: &executor.context.device,
                 queue: &executor.context.queue,
@@ -442,7 +448,7 @@ impl WgpuBackend {
                 multipass_executor::DrawBatchesParams {
                     target_view: &frame_view,
                     load_op: wgpu::LoadOp::Clear(clear_color),
-                    instances: &base_instances,
+                    instances: executor.instances_buffer,
                     path_batches: &base_path_batches,
                     scissor: None,
                 },
@@ -481,7 +487,9 @@ impl WgpuBackend {
             path_interner: &mut self.path_interner,
             text_renderer: &mut self.text_renderer,
             glyph_texture: &self.glyph_texture,
+
             traversal_stack: &mut self.traversal_stack,
+            instances_buffer: &mut self.instances_buffer,
             ordered_nodes_buffer: &mut self.ordered_nodes_buffer,
             effect_kinds_buffer: &mut self.effect_kinds_buffer,
             background_capture_bounds_buffer: &mut self.background_capture_bounds_buffer,
@@ -494,51 +502,22 @@ impl WgpuBackend {
             &mut self.multipass_node_ids_buffer,
         );
         if self.multipass_node_ids_buffer.is_empty() {
-            let (instances, path_batches) = executor.collect_frame_batches(scene);
+            let (_, base_path_batches) = executor.collect_frame_batches(scene);
 
             executor.primitive_pipeline.prepare(
                 &executor.context.device,
                 &executor.context.queue,
-                &instances,
+                executor.instances_buffer,
             );
             executor.path_pipeline.prepare(
                 &executor.context.device,
                 &executor.context.queue,
-                &path_batches,
+                &base_path_batches,
             );
 
-            // We need to borrow context from executor again for render pass?
-            // `executor` holds mutable borrow of context.
-            // But we need `clip_stack` from `self`.
-            // `executor` does NOT hold `clip_stack`.
-            // So we can borrow `self.clip_stack`.
-            // But `executor` holds `&mut self.context`.
-
-            // `with_render_pass` takes `&mut self` on context.
-            // `executor.context` IS `&mut context`.
-            // So `executor.context.with_render_pass(...)`.
-
-            // Inside closure we use `executor.primitive_pipeline` etc.
-            // But `primitive_pipeline.render` takes `&mut RenderPass` and `&BindGroup`.
-            // `executor.primitive_pipeline` is `&mut PrimitivePipeline`.
-
             let clip_stack = &mut self.clip_stack;
+            let instances_len = executor.instances_buffer.len() as u32;
 
-            // To avoid borrowing executor in closure while borrowing context from executor...
-            // `context.with_render_pass` borrows `context`.
-            // `executor` owns `&mut context`.
-            // The closure uses `primitive_pipeline` which is also in `executor`.
-            // Rust should allow splitting borrows of `executor`? No, `executor` is a struct, not `self`.
-            // But `executor` fields are disjoint mutable borrows of `self` fields.
-            // Wait, `executor` holds `&mut context` and `&mut primitive_pipeline`.
-            // If I call `executor.context.with_render_pass`, `executor` is mutably borrowed (for context).
-            // Can I use `executor.primitive_pipeline` in the closure?
-            // `primitive_pipeline` is disjoint from `context` in `MultipassRenderer`.
-            // If `MultipassRenderer` fields were public I could access them disjointly.
-            // They are `pub(crate)`.
-            // So `executor.primitive_pipeline` access inside closure while `executor.context` is borrowed might work if compiler is smart enough or if I destructure.
-
-            // Destructuring executor seems best.
             let MultipassRenderer {
                 context,
                 primitive_pipeline,
@@ -547,7 +526,7 @@ impl WgpuBackend {
             } = executor;
 
             return context.with_render_pass(|render_pass, globals_bind_group| {
-                primitive_pipeline.render(render_pass, globals_bind_group, instances.len() as u32);
+                primitive_pipeline.render(render_pass, globals_bind_group, instances_len);
                 path_pipeline.render(render_pass, globals_bind_group);
                 let _ = clip_stack.depth();
             });

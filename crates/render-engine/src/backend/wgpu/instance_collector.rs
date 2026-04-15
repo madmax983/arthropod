@@ -407,17 +407,15 @@ pub(crate) fn collect_instances<'a>(
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
     stack: &mut Vec<(crate::NodeId, f32)>,
+    instances: &mut Vec<PrimitiveInstance>,
     scene: &'a Scene,
-) -> (
-    Vec<PrimitiveInstance>,
-    Vec<TextNodeData<'a>>,
-    Vec<PathBatch<'a>>,
-) {
+) -> (Vec<TextNodeData<'a>>, Vec<PathBatch<'a>>) {
     collect_instances_impl(
         Some(pipeline),
         Some(tessellation_cache),
         Some(path_interner),
         stack,
+        instances,
         scene,
         false,
     )
@@ -428,17 +426,15 @@ pub(crate) fn collect_instances_excluding_multipass<'a>(
     tessellation_cache: &mut TessellationCache,
     path_interner: &mut PathInterner,
     stack: &mut Vec<(crate::NodeId, f32)>,
+    instances: &mut Vec<PrimitiveInstance>,
     scene: &'a Scene,
-) -> (
-    Vec<PrimitiveInstance>,
-    Vec<TextNodeData<'a>>,
-    Vec<PathBatch<'a>>,
-) {
+) -> (Vec<TextNodeData<'a>>, Vec<PathBatch<'a>>) {
     collect_instances_impl(
         Some(pipeline),
         Some(tessellation_cache),
         Some(path_interner),
         stack,
+        instances,
         scene,
         true,
     )
@@ -453,7 +449,10 @@ pub(crate) fn collect_instances_for_tests<'a>(
     Vec<PathBatch<'a>>,
 ) {
     let mut stack = Vec::new();
-    collect_instances_impl(None, None, None, &mut stack, scene, false)
+    let mut instances = Vec::new();
+    let (text, paths) =
+        collect_instances_impl(None, None, None, &mut stack, &mut instances, scene, false);
+    (instances, text, paths)
 }
 
 #[cfg(test)]
@@ -465,7 +464,10 @@ pub(crate) fn collect_instances_without_multipass_for_tests<'a>(
     Vec<PathBatch<'a>>,
 ) {
     let mut stack = Vec::new();
-    collect_instances_impl(None, None, None, &mut stack, scene, true)
+    let mut instances = Vec::new();
+    let (text, paths) =
+        collect_instances_impl(None, None, None, &mut stack, &mut instances, scene, true);
+    (instances, text, paths)
 }
 
 fn collect_path_geometry_batches<'a>(
@@ -480,79 +482,91 @@ fn collect_path_geometry_batches<'a>(
         return;
     };
 
+    thread_local! {
+        static MESH_BUFFER: std::cell::RefCell<Vec<Arc<crate::backend::wgpu::pipelines::path_pipeline::PathMesh>>> = std::cell::RefCell::new(Vec::with_capacity(8));
+    }
+
     let fill_paints = resolve_path_fill_paints(style);
-    let mut fill_meshes = Vec::with_capacity(paths.len());
-    for path in paths {
-        let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
-            interner.hash_for(path)
-        } else {
-            TessellationCache::fill_key(path)
-        };
-        let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-            cache.get_or_tessellate_fill_with_key(path_hash, path)
-        } else {
-            tessellate_fill(path).map(Arc::new)
-        };
-
-        if let Ok(mesh) = mesh_result
-            && !mesh.indices.is_empty()
-        {
-            fill_meshes.push(mesh);
-        }
-    }
-
-    for fill_paint in fill_paints {
-        for mesh in &fill_meshes {
-            path_batches.push(PathBatch {
-                mesh: Arc::clone(mesh),
-                paint: fill_paint,
-                opacity: effective_opacity,
-                size: [render_bounds.width, render_bounds.height],
-                offset: [render_bounds.x, render_bounds.y],
-            });
-        }
-    }
-
-    if let Some(stroke) = &style.stroke {
-        let stroke_paints = resolve_path_stroke_paints(stroke);
-        if let Some(stroke_paths) = style
-            .stroke_geometry
-            .as_ref()
-            .or(style.fill_geometry.as_ref())
-        {
-            let mut stroke_meshes = Vec::with_capacity(stroke_paths.len());
-            for path in stroke_paths {
+    MESH_BUFFER.with(
+        |buffer: &std::cell::RefCell<
+            Vec<Arc<crate::backend::wgpu::pipelines::path_pipeline::PathMesh>>,
+        >| {
+            let mut fill_meshes = buffer.borrow_mut();
+            fill_meshes.clear();
+            for path in paths {
                 let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
                     interner.hash_for(path)
                 } else {
                     TessellationCache::fill_key(path)
                 };
-                let stroke_key = TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
                 let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
-                    cache.get_or_tessellate_stroke_with_key(stroke_key, path, stroke)
+                    cache.get_or_tessellate_fill_with_key(path_hash, path)
                 } else {
-                    tessellate_stroke(path, stroke).map(Arc::new)
+                    tessellate_fill(path).map(Arc::new)
                 };
+
                 if let Ok(mesh) = mesh_result
                     && !mesh.indices.is_empty()
                 {
-                    stroke_meshes.push(mesh);
+                    fill_meshes.push(mesh);
                 }
             }
 
-            for stroke_paint in stroke_paints {
-                for mesh in &stroke_meshes {
+            for fill_paint in fill_paints {
+                for mesh in &*fill_meshes {
                     path_batches.push(PathBatch {
                         mesh: Arc::clone(mesh),
-                        paint: stroke_paint,
+                        paint: fill_paint,
                         opacity: effective_opacity,
                         size: [render_bounds.width, render_bounds.height],
                         offset: [render_bounds.x, render_bounds.y],
                     });
                 }
             }
-        }
-    }
+
+            if let Some(stroke) = &style.stroke {
+                let stroke_paints = resolve_path_stroke_paints(stroke);
+                if let Some(stroke_paths) = style
+                    .stroke_geometry
+                    .as_ref()
+                    .or(style.fill_geometry.as_ref())
+                {
+                    fill_meshes.clear(); // reuse buffer for stroke meshes
+                    for path in stroke_paths {
+                        let path_hash = if let Some(interner) = path_interner.as_deref_mut() {
+                            interner.hash_for(path)
+                        } else {
+                            TessellationCache::fill_key(path)
+                        };
+                        let stroke_key =
+                            TessellationCache::stroke_key_from_path_hash(path_hash, stroke);
+                        let mesh_result = if let Some(cache) = tessellation_cache.as_deref_mut() {
+                            cache.get_or_tessellate_stroke_with_key(stroke_key, path, stroke)
+                        } else {
+                            tessellate_stroke(path, stroke).map(Arc::new)
+                        };
+                        if let Ok(mesh) = mesh_result
+                            && !mesh.indices.is_empty()
+                        {
+                            fill_meshes.push(mesh);
+                        }
+                    }
+
+                    for stroke_paint in stroke_paints {
+                        for mesh in &*fill_meshes {
+                            path_batches.push(PathBatch {
+                                mesh: Arc::clone(mesh),
+                                paint: stroke_paint,
+                                opacity: effective_opacity,
+                                size: [render_bounds.width, render_bounds.height],
+                                offset: [render_bounds.x, render_bounds.y],
+                            });
+                        }
+                    }
+                }
+            }
+        },
+    );
 }
 
 fn collect_image_fill_batches<'a>(
@@ -617,13 +631,10 @@ fn collect_instances_impl<'a>(
     mut tessellation_cache: Option<&mut TessellationCache>,
     mut path_interner: Option<&mut PathInterner>,
     stack: &mut Vec<(crate::NodeId, f32)>,
+    instances: &mut Vec<PrimitiveInstance>,
     scene: &'a Scene,
     skip_multipass: bool,
-) -> (
-    Vec<PrimitiveInstance>,
-    Vec<TextNodeData<'a>>,
-    Vec<PathBatch<'a>>,
-) {
+) -> (Vec<TextNodeData<'a>>, Vec<PathBatch<'a>>) {
     // We need style_requires_multipass but it is in mod.rs (or multipass_executor.rs later).
     // For now I will inline or import it.
     // It seems it is better to move it to a shared place or redefine it here since it is pure logic on VisualStyle.
@@ -634,8 +645,8 @@ fn collect_instances_impl<'a>(
     // Maybe `style_requires_multipass` should be in `effects.rs` or `style-engine`.
 
     // Pre-allocate to reduce heap re-allocations during iteration.
+    instances.clear();
     let capacity = scene.node_count().clamp(16, 4096);
-    let mut instances = Vec::with_capacity(capacity);
     let mut text_nodes_for_shaping = Vec::with_capacity(capacity / 4);
     let mut path_batches = Vec::with_capacity(capacity / 4);
 
@@ -709,10 +720,10 @@ fn collect_instances_impl<'a>(
                         pos,
                         size,
                         effective_opacity,
-                        &mut instances,
+                        instances,
                     )
                 } else {
-                    create_primitive_instances(style, pos, size, effective_opacity, &mut instances)
+                    create_primitive_instances(style, pos, size, effective_opacity, instances)
                 };
                 apply_node_transform_to_instances(&mut instances[start_idx..], node.transform);
             }
@@ -736,7 +747,7 @@ fn collect_instances_impl<'a>(
             NodeContent::Empty => {}
         }
     }
-    (instances, text_nodes_for_shaping, path_batches)
+    (text_nodes_for_shaping, path_batches)
 }
 
 pub(crate) fn collect_style_batches_for_bounds<'a>(

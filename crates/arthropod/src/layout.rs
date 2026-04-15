@@ -41,21 +41,33 @@ pub fn auto_layout(
         min_height: None,
     };
 
-    let mut engine = LayoutEngine::new();
-    let mut node_map = HashMap::new();
-    let mut updates = Vec::new();
+    thread_local! {
+        static LAYOUT_ENGINE: std::cell::RefCell<LayoutEngine> = std::cell::RefCell::new(LayoutEngine::new());
+        static NODE_MAP: std::cell::RefCell<HashMap<NodeId, layout_engine::NodeId>> = std::cell::RefCell::new(HashMap::new());
+        static UPDATES: std::cell::RefCell<Vec<(NodeId, plat_core::Rect)>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
 
-    // Use shared layout logic from widget-core
-    // This avoids code duplication and ensures consistent behavior
-    widget_core::perform_layout(
-        scene,
-        root,
-        constraints,
-        layout_styles,
-        &mut engine,
-        &mut node_map,
-        &mut updates,
-    );
+    LAYOUT_ENGINE.with(|engine_ref| {
+        NODE_MAP.with(|node_map_ref| {
+            UPDATES.with(|updates_ref| {
+                let mut engine = engine_ref.borrow_mut();
+                let mut node_map = node_map_ref.borrow_mut();
+                let mut updates = updates_ref.borrow_mut();
+
+                // Use shared layout logic from widget-core
+                // This avoids code duplication and ensures consistent behavior
+                widget_core::perform_layout(
+                    scene,
+                    root,
+                    constraints,
+                    layout_styles,
+                    &mut engine,
+                    &mut node_map,
+                    &mut updates,
+                );
+            })
+        })
+    });
 }
 
 /// Convenience function to layout a widget context's scene.

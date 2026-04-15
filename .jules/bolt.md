@@ -120,3 +120,7 @@
 **Eliminate vector allocations in layout_system**
 **Learning:** In recursive collection algorithms that run per-frame (like flexbox layout bridge), initializing a new Vec or Vec::with_capacity creates a recurrent heap allocation that can be easily avoided by hoisting the buffer up to the ECS system state using `Local<Vec<T>>` and passing it down.
 **Action:** Next time I see a `Vec::with_capacity` or `Vec::new()` inside a function called by a Bevy system on every frame, I will try to lift that allocation into a `Local` parameter to reuse its capacity.
+
+**[Eliminate Per-Frame Allocation in Rendering Collector]
+**Learning:** Returning `Vec<PrimitiveInstance>` and generating nested Vectors within Rayon threads during hot-path rendering scene traversal caused massive allocation churn per frame (`O(P)` Vectors per frame, and `O(N)` PrimitiveInstance allocations per frame).
+**Action:** Always hoist large result vectors `Vec<PrimitiveInstance>` to `WgpuBackend` (using `.clear()` instead of `Vec::new()`) and avoid threaded Map-Reduce collections for small payloads that cause thread contention overhead. Use `thread_local!` to reuse `Vec<Arc<Mesh>>` allocations in functions that can't borrow mutably from `self`.
