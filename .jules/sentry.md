@@ -8,3 +8,6 @@
 **WGPU Readback OOM Vulnerability**
 **Learning:** Calculating `total_size` and reserving memory based on input dimensions before validating against the actual readback slice length can cause catastrophic Out-Of-Memory (OOM) panics.
 **Action:** When reading back textures from WGPU buffers (e.g., `unpack_readback_pixels`), always validate the source slice length against the minimum required dimensions (`padded_bytes_per_row * (height - 1) + row_len`) before allocating the destination vector to prevent Out-Of-Memory (OOM) panics from malformed dimension parameters.
+**[Action Handler Mutex Poisoning]
+**Learning:** Using `.ok()` on a `Mutex::lock()` silently drops the error when poisoned, causing action handlers (like focus) to fail silently on subsequent invocations.
+**Action:** Always use `.unwrap_or_else(std::sync::PoisonError::into_inner)` for synchronized handlers to allow recovery instead of silencing failures.

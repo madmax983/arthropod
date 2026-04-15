@@ -86,7 +86,11 @@ impl ActionHandler for ArthropodActionHandler {
             }
             accesskit::Action::Focus => {
                 // Invoke focus handler if registered
-                if let Some(mut h) = self.focus_handler.as_ref().and_then(|h| h.lock().ok()) {
+                if let Some(mut h) = self
+                    .focus_handler
+                    .as_ref()
+                    .map(|h| h.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
+                {
                     h(node_id);
                 }
             }
