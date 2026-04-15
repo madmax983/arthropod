@@ -1,9 +1,12 @@
-// Nova Story Engine
-//
-// Provides interactive narrative generation and runtime.
+//! Nova Story Engine
+//!
+//! Provides an interactive narrative generation and playback runtime.
 
+/// Data structures representing the story graph, passages, and choices.
 pub mod model;
+/// State machine for executing and tracking story progress.
 pub mod runtime;
+/// ECS systems that sync the active story passage into visual UI elements.
 pub mod system;
 
 pub use self::model::*;

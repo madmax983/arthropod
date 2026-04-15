@@ -1,19 +1,45 @@
+//! X-Ray Debugging Tool
+//!
+//! Provides a spatial debugging overlay that draws colored outlines around UI nodes
+//! to help visualize layout boundaries and hit-testing regions.
+
 use bevy_ecs::prelude::*;
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use std::collections::{HashMap, HashSet};
 use style_engine::{Paint, StrokeAlign, StrokeStyle, VisualStyle};
 
+/// Configuration for the X-Ray spatial debugging tool.
+///
+/// X-Ray is used to visualize the layout bounds of UI nodes by drawing colored outlines
+/// around every node in the scene graph. This is invaluable for debugging layout issues,
+/// overflowing content, or incorrect hit-testing bounds.
+///
+/// # Examples
+/// ```
+/// use arthropod::experimental::xray::XRayConfig;
+///
+/// // Enable the X-Ray overlay
+/// let config = XRayConfig { enabled: true };
+/// ```
 #[derive(Resource, Default)]
 pub struct XRayConfig {
+    /// Whether the X-Ray overlay should be drawn.
     pub enabled: bool,
 }
 
+/// Internal state tracking for the X-Ray system.
+///
+/// Manages the mapping between actual UI nodes and the generated debug outline nodes.
 #[derive(Resource, Default)]
 pub struct XRayState {
-    // Maps target node ID -> debug node ID
+    /// Maps a target UI node's ID to its corresponding debug outline node ID.
     pub active_nodes: HashMap<NodeId, NodeId>,
 }
 
+/// System that synchronizes the X-Ray debug nodes with the actual scene graph.
+///
+/// When enabled, it dynamically injects styled nodes with red strokes to visualize
+/// the bounds of all non-debug nodes. When disabled, it cleans up all debug nodes.
 pub fn update_xray(
     mut scene: ResMut<Scene>,
     config: Res<XRayConfig>,
@@ -100,6 +126,7 @@ pub fn update_xray(
     }
 }
 
+/// Registers the X-Ray debugging systems and resources into the application.
 pub fn register_xray(app: &mut crate::App) {
     app.world_mut()
         .insert_resource(XRayConfig { enabled: true });

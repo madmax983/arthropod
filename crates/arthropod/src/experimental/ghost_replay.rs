@@ -1,3 +1,9 @@
+//! Ghost Replay (Time Travel)
+//!
+//! Provides the ability to record user interactions (mouse movements, clicks)
+//! and replay them visually on the screen. Useful for automated tutorials,
+//! bug reproduction, and "time travel" debugging.
+
 use arthropod_ecs::components::SceneNodeRef;
 use bevy_ecs::prelude::*;
 use plat_core::{ElementState, Event, MouseButton, WindowEvent};
@@ -8,34 +14,59 @@ use std::time::{Duration, Instant};
 // Data Structures
 // =============================================================================
 
+/// A single recorded user interaction event, timestamped relative to the start of the recording.
 #[derive(Debug, Clone)]
 pub struct GhostEvent {
+    /// The duration elapsed from the start of the recording when this event occurred.
     pub timestamp: Duration,
+    /// The specific type of input event (e.g., cursor movement or click).
     pub kind: GhostEventKind,
 }
 
+/// The types of user inputs that can be recorded and replayed.
 #[derive(Debug, Clone)]
 pub enum GhostEventKind {
+    /// A change in the mouse cursor's X/Y coordinates.
     CursorMoved(Vec2),
+    /// A mouse button press.
     Click(MouseButton),
+    /// A mouse button release.
     Release(MouseButton),
 }
 
 /// Resource to store recorded events.
+///
+/// This captures raw UI events (mouse movements, clicks) during an interactive session
+/// so they can be serialized or immediately replayed via the [`GhostReplayer`].
+///
+/// # Examples
+/// ```
+/// use arthropod::experimental::ghost_replay::GhostRecorder;
+///
+/// let mut recorder = GhostRecorder::default();
+/// recorder.start(); // Begins capturing input events
+/// // ... user interacts ...
+/// recorder.stop();  // Pauses capture, events are retained in `recorder.events`
+/// ```
 #[derive(Resource, Default)]
 pub struct GhostRecorder {
+    /// The list of recorded events in chronological order.
     pub events: Vec<GhostEvent>,
+    /// The absolute system time when recording began, used to calculate relative event timestamps.
     pub start_time: Option<Instant>,
+    /// Whether the recorder is currently capturing input events.
     pub recording: bool,
 }
 
 impl GhostRecorder {
+    /// Starts or restarts the recording process, clearing any previously recorded events.
     pub fn start(&mut self) {
         self.events.clear();
         self.start_time = Some(Instant::now());
         self.recording = true;
     }
 
+    /// Stops recording, keeping the currently recorded events for replay.
     pub fn stop(&mut self) {
         self.recording = false;
         // Keep events for replay
@@ -43,12 +74,20 @@ impl GhostRecorder {
 }
 
 /// Resource to manage playback state.
+///
+/// Responsible for reading a list of [`GhostEvent`]s and injecting a visual "ghost cursor"
+/// into the UI scene graph that mimics the original recorded actions.
 #[derive(Resource)]
 pub struct GhostReplayer {
+    /// The sequence of events currently loaded for playback.
     pub events: Vec<GhostEvent>,
+    /// The system time when playback started, used for synchronizing event timestamps.
     pub start_time: Option<Instant>,
+    /// Whether a replay is actively running.
     pub playing: bool,
+    /// The index of the next event to be processed in the `events` slice.
     pub current_index: usize,
+    /// Playback speed multiplier (e.g., 1.0 for real-time, 2.0 for double speed).
     pub speed: f32,
     /// Track the visual cursor node ID to avoid ECS query lag
     pub cursor_node: Option<NodeId>,
@@ -68,6 +107,7 @@ impl Default for GhostReplayer {
 }
 
 impl GhostReplayer {
+    /// Begins playing back a sequence of events.
     pub fn play(&mut self, events: Vec<GhostEvent>) {
         self.events = events;
         self.start_time = Some(Instant::now());
@@ -76,6 +116,7 @@ impl GhostReplayer {
         self.cursor_node = None; // Reset cursor
     }
 
+    /// Prematurely stops playback and removes the visual ghost cursor.
     pub fn stop(&mut self) {
         self.playing = false;
         self.start_time = None;
@@ -84,6 +125,9 @@ impl GhostReplayer {
 }
 
 /// Component for the visual cursor entity.
+///
+/// Used internally by the `update_ghost_replay` system to track and eventually clean up
+/// the ghost cursor from the ECS when playback stops.
 #[derive(Component)]
 pub struct GhostCursor;
 
@@ -92,7 +136,7 @@ pub struct GhostCursor;
 // =============================================================================
 
 /// Helper to record an event.
-/// Called from `WidgetApp::on_event`.
+/// Called internally from `WidgetApp::on_event` to pipe UI events into the active [`GhostRecorder`].
 pub fn record_event(world: &mut World, event: &Event) {
     // Check if recorder exists and is recording
     // We use a scope to limit borrow of world
@@ -140,6 +184,8 @@ pub fn record_event(world: &mut World, event: &Event) {
 // Systems
 // =============================================================================
 
+/// System responsible for reading the [`GhostReplayer`] state and visually updating
+/// the ghost cursor in the scene graph to match recorded movements and clicks.
 pub fn update_ghost_replay(
     mut commands: Commands,
     mut replayer: ResMut<GhostReplayer>,
