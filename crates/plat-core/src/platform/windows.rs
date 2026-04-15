@@ -60,7 +60,7 @@ fn get_y_lparam(lparam: LPARAM) -> f64 {
 /// The provided `HWND` must be a valid window handle.
 #[inline]
 unsafe fn get_window_id(hwnd: HWND) -> Option<WindowId> {
-    if hwnd.0.is_null() {
+    if !unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindow(Some(hwnd)).as_bool() } {
         return None;
     }
     // GetWindowLongPtrW returns zero on failure (or if the value is zero).

@@ -43,7 +43,8 @@ impl CompositionDevice {
     /// If `topmost` is true, the visual tree is rendered on top of the window's children.
     /// If `topmost` is false, it is rendered behind the window's children (but in front of the window background).
     pub fn create_target_for_hwnd(&self, hwnd: HWND, topmost: bool) -> Result<CompositionTarget> {
-        if hwnd.0.is_null() {
+        // SAFETY: The provided HWND is checked to be valid.
+        if !unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindow(Some(hwnd)).as_bool() } {
             return Err(Error::from(E_HANDLE));
         }
 

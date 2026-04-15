@@ -17,3 +17,6 @@
 **2025-02-23 - Handle infinite loop DoS in cyclic parent structures**
 **Threat:** A cyclic scene graph structure could cause an infinite loop in `arthropod-ecs` parent traversal, leading to CPU exhaustion (Denial of Service).
 **Defense:** Added a `HashSet::insert` check during traversal to detect duplicate parent nodes, gracefully breaking out of the loop and preventing the application from freezing.
+**2025-02-23 - Handle invalid HWND access violations via IsWindow**
+**Threat:** A null or invalid window handle (`HWND`) could be passed to unsafe FFI functions and COM APIs in `plat-core` (`create_target_for_hwnd` and `get_window_id`), causing undefined behavior or access violations (DoS) when attempting to read the window data. Checking `.is_null()` is insufficient to verify the handle refers to a valid Windows object.
+**Defense:** Replaced the `.is_null()` check with the system's `IsWindow` API before safely accessing user data or passing it to COM targets.
