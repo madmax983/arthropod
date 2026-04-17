@@ -59,3 +59,8 @@ Created `specs/026-docking-layout-manager.md` to define a Docking & Split Layout
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A common requirement for interactive applications missing from the current specs is a **Notifications & Toast Engine**. Let's spec out a **Notifications & Toast Engine**.
 Created `specs/027-notifications-engine.md` to define a Notifications & Toast Engine. This addresses a core UX requirement for modern web and desktop applications, providing standard, non-blocking feedback to users.
+
+## 2026-04-17 - [Webview Widget Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise desktop applications is embedding legacy web apps or complex dashboards. Let's spec out a **Webview Widget**.
+Created `specs/028-webview-widget.md` to define a Webview Widget. This addresses a core UX requirement for modern enterprise software tools and allows seamless integration with existing web-based workflows.
