@@ -1,0 +1,10 @@
+--- crates/style-engine/src/path.rs
++++ crates/style-engine/src/path.rs
+@@ -360,7 +360,7 @@
+
+         let mut polygons = Vec::with_capacity(exteriors.len());
+-        for (exterior, holes) in exteriors.into_iter().zip(holes_by_poly.into_iter()) {
++        for (exterior, holes) in exteriors.into_iter().zip(holes_by_poly) {
+             polygons.push(Polygon::new(exterior, holes));
+         }
+         MultiPolygon(polygons)

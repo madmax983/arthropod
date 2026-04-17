@@ -1,0 +1,14 @@
+--- src/bin/stitch_scene.rs
++++ src/bin/stitch_scene.rs
+@@ -789,10 +789,7 @@
+ fn extract_style_blocks(source: &str) -> Vec<&str> {
+     let mut blocks = Vec::new();
+     let mut cursor = source;
+-    loop {
+-        let Some(style_start) = cursor.find("<style") else {
+-            break;
+-        };
++    while let Some(style_start) = cursor.find("<style") {
+         let style_tail = &cursor[style_start..];
+         let Some(open_end) = style_tail.find('>') else {
+             break;

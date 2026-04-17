@@ -1,0 +1,18 @@
+--- examples/themed_form.rs
++++ examples/themed_form.rs
+@@ -235,6 +235,7 @@
+             } => {
+                 *control_flow = ControlFlow::Exit;
+             }
++            #[allow(clippy::collapsible_match)]
+             Event::Window {
+                 event: WindowEvent::KeyboardInput(input),
+                 ..
+@@ -282,6 +283,7 @@
+                     }
+                 }
+             }
++            #[allow(clippy::collapsible_match)]
+             Event::Window {
+                 event: WindowEvent::MouseInput(mouse),
+                 ..

@@ -9,7 +9,6 @@ yanked = "deny"
 ignore = [
     "RUSTSEC-2024-0436", # paste is unmaintained (transitive dependency via accesskit)
     "RUSTSEC-2025-0057", # fxhash is unmaintained
-    "RUSTSEC-2026-0097", # rand is unsound
 ]
 
 [licenses]
@@ -27,6 +26,7 @@ allow = [
     "CC0-1.0",
     "Unlicense",
     "BSL-1.0",
+    "NCSA",
     "Unicode-3.0",
     "CDLA-Permissive-2.0",
 ]
@@ -59,6 +59,16 @@ skip = [
     # Allow multiple versions of these crates
     # (often needed for transitive dependencies)
     { name = "windows-sys" },
+    { name = "windows-targets" },
+    { name = "windows_x86_64_msvc" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_i686_gnullvm" },
+    { name = "windows_i686_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_x86_64_gnullvm" },
+    { name = "zune-core" },
+    { name = "zune-jpeg" },
 ]
 
 skip-tree = []

@@ -237,7 +237,6 @@ impl Application for ThemedFormApp {
             } => {
                 *control_flow = ControlFlow::Exit;
             }
-            #[allow(clippy::collapsible_match)]
             Event::Window {
                 event: WindowEvent::KeyboardInput(input),
                 ..
@@ -281,7 +280,6 @@ impl Application for ThemedFormApp {
                     }
                 }
             }
-            #[allow(clippy::collapsible_match)]
             Event::Window {
                 event: WindowEvent::MouseInput(mouse),
                 ..

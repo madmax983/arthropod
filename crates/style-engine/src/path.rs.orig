@@ -359,7 +359,7 @@ impl VectorPath {
         }
 
         let mut polygons = Vec::with_capacity(exteriors.len());
-        for (exterior, holes) in exteriors.into_iter().zip(holes_by_poly) {
+        for (exterior, holes) in exteriors.into_iter().zip(holes_by_poly.into_iter()) {
             polygons.push(Polygon::new(exterior, holes));
         }
         MultiPolygon(polygons)

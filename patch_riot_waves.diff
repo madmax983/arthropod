@@ -1,0 +1,18 @@
+--- examples/riot_waves_generated.rs
++++ examples/riot_waves_generated.rs
+@@ -124,6 +124,7 @@
+                     }
+                 }
+             }
++            #[allow(clippy::collapsible_match)]
+             Event::Window {
+                 event: WindowEvent::MouseInput(input),
+                 ..
+@@ -144,6 +145,7 @@
+                     }
+                 }
+             }
++            #[allow(clippy::collapsible_match)]
+             Event::Window {
+                 event: WindowEvent::KeyboardInput(input),
+                 ..

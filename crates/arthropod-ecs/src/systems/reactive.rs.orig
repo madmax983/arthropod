@@ -150,12 +150,12 @@ fn update_progress_bar_width(
     layout: &mut Option<Mut<'_, LayoutStyle>>,
     progress_bar: &mut Option<Mut<'_, ProgressBarState>>,
 ) {
-    if let Some(val) = progress_bar.as_mut() {
-        let prog = val.progress.get_untracked();
-        let delta = (prog - val.last_progress).abs();
+    if let Some(p) = progress_bar.as_deref() {
+        let prog = p.progress.get_untracked();
+        let delta = (prog - p.last_progress).abs();
         if delta >= 0.0001 {
-            let total_width = val.total_width;
-            val.last_progress = prog;
+            let total_width = p.total_width;
+            progress_bar.as_mut().unwrap().last_progress = prog;
             if let Some(l) = layout.as_mut() {
                 l.0.width = Some(prog * total_width);
             }
@@ -167,10 +167,10 @@ fn update_layout_flex_grow(
     layout: &mut Option<Mut<'_, LayoutStyle>>,
     flex_grow: &mut Option<Mut<'_, ReactiveLayoutFlexGrow>>,
 ) {
-    if let Some(val) = flex_grow.as_mut() {
-        let new_grow = val.signal.get_untracked();
-        if (new_grow - val.last_value).abs() >= f32::EPSILON {
-            val.last_value = new_grow;
+    if let Some(f) = flex_grow.as_deref() {
+        let new_grow = f.signal.get_untracked();
+        if (new_grow - f.last_value).abs() >= f32::EPSILON {
+            flex_grow.as_mut().unwrap().last_value = new_grow;
             if let Some(l) = layout.as_mut() {
                 l.0.flex_grow = new_grow;
             }
@@ -183,10 +183,10 @@ fn update_color(
     node_id: render_engine::NodeId,
     color: &mut Option<Mut<'_, ReactiveColor>>,
 ) {
-    if let Some(val) = color.as_mut() {
-        let new_color = val.signal.get_untracked();
-        if new_color != val.last_value {
-            val.last_value = new_color;
+    if let Some(reactive) = color.as_deref() {
+        let new_color = reactive.signal.get_untracked();
+        if new_color != reactive.last_value {
+            color.as_mut().unwrap().last_value = new_color;
 
             if let Some(style) = scene
                 .get_mut(node_id)
@@ -212,10 +212,10 @@ fn update_text(
     node_id: render_engine::NodeId,
     text: &mut Option<Mut<'_, ReactiveText>>,
 ) {
-    if let Some(val) = text.as_mut() {
-        let new_text = val.signal.get_untracked();
-        if new_text != val.last_value {
-            val.last_value = new_text.clone();
+    if let Some(reactive) = text.as_deref() {
+        let new_text = reactive.signal.get_untracked();
+        if new_text != reactive.last_value {
+            text.as_mut().unwrap().last_value = new_text.clone();
 
             if let Some(text_content) = scene
                 .get_mut(node_id)
@@ -236,10 +236,10 @@ fn update_computed_text(
     node_id: render_engine::NodeId,
     computed_text: &mut Option<Mut<'_, ReactiveComputedText>>,
 ) {
-    if let Some(val) = computed_text.as_mut() {
-        let new_text = val.computed.get();
-        if new_text != val.last_value {
-            val.last_value = new_text.clone();
+    if let Some(reactive) = computed_text.as_deref() {
+        let new_text = reactive.computed.get();
+        if new_text != reactive.last_value {
+            computed_text.as_mut().unwrap().last_value = new_text.clone();
 
             if let Some(text_content) = scene
                 .get_mut(node_id)
@@ -260,10 +260,10 @@ fn update_transform(
     node_id: render_engine::NodeId,
     transform: &mut Option<Mut<'_, ReactiveTransform>>,
 ) {
-    if let Some(val) = transform.as_mut() {
-        let new_transform = val.signal.get_untracked();
-        if new_transform != val.last_value {
-            val.last_value = new_transform;
+    if let Some(reactive) = transform.as_deref() {
+        let new_transform = reactive.signal.get_untracked();
+        if new_transform != reactive.last_value {
+            transform.as_mut().unwrap().last_value = new_transform;
 
             if let Some(node) = scene.get_mut(node_id) {
                 node.transform = new_transform;
@@ -277,10 +277,10 @@ fn update_opacity(
     node_id: render_engine::NodeId,
     opacity: &mut Option<Mut<'_, ReactiveOpacity>>,
 ) {
-    if let Some(val) = opacity.as_mut() {
-        let new_opacity = val.signal.get_untracked();
-        if (new_opacity - val.last_value).abs() >= f32::EPSILON {
-            val.last_value = new_opacity;
+    if let Some(reactive) = opacity.as_deref() {
+        let new_opacity = reactive.signal.get_untracked();
+        if (new_opacity - reactive.last_value).abs() >= f32::EPSILON {
+            opacity.as_mut().unwrap().last_value = new_opacity;
 
             if let Some(node) = scene.get_mut(node_id) {
                 node.opacity = new_opacity;

@@ -1,0 +1,6 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2024-0436", # paste is unmaintained (transitive dependency via accesskit)
+    "RUSTSEC-2025-0057", # fxhash is unmaintained
+    "RUSTSEC-2026-0097", # rand is unsound
+]
