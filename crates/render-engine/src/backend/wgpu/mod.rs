@@ -1,11 +1,15 @@
 //! WGPU backend implementation.
 
+/// Handles clipping masks and stencil buffer operations.
 pub mod clipping;
 pub mod context;
 pub mod effects;
 pub mod image_store;
+/// Phase 2 rendering collector for building primitive instances.
 pub mod instance_collector;
+/// Phase 5 renderer for compositing multiple passes.
 pub mod multipass_executor;
+/// Path geometry hashing and interning.
 pub mod path_interner;
 pub mod pipelines;
 pub mod render_target_pool;
@@ -66,11 +70,16 @@ pub struct WgpuBackend {
     background_capture_bounds_buffer: Vec<[u32; 4]>,
 }
 
+/// Metrics on tessellation cache background warmup.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PathCacheWarmupReport {
+    /// Count of fill paths queued for warmup.
     pub fill_paths: u64,
+    /// Count of stroked paths queued for warmup.
     pub stroke_paths: u64,
+    /// Count of meshes successfully pre-tessellated.
     pub warmed_meshes: u64,
+    /// Count of tessellation failures.
     pub failed: u64,
 }
 
@@ -281,10 +290,12 @@ impl WgpuBackend {
         }
     }
 
+    /// Get current tessellation cache statistics.
     pub fn tessellation_cache_stats(&self) -> TessellationCacheStats {
         self.tessellation_cache.stats()
     }
 
+    /// Reset the tessellation cache statistics.
     pub fn reset_tessellation_cache_stats(&mut self) {
         self.tessellation_cache.reset_stats();
     }
@@ -355,6 +366,7 @@ impl WgpuBackend {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    /// Render the scene synchronously to an RGBA byte buffer (useful for testing or screenshots).
     pub fn render_scene_to_rgba(
         &mut self,
         scene: &Scene,
@@ -550,6 +562,7 @@ impl WgpuBackend {
     }
 
     /// Set the clear color.
+    /// Set the background clear color for the frame.
     pub fn set_clear_color(&mut self, color: Color) {
         self.context.clear_color = color;
     }

@@ -6,12 +6,15 @@ use style_engine::BlendMode;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BlendParams {
+    /// Blend mode enum value encoded as bits.
     pub blend_mode: u32,
+    /// Padding to match 16-byte alignment.
     pub _pad: [u32; 3],
 }
 
 impl BlendParams {
     #[must_use]
+    /// Create new blend parameters for the given blend mode.
     pub fn new(mode: BlendMode) -> Self {
         Self {
             blend_mode: mode.to_flag_bits() as u32,
@@ -44,6 +47,7 @@ fn blend_color_target_state(format: wgpu::TextureFormat) -> wgpu::ColorTargetSta
 }
 
 impl BlendPipeline {
+    /// Create a new blend pipeline instance.
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Blend Shader"),
@@ -138,6 +142,7 @@ impl BlendPipeline {
     }
 
     #[must_use]
+    /// Create a bind group mapping source and destination views.
     pub fn create_bind_group(
         &self,
         device: &wgpu::Device,
@@ -169,10 +174,12 @@ impl BlendPipeline {
         })
     }
 
+    /// Update uniform parameters before rendering.
     pub fn update_params(&self, queue: &wgpu::Queue, params: BlendParams) {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
+    /// Render a fullscreen triangle to composite the source over the destination.
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, bind_group: &wgpu::BindGroup) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);

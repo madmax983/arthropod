@@ -27,6 +27,7 @@ pub struct PrimitivePipeline {
 }
 
 impl PrimitivePipeline {
+    /// Create a new instance.
     pub fn new(
         device: &wgpu::Device,
         globals_layout: &wgpu::BindGroupLayout,
@@ -274,6 +275,7 @@ impl PrimitivePipeline {
         self.gradient_params.clear();
     }
 
+    /// Prepare instances for rendering by updating buffers.
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -341,6 +343,7 @@ impl PrimitivePipeline {
         self.vertex_buffer_capacity = instances.len();
     }
 
+    /// Draw the primitive instances.
     pub fn render(
         &self,
         render_pass: &mut wgpu::RenderPass<'_>,

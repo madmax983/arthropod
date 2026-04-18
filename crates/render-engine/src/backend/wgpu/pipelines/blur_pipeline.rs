@@ -5,7 +5,9 @@ use crate::backend::wgpu::effects::gaussian_kernel_1d;
 /// Blur pass direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlurDirection {
+    /// Horizontal blur pass.
     Horizontal,
+    /// Vertical blur pass.
     Vertical,
 }
 
@@ -32,13 +34,19 @@ pub fn select_blur_tier(radius: f32) -> BlurTier {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BlurParams {
+    /// Blur direction vector (e.g. [1.0, 0.0] or [0.0, 1.0]).
     pub direction: [f32; 2],
+    /// Size of a single texel in UV space.
     pub texel_size: [f32; 2],
+    /// Number of taps (samples) in the kernel.
     pub tap_count: u32,
+    /// Padding to match 16-byte alignment.
     pub _pad: u32,
     // Match WGSL uniform alignment before packed_weights (offset 32).
+    /// Padding to match WGSL uniform array alignment.
     pub _pad2: [u32; 2],
     // WGSL uniform arrays require 16-byte stride; pack scalar weights into vec4 lanes.
+    /// Packed scalar weights for the blur kernel.
     pub packed_weights: [[f32; 4]; 7],
 }
 
@@ -95,6 +103,7 @@ fn blur_color_target_state(format: wgpu::TextureFormat) -> wgpu::ColorTargetStat
 }
 
 impl BlurPipeline {
+    /// Create a new blur pipeline instance.
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Blur Shader"),
@@ -179,6 +188,7 @@ impl BlurPipeline {
     }
 
     #[must_use]
+    /// Create a bind group mapping source texture and sampler.
     pub fn create_bind_group(
         &self,
         device: &wgpu::Device,
@@ -205,10 +215,12 @@ impl BlurPipeline {
         })
     }
 
+    /// Update uniform parameters before rendering.
     pub fn update_params(&self, queue: &wgpu::Queue, params: &BlurParams) {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(params));
     }
 
+    /// Render a fullscreen triangle to apply the blur pass.
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, bind_group: &wgpu::BindGroup) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);

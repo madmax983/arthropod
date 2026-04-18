@@ -6,9 +6,13 @@ use hashbrown::HashMap;
 /// Texture coordinates in atlas (0.0-1.0 normalized) plus pixel dimensions and placement
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TexCoords {
+    /// Left texture coordinate (0.0 to 1.0).
     pub u0: f32,
+    /// Top texture coordinate (0.0 to 1.0).
     pub v0: f32,
+    /// Right texture coordinate (0.0 to 1.0).
     pub u1: f32,
+    /// Bottom texture coordinate (0.0 to 1.0).
     pub v1: f32,
     /// Rasterized glyph width in pixels
     pub pixel_width: u32,

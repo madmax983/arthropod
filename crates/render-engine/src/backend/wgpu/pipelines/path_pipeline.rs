@@ -21,15 +21,19 @@ use wgpu::util::DeviceExt;
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PathVertex {
     /// Tessellated local-space position.
+    /// Local position.
     pub position: [f32; 2],
     /// Optional normal. Fill tessellation uses `[0, 0]`.
+    /// Normal vector for stroke expansion.
     pub normal: [f32; 2],
 }
 
 /// CPU-side tessellation output.
 #[derive(Debug, Clone, Default)]
 pub struct PathMesh {
+    /// List of vertices forming the mesh.
     pub vertices: Vec<PathVertex>,
+    /// List of indices for the triangles.
     pub indices: Vec<u32>,
 }
 
@@ -37,21 +41,32 @@ pub struct PathMesh {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PathGpuVertex {
+    /// Local position.
     pub position: [f32; 2],
+    /// Normal vector for stroke expansion.
     pub normal: [f32; 2],
+    /// Primary color or gradient fallback.
     pub color: [f32; 4],
+    /// UV coordinates for gradients.
     pub uv: [f32; 2],
+    /// Type of fill: 0=Solid, 1=Linear, 2=Radial, 3=Angular, 4=Diamond.
     pub fill_type: u32,
+    /// Index into the gradient atlas.
     pub gradient_index: u32,
 }
 
 /// Prepared path draw batch for upload.
 #[derive(Debug, Clone)]
 pub struct PathBatch<'a> {
+    /// Tessellated mesh geometry.
     pub mesh: Arc<PathMesh>,
+    /// Paint style to apply (solid color or gradient).
     pub paint: &'a Paint,
+    /// Overall opacity multiplier.
     pub opacity: f32,
+    /// Bounding size of the path.
     pub size: [f32; 2],
+    /// Translation offset.
     pub offset: [f32; 2],
 }
 
@@ -84,8 +99,11 @@ struct InternedPathKeyEntry {
 /// Runtime counters for tessellation cache behavior.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TessellationCacheStats {
+    /// Number of cache hits.
     pub hits: u64,
+    /// Number of cache misses requiring re-tessellation.
     pub misses: u64,
+    /// Number of items evicted from the cache.
     pub evictions: u64,
 }
 
@@ -93,6 +111,7 @@ pub struct TessellationCacheStats {
 #[derive(Debug, Error)]
 pub enum TessellationError {
     #[error("lyon tessellation failed: {0}")]
+    /// Error string from the underlying lyon crate.
     Lyon(String),
 }
 
@@ -596,6 +615,8 @@ impl TessellationCache {
         path_hash
     }
 
+    /// Create a new tessellation cache with a specific entry capacity.
+    /// Create a new instance.
     pub fn new(max_entries: usize) -> Self {
         Self {
             cache: HashMap::new(),
@@ -657,18 +678,22 @@ impl TessellationCache {
         self.stats.misses = self.stats.misses.saturating_add(1);
     }
 
+    /// Generate a cache key for filling a vector path.
     pub fn fill_key(path: &VectorPath) -> u64 {
         hash_vector_path(path)
     }
 
+    /// Generate a cache key for stroking a vector path.
     pub fn stroke_key(path: &VectorPath, stroke: &StrokeStyle) -> u64 {
         stroke_key_from_parts(hash_vector_path(path), hash_stroke_style(stroke))
     }
 
+    /// Generate a stroke cache key using a pre-computed path hash.
     pub fn stroke_key_from_path_hash(path_hash: u64, stroke: &StrokeStyle) -> u64 {
         stroke_key_from_parts(path_hash, hash_stroke_style(stroke))
     }
 
+    /// Get a cached fill mesh or tessellate it using a specific key.
     pub fn get_or_tessellate_fill_with_key(
         &mut self,
         key: u64,
@@ -686,6 +711,7 @@ impl TessellationCache {
         Ok(self.insert_mesh(key, mesh))
     }
 
+    /// Get a cached fill mesh or tessellate it.
     pub fn get_or_tessellate_fill(
         &mut self,
         path: &VectorPath,
@@ -694,6 +720,7 @@ impl TessellationCache {
         self.get_or_tessellate_fill_with_key(key, path)
     }
 
+    /// Get a cached stroke mesh or tessellate it using a specific key.
     pub fn get_or_tessellate_stroke_with_key(
         &mut self,
         key: u64,
@@ -710,6 +737,7 @@ impl TessellationCache {
         Ok(self.insert_mesh(key, mesh))
     }
 
+    /// Get a cached stroke mesh or tessellate it.
     pub fn get_or_tessellate_stroke(
         &mut self,
         path: &VectorPath,
@@ -720,10 +748,12 @@ impl TessellationCache {
         self.get_or_tessellate_stroke_with_key(key, path, stroke)
     }
 
+    /// Get cache usage statistics.
     pub fn stats(&self) -> TessellationCacheStats {
         self.stats
     }
 
+    /// Reset cache usage statistics.
     pub fn reset_stats(&mut self) {
         self.stats = TessellationCacheStats::default();
     }
@@ -907,6 +937,7 @@ fn gradient_params_for_paint(paint: &Paint, atlas_row: u32) -> Option<GradientPa
 }
 
 impl PathPipeline {
+    /// Create a new instance.
     pub fn new(
         device: &wgpu::Device,
         globals_bind_group_layout: &wgpu::BindGroupLayout,
@@ -1065,6 +1096,7 @@ impl PathPipeline {
         }
     }
 
+    /// Prepare vertex and index buffers from batches.
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -1161,6 +1193,7 @@ impl PathPipeline {
         self.index_capacity = self.cpu_indices.len();
     }
 
+    /// Render the paths to the screen.
     pub fn render(
         &self,
         render_pass: &mut wgpu::RenderPass<'_>,

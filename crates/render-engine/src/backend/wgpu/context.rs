@@ -12,20 +12,27 @@ use wasm_bindgen::JsCast;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Globals {
+    /// The 4x4 orthographic projection matrix used to map scene coordinates to normalized device coordinates.
     pub transform: [[f32; 4]; 4], // 4x4 projection matrix
 }
 
 /// Offscreen render target (color + optional stencil).
 pub struct RenderTarget {
+    /// The unique configuration key for this render target.
     pub key: RenderTargetKey,
+    /// The actual WGPU color texture.
     pub color_texture: wgpu::Texture,
+    /// The view into the color texture used for rendering.
     pub color_view: wgpu::TextureView,
+    /// An optional stencil texture for clipping masks.
     pub stencil_texture: Option<wgpu::Texture>,
+    /// The view into the optional stencil texture.
     pub stencil_view: Option<wgpu::TextureView>,
 }
 
 impl RenderTarget {
     #[must_use]
+    /// Estimate the VRAM usage of this render target in bytes.
     pub fn estimated_bytes(&self) -> u64 {
         self.key.estimated_bytes()
     }
@@ -43,7 +50,9 @@ pub enum WebBackend {
 /// Capability probe output used to choose a web backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProbeCaps {
+    /// True if WebGPU is supported by the browser.
     pub webgpu_available: bool,
+    /// True if WebGL2 is supported by the browser.
     pub webgl2_available: bool,
 }
 
@@ -471,10 +480,12 @@ impl WgpuContext {
     }
 
     #[must_use]
+    /// Retrieve a reference to a render target by its handle.
     pub fn get_render_target(&self, handle: RenderTargetHandle) -> Option<&RenderTarget> {
         self.render_targets.get(&handle)
     }
 
+    /// Remove and return a render target from the context.
     pub fn remove_render_target(&mut self, handle: RenderTargetHandle) -> Option<RenderTarget> {
         self.render_targets.remove(&handle)
     }
@@ -736,6 +747,7 @@ impl WgpuContext {
         Ok(rgba)
     }
 
+    /// Resize the window surface and update projection matrices.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.config.width = width;
@@ -745,6 +757,7 @@ impl WgpuContext {
         }
     }
 
+    /// Set the design space coordinate system.
     pub fn set_design_space(&mut self, width: f32, height: f32) {
         self.design_space =
             if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 {
@@ -755,6 +768,7 @@ impl WgpuContext {
         self.update_globals_transform();
     }
 
+    /// Clear the design space and return to pixel coordinates.
     pub fn clear_design_space(&mut self) {
         self.design_space = None;
         self.update_globals_transform();
@@ -773,6 +787,7 @@ impl WgpuContext {
             .write_buffer(&self.globals_buffer, 0, bytemuck::cast_slice(&[globals]));
     }
 
+    /// Map a rectangle from scene space to surface pixel coordinates.
     pub fn map_scene_rect_to_surface(&self, rect: plat_core::Rect) -> plat_core::Rect {
         map_scene_rect_to_surface_with_design_space(
             rect,

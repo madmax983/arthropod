@@ -36,11 +36,15 @@ pub enum EffectPassKind {
 /// Planned effect pass entry for a node.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EffectPass {
+    /// The ID of the node this pass applies to.
     pub node_id: NodeId,
+    /// The kind of effect pass.
     pub kind: EffectPassKind,
+    /// The target handle, if rendering to an offscreen buffer.
     pub target: Option<RenderTargetHandle>,
     /// Pixel bounds: [x, y, width, height]
     pub bounds_px: [u32; 4],
+    /// The blend mode to apply during compositing.
     pub blend_mode: BlendMode,
 }
 
@@ -50,16 +54,23 @@ pub struct EffectPass {
 /// owned copy to prevent expensive heap allocations (`.clone()`) per scene node during effect planning.
 #[derive(Debug, Clone)]
 pub struct EffectPlanNode<'a> {
+    /// The ID of the node.
     pub node_id: NodeId,
+    /// The visual style applied to the node, if any.
     pub style: Option<&'a VisualStyle>,
+    /// The layout bounds of the node.
     pub bounds: plat_core::Rect,
+    /// True if the node has child nodes.
     pub has_children: bool,
+    /// True if the node is visible.
     pub visible: bool,
+    /// The opacity of the node (0.0 to 1.0).
     pub opacity: f32,
 }
 
 impl<'a> EffectPlanNode<'a> {
     #[must_use]
+    /// Extract planning information from a scene node.
     pub fn from_scene(node_id: NodeId, node: &'a SceneNode) -> Self {
         let style = match &node.content {
             NodeContent::Styled { style } => Some(&**style),
@@ -563,6 +574,7 @@ pub fn inner_shadow_alpha(mask: f32, blurred_offset_mask: f32) -> f32 {
     (blurred_offset_mask - (1.0 - mask)).clamp(0.0, 1.0) * mask
 }
 
+/// Determine if a style requires multi-pass rendering (e.g. blurs, filters, non-normal blend modes).
 pub fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
     if !matches!(
         style.blend_mode,
@@ -583,6 +595,7 @@ pub fn style_requires_multipass(style: &style_engine::VisualStyle) -> bool {
 }
 
 #[must_use]
+/// Determine if a color filter does nothing (grayscale=0, contrast=1, invert=0).
 pub fn color_filter_is_identity(filter: ColorFilter) -> bool {
     filter.grayscale <= f32::EPSILON
         && (filter.contrast - 1.0).abs() <= f32::EPSILON

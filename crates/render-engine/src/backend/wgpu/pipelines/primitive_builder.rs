@@ -151,6 +151,7 @@ fn create_primitive_instances_impl(
     }
 }
 
+/// Create instances from a style.
 pub fn create_primitive_instances(
     style: &VisualStyle,
     pos: Vec2,
@@ -161,6 +162,7 @@ pub fn create_primitive_instances(
     create_primitive_instances_impl(None, style, pos, size, opacity, instances)
 }
 
+/// Create instances from a style using an existing pipeline instance.
 pub fn create_primitive_instances_with_pipeline(
     pipeline: &mut PrimitivePipeline,
     style: &VisualStyle,

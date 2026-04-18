@@ -41,8 +41,11 @@
 //! scene.add_node(root, node);
 //! ```
 
+/// Render backends and graphics API integration.
 pub mod backend;
+/// Scene node graph structures.
 pub mod node;
+/// Graphic primitives and colors.
 pub mod primitives;
 mod scene;
 
@@ -75,22 +78,29 @@ pub use style_engine::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+/// Errors that can occur during renderer initialization or execution.
 pub enum RendererError {
     #[error("No suitable graphics adapter found")]
+    /// No supported GPU adapter could be found.
     NoAdapter,
 
     #[error("Initialization failed: {0}")]
+    /// Initialization failed with the given reason.
     InitializationFailed(String),
 
     #[error("wgpu error: {0}")]
+    /// Error requesting a GPU device.
     Wgpu(#[from] wgpu::RequestDeviceError),
 
     #[error("Surface error: {0}")]
+    /// Error interacting with the window surface.
     Surface(#[from] wgpu::SurfaceError),
 
     #[error("Surface creation error: {0}")]
+    /// Error creating the window surface.
     SurfaceCreation(#[from] wgpu::CreateSurfaceError),
 
     #[error("Window handle error: {0}")]
+    /// Error obtaining a raw window handle.
     WindowHandle(#[from] raw_window_handle::HandleError),
 }

@@ -6,14 +6,19 @@ use style_engine::ColorFilter;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ColorFilterParams {
+    /// Grayscale amount (0.0 to 1.0).
     pub grayscale: f32,
+    /// Contrast multiplier (1.0 is unchanged).
     pub contrast: f32,
+    /// Invert amount (0.0 to 1.0).
     pub invert: f32,
+    /// Padding to match 16-byte alignment.
     pub _pad: f32,
 }
 
 impl ColorFilterParams {
     #[must_use]
+    /// Create new color filter parameters.
     pub fn new(filter: ColorFilter) -> Self {
         Self {
             grayscale: filter.grayscale.clamp(0.0, 1.0),
@@ -40,6 +45,7 @@ pub struct ColorFilterPipeline {
 }
 
 impl ColorFilterPipeline {
+    /// Create a new color filter pipeline instance.
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Color Filter Shader"),
@@ -126,6 +132,7 @@ impl ColorFilterPipeline {
     }
 
     #[must_use]
+    /// Create a bind group mapping source texture and sampler.
     pub fn create_bind_group(
         &self,
         device: &wgpu::Device,
@@ -152,10 +159,12 @@ impl ColorFilterPipeline {
         })
     }
 
+    /// Update uniform parameters before rendering.
     pub fn update_params(&self, queue: &wgpu::Queue, params: ColorFilterParams) {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
+    /// Render a fullscreen triangle to apply the color filter.
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, bind_group: &wgpu::BindGroup) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);
