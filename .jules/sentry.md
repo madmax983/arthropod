@@ -11,3 +11,6 @@
 **[Action Handler Mutex Poisoning]
 **Learning:** Using `.ok()` on a `Mutex::lock()` silently drops the error when poisoned, causing action handlers (like focus) to fail silently on subsequent invocations.
 **Action:** Always use `.unwrap_or_else(std::sync::PoisonError::into_inner)` for synchronized handlers to allow recovery instead of silencing failures.
+**Graceful Lock Poison Recovery**
+**Learning:** Raw `unwrap()` calls on Mutex or RwLock operations crash the runtime when a holding thread panics, leading to subsequent, catastrophic lock poisoning across the workspace.
+**Action:** Replace `.lock().unwrap()`, `.read().unwrap()`, and `.write().unwrap()` with `.unwrap_or_else(std::sync::PoisonError::into_inner)` inside core synchronization boundaries to safely recover the lock guard and maintain stability.

@@ -287,7 +287,9 @@ mod tests {
                 field_mapping,
                 is_valid: true,
                 on_submit: Some(Arc::new(move |_data| {
-                    *submit_called_clone.lock().unwrap() = true;
+                    *submit_called_clone
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
                     Err("Server error".to_string())
                 })),
                 submit_error: None,
@@ -319,7 +321,11 @@ mod tests {
             &mut validators,
         );
 
-        assert!(!(*submit_called.lock().unwrap()));
+        assert!(
+            !(*submit_called
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner))
+        );
         assert!(!form_states.get(&form_id).unwrap().is_valid);
         assert_eq!(form_states.get(&form_id).unwrap().submit_error, None);
 
@@ -338,7 +344,11 @@ mod tests {
             &mut validators,
         );
 
-        assert!(*submit_called.lock().unwrap());
+        assert!(
+            *submit_called
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        );
         assert!(form_states.get(&form_id).unwrap().is_valid);
         assert_eq!(
             form_states.get(&form_id).unwrap().submit_error,

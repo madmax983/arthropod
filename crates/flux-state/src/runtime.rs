@@ -356,7 +356,10 @@ impl Runtime {
     }
 
     pub(crate) fn create_signal(&self, value: Arc<dyn Any + Send + Sync>) -> NodeId {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
         inner.signals.insert(id, value);
@@ -367,7 +370,10 @@ impl Runtime {
         &self,
         compute: std::sync::Arc<dyn Fn() -> Arc<dyn Any + Send + Sync> + Send + Sync>,
     ) -> NodeId {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
         inner.computeds.insert(
@@ -384,7 +390,10 @@ impl Runtime {
         &self,
         effect_fn: std::sync::Arc<dyn Fn() + Send + Sync>,
     ) -> NodeId {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
         inner.effects.insert(id, effect_fn);
@@ -393,7 +402,10 @@ impl Runtime {
 
     fn run_with_context<R>(&self, id: NodeId, keep_stale: bool, f: impl FnOnce() -> R) -> R {
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Err(e) = inner.prepare_execution(id, keep_stale) {
                 // Drop lock before panicking to prevent mutex poisoning,
                 // which would cause double-panics during unwinding cleanup.
@@ -411,7 +423,10 @@ impl Runtime {
 
     /// Track a dependency (called during signal/computed reads).
     pub(crate) fn track(&self, source: NodeId) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(observer) = inner.current_context() {
             inner
                 .dependencies
@@ -430,7 +445,10 @@ impl Runtime {
     pub(crate) fn notify(&self, source: NodeId) {
         // println!("DEBUG: notify called for {:?}", source);
         // Mark all transitive subscribers as stale
-        self.inner.lock().unwrap().mark_subscribers_stale(source);
+        self.inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .mark_subscribers_stale(source);
 
         // Flush pending effects (synchronous for now)
         self.flush_effects();
@@ -449,7 +467,10 @@ impl Runtime {
 
         // 1) Wait until no other thread is flushing.
         // If we are already flushing (reentrant flush), we just proceed (or we don't block ourselves).
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         while let Some(flushing) = inner.flushing_thread {
             if flushing == current_thread {
                 // We are already the flushing thread. This means a set() was called
@@ -498,7 +519,10 @@ impl Runtime {
             drop(inner);
             self.process_effect_batch(&mut local_effects);
             // Re-acquire lock to check for more pending effects
-            inner = self.inner.lock().unwrap();
+            inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
         }
 
         // Let the FlushingGuard release the lock when dropped
@@ -523,7 +547,10 @@ impl Runtime {
 
     pub(crate) fn run_effect(&self, id: NodeId) {
         let effect_fn = {
-            let inner = self.inner.lock().unwrap();
+            let inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.effects.get(&id).cloned()
         };
 
@@ -544,7 +571,10 @@ impl Runtime {
     /// Panics if the signal does not exist.
     #[allow(dead_code)]
     pub(crate) fn get_signal_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         inner
             .signals
             .get(&id)
@@ -558,7 +588,10 @@ impl Runtime {
     ///
     /// Panics if the computed value does not exist or has not been initialized.
     pub(crate) fn get_computed_handle(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let computed = inner
             .computeds
             .get(&id)
@@ -572,7 +605,10 @@ impl Runtime {
     /// Combined operation to track a dependency and get the signal handle in one lock.
     #[allow(dead_code)]
     pub(crate) fn track_and_get_signal(&self, id: NodeId) -> Arc<dyn Any + Send + Sync> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(observer) = inner.current_context() {
             inner.dependencies.entry(observer).or_default().insert(id);
             inner.subscribers.entry(id).or_default().insert(observer);
@@ -590,7 +626,10 @@ impl Runtime {
         &self,
         id: NodeId,
     ) -> Option<Arc<dyn Any + Send + Sync>> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         if let Some(observer) = inner.current_context() {
             inner.dependencies.entry(observer).or_default().insert(id);
@@ -610,7 +649,10 @@ impl Runtime {
 
     /// Get the computed handle if fresh, without tracking.
     pub(crate) fn get_computed_if_fresh(&self, id: NodeId) -> Option<Arc<dyn Any + Send + Sync>> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         if inner.stale.contains(&id) {
             return None;
@@ -624,7 +666,11 @@ impl Runtime {
     }
 
     pub(crate) fn is_stale(&self, id: NodeId) -> bool {
-        self.inner.lock().unwrap().stale.contains(&id)
+        self.inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .stale
+            .contains(&id)
     }
 
     fn wait_for_computation<'a>(
@@ -651,7 +697,10 @@ impl Runtime {
     }
 
     fn finish_computation(&self, id: NodeId, new_value: Arc<dyn Any + Send + Sync>) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(computed) = inner.computeds.get_mut(&id) {
             computed.value = Some(new_value);
         }
@@ -673,7 +722,10 @@ impl Runtime {
     pub(crate) fn recompute(&self, id: NodeId) {
         // println!("DEBUG: recompute called for {:?}", id);
         let compute_fn = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             // Check for recursion (cycle detection) - return stale value if we are already computing this
             if inner.check_recursion(id) {
@@ -716,7 +768,10 @@ impl Runtime {
     }
 
     pub(crate) fn dispose_effect(&self, id: NodeId) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // Remove from effects
         inner.effects.remove(&id);
@@ -788,7 +843,10 @@ mod tests {
 
         // Populate pending effects
         {
-            let mut inner = runtime.inner.lock().unwrap();
+            let mut inner = runtime
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.pending_effects.push(NodeId(1));
             inner.pending_effects.push(NodeId(2));
             inner.pending_effects.push(NodeId(3));
@@ -812,7 +870,10 @@ mod tests {
         assert!(result.is_err());
 
         // Check that remaining effects were restored
-        let inner = runtime.inner.lock().unwrap();
+        let inner = runtime
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert_eq!(
             inner.pending_effects,
             vec![NodeId(1), NodeId(2), NodeId(3), NodeId(1), NodeId(2)]
@@ -874,7 +935,10 @@ mod tests {
         assert!(!taken);
 
         let spare_ptr = {
-            let inner = runtime.inner.lock().unwrap();
+            let inner = runtime
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             assert_eq!(inner.spare_pending_effects.capacity(), 10);
             inner.spare_pending_effects.as_ptr()
         };
@@ -889,7 +953,10 @@ mod tests {
 
         // Create a spare buffer
         {
-            let mut inner = runtime.inner.lock().unwrap();
+            let mut inner = runtime
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.spare_pending_effects = Vec::with_capacity(20);
             inner.pending_effects.push(NodeId(1));
         }
@@ -906,7 +973,10 @@ mod tests {
         assert_eq!(buffer, vec![NodeId(1)]);
 
         // Check that spare_pending_effects is now empty (was moved)
-        let inner = runtime.inner.lock().unwrap();
+        let inner = runtime
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert_eq!(inner.spare_pending_effects.capacity(), 0);
         assert_eq!(inner.pending_effects.capacity(), 20); // Reused spare
     }
@@ -916,7 +986,10 @@ mod tests {
         let runtime = Runtime::new();
 
         {
-            let mut inner = runtime.inner.lock().unwrap();
+            let mut inner = runtime
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.spare_pending_effects = Vec::new(); // capacity 0
             inner.pending_effects.push(NodeId(2));
         }
@@ -933,7 +1006,10 @@ mod tests {
 
         // Because spare_pending_effects was empty (capacity 0), take_pending_effects
         // should have fallen back to returning the provided buffer.
-        let inner = runtime.inner.lock().unwrap();
+        let inner = runtime
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert_eq!(inner.pending_effects.capacity(), 5);
     }
 
@@ -1136,7 +1212,10 @@ pub enum NodeType {
 #[cfg(feature = "nova")]
 impl Runtime {
     pub(crate) fn set_label(&self, id: NodeId, label: String) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         inner.labels.insert(id, label);
     }
 
@@ -1182,7 +1261,10 @@ impl Runtime {
     /// # }
     /// ```
     pub fn inspect_graph(self: &Arc<Self>) -> GraphSnapshot {
-        let inner = self.inner.lock().unwrap();
+        let inner = self
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut nodes = Vec::new();
         let mut dependencies = Vec::new();
         let mut stale_nodes = Vec::new();
@@ -1290,7 +1372,10 @@ mod tests_sentry {
     fn test_get_computed_handle_panics_on_uninitialized_computed() {
         let runtime = Runtime::new();
 
-        let mut inner = runtime.inner.lock().unwrap();
+        let mut inner = runtime
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let id = NodeId(inner.next_id);
         inner.next_id += 1;
         inner.computeds.insert(
@@ -1360,7 +1445,10 @@ mod tests_sentry {
             .join()
             .unwrap();
 
-        let mut inner = runtime.inner.lock().unwrap();
+        let mut inner = runtime
+            .inner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         inner.computing.insert(node_a, thread_1);
         inner.waiting_for.insert(thread_1, node_b);

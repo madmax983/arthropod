@@ -209,7 +209,7 @@ impl<T: 'static + Send + Sync> Computed<T> {
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
             .read()
-            .unwrap();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         f(&*guard)
     }
 
@@ -250,7 +250,7 @@ impl<T: 'static + Send + Sync> Computed<T> {
             .downcast_ref::<RwLock<T>>()
             .expect("Type mismatch")
             .read()
-            .unwrap();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         f(&*guard)
     }
 
@@ -492,7 +492,7 @@ mod tests {
             .downcast_ref::<RwLock<i32>>()
             .unwrap()
             .write()
-            .unwrap();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let debug_str = format!("{:?}", computed);
         assert!(debug_str.contains("value: <locked>"));

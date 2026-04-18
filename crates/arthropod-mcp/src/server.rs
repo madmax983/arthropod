@@ -187,12 +187,17 @@ impl ArthropodServer {
     }
 
     pub fn context(&self) -> std::sync::MutexGuard<'_, McpFrameworkContext> {
-        self.context.lock().unwrap()
+        self.context
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Check if a live app is connected and return its info
     fn get_connected_app_info(&self) -> Option<(String, u32)> {
-        let app_guard = self.connected_app.read().unwrap();
+        let app_guard = self
+            .connected_app
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         app_guard.as_ref().map(|app| (app.name.clone(), app.pid))
     }
 
@@ -214,7 +219,10 @@ impl ArthropodServer {
         T: ArthropodTool,
         P: Serialize,
     {
-        let mut ctx = self.context.lock().unwrap();
+        let mut ctx = self
+            .context
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let json_params = serde_json::to_value(params)
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
@@ -237,7 +245,11 @@ impl ArthropodServer {
         let mut output = self.get_source_banner();
 
         // Check if we have live scene data
-        if let Some(app) = self.connected_app.read().unwrap().as_ref()
+        if let Some(app) = self
+            .connected_app
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
             && let Some(scene_json) = &app.scene
         {
             // Use live scene data
@@ -381,7 +393,7 @@ impl ArthropodServer {
     // TODO: Fix schema generation for flexible JSON parameters
     // #[tool(description = "Register a new reactive signal")]
     // async fn state_register_signal(&self, params: Parameters<RegisterSignalParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::state::RegisterSignalTool;
     //
     //     let json_params = serde_json::to_value(&params.0)
@@ -397,7 +409,7 @@ impl ArthropodServer {
 
     // #[tool(description = "Set a signal value")]
     // async fn state_set_signal(&self, params: Parameters<SetSignalParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::state::SetSignalTool;
     //
     //     let json_params = serde_json::to_value(&params.0)
@@ -440,7 +452,7 @@ impl ArthropodServer {
     // TODO: Fix schema generation for flexible JSON parameters
     // #[tool(description = "Create a test scene with nodes")]
     // async fn test_create_scene(&self, params: Parameters<CreateSceneParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::test::CreateSceneTool;
     //
     //     let json_params = serde_json::to_value(&params.0)
@@ -456,7 +468,7 @@ impl ArthropodServer {
 
     // #[tool(description = "Assert node state matches expected")]
     // async fn test_assert_node_state(&self, params: Parameters<AssertNodeStateParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::test::AssertNodeStateTool;
     //
     //     let json_params = serde_json::to_value(&params.0)
@@ -472,7 +484,7 @@ impl ArthropodServer {
 
     // #[tool(description = "Verify render output")]
     // async fn test_verify_render_output(&self, params: Parameters<VerifyRenderOutputParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::test::VerifyRenderOutputTool;
     //
     //     let json_params = serde_json::to_value(&params.0)
@@ -488,7 +500,7 @@ impl ArthropodServer {
 
     // #[tool(description = "Setup a reactive chain for testing")]
     // async fn test_setup_reactive_chain(&self, params: Parameters<SetupReactiveChainParams>) -> Result<CallToolResult, McpError> {
-    //     let mut ctx = self.context.lock().unwrap();
+    //     let mut ctx = self.context.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     //     let tool = crate::tools::test::SetupReactiveChainTool;
     //
     //     let json_params = serde_json::to_value(&params.0)

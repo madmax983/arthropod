@@ -180,15 +180,26 @@ mod tests {
         let log_clone = log.clone();
 
         let _effect = Effect::new(runtime, move || {
-            log_clone.lock().unwrap().push(read.get());
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(read.get());
         });
 
         // Initial run
-        assert_eq!(*log.lock().unwrap(), vec![0]);
+        assert_eq!(
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec![0]
+        );
 
         // Update
         write.set(1);
-        assert_eq!(*log.lock().unwrap(), vec![0, 1]);
+        assert_eq!(
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec![0, 1]
+        );
     }
 
     #[test]
@@ -203,19 +214,33 @@ mod tests {
         {
             let _effect = Effect::new(runtime, move || {
                 let _ = read.get();
-                *log_clone.lock().unwrap() += 1;
+                *log_clone
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
             });
             // Run 1 (init)
-            assert_eq!(*log.lock().unwrap(), 1);
+            assert_eq!(
+                *log.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+                1
+            );
 
             write.set(1);
             // Run 2
-            assert_eq!(*log.lock().unwrap(), 2);
+            assert_eq!(
+                *log.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+                2
+            );
         } // Effect dropped here
 
         write.set(2);
         // Should NOT run
-        assert_eq!(*log.lock().unwrap(), 2);
+        assert_eq!(
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            2
+        );
     }
 
     #[test]
@@ -230,7 +255,10 @@ mod tests {
         let read_clone = read.clone();
 
         let effect = Effect::new(runtime.clone(), move || {
-            log_clone.lock().unwrap().push(read_clone.get());
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(read_clone.get());
         });
 
         let id_before = effect.id;
@@ -247,6 +275,10 @@ mod tests {
 
         // Update should trigger the effect still
         write.set(1);
-        assert_eq!(*log.lock().unwrap(), vec![0, 1]);
+        assert_eq!(
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec![0, 1]
+        );
     }
 }

@@ -194,7 +194,10 @@ impl<T: 'static + Send + Sync> Signal<T> {
     ///
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
-        let guard = self.handle.read().unwrap();
+        let guard = self
+            .handle
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         f(&*guard)
     }
 
@@ -216,7 +219,10 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// - Panics if the internal lock is poisoned.
     ///
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
-        let guard = self.handle.read().unwrap();
+        let guard = self
+            .handle
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         f(&*guard)
     }
 
@@ -339,7 +345,10 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
             f(&*guard)
         } else {
             self.runtime.track(self.id);
-            let guard = self.handle.read().unwrap();
+            let guard = self
+                .handle
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&*guard)
         }
     }
@@ -380,7 +389,10 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 .unwrap();
             f(&*guard)
         } else {
-            let guard = self.handle.read().unwrap();
+            let guard = self
+                .handle
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&*guard)
         }
     }
@@ -427,7 +439,10 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     ///
     pub fn set(&self, value: T) {
         let old_value = {
-            let mut guard = self.handle.write().unwrap();
+            let mut guard = self
+                .handle
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             std::mem::replace(&mut *guard, value)
         };
         drop(old_value);
@@ -461,7 +476,10 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     ///
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         {
-            let mut guard = self.handle.write().unwrap();
+            let mut guard = self
+                .handle
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&mut *guard);
         }
         self.runtime.notify(self.id);
@@ -514,7 +532,11 @@ mod tests {
 
         // Initial state
         assert_eq!(computed.get(), 3);
-        assert_eq!(*log.lock().unwrap(), vec![vec![1, 2, 3]]);
+        assert_eq!(
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            vec![vec![1, 2, 3]]
+        );
 
         // Mutate the signal using update()
         write.update(|v| {
@@ -527,7 +549,8 @@ mod tests {
 
         // Assert that effect ran again and logged the new state
         assert_eq!(
-            *log.lock().unwrap(),
+            *log.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             vec![vec![1, 2, 3], vec![1, 2, 3, 4, 5]]
         );
     }

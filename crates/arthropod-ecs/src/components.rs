@@ -428,14 +428,18 @@ mod tests {
         let clicked_clone = clicked.clone();
 
         let click_handler = OnA11yClick::new(move || {
-            *clicked_clone.lock().unwrap() = true;
+            *clicked_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
         });
 
         // Invoke the callback
         (click_handler.callback)();
 
         assert!(
-            *clicked.lock().unwrap(),
+            *clicked
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             "Callback should have been invoked"
         );
     }
@@ -448,7 +452,9 @@ mod tests {
         let count_clone = count.clone();
 
         let handler1 = OnA11yClick::new(move || {
-            *count_clone.lock().unwrap() += 1;
+            *count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
         });
 
         // Clone the handler
@@ -458,6 +464,11 @@ mod tests {
         (handler1.callback)();
         (handler2.callback)();
 
-        assert_eq!(*count.lock().unwrap(), 2);
+        assert_eq!(
+            *count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            2
+        );
     }
 }
