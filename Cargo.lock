@@ -4426,6 +4426,7 @@ dependencies = [
  "criterion",
  "geo",
  "glam",
+ "proptest",
  "serde",
  "serde_json",
 ]

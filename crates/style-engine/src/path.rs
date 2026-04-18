@@ -932,6 +932,11 @@ fn tokenize_svg_path(data: &str) -> Result<Vec<SvgToken>, VectorPathError> {
         }
 
         let raw = &data[start..i];
+        if raw.len() > 255 {
+            return Err(VectorPathError::InvalidSvgPathData(
+                "numeric token exceeds maximum allowed length of 255 bytes".to_string(),
+            ));
+        }
         let value = f32::from_str(raw).map_err(|_| {
             VectorPathError::InvalidSvgPathData(format!("invalid numeric value: {raw}"))
         })?;
