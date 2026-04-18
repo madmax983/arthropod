@@ -168,7 +168,7 @@ sequenceDiagram
 
 ## Widget System Structure
 
-The widget system follows a "Functional Core, Imperative Shell" approach. `WidgetContext` acts as a flattened state container, while complex logic is delegated to pure functional modules. See [ADR 0028](./adr/0028-widget-state-delegation.md) and [ADR 0037](./adr/0037-input-engine-unification.md).
+The widget system follows a "Functional Core, Imperative Shell" approach. `WidgetContext` acts as a flattened state container, while complex logic is delegated to pure functional modules. See [ADR 0028](./adr/0028-widget-state-delegation.md) and [ADR 0037](./adr/0037-input-engine-unification.md). Also, see [ADR 0040](./adr/0040-module-encapsulation.md) for the Facade encapsulation.
 
 ```mermaid
 classDiagram
@@ -202,6 +202,15 @@ classDiagram
     Widget ..> WidgetContext : Uses
     WidgetContext "1" *-- "*" TextInputState : Owns
     WidgetContext ..> InputEngine : Delegates to
+
+    class WidgetCoreFacade {
+        <<Facade>>
+        +WidgetContext
+        +perform_layout()
+        +ReactiveColorState
+    }
+
+    WidgetCoreFacade ..> WidgetContext : Encapsulates
 ```
 
 ## Key Architectural Decisions
@@ -210,6 +219,7 @@ classDiagram
 - **Reactive State**: State is managed via `flux-state` signals. We use `ReadSignal<T>` directly (which is thread-safe) to propagate changes from the UI to the ECS. See [ADR 0027](./adr/0027-reactive-signal-simplification.md) and [ADR 0024](./adr/0024-single-pass-reactive-updates.md).
 - **Platform Abstraction**: `plat-core` isolates OS-specific code, allowing the rest of the engine to remain platform-agnostic.
 - **Input Engine Decoupling**: The `input-engine` operates independently of the rendering layer by utilizing `InputNodeId` instead of rendering `NodeId`. See [ADR 0039](./adr/0039-decouple-input-engine.md).
+- **Module Encapsulation**: Crate internal modules are strictly encapsulated using `pub(crate)` visibility to reduce coupling and enforce the Facade pattern at the crate boundary. See [ADR 0040](./adr/0040-module-encapsulation.md).
 
 ## Experimental Subsystems (Nova)
 
