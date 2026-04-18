@@ -10,7 +10,11 @@ macro_rules! downcast_check {
                     Ok(val) => {
                         let formatted = format!("{:?}", *val);
                         if formatted.len() > 1000 {
-                            Some(format!("{}...", &formatted[..1000]))
+                            let mut max_len = 1000;
+                            while !formatted.is_char_boundary(max_len) {
+                                max_len -= 1;
+                            }
+                            Some(format!("{}...", &formatted[..max_len]))
                         } else {
                             Some(formatted)
                         }
@@ -46,4 +50,20 @@ pub fn try_inspect_value(any: &Arc<dyn Any + Send + Sync>) -> Option<String> {
 
     // Fallback for types that we didn't explicitly register
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_truncate_multibyte_safely() {
+        let s = format!("a{}", "あ".repeat(334));
+        let any: Arc<dyn Any + Send + Sync> = Arc::new(RwLock::new(s));
+        let result = try_inspect_value(&any);
+        assert!(result.is_some());
+        let result_str = result.unwrap();
+        assert!(result_str.ends_with("..."));
+        assert!(result_str.len() <= 1003); // 1000 max_len + 3 for "..."
+    }
 }
