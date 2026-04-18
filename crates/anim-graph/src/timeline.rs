@@ -112,16 +112,10 @@ impl<T: Animatable + Send + Sync + 'static> Timeline<T> {
         )
     }
 
-    /// Create a spring timeline with default stiffness/damping.
-    ///
-    /// Use `.stiffness()` and `.damping()` to customize.
-    pub fn spring(from: T, to: T) -> SpringBuilder<T> {
-        SpringBuilder {
-            from,
-            to,
-            stiffness: 300.0,
-            damping: 30.0,
-        }
+    /// Create a spring timeline.
+    pub fn spring(from: T, to: T, stiffness: f32, damping: f32) -> Self {
+        let seg = SpringSegment::new(from, to, stiffness, damping);
+        Self::from_evaluable(Box::new(seg), PlaybackMode::Once)
     }
 
     /// Start building a sequence.
@@ -283,34 +277,6 @@ impl<T: Animatable + Send + Sync + 'static> Timeline<T> {
 }
 
 // ========== Builders ==========
-
-/// Builder for spring timelines.
-pub struct SpringBuilder<T: Animatable> {
-    from: T,
-    to: T,
-    stiffness: f32,
-    damping: f32,
-}
-
-impl<T: Animatable + Send + Sync + 'static> SpringBuilder<T> {
-    /// Set spring stiffness.
-    pub fn stiffness(mut self, s: f32) -> Self {
-        self.stiffness = s;
-        self
-    }
-
-    /// Set spring damping.
-    pub fn damping(mut self, d: f32) -> Self {
-        self.damping = d;
-        self
-    }
-
-    /// Build the timeline.
-    pub fn build(self) -> Timeline<T> {
-        let seg = SpringSegment::new(self.from, self.to, self.stiffness, self.damping);
-        Timeline::from_evaluable(Box::new(seg), PlaybackMode::Once)
-    }
-}
 
 /// Builder for sequence timelines.
 pub struct SequenceBuilder<T: Animatable> {
@@ -560,11 +526,8 @@ mod tests {
     }
 
     #[test]
-    fn builder_spring_one_liner() {
-        let mut tl = Timeline::spring(0.0_f32, 100.0)
-            .stiffness(400.0)
-            .damping(40.0)
-            .build();
+    fn timeline_spring() {
+        let mut tl = Timeline::spring(0.0_f32, 100.0, 400.0, 40.0);
         tl.tick(0.05);
         assert!(tl.current_value() > 0.0, "Spring should have moved");
     }

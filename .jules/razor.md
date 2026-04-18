@@ -59,3 +59,7 @@
 **Bloat:** `Tickable` trait in `arthropod`'s `elastic.rs` (Single-implementation trait used only for type erasure)
 **Cut:** Removed `Tickable` trait entirely and replaced it with a concrete `Ticker` struct wrapping a `Box<dyn Fn(Duration) -> bool>`.
 **Saved:** 1 trait definition, simplified component type bounds, and removed unnecessary abstraction complexity without compromising the homogeneous `ElasticRegistry` collection.
+## [Reduction]
+**Bloat:** `SpringBuilder` (Factory builder for a simple 4-parameter struct)
+**Cut:** Replaced with direct constructor `Timeline::spring(from, to, stiffness, damping)`
+**Saved:** ~30 lines of boilerplate, reduced indirection.
