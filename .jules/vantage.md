@@ -64,3 +64,8 @@ Created `specs/027-notifications-engine.md` to define a Notifications & Toast En
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise desktop applications is embedding legacy web apps or complex dashboards. Let's spec out a **Webview Widget**.
 Created `specs/028-webview-widget.md` to define a Webview Widget. This addresses a core UX requirement for modern enterprise software tools and allows seamless integration with existing web-based workflows.
+
+## 2026-04-18 - [System Tray Integration Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise applications and daemon-like services is running headlessly or minimizing to the system tray. Let's spec out a **System Tray Integration** feature.
+Created `specs/029-system-tray-integration.md` to define System Tray Integration. This addresses a core UX requirement for modern background-running desktop applications, providing a native feel and efficient resource usage without cluttering the taskbar.

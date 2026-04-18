@@ -43,6 +43,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [026](026-pdf-report-export.md) | PDF Report Export | Draft |
 | [027](027-notifications-engine.md) | Notifications & Toast Engine | Draft |
 | [028](028-webview-widget.md) | Webview Widget | Draft |
+| [029](029-system-tray-integration.md) | System Tray Integration | Draft |
 
 ## Lifecycle
 
