@@ -467,6 +467,9 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             // Extract WindowId from lpCreateParams and store in GWLP_USERDATA
             // SAFETY: lparam is a pointer to CREATESTRUCTW during WM_NCCREATE
             let create_struct = unsafe { &*(lparam.0 as *const CREATESTRUCTW) };
+            if create_struct.lpCreateParams.is_null() {
+                return LRESULT(0); // Error: Invalid lpCreateParams pointer
+            }
             let window_id = create_struct.lpCreateParams as u64;
             // SAFETY: We own the HWND at creation and safely set user data on it.
             unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, window_id as isize) };
@@ -843,5 +846,29 @@ mod tests {
         let hwnd = HWND(0 as _);
         let id = unsafe { get_window_id(hwnd) };
         assert_eq!(id, None);
+    }
+
+    #[test]
+    fn test_wndproc_wm_nccreate_null_pointer() {
+        // Just invoking wndproc directly with an invalid structure should be safe now
+        let _result = unsafe { super::wndproc(HWND(0 as _), WM_NCCREATE, WPARAM(0), LPARAM(0)) };
+    }
+
+    #[test]
+    fn test_wndproc_wm_nccreate_null_create_params() {
+        let hwnd = HWND(0 as _);
+        // Create a CREATESTRUCTW with a null lpCreateParams
+        let mut create_struct = windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW::default();
+        create_struct.lpCreateParams = std::ptr::null_mut();
+
+        let lparam = LPARAM(&create_struct as *const _ as isize);
+
+        // Just invoking wndproc directly with an invalid structure should be safe now.
+        // Before the fix, this could cause initialization failures down the line
+        // because it cast a null pointer to u64 and proceeded with a zeroed-out WindowId.
+        let result = unsafe { super::wndproc(hwnd, WM_NCCREATE, WPARAM(0), lparam) };
+
+        // We expect LRESULT(0) indicating failure or ignored creation
+        assert_eq!(result.0, 0);
     }
 }
