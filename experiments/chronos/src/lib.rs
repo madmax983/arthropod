@@ -1,3 +1,17 @@
+//! # Chronos
+//!
+//! Experimental time-travel and transaction history tracking for reactive signals.
+//!
+//! This crate implements the `Timeline` and `RetroSignal` primitives, enabling complex
+//! state interactions like undo/redo, timeline jumping, and transaction batching
+//! directly on top of `flux-state` reactive properties.
+//!
+//! ## Core Concepts
+//!
+//! - **Timeline**: A shared history state that tracks transactions as a tree.
+//! - **RetroSignal**: A wrapper around `flux-state::Signal` that automatically records
+//!   its changes to a `Timeline`.
+
 use flux_state::{ReadSignal, Runtime, Signal, WriteSignal};
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +42,15 @@ struct Operation {
 }
 
 impl Timeline {
+    /// Create a new timeline with a root node.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use chronos::Timeline;
+    ///
+    /// let timeline = Timeline::new();
+    /// ```
     pub fn new() -> Arc<Mutex<Self>> {
         // Create root node with empty transaction
         let root = Node {
@@ -170,6 +193,16 @@ impl Timeline {
         }
     }
 
+    /// Print the transaction tree to standard output for debugging.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use chronos::Timeline;
+    ///
+    /// let timeline = Timeline::new();
+    /// timeline.lock().unwrap().print_tree();
+    /// ```
     pub fn print_tree(&self) {
         self.print_node(0, 0);
     }
@@ -208,6 +241,19 @@ pub struct RetroSignal<T> {
 }
 
 impl<T: Clone + 'static + Send + Sync> RetroSignal<T> {
+    /// Create a new retro signal that records its changes to the provided timeline.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use flux_state::Runtime;
+    /// use chronos::{Timeline, RetroSignal};
+    ///
+    /// let runtime = Runtime::new();
+    /// let timeline = Timeline::new();
+    /// let signal = RetroSignal::new(runtime, timeline, "test_sig", 0);
+    /// assert_eq!(signal.get(), 0);
+    /// ```
     pub fn new(
         runtime: Arc<Runtime>,
         timeline: Arc<Mutex<Timeline>>,

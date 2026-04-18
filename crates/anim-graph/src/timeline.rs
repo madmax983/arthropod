@@ -18,7 +18,9 @@ use crate::{Animatable, Easing, Sample};
 /// Spring configuration for interruptions.
 #[derive(Debug, Clone, Copy)]
 pub struct SpringConfig {
+    /// Controls how strongly the spring pulls towards the target.
     pub stiffness: f32,
+    /// Controls how quickly the spring's momentum decays over time.
     pub damping: f32,
 }
 

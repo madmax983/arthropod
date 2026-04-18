@@ -23,10 +23,15 @@ const MAX_STEP_SECS: f32 = 0.001; // 1ms steps
 /// interrupted, the current velocity feeds into the next spring segment's
 /// initial conditions, preserving momentum.
 pub struct SpringSegment<T: Animatable> {
+    /// The starting value of the spring animation.
     pub from: T,
+    /// The target destination value the spring pulls towards.
     pub to: T,
+    /// The starting momentum, allowing seamless transitions from prior animations.
     pub initial_velocity: T,
+    /// Spring stiffness parameter (higher is faster, sharper).
     pub stiffness: f32,
+    /// Spring damping parameter (lower is bouncier).
     pub damping: f32,
     /// Time budget in seconds (the segment's natural duration).
     pub budget: f32,

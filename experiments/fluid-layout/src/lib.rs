@@ -17,10 +17,20 @@ use std::time::Duration;
 pub enum FluidLayoutConfig {
     /// Physics-based spring animation.
     /// Good for interactive UI that needs to feel organic.
-    Spring { stiffness: f32, damping: f32 },
+    Spring {
+        /// Controls how strongly the layout snaps to the target.
+        stiffness: f32,
+        /// Controls how quickly the layout settles.
+        damping: f32,
+    },
     /// Time-based tween animation.
     /// Good for predictable transitions.
-    Tween { duration: Duration, easing: Easing },
+    Tween {
+        /// The total time the layout transition should take.
+        duration: Duration,
+        /// The curve controlling the rate of the transition.
+        easing: Easing,
+    },
 }
 
 impl Default for FluidLayoutConfig {
@@ -39,19 +49,37 @@ impl Default for FluidLayoutConfig {
 pub struct FluidRect(pub Vec4);
 
 impl FluidRect {
+    /// Create a new FluidRect from raw coordinates and dimensions.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use fluid_layout::FluidRect;
+    ///
+    /// let rect = FluidRect::new(10.0, 20.0, 100.0, 50.0);
+    /// assert_eq!(rect.x(), 10.0);
+    /// assert_eq!(rect.width(), 100.0);
+    /// ```
     pub fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self(Vec4::new(x, y, w, h))
     }
 
+    /// Extracts the horizontal position from the packed SIMD vector.
     pub fn x(&self) -> f32 {
         self.0.x
     }
+
+    /// Extracts the vertical position from the packed SIMD vector.
     pub fn y(&self) -> f32 {
         self.0.y
     }
+
+    /// Extracts the layout width from the packed SIMD vector.
     pub fn width(&self) -> f32 {
         self.0.z
     }
+
+    /// Extracts the layout height from the packed SIMD vector.
     pub fn height(&self) -> f32 {
         self.0.w
     }

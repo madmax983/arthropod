@@ -23,8 +23,11 @@ use crate::{Animatable, Easing, Sample};
 /// assert!((sample.value - 50.0).abs() < 0.01);
 /// ```
 pub struct Keyframe<T: Animatable> {
+    /// The starting value of the keyframe interpolation.
     pub from: T,
+    /// The target value of the keyframe interpolation.
     pub to: T,
+    /// The interpolation curve controlling the rate of change.
     pub easing: Easing,
     /// Natural duration in seconds.
     pub duration: f32,

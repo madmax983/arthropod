@@ -65,14 +65,28 @@ use std::time::Duration;
 pub enum MotionConfig {
     /// Physics-based spring animation.
     ///
-    /// - `stiffness`: Controls the speed of the spring (higher is faster).
-    /// - `damping`: Controls the bounciness (lower is bouncier, higher is stiffer).
-    Spring { stiffness: f32, damping: f32 },
+    /// Spring animations are dynamic and physics-based, feeling natural and organic.
+    /// They do not have a fixed duration; rather, they settle when the physics
+    /// simulation reaches an equilibrium state.
+    Spring {
+        /// The stiffness of the spring (spring constant). Higher values result in
+        /// a stronger pull towards the target and a faster overall animation.
+        stiffness: f32,
+        /// The damping coefficient. Lower values result in a bouncier, longer-lasting
+        /// spring, while higher values cause the spring to settle more quickly and stiffly.
+        damping: f32,
+    },
     /// Time-based tween animation.
     ///
-    /// - `duration`: Total time for the animation.
-    /// - `easing`: Easing curve (Linear, Quad, Cubic, etc.).
-    Tween { duration: Duration, easing: Easing },
+    /// Tween animations interpolate a value linearly or via a mathematical curve over
+    /// a strict, predetermined time duration.
+    Tween {
+        /// The exact length of time the animation will take from start to finish.
+        duration: Duration,
+        /// The mathematical curve used to calculate the rate of change over time
+        /// (e.g., `Easing::EaseInOutCubic`).
+        easing: Easing,
+    },
 }
 
 impl Default for MotionConfig {

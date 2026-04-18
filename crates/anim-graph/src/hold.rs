@@ -23,6 +23,7 @@ use crate::{Animatable, Sample};
 /// assert_eq!(s.velocity, 0.0);
 /// ```
 pub struct Hold<T: Animatable> {
+    /// The constant value to hold during this segment.
     pub value: T,
     /// Duration in seconds.
     pub duration: f32,
