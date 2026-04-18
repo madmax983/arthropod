@@ -3,8 +3,8 @@
 use crate::InputNodeId;
 use crate::text::TextInputState;
 use crate::validation::ValidationState;
+use hashbrown::HashMap;
 use indexmap::IndexMap;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Form data map (Field Name -> Field Value).

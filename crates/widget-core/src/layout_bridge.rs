@@ -6,10 +6,10 @@
 //!
 //! It bridges the gap between `layout-engine` (Taffy) and `render-engine` (Scene).
 
+use hashbrown::HashMap;
 use layout_engine::{FlexDirection, FlexStyle, LayoutConstraints, LayoutEngine};
 use plat_core::Rect;
 use render_engine::{NodeId, Scene};
-use std::collections::HashMap;
 
 /// Perform layout calculation on the scene tree.
 ///

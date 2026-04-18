@@ -3,9 +3,9 @@
 //! Bridges the WidgetContext layout styles to Scene node bounds using
 //! the layout-engine (taffy) for flexbox computation.
 
+use hashbrown::HashMap; // ⚡ Bolt: Using hashbrown::HashMap instead of std::collections::HashMap gives us AHash instead of SipHash which improves layout calculation performance
 use layout_engine::{FlexStyle, LayoutConstraints, LayoutEngine};
 use render_engine::{NodeId, Scene};
-use std::collections::HashMap;
 use widget_core::WidgetContext;
 
 /// Perform automatic layout on the scene tree.

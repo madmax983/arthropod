@@ -81,12 +81,12 @@ use crate::layer::{Layer, LayerManager};
 use anim_graph::timeline::Timeline;
 use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
+use hashbrown::{HashMap, HashSet}; // ⚡ Bolt: Using hashbrown gives us AHash instead of SipHash which improves performance during widget tree construction
 use indexmap::IndexMap;
 use input_engine::validation::Validator;
 use layout_engine::FlexStyle;
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use std::any::{Any, TypeId};
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use theme_engine::DesignTokens;
 

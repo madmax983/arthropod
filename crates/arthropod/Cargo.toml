@@ -6,6 +6,7 @@ license.workspace = true
 description = "Enterprise-grade cross-platform Rust GUI framework"
 
 [dependencies]
+hashbrown.workspace = true
 plat-core = { path = "../plat-core" }
 render-engine = { path = "../render-engine" }
 anim-graph = { path = "../anim-graph" }

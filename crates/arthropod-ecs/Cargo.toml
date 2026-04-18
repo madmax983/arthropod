@@ -12,6 +12,7 @@ description = "ECS integration layer for Arthropod GUI framework"
 parallel-reactive = []
 
 [dependencies]
+hashbrown.workspace = true
 widget-core = { path = "../widget-core" }
 bevy_ecs = { version = "0.15", features = ["multi_threaded"] }
 bevy_tasks = "0.15"

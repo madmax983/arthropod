@@ -224,7 +224,7 @@ fn test_form_submit_receives_field_data() {
     let name = Signal::new(runtime.clone(), "John Doe".to_string());
 
     let form = Form::new((("name", TextInput::new(name)),)).on_submit(
-        move |data: std::collections::HashMap<String, String>| {
+        move |data: hashbrown::HashMap<String, String>| {
             if let Some(name_value) = data.get("name") {
                 *received_name_clone.lock().unwrap() = name_value.clone();
             }

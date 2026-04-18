@@ -199,6 +199,7 @@ dependencies = [
  "env_logger",
  "flux-state",
  "glam",
+ "hashbrown 0.15.5",
  "indexmap",
  "input-engine",
  "layout-engine",
@@ -225,6 +226,7 @@ dependencies = [
  "criterion",
  "flux-state",
  "glam",
+ "hashbrown 0.15.5",
  "layout-engine",
  "plat-core",
  "rayon",
@@ -1865,6 +1867,7 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.1.5",
+ "serde",
 ]
 
 [[package]]
@@ -2246,6 +2249,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "flux-state",
+ "hashbrown 0.15.5",
  "indexmap",
  "plat-core",
  "proptest",
@@ -5591,6 +5595,7 @@ dependencies = [
  "criterion",
  "flux-state",
  "glam",
+ "hashbrown 0.15.5",
  "indexmap",
  "input-engine",
  "layout-engine",

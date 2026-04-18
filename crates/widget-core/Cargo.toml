@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "Core widget system for Arthropod GUI framework"
 
 [dependencies]
+hashbrown.workspace = true
 render-engine = { path = "../render-engine" }
 layout-engine = { path = "../layout-engine" }
 flux-state = { path = "../flux-state" }

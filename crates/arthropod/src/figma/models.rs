@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 use layout_engine::FlexStyle;
 use render_engine::{NodeId, Scene};

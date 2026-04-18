@@ -1,5 +1,5 @@
 use super::models::*;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::fmt::Write as _;
 
 use layout_engine::{

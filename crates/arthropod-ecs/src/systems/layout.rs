@@ -21,9 +21,9 @@
 
 use crate::components::{LayoutConstraintsResource, LayoutStyle, SceneNodeRef};
 use bevy_ecs::prelude::*;
+use hashbrown::HashMap;
 use layout_engine::{FlexStyle, LayoutEngine};
 use render_engine::Scene;
-use std::collections::HashMap;
 
 /// Layout system - runs in the update schedule
 ///
