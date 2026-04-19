@@ -380,11 +380,13 @@ async fn main() -> Result<()> {
                 .then(|| event::read().ok())
                 .flatten();
 
-            #[allow(clippy::collapsible_if)]
-            if let Some(Event::Key(key)) = key_event {
-                if tx_input.send(AppEvent::Input(key)).await.is_err() {
-                    return;
-                }
+            let is_err = match key_event {
+                Some(Event::Key(key)) => tx_input.send(AppEvent::Input(key)).await.is_err(),
+                _ => false,
+            };
+
+            if is_err {
+                return;
             }
 
             if last_tick.elapsed() >= tick_rate {
