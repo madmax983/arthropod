@@ -73,6 +73,21 @@ pub struct Slider {
     width: f32,
 }
 
+struct TrackContext {
+    root: NodeId,
+    track_width: f32,
+    initial_active_width: f32,
+    surface_variant: Vec4,
+    primary: Vec4,
+    active_track_color_read: flux_state::ReadSignal<Color>,
+}
+
+struct ThumbContext {
+    root: NodeId,
+    initial_thumb_left: f32,
+    primary: Vec4,
+    thumb_color_read: flux_state::ReadSignal<Color>,
+}
 impl Slider {
     /// Create a new slider wired to a reactive `f32` signal.
     ///
@@ -142,6 +157,101 @@ impl Slider {
             (clamped - self.min) / (self.max - self.min)
         }
     }
+
+    fn build_track(&self, ctx: &mut WidgetContext, tctx: TrackContext) {
+        // 2. Track container -- positions track vertically centered within tctx.root.
+        //    Uses padding_top to center the 4dp track within the 20dp tctx.root height.
+        //    Center offset = (20 - 4) / 2 = 8dp
+        let track_container = ctx.create_node(tctx.root, NodeContent::Empty);
+        ctx.set_layout_style(
+            track_container,
+            FlexStyle {
+                direction: FlexDirection::Row,
+                width: Some(tctx.track_width),
+                height: Some(THUMB_SIZE),
+                padding_top: (THUMB_SIZE - TRACK_HEIGHT) / 2.0,
+                align_items: FlexAlign::Start,
+                ..Default::default()
+            },
+        );
+
+        // 3. Track background -- full-width, 4dp height, tctx.surface_variant color
+        let track_bg = ctx.create_node(
+            track_container,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(tctx.surface_variant)
+                        .corner_radius(TRACK_CORNER_RADIUS),
+                ),
+            },
+        );
+        ctx.set_layout_style(
+            track_bg,
+            FlexStyle {
+                width: Some(tctx.track_width),
+                height: Some(TRACK_HEIGHT),
+                ..Default::default()
+            },
+        );
+
+        // 4. Active track -- partial width based on value ratio, tctx.primary color.
+        //    Placed as first child of track_bg so it overlaps visually.
+        let active_track = ctx.create_node(
+            track_bg,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(tctx.primary)
+                        .corner_radius(TRACK_CORNER_RADIUS),
+                ),
+            },
+        );
+        ctx.set_layout_style(
+            active_track,
+            FlexStyle {
+                width: Some(tctx.initial_active_width),
+                height: Some(TRACK_HEIGHT),
+                ..Default::default()
+            },
+        );
+        ctx.add_reactive_color_state(active_track, tctx.active_track_color_read);
+    }
+
+    fn build_thumb(&self, ctx: &mut WidgetContext, tctx: ThumbContext) {
+        // 5. Thumb container -- positioned via padding_left to place the thumb
+        //    at the correct horizontal position along the track.
+        let thumb_container = ctx.create_node(tctx.root, NodeContent::Empty);
+        ctx.set_layout_style(
+            thumb_container,
+            FlexStyle {
+                direction: FlexDirection::Row,
+                padding_left: tctx.initial_thumb_left,
+                ..Default::default()
+            },
+        );
+
+        // 6. Thumb -- 20dp circle, tctx.primary color
+        let thumb = ctx.create_node(
+            thumb_container,
+            NodeContent::Styled {
+                style: Box::new(
+                    render_engine::VisualStyle::new()
+                        .solid_fill(tctx.primary)
+                        .corner_radius(THUMB_CORNER_RADIUS),
+                ),
+            },
+        );
+        ctx.set_layout_style(
+            thumb,
+            FlexStyle {
+                width: Some(THUMB_SIZE),
+                height: Some(THUMB_SIZE),
+                ..Default::default()
+            },
+        );
+        ctx.add_reactive_color_state(thumb, tctx.thumb_color_read);
+    }
 }
 
 impl Widget for Slider {
@@ -203,96 +313,27 @@ impl Widget for Slider {
             },
         );
 
-        // 2. Track container -- positions track vertically centered within root.
-        //    Uses padding_top to center the 4dp track within the 20dp root height.
-        //    Center offset = (20 - 4) / 2 = 8dp
-        let track_container = ctx.create_node(root, NodeContent::Empty);
-        ctx.set_layout_style(
-            track_container,
-            FlexStyle {
-                direction: FlexDirection::Row,
-                width: Some(track_width),
-                height: Some(THUMB_SIZE),
-                padding_top: (THUMB_SIZE - TRACK_HEIGHT) / 2.0,
-                align_items: FlexAlign::Start,
-                ..Default::default()
+        self.build_track(
+            ctx,
+            TrackContext {
+                root,
+                track_width,
+                initial_active_width,
+                surface_variant,
+                primary,
+                active_track_color_read,
             },
         );
 
-        // 3. Track background -- full-width, 4dp height, surface_variant color
-        let track_bg = ctx.create_node(
-            track_container,
-            NodeContent::Styled {
-                style: Box::new(
-                    render_engine::VisualStyle::new()
-                        .solid_fill(surface_variant)
-                        .corner_radius(TRACK_CORNER_RADIUS),
-                ),
+        self.build_thumb(
+            ctx,
+            ThumbContext {
+                root,
+                initial_thumb_left,
+                primary,
+                thumb_color_read,
             },
         );
-        ctx.set_layout_style(
-            track_bg,
-            FlexStyle {
-                width: Some(track_width),
-                height: Some(TRACK_HEIGHT),
-                ..Default::default()
-            },
-        );
-
-        // 4. Active track -- partial width based on value ratio, primary color.
-        //    Placed as first child of track_bg so it overlaps visually.
-        let active_track = ctx.create_node(
-            track_bg,
-            NodeContent::Styled {
-                style: Box::new(
-                    render_engine::VisualStyle::new()
-                        .solid_fill(primary)
-                        .corner_radius(TRACK_CORNER_RADIUS),
-                ),
-            },
-        );
-        ctx.set_layout_style(
-            active_track,
-            FlexStyle {
-                width: Some(initial_active_width),
-                height: Some(TRACK_HEIGHT),
-                ..Default::default()
-            },
-        );
-        ctx.add_reactive_color_state(active_track, active_track_color_read);
-
-        // 5. Thumb container -- positioned via padding_left to place the thumb
-        //    at the correct horizontal position along the track.
-        let thumb_container = ctx.create_node(root, NodeContent::Empty);
-        ctx.set_layout_style(
-            thumb_container,
-            FlexStyle {
-                direction: FlexDirection::Row,
-                padding_left: initial_thumb_left,
-                ..Default::default()
-            },
-        );
-
-        // 6. Thumb -- 20dp circle, primary color
-        let thumb = ctx.create_node(
-            thumb_container,
-            NodeContent::Styled {
-                style: Box::new(
-                    render_engine::VisualStyle::new()
-                        .solid_fill(primary)
-                        .corner_radius(THUMB_CORNER_RADIUS),
-                ),
-            },
-        );
-        ctx.set_layout_style(
-            thumb,
-            FlexStyle {
-                width: Some(THUMB_SIZE),
-                height: Some(THUMB_SIZE),
-                ..Default::default()
-            },
-        );
-        ctx.add_reactive_color_state(thumb, thumb_color_read);
 
         // -- Effect: sync signal value -> active track width and thumb position --
         // Note: Without layout mutation from effects, we store the effect so it

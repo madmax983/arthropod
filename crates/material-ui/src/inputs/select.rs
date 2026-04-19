@@ -6,7 +6,7 @@ use glam::Vec4;
 use layout_engine::{FlexAlign, FlexDirection, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{Color, NodeId, TextContent, VisualStyle};
-use std::sync::Arc;
+
 use widget_core::Layer;
 use widget_core::Widget;
 use widget_core::WidgetContext;
@@ -156,49 +156,18 @@ impl Select {
         self.width = width;
         self
     }
-}
 
-impl Widget for Select {
-    fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+    fn build_trigger(
+        &self,
+        ctx: &mut WidgetContext,
+        outline_color: Vec4,
+        on_surface: Vec4,
+        on_surface_variant: Vec4,
+        initial_text: String,
+        is_placeholder: bool,
+    ) -> NodeId {
         let runtime = self.read_signal.runtime().clone();
-        let read = self.read_signal.clone();
-        let write = self.write_signal.clone();
-
-        // -- Resolve theme colors --
-        let theme = ctx.get_extension::<MaterialTheme>().cloned();
-        let outline_color = theme
-            .as_ref()
-            .map(|t| t.color.outline)
-            .unwrap_or(FALLBACK_OUTLINE);
-        let on_surface = theme
-            .as_ref()
-            .map(|t| t.color.on_surface)
-            .unwrap_or(FALLBACK_ON_SURFACE);
-        let surface = theme
-            .as_ref()
-            .map(|t| t.color.surface)
-            .unwrap_or(FALLBACK_SURFACE);
-        let secondary_container = theme
-            .as_ref()
-            .map(|t| t.color.secondary_container)
-            .unwrap_or(FALLBACK_SECONDARY_CONTAINER);
-        let on_surface_variant = theme
-            .as_ref()
-            .map(|t| t.color.on_surface_variant)
-            .unwrap_or(FALLBACK_ON_SURFACE_VARIANT);
-
-        // -- Determine initial display text --
-        let current_value = read.get_untracked();
-        let initial_text = current_value
-            .as_ref()
-            .and_then(|v| self.options.iter().find(|o| &o.value == v))
-            .map(|o| o.label.clone())
-            .unwrap_or_else(|| self.placeholder.clone());
-        let is_placeholder = current_value.is_none();
-
-        // =====================================================================
-        // Trigger (Content layer)
-        // =====================================================================
+        let read_for_label = self.read_signal.clone();
 
         // Outlined container
         let trigger = ctx.create_node(
@@ -233,7 +202,7 @@ impl Widget for Select {
 
         let label_style = VisualStyle::new()
             .solid_fill(text_color)
-            .text(TextContent::new(initial_text.clone(), LABEL_FONT_SIZE));
+            .text(TextContent::new(initial_text, LABEL_FONT_SIZE));
 
         let label_node = ctx.create_node(
             trigger,
@@ -250,7 +219,6 @@ impl Widget for Select {
         );
 
         // -- Reactive effect: update trigger label when signal changes --
-        let read_for_label = read.clone();
         let options_for_label: Vec<(String, String)> = self
             .options
             .iter()
@@ -285,9 +253,18 @@ impl Widget for Select {
         ctx.store_effect(effect);
         ctx.add_reactive_color_state(label_node, label_color_read);
 
-        // =====================================================================
-        // Dropdown (Dropdown layer)
-        // =====================================================================
+        trigger
+    }
+
+    fn build_dropdown(
+        &self,
+        ctx: &mut WidgetContext,
+        surface: Vec4,
+        secondary_container: Vec4,
+        on_surface: Vec4,
+    ) -> NodeId {
+        let read = self.read_signal.clone();
+        let write = self.write_signal.clone();
 
         let dropdown_style = VisualStyle::new()
             .solid_fill(surface)
@@ -368,18 +345,75 @@ impl Widget for Select {
                 let value = option.value.clone();
                 ctx.add_clickable(
                     row,
-                    Arc::new(move || {
+                    std::sync::Arc::new(move || {
                         write_clone.set(Some(value.clone()));
                     }),
                 );
             }
         }
 
+        dropdown
+    }
+}
+
+impl Widget for Select {
+    fn build(&self, ctx: &mut WidgetContext) -> NodeId {
+        let read = self.read_signal.clone();
+
+        // -- Resolve theme colors --
+        let theme = ctx.get_extension::<MaterialTheme>().cloned();
+        let outline_color = theme
+            .as_ref()
+            .map(|t| t.color.outline)
+            .unwrap_or(FALLBACK_OUTLINE);
+        let on_surface = theme
+            .as_ref()
+            .map(|t| t.color.on_surface)
+            .unwrap_or(FALLBACK_ON_SURFACE);
+        let surface = theme
+            .as_ref()
+            .map(|t| t.color.surface)
+            .unwrap_or(FALLBACK_SURFACE);
+        let secondary_container = theme
+            .as_ref()
+            .map(|t| t.color.secondary_container)
+            .unwrap_or(FALLBACK_SECONDARY_CONTAINER);
+        let on_surface_variant = theme
+            .as_ref()
+            .map(|t| t.color.on_surface_variant)
+            .unwrap_or(FALLBACK_ON_SURFACE_VARIANT);
+
+        // -- Determine initial display text --
+        let current_value = read.get_untracked();
+        let initial_text = current_value
+            .as_ref()
+            .and_then(|v| self.options.iter().find(|o| &o.value == v))
+            .map(|o| o.label.clone())
+            .unwrap_or_else(|| self.placeholder.clone());
+        let is_placeholder = current_value.is_none();
+
+        // =====================================================================
+        // Trigger (Content layer)
+        // =====================================================================
+        let trigger = self.build_trigger(
+            ctx,
+            outline_color,
+            on_surface,
+            on_surface_variant,
+            initial_text,
+            is_placeholder,
+        );
+
+        // =====================================================================
+        // Dropdown (Dropdown layer)
+        // =====================================================================
+        self.build_dropdown(ctx, surface, secondary_container, on_surface);
+
         // -- Trigger click handler (make trigger clickable unless disabled) --
         if !self.disabled {
             // In a full implementation this would toggle dropdown visibility.
             // For now the trigger is clickable as a signal that it is interactive.
-            ctx.add_clickable(trigger, Arc::new(|| {}));
+            ctx.add_clickable(trigger, std::sync::Arc::new(|| {}));
         }
 
         trigger

@@ -6,7 +6,6 @@ use glam::Vec4;
 use layout_engine::{FlexAlign, FlexDirection, FlexJustifyContent, FlexStyle};
 use render_engine::node::NodeContent;
 use render_engine::{Color, NodeId, TextContent, VisualStyle};
-use std::sync::Arc;
 use widget_core::Widget;
 use widget_core::WidgetContext;
 
@@ -116,6 +115,133 @@ impl BottomNavigation {
     pub fn new(items: Vec<BottomNavItem>, signal: Signal<usize>) -> Self {
         Self { items, signal }
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_item(
+        &self,
+        ctx: &mut WidgetContext,
+        root: NodeId,
+        item: &BottomNavItem,
+        i: usize,
+        is_selected: bool,
+        primary: Vec4,
+        on_surface_variant: Vec4,
+        secondary_container: Vec4,
+        write: flux_state::WriteSignal<usize>,
+        runtime: std::sync::Arc<flux_state::Runtime>,
+        icon_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
+        label_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
+        indicator_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
+    ) {
+        let item_color = if is_selected {
+            primary
+        } else {
+            on_surface_variant
+        };
+        let indicator_fill = if is_selected {
+            secondary_container
+        } else {
+            Vec4::new(0.0, 0.0, 0.0, 0.0) // Transparent
+        };
+
+        // Item column: centered, flex_grow=1
+        let item_col = ctx.create_node(root, NodeContent::Empty);
+        ctx.set_layout_style(
+            item_col,
+            FlexStyle {
+                direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                align_items: FlexAlign::Center,
+                justify_content: FlexJustifyContent::Center,
+                gap: ICON_LABEL_GAP,
+                height: Some(BAR_HEIGHT),
+                ..Default::default()
+            },
+        );
+
+        // Indicator pill (behind icon, acts as a background highlight)
+        let indicator_style = VisualStyle::new()
+            .solid_fill(indicator_fill)
+            .corner_radius(INDICATOR_RADIUS);
+        let indicator_node = ctx.create_node(
+            item_col,
+            NodeContent::Styled {
+                style: Box::new(indicator_style),
+            },
+        );
+        ctx.set_layout_style(
+            indicator_node,
+            FlexStyle {
+                width: Some(INDICATOR_WIDTH),
+                height: Some(INDICATOR_HEIGHT),
+                justify_content: FlexJustifyContent::Center,
+                align_items: FlexAlign::Center,
+                ..Default::default()
+            },
+        );
+
+        // Icon text (inside indicator pill)
+        let icon_style = VisualStyle::new()
+            .solid_fill(item_color)
+            .text(TextContent::new(item.icon.clone(), ICON_FONT_SIZE));
+        let icon_node = ctx.create_node(
+            indicator_node,
+            NodeContent::Styled {
+                style: Box::new(icon_style),
+            },
+        );
+
+        // Label text (below indicator)
+        let label_style = VisualStyle::new()
+            .solid_fill(item_color)
+            .text(TextContent::new(item.label.clone(), LABEL_FONT_SIZE));
+        let label_node = ctx.create_node(
+            item_col,
+            NodeContent::Styled {
+                style: Box::new(label_style),
+            },
+        );
+
+        // Click handler
+        let w = write.clone();
+        let idx = i;
+        ctx.add_clickable(
+            item_col,
+            std::sync::Arc::new(move || {
+                w.set(idx);
+            }),
+        );
+
+        // Reactive color signals for icon, label, and indicator
+        let icon_color_signal = Signal::new(
+            runtime.clone(),
+            Color::rgba(item_color.x, item_color.y, item_color.z, item_color.w),
+        );
+        let (icon_cr, icon_cw) = icon_color_signal.split();
+        ctx.add_reactive_color_state(icon_node, icon_cr);
+        icon_color_writers.push(icon_cw);
+
+        let label_color_signal = Signal::new(
+            runtime.clone(),
+            Color::rgba(item_color.x, item_color.y, item_color.z, item_color.w),
+        );
+        let (label_cr, label_cw) = label_color_signal.split();
+        ctx.add_reactive_color_state(label_node, label_cr);
+        label_color_writers.push(label_cw);
+
+        let indicator_color_signal = Signal::new(
+            runtime.clone(),
+            Color::rgba(
+                indicator_fill.x,
+                indicator_fill.y,
+                indicator_fill.z,
+                indicator_fill.w,
+            ),
+        );
+        let (ind_cr, ind_cw) = indicator_color_signal.split();
+        ctx.add_reactive_color_state(indicator_node, ind_cr);
+        indicator_color_writers.push(ind_cw);
+    }
 }
 
 impl Widget for BottomNavigation {
@@ -168,115 +294,21 @@ impl Widget for BottomNavigation {
 
         for (i, item) in self.items.iter().enumerate() {
             let is_selected = i == current_index;
-
-            let item_color = if is_selected {
-                primary
-            } else {
-                on_surface_variant
-            };
-            let indicator_fill = if is_selected {
-                secondary_container
-            } else {
-                Vec4::new(0.0, 0.0, 0.0, 0.0) // Transparent
-            };
-
-            // Item column: centered, flex_grow=1
-            let item_col = ctx.create_node(root, NodeContent::Empty);
-            ctx.set_layout_style(
-                item_col,
-                FlexStyle {
-                    direction: FlexDirection::Column,
-                    flex_grow: 1.0,
-                    align_items: FlexAlign::Center,
-                    justify_content: FlexJustifyContent::Center,
-                    gap: ICON_LABEL_GAP,
-                    height: Some(BAR_HEIGHT),
-                    ..Default::default()
-                },
-            );
-
-            // Indicator pill (behind icon, acts as a background highlight)
-            let indicator_style = VisualStyle::new()
-                .solid_fill(indicator_fill)
-                .corner_radius(INDICATOR_RADIUS);
-            let indicator_node = ctx.create_node(
-                item_col,
-                NodeContent::Styled {
-                    style: Box::new(indicator_style),
-                },
-            );
-            ctx.set_layout_style(
-                indicator_node,
-                FlexStyle {
-                    width: Some(INDICATOR_WIDTH),
-                    height: Some(INDICATOR_HEIGHT),
-                    justify_content: FlexJustifyContent::Center,
-                    align_items: FlexAlign::Center,
-                    ..Default::default()
-                },
-            );
-
-            // Icon text (inside indicator pill)
-            let icon_style = VisualStyle::new()
-                .solid_fill(item_color)
-                .text(TextContent::new(item.icon.clone(), ICON_FONT_SIZE));
-            let icon_node = ctx.create_node(
-                indicator_node,
-                NodeContent::Styled {
-                    style: Box::new(icon_style),
-                },
-            );
-
-            // Label text (below indicator)
-            let label_style = VisualStyle::new()
-                .solid_fill(item_color)
-                .text(TextContent::new(item.label.clone(), LABEL_FONT_SIZE));
-            let label_node = ctx.create_node(
-                item_col,
-                NodeContent::Styled {
-                    style: Box::new(label_style),
-                },
-            );
-
-            // Click handler
-            let w = write.clone();
-            let idx = i;
-            ctx.add_clickable(
-                item_col,
-                Arc::new(move || {
-                    w.set(idx);
-                }),
-            );
-
-            // Reactive color signals for icon, label, and indicator
-            let icon_color_signal = Signal::new(
+            self.build_item(
+                ctx,
+                root,
+                item,
+                i,
+                is_selected,
+                primary,
+                on_surface_variant,
+                secondary_container,
+                write.clone(),
                 runtime.clone(),
-                Color::rgba(item_color.x, item_color.y, item_color.z, item_color.w),
+                &mut icon_color_writers,
+                &mut label_color_writers,
+                &mut indicator_color_writers,
             );
-            let (icon_cr, icon_cw) = icon_color_signal.split();
-            ctx.add_reactive_color_state(icon_node, icon_cr);
-            icon_color_writers.push(icon_cw);
-
-            let label_color_signal = Signal::new(
-                runtime.clone(),
-                Color::rgba(item_color.x, item_color.y, item_color.z, item_color.w),
-            );
-            let (label_cr, label_cw) = label_color_signal.split();
-            ctx.add_reactive_color_state(label_node, label_cr);
-            label_color_writers.push(label_cw);
-
-            let indicator_color_signal = Signal::new(
-                runtime.clone(),
-                Color::rgba(
-                    indicator_fill.x,
-                    indicator_fill.y,
-                    indicator_fill.z,
-                    indicator_fill.w,
-                ),
-            );
-            let (ind_cr, ind_cw) = indicator_color_signal.split();
-            ctx.add_reactive_color_state(indicator_node, ind_cr);
-            indicator_color_writers.push(ind_cw);
         }
 
         // -- Reactive effect: update all item colors when selection changes --
@@ -298,7 +330,7 @@ impl Widget for BottomNavigation {
                 let ind_fill = if selected {
                     secondary_container
                 } else {
-                    Vec4::new(0.0, 0.0, 0.0, 0.0)
+                    Vec4::new(0.0, 0.0, 0.0, 0.0) // Transparent
                 };
 
                 icon_w.set(Color::rgba(color.x, color.y, color.z, color.w));
