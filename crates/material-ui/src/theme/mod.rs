@@ -21,7 +21,7 @@ use theme_engine::DesignTokens;
 /// Generated from a single seed color via [`MaterialTheme::from_seed`].
 /// Contains all four MD3 subsystems: color, typography, shape, and elevation.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use glam::Vec4;
@@ -33,9 +33,13 @@ use theme_engine::DesignTokens;
 /// ```
 #[derive(Debug, Clone)]
 pub struct MaterialTheme {
+    /// The comprehensive MD3 color palette generated from the seed color.
     pub color: ColorScheme,
+    /// The standard 15-slot MD3 typography scale for text rendering.
     pub typography: TypographyScale,
+    /// The seven-tier MD3 shape scale for component corner radii.
     pub shape: ShapeScale,
+    /// The six-level MD3 tonal elevation system mapping depth to surface tint/shadows.
     pub elevation: ElevationScale,
 }
 

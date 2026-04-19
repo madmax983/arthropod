@@ -14,13 +14,29 @@ pub struct ElevationLevel {
 ///
 /// Level 0 is the base surface with no tint or shadow.
 /// Higher levels add progressively more tint and shadow.
+///
+/// # Examples
+///
+/// ```
+/// use material_ui::theme::ElevationScale;
+///
+/// let scale = ElevationScale::default();
+/// assert_eq!(scale.level0.tint_opacity, 0.0);
+/// assert!(scale.level5.tint_opacity > scale.level1.tint_opacity);
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ElevationScale {
+    /// Level 0: The resting state of a surface (0dp). No tint, no shadow.
     pub level0: ElevationLevel,
+    /// Level 1: Low elevation (1dp). Subtle tint and very low shadow, used for dragged items or cards.
     pub level1: ElevationLevel,
+    /// Level 2: Low-mid elevation (3dp). Moderate tint and low shadow.
     pub level2: ElevationLevel,
+    /// Level 3: Mid elevation (6dp). Distinct tint and shadow, used for active surfaces or dialogs.
     pub level3: ElevationLevel,
+    /// Level 4: Mid-high elevation (8dp). More prominent tint and shadow.
     pub level4: ElevationLevel,
+    /// Level 5: High elevation (12dp). Maximum tint and shadow, used for prominent overlays like navigation drawers.
     pub level5: ElevationLevel,
 }
 

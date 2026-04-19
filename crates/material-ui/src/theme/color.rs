@@ -11,54 +11,101 @@ use glam::Vec4;
 /// Generated from a seed color via [`ColorScheme::from_seed_light`] or
 /// [`ColorScheme::from_seed_dark`]. Contains primary, secondary, tertiary,
 /// error, surface, outline, and inverse color groups.
+///
+/// # Examples
+///
+/// ```
+/// use glam::Vec4;
+/// use material_ui::theme::ColorScheme;
+///
+/// // Create a light color scheme from a red seed
+/// let light_scheme = ColorScheme::from_seed_light(Vec4::new(0.9, 0.2, 0.2, 1.0));
+/// assert!(light_scheme.surface.x > 0.9); // Surface is light
+///
+/// // Create a dark color scheme from the same red seed
+/// let dark_scheme = ColorScheme::from_seed_dark(Vec4::new(0.9, 0.2, 0.2, 1.0));
+/// assert!(dark_scheme.surface.x < 0.2); // Surface is dark
+/// ```
 #[derive(Debug, Clone)]
 pub struct ColorScheme {
     // Primary
+    /// The most prominent color, used for key components like FABs, prominent buttons, and active states.
     pub primary: Vec4,
+    /// Color used for text and icons overlaid on top of the primary color.
     pub on_primary: Vec4,
+    /// A standalone color used for elements needing less emphasis than primary, such as tonal buttons.
     pub primary_container: Vec4,
+    /// Color used for text and icons overlaid on top of the primary container color.
     pub on_primary_container: Vec4,
 
     // Secondary
+    /// Used for less prominent components, like filter chips, expanding components, and secondary buttons.
     pub secondary: Vec4,
+    /// Color used for text and icons overlaid on top of the secondary color.
     pub on_secondary: Vec4,
+    /// A standalone color for secondary elements needing less emphasis, like tonal secondary buttons.
     pub secondary_container: Vec4,
+    /// Color used for text and icons overlaid on top of the secondary container color.
     pub on_secondary_container: Vec4,
 
     // Tertiary
+    /// Used for contrasting accents that balance primary and secondary colors, such as badges or active inputs.
     pub tertiary: Vec4,
+    /// Color used for text and icons overlaid on top of the tertiary color.
     pub on_tertiary: Vec4,
+    /// A standalone color for tertiary elements needing less emphasis.
     pub tertiary_container: Vec4,
+    /// Color used for text and icons overlaid on top of the tertiary container color.
     pub on_tertiary_container: Vec4,
 
     // Error
+    /// Used to indicate errors and severe warnings, such as invalid text fields.
     pub error: Vec4,
+    /// Color used for text and icons overlaid on top of the error color.
     pub on_error: Vec4,
+    /// A standalone error color for elements needing less emphasis, like error states on cards.
     pub error_container: Vec4,
+    /// Color used for text and icons overlaid on top of the error container color.
     pub on_error_container: Vec4,
 
     // Surface
+    /// The default background color for the application page or root background.
     pub surface: Vec4,
+    /// Color used for primary text and icons overlaid on top of the surface color.
     pub on_surface: Vec4,
+    /// A variant of the surface color for subtle grouping or boundaries without sharp lines.
     pub surface_variant: Vec4,
+    /// Color used for secondary text and icons overlaid on top of the surface variant color.
     pub on_surface_variant: Vec4,
+    /// The lowest emphasis surface container, slightly lighter/darker than surface based on theme.
     pub surface_container_lowest: Vec4,
+    /// A low emphasis surface container, used for cards or bounded areas.
     pub surface_container_low: Vec4,
+    /// The standard surface container, providing a mid-level baseline for layered content.
     pub surface_container: Vec4,
+    /// A high emphasis surface container, used for dialogs or popups.
     pub surface_container_high: Vec4,
+    /// The highest emphasis surface container, used for temporary surfaces like drawers or menus.
     pub surface_container_highest: Vec4,
 
     // Outline
+    /// Used for prominent boundaries, such as text field outlines or dividers requiring high contrast.
     pub outline: Vec4,
+    /// Used for decorative boundaries, dividers, and decorative outlines requiring low contrast.
     pub outline_variant: Vec4,
 
     // Inverse
+    /// A color that strongly contrasts with the surface color, used for snackbars and tooltips.
     pub inverse_surface: Vec4,
+    /// Color used for text and icons overlaid on top of the inverse surface color.
     pub inverse_on_surface: Vec4,
+    /// Used for actions within inverse surface components, like a button on a snackbar.
     pub inverse_primary: Vec4,
 
     // Misc
+    /// A semi-transparent overlay color applied behind modal layers like dialogs or bottom sheets.
     pub scrim: Vec4,
+    /// Color used for casting structural shadows under elevated components.
     pub shadow: Vec4,
 }
 

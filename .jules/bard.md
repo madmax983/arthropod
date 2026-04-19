@@ -33,3 +33,6 @@
 ## 2025-05-15 - [Figma Import Models Documentation]
 **Confusion:** The `crates/arthropod/src/figma/models.rs` file triggered dozens of `missing_docs` warnings for variants of pure schema-mapping enums like `ConstraintAxis::Min`. Documenting these with tautological phrases (e.g., "The Min constraint") creates noise and doesn't actually help users understand the system.
 **Clarification:** I added a file-level `#![allow(missing_docs)]` to `models.rs` to silence warnings for the raw struct and enum variants, as they are essentially generated schema equivalents. To maintain usability, I added comprehensive documentation to the root `ImportedFigmaDocument` struct and the `import_figma_document` function in `schema.rs` to explain the "what" and "why" of the whole module without cluttering the details.
+## 2025-05-18 - [Documenting Material UI Theme Subsystems]
+**Confusion:** It was unclear what the fields of `MaterialTheme`, `ColorScheme`, `TypographyScale`, and `ElevationScale` were actually for in MD3 context.
+**Clarification:** Added detailed documentation to all fields explaining their functional role in the MD3 system (e.g. `primary_container`, `surface_container_highest`, `display_large`, `level5`) along with executable doc tests.
