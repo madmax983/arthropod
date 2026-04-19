@@ -375,7 +375,8 @@ impl App {
         F: Fn(&T) -> C,
     {
         // 1. Build a temporary map of NodeId -> Entity for fast lookup
-        let mut node_to_entity = std::collections::HashMap::new();
+        // ⚡ Bolt: Using `hashbrown::HashMap` gives us AHash instead of SipHash, preventing hashing overhead from being a bottleneck during large widget integrations
+        let mut node_to_entity = hashbrown::HashMap::new();
         let mut query = self.world_mut().query::<(Entity, &SceneNodeRef)>();
         for (entity, scene_ref) in query.iter(self.world()) {
             node_to_entity.insert(scene_ref.0, entity);
@@ -537,7 +538,8 @@ impl App {
     /// This must be called separately from `integrate_widgets` since it requires `&mut WidgetContext`.
     pub fn integrate_timelines(&mut self, widget_ctx: &mut WidgetContext) {
         // Build node→entity lookup
-        let mut node_to_entity = std::collections::HashMap::new();
+        // ⚡ Bolt: Using `hashbrown::HashMap` gives us AHash instead of SipHash, preventing hashing overhead from being a bottleneck during large widget integrations
+        let mut node_to_entity = hashbrown::HashMap::new();
         let mut query = self.world_mut().query::<(Entity, &SceneNodeRef)>();
         for (entity, scene_ref) in query.iter(self.world()) {
             node_to_entity.insert(scene_ref.0, entity);

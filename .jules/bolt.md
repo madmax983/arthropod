@@ -1,8 +1,3 @@
-**Hashbrown over std::collections**
-**Learning:** `hashbrown::HashMap` and `HashSet` provide a performance advantage because they use `AHash` by default instead of `SipHash` which is used in the standard library.
-**Action:** When a `HashMap` or `HashSet` is created and the keys do not need to be robust to collision attacks (i.e. most internal structures keyed by things like `NodeId` or `String`), prefer `hashbrown::HashMap` to improve performance.
-
-
-**Hashbrown over std::collections**
-**Learning:** `hashbrown::HashMap` and `HashSet` provide a performance advantage because they use `AHash` by default instead of `SipHash` which is used in the standard library.
-**Action:** When a `HashMap` or `HashSet` is created and the keys do not need to be robust to collision attacks (i.e. most internal structures keyed by things like `NodeId` or `String`), prefer `hashbrown::HashMap` to improve performance.
+**[Hashbrown replacement inside functions]
+**Learning:** Adding a `///` doc comment inside a function causes a compiler error with `-D warnings` due to `unused_doc_comments`.
+**Action:** Use standard `//` comments when explaining a performance change applied to a local variable declaration.
