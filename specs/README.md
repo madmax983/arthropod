@@ -44,6 +44,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [027](027-notifications-engine.md) | Notifications & Toast Engine | Draft |
 | [028](028-webview-widget.md) | Webview Widget | Draft |
 | [029](029-system-tray-integration.md) | System Tray Integration | Draft |
+| [030](030-date-time-picker-widget.md) | Date & Time Picker Widget | Draft |
 
 ## Lifecycle
 

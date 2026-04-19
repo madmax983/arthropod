@@ -69,3 +69,8 @@ Created `specs/028-webview-widget.md` to define a Webview Widget. This addresses
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise applications and daemon-like services is running headlessly or minimizing to the system tray. Let's spec out a **System Tray Integration** feature.
 Created `specs/029-system-tray-integration.md` to define System Tray Integration. This addresses a core UX requirement for modern background-running desktop applications, providing a native feel and efficient resource usage without cluttering the taskbar.
+
+## 2026-04-19 - [Date & Time Picker Widget Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise applications is inputting dates, times, or date ranges. Let's spec out a **Date & Time Picker Widget** feature.
+Created `specs/030-date-time-picker-widget.md` to define the Date & Time Picker Widget. This addresses a core UX requirement for modern desktop applications and eliminates the need to rely on error-prone raw text inputs.
