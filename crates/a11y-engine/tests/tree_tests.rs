@@ -2,7 +2,7 @@
 //!
 //! Following TDD - tests written before full implementation.
 
-use a11y_engine::{A11yNode, A11yTree, AccessibleName, Role};
+use a11y_engine::{A11yId, A11yNode, A11yTree, AccessibleName, Role};
 use plat_core::Rect;
 
 #[test]
@@ -101,6 +101,36 @@ fn test_nested_nodes() {
     assert_eq!(group_node.parent, Some(root));
     assert_eq!(group_node.children.len(), 1);
     assert_eq!(group_node.children[0], button);
+}
+
+#[test]
+fn test_get_node_mut() {
+    let mut tree = A11yTree::new();
+    let root = tree.root();
+
+    let button_id = tree.add_node(
+        root,
+        A11yNode {
+            role: Role::Button,
+            name: AccessibleName::Text("Original".into()),
+            ..Default::default()
+        },
+    );
+
+    // Get mutable reference and mutate
+    if let Some(node) = tree.get_node_mut(button_id) {
+        node.name = AccessibleName::Text("Mutated".into());
+        node.bounds = Rect::new(100.0, 200.0, 50.0, 30.0);
+    }
+
+    // Verify update
+    let button = tree.get_node(button_id).unwrap();
+    assert_eq!(button.name, AccessibleName::Text("Mutated".into()));
+    assert_eq!(button.bounds.width, 50.0);
+    assert_eq!(button.bounds.height, 30.0);
+
+    // Verify non-existent node returns None
+    assert!(tree.get_node_mut(A11yId::new()).is_none());
 }
 
 #[test]
