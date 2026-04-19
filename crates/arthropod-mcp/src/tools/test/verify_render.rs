@@ -51,6 +51,67 @@ fn default_tolerance() -> f32 {
     0.001
 }
 
+impl VerifyRenderOutputTool {
+    fn check_color(
+        idx: usize,
+        expected: &[f32; 4],
+        actual: &[f32; 4],
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        for (i, comp) in ["r", "g", "b", "a"].iter().enumerate() {
+            if (actual[i] - expected[i]).abs() > tolerance {
+                failures.push(format!(
+                    "instance[{}].color.{}: expected {}, got {} (tolerance: {})",
+                    idx, comp, expected[i], actual[i], tolerance
+                ));
+            }
+        }
+    }
+
+    fn check_position(
+        idx: usize,
+        expected: &PositionSpec,
+        actual: &[f32; 2],
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if (actual[0] - expected.x).abs() > tolerance {
+            failures.push(format!(
+                "instance[{}].position.x: expected {}, got {} (tolerance: {})",
+                idx, expected.x, actual[0], tolerance
+            ));
+        }
+        if (actual[1] - expected.y).abs() > tolerance {
+            failures.push(format!(
+                "instance[{}].position.y: expected {}, got {} (tolerance: {})",
+                idx, expected.y, actual[1], tolerance
+            ));
+        }
+    }
+
+    fn check_size(
+        idx: usize,
+        expected: &SizeSpec,
+        actual: &[f32; 2],
+        tolerance: f32,
+        failures: &mut Vec<String>,
+    ) {
+        if (actual[0] - expected.width).abs() > tolerance {
+            failures.push(format!(
+                "instance[{}].size.width: expected {}, got {} (tolerance: {})",
+                idx, expected.width, actual[0], tolerance
+            ));
+        }
+        if (actual[1] - expected.height).abs() > tolerance {
+            failures.push(format!(
+                "instance[{}].size.height: expected {}, got {} (tolerance: {})",
+                idx, expected.height, actual[1], tolerance
+            ));
+        }
+    }
+}
+
 impl Tool for VerifyRenderOutputTool {
     fn name(&self) -> &str {
         "test.verify_render_output"
@@ -116,12 +177,13 @@ impl Tool for VerifyRenderOutputTool {
         let mut failures = Vec::new();
 
         // Check expected count
-        if let Some(expected_count) = params.expected_count
-            && instances.len() != expected_count
+        if params
+            .expected_count
+            .is_some_and(|count| instances.len() != count)
         {
             failures.push(format!(
                 "instance_count: expected {}, got {}",
-                expected_count,
+                params.expected_count.unwrap(),
                 instances.len()
             ));
         }
@@ -135,64 +197,34 @@ impl Tool for VerifyRenderOutputTool {
 
             let actual = &instances[idx];
 
-            // Check color (color is [f32; 4])
             if let Some(expected_color) = &expected.color {
-                if (actual.color[0] - expected_color[0]).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].color.r: expected {}, got {} (tolerance: {})",
-                        idx, expected_color[0], actual.color[0], params.tolerance
-                    ));
-                }
-                if (actual.color[1] - expected_color[1]).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].color.g: expected {}, got {} (tolerance: {})",
-                        idx, expected_color[1], actual.color[1], params.tolerance
-                    ));
-                }
-                if (actual.color[2] - expected_color[2]).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].color.b: expected {}, got {} (tolerance: {})",
-                        idx, expected_color[2], actual.color[2], params.tolerance
-                    ));
-                }
-                if (actual.color[3] - expected_color[3]).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].color.a: expected {}, got {} (tolerance: {})",
-                        idx, expected_color[3], actual.color[3], params.tolerance
-                    ));
-                }
+                Self::check_color(
+                    idx,
+                    expected_color,
+                    &actual.color,
+                    params.tolerance,
+                    &mut failures,
+                );
             }
 
-            // Check position (pos is [f32; 2])
             if let Some(expected_pos) = &expected.position {
-                if (actual.pos[0] - expected_pos.x).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].position.x: expected {}, got {} (tolerance: {})",
-                        idx, expected_pos.x, actual.pos[0], params.tolerance
-                    ));
-                }
-                if (actual.pos[1] - expected_pos.y).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].position.y: expected {}, got {} (tolerance: {})",
-                        idx, expected_pos.y, actual.pos[1], params.tolerance
-                    ));
-                }
+                Self::check_position(
+                    idx,
+                    expected_pos,
+                    &actual.pos,
+                    params.tolerance,
+                    &mut failures,
+                );
             }
 
-            // Check size (size is [f32; 2])
             if let Some(expected_size) = &expected.size {
-                if (actual.size[0] - expected_size.width).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].size.width: expected {}, got {} (tolerance: {})",
-                        idx, expected_size.width, actual.size[0], params.tolerance
-                    ));
-                }
-                if (actual.size[1] - expected_size.height).abs() > params.tolerance {
-                    failures.push(format!(
-                        "instance[{}].size.height: expected {}, got {} (tolerance: {})",
-                        idx, expected_size.height, actual.size[1], params.tolerance
-                    ));
-                }
+                Self::check_size(
+                    idx,
+                    expected_size,
+                    &actual.size,
+                    params.tolerance,
+                    &mut failures,
+                );
             }
         }
 

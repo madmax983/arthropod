@@ -53,3 +53,6 @@
 **[Refactoring update_all_reactive_system]**
 **Learning:** Repetitive polling of reactive signals inside large `if let` blocks or matches causes functions to grow quickly and obscures the control flow.
 **Action:** Extract the logic for updating each individual property type (Layout Width, Colors, Text, etc.) into its own static helper function. These helpers can take `Option<&mut T>` for the specific reactive components they care about, allowing the main system to just call each helper sequentially.
+**[Refactoring VerifyRenderOutputTool]**
+**Learning:** `verify_render.rs` had a long `execute` method that checked many different properties sequentially inside a loop, creating a "God Function".
+**Action:** Extract the checks into separate helper functions (`check_color`, `check_position`, `check_size`) on `VerifyRenderOutputTool` to flatten out deeply nested structures and simplify the main logic. This makes the code easier to follow and maintain without changing its behavior.
