@@ -206,22 +206,29 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<RwLock<Option<Con
                         tracing::info!("App registered: {} (PID: {})", name, pid);
 
                         // Replace any existing connected app
-                        *connected_app.write().unwrap() = Some(ConnectedApp {
-                            name: name.clone(),
-                            pid,
-                            scene: None,
-                            stream: stream.try_clone().expect("Failed to clone stream"),
-                        });
+                        *connected_app
+                            .write()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                            Some(ConnectedApp {
+                                name: name.clone(),
+                                pid,
+                                scene: None,
+                                stream: stream.try_clone().expect("Failed to clone stream"),
+                            });
 
                         // Send acknowledgment
-                        let _ = writeln!(
-                            &stream,
-                            "{}",
-                            serde_json::to_string(&ServerMessage::Registered).unwrap()
-                        );
+                        if let Ok(msg_str) = serde_json::to_string(&ServerMessage::Registered) {
+                            let _ = writeln!(&stream, "{}", msg_str);
+                        } else {
+                            tracing::error!("Failed to serialize Registered message");
+                        }
                     }
                     Ok(AppMessage::SceneUpdate { scene }) => {
-                        if let Some(app) = connected_app.write().unwrap().as_mut() {
+                        if let Some(app) = connected_app
+                            .write()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .as_mut()
+                        {
                             let node_count = scene
                                 .get("node_count")
                                 .and_then(|v| v.as_u64())
@@ -247,7 +254,9 @@ fn handle_app_connection(stream: TcpStream, connected_app: Arc<RwLock<Option<Con
 
     // Connection closed
     tracing::info!("App disconnected");
-    *connected_app.write().unwrap() = None;
+    *connected_app
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 }
 
 /// Helper for apps to connect to the MCP server
@@ -265,11 +274,14 @@ pub fn connect_to_mcp_server(app_name: impl Into<String>) -> Result<AppConnectio
         name: app_name.clone(),
         pid,
     };
-    writeln!(
-        &mut stream_clone,
-        "{}",
-        serde_json::to_string(&register_msg).unwrap()
-    )?;
+    if let Ok(msg_str) = serde_json::to_string(&register_msg) {
+        writeln!(&mut stream_clone, "{}", msg_str)?;
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Failed to serialize registration message",
+        ));
+    }
 
     Ok(AppConnection { stream, app_name })
 }
@@ -284,13 +296,27 @@ impl AppConnection {
     /// Send a scene state update to the MCP server
     pub fn send_scene_update(&mut self, scene: Value) -> Result<(), std::io::Error> {
         let msg = AppMessage::SceneUpdate { scene };
-        writeln!(&mut self.stream, "{}", serde_json::to_string(&msg).unwrap())
+        if let Ok(msg_str) = serde_json::to_string(&msg) {
+            writeln!(&mut self.stream, "{}", msg_str)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Failed to serialize scene update message",
+            ))
+        }
     }
 
     /// Send a heartbeat to keep the connection alive
     pub fn send_heartbeat(&mut self) -> Result<(), std::io::Error> {
         let msg = AppMessage::Heartbeat;
-        writeln!(&mut self.stream, "{}", serde_json::to_string(&msg).unwrap())
+        if let Ok(msg_str) = serde_json::to_string(&msg) {
+            writeln!(&mut self.stream, "{}", msg_str)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Failed to serialize heartbeat message",
+            ))
+        }
     }
 
     /// Get the app name
