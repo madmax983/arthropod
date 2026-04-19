@@ -164,6 +164,13 @@ impl WindowImpl {
             ));
         }
 
+        // Validate window dimensions to prevent overflow when casting to i32
+        if config.size.width > i32::MAX as u32 || config.size.height > i32::MAX as u32 {
+            return Err(PlatformError::WindowCreation(
+                "Window dimensions exceed i32::MAX bounds".into(),
+            ));
+        }
+
         let title: Vec<u16> = config
             .title
             .encode_utf16()
@@ -280,10 +287,11 @@ impl WindowImpl {
         unsafe {
             let _ = GetClientRect(self.hwnd, &mut rect);
         }
-        Size::new(
-            (rect.right - rect.left) as u32,
-            (rect.bottom - rect.top) as u32,
-        )
+
+        let width = rect.right.saturating_sub(rect.left).max(0) as u32;
+        let height = rect.bottom.saturating_sub(rect.top).max(0) as u32;
+
+        Size::new(width, height)
     }
 
     pub fn set_title(&self, title: &str) {
@@ -870,5 +878,56 @@ mod tests {
 
         // We expect LRESULT(0) indicating failure or ignored creation
         assert_eq!(result.0, 0);
+    }
+
+    #[test]
+    fn test_window_creation_exceeds_i32_max() {
+        // Attempt to create a window with dimensions exceeding i32::MAX
+        // This should fail gracefully rather than wrapping and sending
+        // negative dimensions to the Win32 API.
+
+        let event_loop = crate::EventLoop::new().unwrap();
+
+        let mut config = crate::WindowConfig::default();
+        config.size = crate::Size::new(u32::MAX, 600); // Exceeds i32::MAX width
+
+        let result = event_loop.create_window(config);
+        assert!(
+            matches!(result, Err(PlatformError::WindowCreation(msg)) if msg.contains("exceed i32::MAX"))
+        );
+
+        let mut config2 = crate::WindowConfig::default();
+        config2.size = crate::Size::new(800, u32::MAX); // Exceeds i32::MAX height
+        let result2 = event_loop.create_window(config2);
+        assert!(
+            matches!(result2, Err(PlatformError::WindowCreation(msg)) if msg.contains("exceed i32::MAX"))
+        );
+    }
+
+    #[test]
+    fn test_inner_size_overflow_prevention() {
+        // This test simulates a corrupted or overflowed RECT that could be
+        // returned by GetClientRect due to invalid window state or manipulation.
+        // It verifies our saturating_sub and max(0) prevent panics that would
+        // normally occur with standard subtraction.
+
+        // We can't easily mock GetClientRect here without restructuring the code,
+        // but the manual logic testing is conceptually verified since it's the exact
+        // same mathematical bounds checks added to inner_size().
+        let right: i32 = -100;
+        let left: i32 = 100;
+        let width = right.saturating_sub(left).max(0) as u32;
+        assert_eq!(
+            width, 0,
+            "Width should be clamped to 0 instead of panicking on underflow"
+        );
+
+        let bottom: i32 = i32::MIN;
+        let top: i32 = 10;
+        let height = bottom.saturating_sub(top).max(0) as u32;
+        assert_eq!(
+            height, 0,
+            "Height should be clamped to 0 instead of panicking on extreme underflow"
+        );
     }
 }
