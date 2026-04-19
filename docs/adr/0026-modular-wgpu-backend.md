@@ -1,6 +1,6 @@
 # ADR 0026: Modular WGPU Backend Architecture
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-05-18
 

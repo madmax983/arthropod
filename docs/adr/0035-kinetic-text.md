@@ -1,6 +1,6 @@
 # ADR 0035: Reactive Kinetic Text Widget
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2024-05-22
 
