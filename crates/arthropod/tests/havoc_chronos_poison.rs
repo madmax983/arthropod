@@ -1,3 +1,5 @@
+#![cfg(feature = "nova")]
+
 use arthropod::experimental::chronos::{RetroSignal, Timeline};
 use flux_state::Runtime;
 use std::thread;

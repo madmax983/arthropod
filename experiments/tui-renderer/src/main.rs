@@ -3,7 +3,7 @@ use plat_core::Rect;
 use render_engine::{
     Color, NodeContent, Paint, Scene, SceneNode, StrokeStyle, TextContent, VisualStyle,
 };
-use style_engine::stroke::StrokeAlign;
+use style_engine::StrokeAlign;
 use tui_renderer::TuiRunner;
 
 fn main() -> std::io::Result<()> {

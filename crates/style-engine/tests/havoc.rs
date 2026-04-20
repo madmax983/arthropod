@@ -1,5 +1,5 @@
 use proptest::prelude::*;
-use style_engine::path::{VectorPath, VectorPathError};
+use style_engine::{VectorPath, VectorPathError};
 
 #[test]
 fn test_dos_long_number_token() {

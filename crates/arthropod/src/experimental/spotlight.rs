@@ -83,9 +83,9 @@ pub fn update_spotlight(
     // a very large rect will cover the screen. We use a hollow path (a rect with a hole).
     // For simplicity in this experiment, we'll draw four solid color rects around the target.
 
-    // The "hole punch" logic can be done with style_engine::path::VectorPath.
+    // The "hole punch" logic can be done with style_engine::VectorPath.
     use render_engine::Vec2;
-    use style_engine::path::VectorPath;
+    use style_engine::VectorPath;
     use style_engine::{Paint, VisualStyle};
 
     // Path for the full screen (assuming standard massive bounds like 10000x10000 centered at origin)

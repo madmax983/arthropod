@@ -2,8 +2,8 @@ use bevy_ecs::prelude::*;
 use flux_state::ReadSignal;
 use render_engine::{Color, NodeContent, Scene, Vec2, VisualStyle};
 use std::collections::VecDeque;
-use style_engine::path::{VectorPath, WindingRule};
 use style_engine::{Paint, StrokeStyle};
+use style_engine::{VectorPath, WindingRule};
 
 /// Component to visualize a signal as a graph.
 #[derive(Component)]
