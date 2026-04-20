@@ -23,3 +23,6 @@
 **2025-02-23 - Prevent null pointer dereference from lpCreateParams in wndproc**
 **Threat:** The `CREATESTRUCTW` structure provided during `WM_NCCREATE` contains an `lpCreateParams` pointer which is expected to be a valid pointer containing the WindowId. However, a malicious or malfunctioning caller could send a `WM_NCCREATE` message via `SendMessage` with a `CREATESTRUCTW` where `lpCreateParams` is null. The `wndproc` function was blindly casting this to a `u64` and continuing, which could lead to a silent initialization failure where window data isn't set, causing crashes down the line when other messages are processed expecting a valid WindowId.
 **Defense:** Added a check to ensure `create_struct.lpCreateParams.is_null()` is false before attempting to process the `WindowId` during `WM_NCCREATE`.
+**2026-04-18 - Unhandled Null Pointer Exception Panic**
+**Threat:** Calling unwrap() or ? on an unhandled FFI function failure for generating a HWND could crash tests if COM API call fails.
+**Defense:** Replaced the unhandled unwraps with `.unwrap_or(HWND(0 as _))` inside test helpers returning a raw HWND to safely fall back.

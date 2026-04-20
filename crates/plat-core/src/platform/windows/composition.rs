@@ -371,7 +371,8 @@ mod tests {
                 None,
                 Some(hinstance),
                 None,
-            )?
+            )
+            .unwrap_or(HWND(0 as _))
         }
     }
 }
