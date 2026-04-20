@@ -68,8 +68,14 @@
 //! let _instances = context.render();
 //! ```
 
+/// ECS components for UI widgets, reactivity, and integration.
+/// ECS components serving as the data models for widgets, reactivity bindings, and integration markers.
 pub mod components;
+/// Internal framework context and app integration layer.
+/// Internal environment bridging the ECS World to the rendering and reactive runtimes.
 pub(crate) mod context;
+/// ECS systems for layout, rendering, reactivity, and accessibility.
+/// Cross-cutting ECS systems responsible for mutating scene graphs, executing layouts, and pushing data to the GPU backend.
 pub mod systems;
 
 // Re-export main types for convenience

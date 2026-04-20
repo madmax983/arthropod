@@ -66,7 +66,11 @@ pub struct SceneNodeRef(pub NodeId);
 /// ```
 #[derive(Component, Clone)]
 pub struct ReactiveColor {
+    /// The signal to read the color from
+    /// The reactive signal driving the color updates. Stored as a ReadSignal so the component doesn't accidentally acquire write privileges and cause cyclic updates.
     pub signal: ReadSignal<Color>,
+    /// The last polled color value, used to detect changes
+    /// The value cached from the previous frame. Kept to implement dirty-checking and avoid unnecessarily mutating the underlying Scene node.
     pub last_value: Color,
 }
 
@@ -97,7 +101,11 @@ impl ReactiveColor {
 /// ```
 #[derive(Component, Clone)]
 pub struct ReactiveTransform {
+    /// The signal to read the transform from
+    /// The reactive signal dictating the node's position and scale. Updates must be applied carefully to avoid invalidating the entire layout tree if possible.
     pub signal: ReadSignal<Transform2D>,
+    /// The last polled transform value, used to detect changes
+    /// The transform cached from the previous frame. Used to halt updates early if the new signal value equals the old one, preserving layout stability.
     pub last_value: Transform2D,
 }
 
@@ -128,7 +136,11 @@ impl ReactiveTransform {
 /// ```
 #[derive(Component, Clone)]
 pub struct ReactiveOpacity {
+    /// The signal to read the primitive value from
+    /// The reactive signal controlling the alpha transparency. Values outside 0.0-1.0 should typically be clamped.
     pub signal: ReadSignal<f32>,
+    /// The last polled primitive value, used to detect changes
+    /// Caches the prior frame's value to perform delta checks (epsilon comparison) instead of blind structural updates.
     pub last_value: f32,
 }
 
@@ -158,7 +170,11 @@ impl ReactiveOpacity {
 /// ```
 #[derive(Component, Clone)]
 pub struct ReactiveText {
+    /// The signal to read the string value from
+    /// The reactive signal providing the string content. When polled and changed, triggers heavy text-shaping invalidation in the underlying scene.
     pub signal: ReadSignal<String>,
+    /// The last polled string value, used to detect changes
+    /// The cached string value. Checked to prevent expensive font shaping if the text content hasn't actually structurally changed.
     pub last_value: String,
 }
 
@@ -191,7 +207,11 @@ impl ReactiveText {
 /// ```
 #[derive(Component, Clone)]
 pub struct ReactiveComputedText {
+    /// The computed value to poll
+    /// The computed text value. Will only be re-evaluated when its upstream dependencies have mutated.
     pub computed: Computed<String>,
+    /// The last polled string value, used to detect changes
+    /// The cached string value. Checked to prevent expensive font shaping if the text content hasn't actually structurally changed.
     pub last_value: String,
 }
 
@@ -213,9 +233,17 @@ impl ReactiveComputedText {
 /// and by the interaction system to trigger callbacks.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InteractionState {
+    /// Whether the widget is currently hovered by the pointer
+    /// Flags if the pointer is currently within the calculated hit area of this specific element.
     pub hovered: bool,
+    /// Whether the widget currently has keyboard/input focus
+    /// Flags if the element currently owns the application's input focus, enabling keyboard navigation.
     pub focused: bool,
+    /// Whether the widget is currently being pressed/activated
+    /// Flags if the element is currently engaged in a primary interaction (like a mouse down or touch press).
     pub active: bool, // Pressed
+    /// Whether the widget is disabled and unresponsive to input
+    /// Flags if the element is structurally disabled. Used to gray-out visuals and intercept pointer events before they trigger actions.
     pub disabled: bool,
 }
 
@@ -232,7 +260,11 @@ pub struct WidgetStyle(pub widget_core::Style);
 /// and update the corresponding LayoutStyle component's width each frame.
 #[derive(Component, Clone)]
 pub struct ReactiveLayoutWidth {
+    /// The signal to read the primitive value from
+    /// The reactive signal directly bound to the layout node's width constraint. Modifying this forces a Taffy layout recalculation.
     pub signal: ReadSignal<f32>,
+    /// The last polled primitive value, used to detect changes
+    /// Caches the prior frame's value to perform delta checks (epsilon comparison) instead of blind structural updates.
     pub last_value: f32,
     /// Optional handle to keep Computed alive (if the signal came from a Computed)
     pub _handle: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
@@ -256,7 +288,11 @@ impl ReactiveLayoutWidth {
 /// Reactive layout flex grow - polls signal to update LayoutStyle flex_grow
 #[derive(Component, Clone)]
 pub struct ReactiveLayoutFlexGrow {
+    /// The signal to read the primitive value from
+    /// The reactive signal determining the flexbox expansion ratio against sibling elements. Changes here invalidate the parent's layout.
     pub signal: ReadSignal<f32>,
+    /// The last polled primitive value, used to detect changes
+    /// Caches the prior frame's value to perform delta checks (epsilon comparison) instead of blind structural updates.
     pub last_value: f32,
 }
 
@@ -271,12 +307,32 @@ impl ReactiveLayoutFlexGrow {
 /// Progress bar specific state for direct width animation
 #[derive(Component, Clone)]
 pub struct ProgressBarState {
+    /// The signal providing the current progress (0.0 to 1.0)
+    /// The reactive signal indicating the current progress ratio, strictly expected to be normalized between 0.0 and 1.0.
     pub progress: ReadSignal<f32>,
+    /// The total target width of the progress bar
+    /// The maximum layout width the progress bar can consume when the ratio is precisely 1.0.
     pub total_width: f32,
+    /// The last polled progress value, used to detect changes
+    /// The last resolved progress ratio, utilized to skip layout adjustments if the delta is below rendering precision.
     pub last_progress: f32,
 }
 
 impl ProgressBarState {
+    /// Create a new progress bar state instance.
+    /// Initiates a reactive bridge for progress tracking.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::components::ProgressBarState;
+    /// use flux_state::{Runtime, Signal};
+    /// let runtime = Runtime::new();
+    /// let signal = Signal::new(runtime, 0.5);
+    /// let (read, _) = signal.split();
+    /// let state = ProgressBarState::new(read, 200.0);
+    /// assert_eq!(state.total_width, 200.0);
+    /// ```
     pub fn new(progress: ReadSignal<f32>, total_width: f32) -> Self {
         let last_progress = progress.get_untracked();
         Self {
@@ -300,6 +356,8 @@ pub struct Renderable;
 /// Currently a placeholder for future event system integration.
 #[derive(Component)]
 pub struct Hoverable {
+    /// Callback to run when the element is hovered
+    /// An executable closure triggered on hover state changes. Must be Send + Sync since event bubbling might occur across multiple threads.
     pub on_hover: Box<dyn Fn() + Send + Sync>,
 }
 
@@ -328,13 +386,19 @@ pub struct MousePosition(pub glam::Vec2);
 /// Widgets can subscribe to the read handle to drive animations.
 #[derive(Resource, Clone)]
 pub struct FrameSignalResource {
+    /// Signal to write the new frame count to
+    /// The signal handle used internally by the timeline runner to bump the global frame counter each tick.
     pub write_handle: flux_state::WriteSignal<u64>,
+    /// Signal to read the current frame count from
+    /// The signal handle exposed to animations. Any computation bound to this handle will reactively execute every single frame.
     pub read_handle: flux_state::ReadSignal<u64>,
 }
 
 /// Diagnostic heartbeat resource to track component counts per frame
 #[derive(Resource, Default)]
 pub struct IntegrationHeartbeat {
+    /// The total number of frames processed so far
+    /// A diagnostic metric tracking total elapsed frames, primarily used by debug overlays to detect heartbeat stutters.
     pub frame_count: u64,
 }
 
@@ -344,6 +408,8 @@ pub struct IntegrationHeartbeat {
 /// The event system will invoke the callback when the node is clicked.
 #[derive(Component, Clone)]
 pub struct Clickable {
+    /// The arc-wrapped callback function to execute
+    /// The stored click execution routine. Uses Arc to allow safe cloning and asynchronous execution without strict lifetimes.
     pub callback: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -367,6 +433,17 @@ pub struct AccessibleNode {
 }
 
 impl AccessibleNode {
+    /// Create a new accessible node
+    /// Links a visual element to the global semantic accessibility tree, marking it with a specific structural role.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::components::AccessibleNode;
+    /// use a11y_engine::{A11yId, Role};
+    /// let node = AccessibleNode::new(A11yId::new(), Role::Button);
+    /// assert_eq!(node.role, Role::Button);
+    /// ```
     pub fn new(a11y_id: a11y_engine::A11yId, role: a11y_engine::Role) -> Self {
         Self { a11y_id, role }
     }
@@ -381,10 +458,21 @@ pub type A11yActionCallback = Arc<dyn Fn() + Send + Sync>;
 /// triggers a click action on this element.
 #[derive(Component, Clone)]
 pub struct OnA11yClick {
+    /// The arc-wrapped callback function to execute
+    /// The routine executed when an assistive technology (like a screen reader) explicitly requests activation.
     pub callback: A11yActionCallback,
 }
 
 impl OnA11yClick {
+    /// Create a new A11y click handler
+    /// Wraps a standard closure into an `Arc` pointer so it can be passed freely into the screen reader interface.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::components::OnA11yClick;
+    /// let handler = OnA11yClick::new(|| println!("Clicked!"));
+    /// ```
     pub fn new<F>(callback: F) -> Self
     where
         F: Fn() + Send + Sync + 'static,

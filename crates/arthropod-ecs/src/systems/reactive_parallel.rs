@@ -25,6 +25,8 @@ pub enum ReactiveChange {
 /// Resource holding buffered reactive changes between gather and apply phases.
 #[derive(Resource, Default)]
 pub struct ReactiveChangeBuffer {
+    /// The list of reactive changes to apply to the scene
+    /// An ordered sequence of visual state mutations that were detected during parallel read passes and are queued for execution on the main thread.
     pub changes: Vec<ReactiveChange>,
 }
 

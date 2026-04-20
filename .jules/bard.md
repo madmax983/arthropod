@@ -36,3 +36,7 @@
 ## 2025-05-18 - [Documenting Material UI Theme Subsystems]
 **Confusion:** It was unclear what the fields of `MaterialTheme`, `ColorScheme`, `TypographyScale`, and `ElevationScale` were actually for in MD3 context.
 **Clarification:** Added detailed documentation to all fields explaining their functional role in the MD3 system (e.g. `primary_container`, `surface_container_highest`, `display_large`, `level5`) along with executable doc tests.
+
+## 2025-05-18 - [Documenting Arthropod ECS]
+**Confusion:** Basic `/// The signal` style documentation for internal components like `ReactiveColor`, `ReactiveOpacity`, and ECS query types fails the Bard philosophy by repeating property names without communicating architectural reasons.
+**Clarification:** Re-documented `arthropod-ecs` components to explain *why* fields exist, e.g., detailing how `last_value` enables epsilon dirty-checking and why `ReadSignal` is used to prevent cycles. Also added complete executable `## Examples` sections to all exposed constructor methods like `ProgressBarState::new` and `AccessibleNode::new`.

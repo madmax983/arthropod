@@ -69,6 +69,8 @@ pub fn update_interaction_state_system(
     }
 }
 
+/// Query type for resolving widget styles based on interaction state
+/// A consolidated ECS query mapping standard structural nodes to their unified presentation states and any active user-interaction states.
 pub type WidgetStyleQuery<'w> = (
     &'w SceneNodeRef,
     &'w WidgetStyle,
@@ -76,6 +78,8 @@ pub type WidgetStyleQuery<'w> = (
     Option<&'w mut LayoutStyle>,
 );
 
+/// Filter type for running widget style updates only when necessary
+/// An ECS filter ensuring the heavy style resolution logic is completely skipped unless a widget actually changed state or configuration.
 pub type WidgetStyleFilter = Or<(Changed<InteractionState>, Changed<WidgetStyle>)>;
 
 /// System that resolves high-level WidgetStyle into low-level SceneNode properties and LayoutStyle
@@ -116,6 +120,8 @@ pub fn update_widget_style_system(
 /// This system combines color, text, transform, and opacity reactive updates into one
 /// system, reducing scheduling overhead and acquiring `ResMut<Scene>` only once
 /// instead of multiple times.
+/// Query type for gathering all reactive components in a single pass
+/// A massive "catch-all" query grouping all potential reactive properties into a single ECS pass, drastically cutting down iteration overhead.
 pub type ReactiveQuery<'w> = (
     &'w SceneNodeRef,
     Option<&'w mut LayoutStyle>,
@@ -290,6 +296,8 @@ fn update_opacity(
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Main system for applying all reactive component updates to the scene in one pass
+/// A monolith system applying all dirty tracked state mutations to the visual tree simultaneously, eliminating redundant `Scene` resource locks.
 pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene: ResMut<Scene>) {
     for (
         node_ref,

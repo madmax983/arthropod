@@ -12,18 +12,52 @@ use std::time::Duration;
 /// Resource to provide delta time to the animation system.
 #[derive(Resource, Default)]
 pub struct TimeResource {
+    /// The elapsed delta time for this frame
+    /// The precise amount of wall-clock time passed since the last system tick, utilized by the driver to step interpolation functions.
     pub delta: Duration,
 }
 
 impl TimeResource {
+    /// Create a new `TimeResource` with the given delta time.
+    /// Bootstraps the timing state. In normal use, this is seeded with the initial application startup tick.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::systems::TimeResource;
+    /// use std::time::Duration;
+    /// let time = TimeResource::new(Duration::from_millis(16));
+    /// ```
     pub fn new(delta: Duration) -> Self {
         Self { delta }
     }
 
+    /// Set the delta time.
+    /// Updates the internal time elapsed. Caution: Setting extreme or negative values here will violently disrupt timeline interpolation.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::systems::TimeResource;
+    /// use std::time::Duration;
+    /// let mut time = TimeResource::default();
+    /// time.set_delta(Duration::from_secs(1));
+    /// ```
     pub fn set_delta(&mut self, delta: Duration) {
         self.delta = delta;
     }
 
+    /// Get the current delta time.
+    /// Retrieves the elapsed tick time, shielding the mutable `delta` field from external manipulation during complex update phases.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use arthropod_ecs::systems::TimeResource;
+    /// use std::time::Duration;
+    /// let time = TimeResource::new(Duration::from_millis(16));
+    /// assert_eq!(time.delta().as_millis(), 16);
+    /// ```
     pub fn delta(&self) -> Duration {
         self.delta
     }
@@ -49,7 +83,11 @@ impl TimeResource {
 /// ```
 #[derive(Component)]
 pub struct TimelineDriver<T: Animatable + Send + Sync + 'static> {
+    /// The animation timeline running on this entity
+    /// The curve data and playback state executing the interpolation logic over time.
     pub timeline: Timeline<T>,
+    /// The reactive signal target to write animation values to
+    /// The target signal being manipulated. The driver systematically injects the interpolated output of the timeline into this signal.
     pub target: WriteSignal<T>,
 }
 

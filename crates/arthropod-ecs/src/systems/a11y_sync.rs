@@ -18,6 +18,8 @@ use render_engine::Scene;
 /// Populated by `gather_a11y_bounds_system`, consumed by `apply_a11y_bounds_system`.
 #[derive(Resource, Default)]
 pub struct A11yBoundsBuffer {
+    /// List of (A11yId, Rect) entries buffered during the gather phase
+    /// A sequential list grouping node identifiers with their newly calculated layout boundaries, extracted from the main scene.
     pub entries: Vec<(A11yId, Rect)>,
 }
 
@@ -73,7 +75,11 @@ pub fn sync_accessible_nodes_system(
     }
 }
 
+/// Query type for reading AccessibleNode and OnA11yClick components
+/// A precise ECS query grouping an element's accessibility ID with its registered click execution routine.
 pub type ActionCallbacksQuery<'w> = (&'w AccessibleNode, &'w OnA11yClick);
+/// Filter type for reading only added or changed OnA11yClick components
+/// An ECS filter enforcing delta-checks, preventing the system from uselessly re-registering callbacks for components that haven't mutated.
 pub type ActionCallbacksFilter = Or<(Added<OnA11yClick>, Changed<OnA11yClick>)>;
 
 /// Register action callbacks with the ActionHandler
