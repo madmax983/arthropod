@@ -295,7 +295,6 @@ fn update_opacity(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 /// Main system for applying all reactive component updates to the scene in one pass
 /// A monolith system applying all dirty tracked state mutations to the visual tree simultaneously, eliminating redundant `Scene` resource locks.
 pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene: ResMut<Scene>) {
