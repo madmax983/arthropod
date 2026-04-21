@@ -146,6 +146,8 @@ impl App {
 
         #[cfg(feature = "nova")]
         crate::experimental::xray::register_xray(&mut app);
+        #[cfg(feature = "nova")]
+        crate::experimental::draggable::register_draggable(&mut app);
 
         app
     }

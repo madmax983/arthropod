@@ -43,3 +43,7 @@
 **Concept:** Added a `chaos_monkey` system connecting `flux-state` reactivity with `arthropod-ecs`'s `Clickable` components. It automatically finds visible clickables and triggers them pseudo-randomly to simulate user interactions and fuzz UI state changes.
 **Fate:** Merged.
 **Lesson:** Isolating simulation logic inside an ECS system allows us to fuzz UI state without having to simulate raw input events at the OS level, making it extremely lightweight and deterministic.
+## [Draggable UI Nodes]
+**Concept:** A new ECS component `DraggableNode` that leverages the `InteractionState` and `MousePosition` resources to let users drag UI elements around the screen with their pointer. This introduces physical interactions to arbitrary widgets via the ECS.
+**Fate:** Merged
+**Lesson:** Connecting ECS input polling directly with physical node transforms creates a seamless, responsive feeling without blocking the main event dispatch loops.

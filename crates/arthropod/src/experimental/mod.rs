@@ -85,3 +85,7 @@ pub mod chaos_monkey;
 /// Visual feedback indicators for touch gestures.
 #[cfg(feature = "nova")]
 pub mod gesture_feedback;
+
+/// Draggable nodes using ECS components and pointer inputs.
+#[cfg(feature = "nova")]
+pub mod draggable;
