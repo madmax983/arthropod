@@ -66,4 +66,53 @@ mod tests {
         assert!(result_str.ends_with("..."));
         assert!(result_str.len() <= 1003); // 1000 max_len + 3 for "..."
     }
+
+    #[test]
+    fn should_inspect_supported_types() {
+        // Table-driven test for supported types
+        let test_cases: Vec<(Arc<dyn Any + Send + Sync>, String)> = vec![
+            (Arc::new(RwLock::new(42i8)), "42".to_string()),
+            (Arc::new(RwLock::new(42i16)), "42".to_string()),
+            (Arc::new(RwLock::new(42i32)), "42".to_string()),
+            (Arc::new(RwLock::new(42i64)), "42".to_string()),
+            (Arc::new(RwLock::new(42isize)), "42".to_string()),
+            (Arc::new(RwLock::new(42u8)), "42".to_string()),
+            (Arc::new(RwLock::new(42u16)), "42".to_string()),
+            (Arc::new(RwLock::new(42u32)), "42".to_string()),
+            (Arc::new(RwLock::new(42u64)), "42".to_string()),
+            (Arc::new(RwLock::new(42usize)), "42".to_string()),
+            (Arc::new(RwLock::new(3.14f32)), "3.14".to_string()),
+            (Arc::new(RwLock::new(3.14f64)), "3.14".to_string()),
+            (Arc::new(RwLock::new(true)), "true".to_string()),
+            (
+                Arc::new(RwLock::new("hello".to_string())),
+                "\"hello\"".to_string(),
+            ),
+            (Arc::new(RwLock::new("world")), "\"world\"".to_string()),
+        ];
+
+        for (any, expected) in test_cases {
+            let result = try_inspect_value(&any);
+            assert_eq!(result, Some(expected));
+        }
+    }
+
+    #[test]
+    fn should_return_none_for_unsupported_types() {
+        let unsupported: Arc<dyn Any + Send + Sync> = Arc::new(RwLock::new(vec![1, 2, 3]));
+        let result = try_inspect_value(&unsupported);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn should_return_locked_when_lock_fails() {
+        let val: Arc<RwLock<i32>> = Arc::new(RwLock::new(42));
+        let any: Arc<dyn Any + Send + Sync> = val.clone();
+
+        // Acquire the write lock to simulate contention
+        let _guard = val.write().unwrap();
+
+        let result = try_inspect_value(&any);
+        assert_eq!(result, Some("<locked>".to_string()));
+    }
 }

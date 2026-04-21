@@ -1,6 +1,7 @@
 use flux_state::{Computed, Runtime, Signal};
 
 #[test]
+#[cfg(feature = "nova")]
 fn test_value_inspection() {
     let runtime = Runtime::new();
 
