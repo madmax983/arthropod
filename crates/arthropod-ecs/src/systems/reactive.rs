@@ -219,9 +219,14 @@ fn update_text(
     text: &mut Option<Mut<'_, ReactiveText>>,
 ) {
     if let Some(val) = text.as_mut() {
-        let new_text = val.signal.get_untracked();
-        if new_text != val.last_value {
-            val.last_value = new_text.clone();
+        // ⚡ Bolt: Check string equality first without allocating, only clone when changed
+        let changed = val
+            .signal
+            .with_untracked(|new_text| *new_text != val.last_value);
+
+        if changed {
+            let new_val = val.signal.get_untracked();
+            val.last_value = new_val;
 
             if let Some(text_content) = scene
                 .get_mut(node_id)
@@ -231,7 +236,7 @@ fn update_text(
                 })
                 .and_then(|style| style.text.as_mut())
             {
-                text_content.text = new_text;
+                text_content.text.clone_from(&val.last_value);
             }
         }
     }
@@ -243,9 +248,14 @@ fn update_computed_text(
     computed_text: &mut Option<Mut<'_, ReactiveComputedText>>,
 ) {
     if let Some(val) = computed_text.as_mut() {
-        let new_text = val.computed.get();
-        if new_text != val.last_value {
-            val.last_value = new_text.clone();
+        // ⚡ Bolt: Check string equality first without allocating, only clone when changed
+        let changed = val
+            .computed
+            .with_untracked(|new_text| *new_text != val.last_value);
+
+        if changed {
+            let new_val = val.computed.get();
+            val.last_value = new_val;
 
             if let Some(text_content) = scene
                 .get_mut(node_id)
@@ -255,7 +265,7 @@ fn update_computed_text(
                 })
                 .and_then(|style| style.text.as_mut())
             {
-                text_content.text = new_text;
+                text_content.text.clone_from(&val.last_value);
             }
         }
     }
