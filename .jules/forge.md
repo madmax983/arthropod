@@ -56,3 +56,6 @@
 **[Refactoring VerifyRenderOutputTool]**
 **Learning:** `verify_render.rs` had a long `execute` method that checked many different properties sequentially inside a loop, creating a "God Function".
 **Action:** Extract the checks into separate helper functions (`check_color`, `check_position`, `check_size`) on `VerifyRenderOutputTool` to flatten out deeply nested structures and simplify the main logic. This makes the code easier to follow and maintain without changing its behavior.
+**[Extracted context from build_item]**
+**Learning:** Functions such as `build_item` in `BottomNavigation` can take a large amount of parameters and require suppression using `#[allow(clippy::too_many_arguments)]`.
+**Action:** Always group parameters into a dedicated context struct like `BuildItemContext` when the parameter list grows large. Grouping parameters makes the code cleaner, type-safe, and avoids the need for clippy suppressions.

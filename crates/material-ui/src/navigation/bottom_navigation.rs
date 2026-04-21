@@ -100,6 +100,18 @@ impl BottomNavItem {
 ///     selected,
 /// );
 /// ```
+pub(crate) struct BuildItemContext<'a> {
+    pub is_selected: bool,
+    pub primary: Vec4,
+    pub on_surface_variant: Vec4,
+    pub secondary_container: Vec4,
+    pub write: flux_state::WriteSignal<usize>,
+    pub runtime: std::sync::Arc<flux_state::Runtime>,
+    pub icon_color_writers: &'a mut Vec<flux_state::WriteSignal<Color>>,
+    pub label_color_writers: &'a mut Vec<flux_state::WriteSignal<Color>>,
+    pub indicator_color_writers: &'a mut Vec<flux_state::WriteSignal<Color>>,
+}
+
 pub struct BottomNavigation {
     items: Vec<BottomNavItem>,
     signal: Signal<usize>,
@@ -116,23 +128,20 @@ impl BottomNavigation {
         Self { items, signal }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn build_item(
         &self,
         ctx: &mut WidgetContext,
         root: NodeId,
         item: &BottomNavItem,
         i: usize,
-        is_selected: bool,
-        primary: Vec4,
-        on_surface_variant: Vec4,
-        secondary_container: Vec4,
-        write: flux_state::WriteSignal<usize>,
-        runtime: std::sync::Arc<flux_state::Runtime>,
-        icon_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
-        label_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
-        indicator_color_writers: &mut Vec<flux_state::WriteSignal<Color>>,
+        b_ctx: &mut BuildItemContext<'_>,
     ) {
+        let is_selected = b_ctx.is_selected;
+        let primary = b_ctx.primary;
+        let on_surface_variant = b_ctx.on_surface_variant;
+        let secondary_container = b_ctx.secondary_container;
+        let write = b_ctx.write.clone();
+        let runtime = b_ctx.runtime.clone();
         let item_color = if is_selected {
             primary
         } else {
@@ -219,7 +228,7 @@ impl BottomNavigation {
         );
         let (icon_cr, icon_cw) = icon_color_signal.split();
         ctx.add_reactive_color_state(icon_node, icon_cr);
-        icon_color_writers.push(icon_cw);
+        b_ctx.icon_color_writers.push(icon_cw);
 
         let label_color_signal = Signal::new(
             runtime.clone(),
@@ -227,7 +236,7 @@ impl BottomNavigation {
         );
         let (label_cr, label_cw) = label_color_signal.split();
         ctx.add_reactive_color_state(label_node, label_cr);
-        label_color_writers.push(label_cw);
+        b_ctx.label_color_writers.push(label_cw);
 
         let indicator_color_signal = Signal::new(
             runtime.clone(),
@@ -240,7 +249,7 @@ impl BottomNavigation {
         );
         let (ind_cr, ind_cw) = indicator_color_signal.split();
         ctx.add_reactive_color_state(indicator_node, ind_cr);
-        indicator_color_writers.push(ind_cw);
+        b_ctx.indicator_color_writers.push(ind_cw);
     }
 }
 
@@ -299,15 +308,17 @@ impl Widget for BottomNavigation {
                 root,
                 item,
                 i,
-                is_selected,
-                primary,
-                on_surface_variant,
-                secondary_container,
-                write.clone(),
-                runtime.clone(),
-                &mut icon_color_writers,
-                &mut label_color_writers,
-                &mut indicator_color_writers,
+                &mut BuildItemContext {
+                    is_selected,
+                    primary,
+                    on_surface_variant,
+                    secondary_container,
+                    write: write.clone(),
+                    runtime: runtime.clone(),
+                    icon_color_writers: &mut icon_color_writers,
+                    label_color_writers: &mut label_color_writers,
+                    indicator_color_writers: &mut indicator_color_writers,
+                },
             );
         }
 
