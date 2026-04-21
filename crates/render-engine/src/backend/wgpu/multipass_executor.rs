@@ -378,12 +378,12 @@ impl<'a> MultipassRenderer<'a> {
 
         collect_ordered_render_nodes(scene, self.traversal_stack, self.ordered_nodes_buffer);
 
-        let mut instances_buffer = Vec::with_capacity(64);
-        let mut path_batches_buffer = Vec::with_capacity(16);
+        let mut tmp_instances_buffer = Vec::with_capacity(64);
+        let mut tmp_path_batches_buffer = Vec::with_capacity(16);
 
         for i in 0..self.ordered_nodes_buffer.len() {
-            instances_buffer.clear();
-            path_batches_buffer.clear();
+            tmp_instances_buffer.clear();
+            tmp_path_batches_buffer.clear();
 
             let entry = self.ordered_nodes_buffer[i];
             match entry.kind {
@@ -392,8 +392,8 @@ impl<'a> MultipassRenderer<'a> {
                         scene,
                         entry.node_id,
                         surface_view,
-                        &mut instances_buffer,
-                        &mut path_batches_buffer,
+                        &mut tmp_instances_buffer,
+                        &mut tmp_path_batches_buffer,
                     );
                 }
                 OrderedRenderNodeKind::Multipass => {
@@ -402,8 +402,8 @@ impl<'a> MultipassRenderer<'a> {
                         std::slice::from_ref(&entry.node_id),
                         surface_texture,
                         surface_view,
-                        &mut instances_buffer,
-                        &mut path_batches_buffer,
+                        &mut tmp_instances_buffer,
+                        &mut tmp_path_batches_buffer,
                     );
                 }
             }
