@@ -25,7 +25,9 @@ fn test_kill_switch_zombie_recovery() {
     let _effect = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         Effect::new(runtime.clone(), move || {
             let val = r_t.get();
-            *did_run_clone.lock().unwrap() += 1;
+            *did_run_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
 
             // The "Kill Switch": Simulate a sudden network/DB failure
             // the first time the effect runs.
@@ -36,7 +38,12 @@ fn test_kill_switch_zombie_recovery() {
     }));
 
     // Effect panicked on first run. run_count is 1.
-    assert_eq!(*did_run.lock().unwrap(), 1);
+    assert_eq!(
+        *did_run
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1
+    );
 
     // If the system recovered cleanly, the effect should either:
     // 1. Be completely dead and removed from the system.
@@ -53,7 +60,9 @@ fn test_kill_switch_zombie_recovery() {
         "The whole system crashed due to the zombie effect!"
     );
 
-    let ran_again = *did_run.lock().unwrap();
+    let ran_again = *did_run
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // In a perfect system, it would either run successfully (ran_again == 2) or be dead (ran_again == 1).
     // Let's assert we observed the kill switch's aftermath!

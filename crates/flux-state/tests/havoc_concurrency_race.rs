@@ -22,13 +22,17 @@ fn test_loom_signal_read_write_race() {
         let log_clone = log.clone();
         let t2 = thread::spawn(move || {
             let val = r_clone.get();
-            *log_clone.lock().unwrap() = val;
+            *log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = val;
         });
 
         t1.join().unwrap();
         t2.join().unwrap();
 
-        let final_log = *log.lock().unwrap();
+        let final_log = *log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Since threads are racing, we either read the value before write (0) or after write (1)
         assert!(final_log == 0 || final_log == 1);
     });

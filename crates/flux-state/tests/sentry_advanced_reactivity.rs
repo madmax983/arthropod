@@ -44,7 +44,9 @@ fn test_effect_batch_order() {
     // Trigger update
     write_root.set(1);
 
-    let log = log_clone.lock().unwrap();
+    let log = log_clone
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     assert_eq!(log.len(), 2, "Both effects should have run");
     assert!(log.contains(&"Effect 1 ran with 1".to_string()));

@@ -16,11 +16,15 @@ fn test_havoc_concurrent_flush_race() {
     let _effect = Effect::new(runtime.clone(), move || {
         let _val = read.get();
         thread::sleep(Duration::from_millis(100));
-        *done_clone.lock().unwrap() = true;
+        *done_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
     });
 
     // Reset done flag after initial run
-    *done.lock().unwrap() = false;
+    *done
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = false;
 
     // Thread 1 writes, which queues the effect, then manually calls run_effects
     // Actually, write.set() automatically calls flush_effects() right now.
@@ -43,7 +47,9 @@ fn test_havoc_concurrent_flush_race() {
     // But the effect might not have run for `set(2)` yet.
     // Let's assert that the effect ran for `set(2)`!
     // Wait, if it didn't block, `done` might still be false.
-    let is_done = *done.lock().unwrap();
+    let is_done = *done
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     // Ensure that it's done, proving the race condition is fixed.
     assert!(
         is_done,

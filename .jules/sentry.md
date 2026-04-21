@@ -14,3 +14,6 @@
 **Graceful Lock Poison Recovery**
 **Learning:** Raw `unwrap()` calls on Mutex or RwLock operations crash the runtime when a holding thread panics, leading to subsequent, catastrophic lock poisoning across the workspace.
 **Action:** Replace `.lock().unwrap()`, `.read().unwrap()`, and `.write().unwrap()` with `.unwrap_or_else(std::sync::PoisonError::into_inner)` inside core synchronization boundaries to safely recover the lock guard and maintain stability.
+**Condvar Poisoning Recovery**
+**Learning:** `Condvar::wait(guard).unwrap()` calls will panic and propagate Mutex poisoning when another thread panics while holding the same lock. This can crash unrelated background threads (like effect flushers or computation waiters) and bring down the entire reactive system.
+**Action:** Always use `.unwrap_or_else(std::sync::PoisonError::into_inner)` on `.wait()` calls for `Condvar`, just as with `.lock()`, to ensure that waiting threads can safely recover from panics in other parts of the system.

@@ -23,7 +23,9 @@ fn test_batch_panic_recovery() {
     let _effect1 = Effect::new(runtime.clone(), move || {
         let val = read1.get();
         if val == 1 {
-            log1.lock().unwrap().push("E1");
+            log1.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E1");
         }
     });
 
@@ -33,7 +35,9 @@ fn test_batch_panic_recovery() {
     let _effect2 = Effect::new(runtime.clone(), move || {
         let val = read2.get();
         if val == 1 {
-            log2.lock().unwrap().push("E2");
+            log2.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E2");
         }
     });
 
@@ -43,7 +47,9 @@ fn test_batch_panic_recovery() {
     let _effect3 = Effect::new(runtime.clone(), move || {
         let val = read3.get();
         if val == 1 {
-            log3.lock().unwrap().push("E3_START");
+            log3.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E3_START");
             panic!("Effect 3 Panic");
         }
     });
@@ -72,7 +78,9 @@ fn test_batch_panic_recovery() {
 
     // Now check that all effects eventually ran.
     {
-        let log = execution_log.lock().unwrap();
+        let log = execution_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // We verify set membership rather than order because of the non-deterministic HashSet
         assert!(log.contains(&"E1"), "Effect 1 should have run");
@@ -121,12 +129,19 @@ fn test_panic_restorer_empty() {
     let _effect2 = Effect::new(runtime.clone(), move || {
         let val = read2.get();
         if val == 1 {
-            log_clone.lock().unwrap().push("Safe");
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("Safe");
         }
     });
 
     write2.set(1);
-    assert_eq!(*log.lock().unwrap(), vec!["Safe"]);
+    assert_eq!(
+        *log.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        vec!["Safe"]
+    );
 }
 
 #[test]

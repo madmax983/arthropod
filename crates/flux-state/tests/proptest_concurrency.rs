@@ -35,7 +35,7 @@ proptest! {
 
         let _effect = Effect::new(runtime.clone(), move || {
             let val = r_clone.get();
-            *log_clone.lock().unwrap() = val;
+            *log_clone.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = val;
         });
 
         writer1.join().unwrap();

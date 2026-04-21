@@ -478,7 +478,10 @@ impl Runtime {
                 break;
             } else {
                 // Another thread is flushing. Wait for it to finish.
-                inner = self.condvar.wait(inner).unwrap();
+                inner = self
+                    .condvar
+                    .wait(inner)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
             }
         }
 
@@ -690,7 +693,10 @@ impl Runtime {
 
             // Register that we are waiting
             inner.waiting_for.insert(current_thread, id);
-            inner = self.condvar.wait(inner).unwrap();
+            inner = self
+                .condvar
+                .wait(inner)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             inner.waiting_for.remove(&current_thread);
         }
         inner

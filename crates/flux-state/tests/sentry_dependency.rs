@@ -29,17 +29,27 @@ fn test_dynamic_dependency_pruning() {
     let computed_clone = computed.clone();
     let _keep_alive = Effect::new(runtime.clone(), move || {
         let _ = computed_clone.get();
-        *run_count_clone.lock().unwrap() += 1;
+        *run_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
     });
 
     // Initial state: Cond=true, A=10. Computed=10.
     assert_eq!(computed.get(), 10);
-    assert_eq!(*run_count.lock().unwrap(), 1, "Effect should run initially");
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1,
+        "Effect should run initially"
+    );
 
     // 1. Update B (inactive branch). Should NOT trigger update.
     write_b.set(21);
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Updating inactive dependency B should not trigger effect"
     );
@@ -50,7 +60,9 @@ fn test_dynamic_dependency_pruning() {
     write_cond.set(false);
     assert_eq!(computed.get(), 21);
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         2,
         "Updating condition should trigger effect"
     );
@@ -58,7 +70,9 @@ fn test_dynamic_dependency_pruning() {
     // 3. Update A (inactive branch). Should NOT trigger update.
     write_a.set(11);
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         2,
         "Updating inactive dependency A should not trigger effect"
     );
@@ -68,7 +82,9 @@ fn test_dynamic_dependency_pruning() {
     write_b.set(22);
     assert_eq!(computed.get(), 22);
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         3,
         "Updating active dependency B should trigger effect"
     );

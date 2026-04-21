@@ -19,13 +19,17 @@ fn test_panic_drops_pending_effects() {
             if val == 1 && i == 179 {
                 panic!("Panic at index 179");
             }
-            run_counts.lock().unwrap()[i] = true;
+            run_counts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)[i] = true;
         }));
     }
 
     // Reset counts before update
     {
-        let mut counts = run_counts.lock().unwrap();
+        let mut counts = run_counts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         for ran in counts.iter_mut() {
             *ran = false;
         }
@@ -43,7 +47,9 @@ fn test_panic_drops_pending_effects() {
     write_recovery.set(1);
 
     // Verify results
-    let counts = run_counts.lock().unwrap();
+    let counts = run_counts
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // Check that we have at least one execution and at least one failure (the panic itself)
     // The panic happens at 179.

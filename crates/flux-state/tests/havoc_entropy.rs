@@ -51,16 +51,22 @@ fn test_schrodingers_effect() {
             // Read both
             let _t = r_trigger_b.get();
             let _s = r_shared_b.get();
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
         });
 
         // Reset count (initial run happened)
-        *run_count.lock().unwrap() = 0;
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = 0;
 
         // Trigger update
         w_trigger.set(1);
 
-        let count = *run_count.lock().unwrap();
+        let count = *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if count == 1 {
             observed_single_run = true;
         } else if count == 2 {
@@ -140,7 +146,9 @@ fn test_recursive_fork_bomb() {
 
     let _e = Effect::new(runtime.clone(), move || {
         let val = r.get();
-        let mut c = counter_clone.lock().unwrap();
+        let mut c = counter_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         *c = val;
 
         if val < max_depth {
@@ -159,7 +167,9 @@ fn test_recursive_fork_bomb() {
     // Wait for the bomb to diffuse
     thread::sleep(Duration::from_millis(500));
 
-    let final_count = *counter.lock().unwrap();
+    let final_count = *counter
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if final_count >= max_depth {
         println!(
             "👺 RECURSION BYPASS CONFIRMED: Threading evaded the recursion limit! Depth reached: {}",

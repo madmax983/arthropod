@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 #[test]
-fn test_computing_guard_panic_wakes_waiting_threads() {
+fn test_condvar_poison_recovery() {
     let runtime = Runtime::new();
 
     // Signal to trigger re-evaluation

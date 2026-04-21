@@ -15,11 +15,15 @@ fn test_signal_with_untracked() {
     let _keep_alive = Effect::new(runtime.clone(), move || {
         // This should NOT track dependency on signal
         let _ = read.with_untracked(|v| *v);
-        *run_count_clone.lock().unwrap() += 1;
+        *run_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
     });
 
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Effect should run once initially"
     );
@@ -29,7 +33,9 @@ fn test_signal_with_untracked() {
 
     // Should NOT have run again because the read was untracked
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Effect should not run on update"
     );
@@ -50,11 +56,15 @@ fn test_computed_with_untracked() {
     let _keep_alive = Effect::new(runtime.clone(), move || {
         // This should NOT track dependency on computed
         let _ = computed_clone.with_untracked(|v| *v);
-        *run_count_clone.lock().unwrap() += 1;
+        *run_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
     });
 
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Effect should run once initially"
     );
@@ -64,7 +74,9 @@ fn test_computed_with_untracked() {
 
     // Computed value is stale, but Effect should NOT have been notified because it untracked-read Computed.
     assert_eq!(
-        *run_count.lock().unwrap(),
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Effect should not run on update"
     );
@@ -83,19 +95,25 @@ fn test_computed_lazy_update() {
     let compute_count_clone = compute_count.clone();
 
     let computed = Computed::new(runtime.clone(), move || {
-        *compute_count_clone.lock().unwrap() += 1;
+        *compute_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
         read.get() * 2
     });
 
     // Initial compute happens on creation
     assert_eq!(
-        *compute_count.lock().unwrap(),
+        *compute_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Should compute on creation"
     );
     assert_eq!(computed.get(), 20);
     assert_eq!(
-        *compute_count.lock().unwrap(),
+        *compute_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Should use memoized value"
     );
@@ -105,7 +123,9 @@ fn test_computed_lazy_update() {
 
     // Should NOT recompute yet (lazy)
     assert_eq!(
-        *compute_count.lock().unwrap(),
+        *compute_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         1,
         "Should be lazy (not recomputed yet)"
     );
@@ -114,7 +134,9 @@ fn test_computed_lazy_update() {
     assert_eq!(computed.get(), 40);
     // Now it should have recomputed
     assert_eq!(
-        *compute_count.lock().unwrap(),
+        *compute_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         2,
         "Should recompute on access"
     );
@@ -123,7 +145,9 @@ fn test_computed_lazy_update() {
     assert_eq!(computed.get(), 40);
     // Should use memoized
     assert_eq!(
-        *compute_count.lock().unwrap(),
+        *compute_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         2,
         "Should use memoized value again"
     );

@@ -16,7 +16,9 @@ fn test_orphaned_effect_panic_during_construction() {
     let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let _effect = Effect::new(runtime.clone(), move || {
             let val = read_trigger.get();
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
 
             if val == 0 {
                 panic!("Panic during construction!");
@@ -29,7 +31,12 @@ fn test_orphaned_effect_panic_during_construction() {
     // Therefore, `dispose_effect` was never called.
 
     // Check run count (should be 1 for the initial run)
-    assert_eq!(*run_count.lock().unwrap(), 1);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1
+    );
 
     // 2. Trigger a dependency update.
     // If the "orphaned" effect is still registered and "clean" (thanks to my previous fix),
@@ -45,7 +52,9 @@ fn test_orphaned_effect_panic_during_construction() {
 
     // If the effect was truly orphaned and active, it ran again.
     // If we fixed it, it should not run.
-    let count = *run_count.lock().unwrap();
+    let count = *run_count
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // Sentry: If count is 2, the orphan is alive. If 1, it's dead (correct).
     assert_eq!(

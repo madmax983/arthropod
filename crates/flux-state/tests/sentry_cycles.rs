@@ -22,7 +22,10 @@ fn test_computed_cycle_behavior() {
     let r_pa_c = r_pa.clone();
     let a = Computed::new(runtime.clone(), move || {
         r_pa_c.get(); // Depend on ProxyA
-        if let Some(ref b) = *b_handle_c.lock().unwrap() {
+        if let Some(ref b) = *b_handle_c
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        {
             // If B exists, read it.
             // Breaking cycle by limiting depth? No, let's see what happens.
             b.get() + 1
@@ -39,8 +42,12 @@ fn test_computed_cycle_behavior() {
         a_clone.get() + 1
     });
 
-    *a_handle.lock().unwrap() = Some(a.clone());
-    *b_handle.lock().unwrap() = Some(b.clone());
+    *a_handle
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(a.clone());
+    *b_handle
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(b.clone());
 
     // Initial state:
     // A was computed first. B was None. A = 0.

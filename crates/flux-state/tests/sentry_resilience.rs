@@ -30,14 +30,18 @@ fn test_multi_effect_resilience() {
     let r_s1 = read_s.clone();
     let _e1 = Effect::new(runtime.clone(), move || {
         let _val = r_s1.get();
-        *c1_clone.lock().unwrap() += 1;
+        *c1_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
     });
 
     // E2: Panics when S == 1
     let r_s2 = read_s.clone();
     let _e2 = Effect::new(runtime.clone(), move || {
         let val = r_s2.get();
-        *c2_clone.lock().unwrap() += 1;
+        *c2_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
         if val == 1 {
             panic!("Effect 2 Panic!");
         }
@@ -47,13 +51,27 @@ fn test_multi_effect_resilience() {
     let r_s3 = read_s.clone();
     let _e3 = Effect::new(runtime.clone(), move || {
         let _val = r_s3.get();
-        *c3_clone.lock().unwrap() += 1;
+        *c3_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
     });
 
     // Initial state: S=0. All effects run once.
-    assert_eq!(*c1.lock().unwrap(), 1, "E1 initial run");
-    assert_eq!(*c2.lock().unwrap(), 1, "E2 initial run");
-    assert_eq!(*c3.lock().unwrap(), 1, "E3 initial run");
+    assert_eq!(
+        *c1.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+        1,
+        "E1 initial run"
+    );
+    assert_eq!(
+        *c2.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+        1,
+        "E2 initial run"
+    );
+    assert_eq!(
+        *c3.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+        1,
+        "E3 initial run"
+    );
 
     // Update S to 1. This should trigger all 3 effects.
     // E2 will panic. The runtime aborts the current flush cycle.
@@ -73,7 +91,7 @@ fn test_multi_effect_resilience() {
 
     // Verify E2 attempted to run
     assert_eq!(
-        *c2.lock().unwrap(),
+        *c2.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
         2,
         "E2 should have started running for S=1"
     );
@@ -95,9 +113,9 @@ fn test_multi_effect_resilience() {
     // Minimum runs: Init (1) + S=2 (1) = 2.
     // Maximum runs: Init (1) + S=1 (1) + S=2 (1) = 3.
 
-    let v1 = *c1.lock().unwrap();
-    let v2 = *c2.lock().unwrap();
-    let v3 = *c3.lock().unwrap();
+    let v1 = *c1.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let v2 = *c2.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let v3 = *c3.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     assert!(v1 >= 2, "E1 should have recovered (runs: {})", v1);
     assert!(v3 >= 2, "E3 should have recovered (runs: {})", v3);

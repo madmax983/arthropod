@@ -16,21 +16,30 @@ mod tests {
 
         let computed_clone = computed.clone();
         let _effect = Effect::new(runtime.clone(), move || {
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
             // Accessing via Debug formatting
             // This SHOULD trigger tracking, but currently doesn't.
             let _ = format!("{:?}", computed_clone);
         });
 
         // Initially 1 run
-        assert_eq!(*run_count.lock().unwrap(), 1);
+        assert_eq!(
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            1
+        );
 
         // Update signal -> computed becomes stale
         write.set(20);
 
         // Should re-run
         assert_eq!(
-            *run_count.lock().unwrap(),
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             2,
             "Effect should re-run when computed dependency updates, even if accessed via Debug"
         );
@@ -47,17 +56,26 @@ mod tests {
 
         let signal_clone = signal.clone();
         let _effect = Effect::new(runtime.clone(), move || {
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
             // Accessing via Debug formatting
             let _ = format!("{:?}", signal_clone);
         });
 
-        assert_eq!(*run_count.lock().unwrap(), 1);
+        assert_eq!(
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            1
+        );
 
         write.set("World");
 
         assert_eq!(
-            *run_count.lock().unwrap(),
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             2,
             "Effect should re-run when signal updates, even if accessed via Debug"
         );
@@ -74,17 +92,26 @@ mod tests {
 
         let read_clone = read.clone();
         let _effect = Effect::new(runtime.clone(), move || {
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
             // Accessing via Debug formatting
             let _ = format!("{:?}", read_clone);
         });
 
-        assert_eq!(*run_count.lock().unwrap(), 1);
+        assert_eq!(
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            1
+        );
 
         write.set(200);
 
         assert_eq!(
-            *run_count.lock().unwrap(),
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             2,
             "Effect should re-run when read signal updates, even if accessed via Debug"
         );
@@ -101,17 +128,26 @@ mod tests {
 
         let write_clone = write.clone();
         let _effect = Effect::new(runtime.clone(), move || {
-            *run_count_clone.lock().unwrap() += 1;
+            *run_count_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
             // Accessing via Debug formatting on WriteSignal (which reads the value!)
             let _ = format!("{:?}", write_clone);
         });
 
-        assert_eq!(*run_count.lock().unwrap(), 1);
+        assert_eq!(
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            1
+        );
 
         write.set(84);
 
         assert_eq!(
-            *run_count.lock().unwrap(),
+            *run_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             2,
             "Effect should re-run when write signal updates, even if accessed via Debug"
         );

@@ -24,7 +24,11 @@ fn test_write_signal_update_triggers_subscribers() {
 
     // Initial state checks
     assert_eq!(len_computed.get(), 3);
-    assert_eq!(*log.lock().unwrap(), vec![vec![1, 2, 3]]);
+    assert_eq!(
+        *log.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        vec![vec![1, 2, 3]]
+    );
 
     // Perform an update using WriteSignal::update
     write_count.update(|v| {
@@ -35,7 +39,8 @@ fn test_write_signal_update_triggers_subscribers() {
     // Verify updates propagated
     assert_eq!(len_computed.get(), 5);
     assert_eq!(
-        *log.lock().unwrap(),
+        *log.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         vec![vec![1, 2, 3], vec![1, 2, 3, 4, 5]]
     );
 }

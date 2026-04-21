@@ -11,14 +11,18 @@ fn test_loom_stale_flag_model() {
         let t1 = loom::thread::spawn(move || {
             // Worker thread simulating `recompute` in Runtime
             // Let's say it finishes computation and clears the flag
-            let mut guard = stale_t1.lock().unwrap();
+            let mut guard = stale_t1
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             *guard = false;
         });
 
         let stale_t2 = stale.clone();
         let t2 = loom::thread::spawn(move || {
             // Mutator thread simulating `notify` setting stale back to true
-            let mut guard = stale_t2.lock().unwrap();
+            let mut guard = stale_t2
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             *guard = true;
         });
 
@@ -27,7 +31,9 @@ fn test_loom_stale_flag_model() {
 
         // After both threads finish, the system expects the data to be stale if t2 ran last.
         // However, because there's no atomic swap or guard, t1 might overwrite t2's 'true'.
-        let final_stale = *stale.lock().unwrap();
+        let final_stale = *stale
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // This will panic when loom explores the permutation where T2 runs, then T1 runs and clears it.
         assert!(final_stale, "Race condition: stale flag was overwritten!");

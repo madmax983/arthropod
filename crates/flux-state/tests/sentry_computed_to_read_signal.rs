@@ -63,11 +63,21 @@ fn test_computed_to_read_signal_reactivity() {
     });
 
     // Effect should run initially
-    assert_eq!(*effect_log.lock().unwrap(), vec![10]);
+    assert_eq!(
+        *effect_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        vec![10]
+    );
 
     // Update root signal
     write.set(15);
 
     // Effect should be triggered again because the read_signal's dependencies changed
-    assert_eq!(*effect_log.lock().unwrap(), vec![10, 20]);
+    assert_eq!(
+        *effect_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        vec![10, 20]
+    );
 }

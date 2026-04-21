@@ -31,7 +31,11 @@ fn test_cross_thread_cycle_deadlock() {
             } else {
                 // Sleep to ensure T2 grabs B lock
                 thread::sleep(Duration::from_millis(50));
-                if let Some(b) = b_reader.read().unwrap().as_ref() {
+                if let Some(b) = b_reader
+                    .read()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                {
                     b.get() + 1
                 } else {
                     0
@@ -50,7 +54,11 @@ fn test_cross_thread_cycle_deadlock() {
             } else {
                 // Sleep to ensure T1 grabs A lock
                 thread::sleep(Duration::from_millis(50));
-                if let Some(a) = a_reader.read().unwrap().as_ref() {
+                if let Some(a) = a_reader
+                    .read()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                {
                     a.get() + 1
                 } else {
                     0
@@ -59,7 +67,9 @@ fn test_cross_thread_cycle_deadlock() {
         });
 
         {
-            let mut guard = b_holder.write().unwrap();
+            let mut guard = b_holder
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             *guard = Some(b.clone());
         }
 

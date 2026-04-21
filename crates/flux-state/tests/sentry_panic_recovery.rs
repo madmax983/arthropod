@@ -50,14 +50,21 @@ fn test_effect_panic_recovery() {
     // Must keep effect handle alive!
     let _effect_handle = Effect::new(runtime.clone(), move || {
         let val = read_count.get();
-        *run_count_clone.lock().unwrap() += 1;
+        *run_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
         if val == 1 {
             panic!("Effect Panic!");
         }
     });
 
     // 0. Initial run (count=0) -> OK
-    assert_eq!(*effect_run_count.lock().unwrap(), 1);
+    assert_eq!(
+        *effect_run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1
+    );
 
     // 1. Set to 1 -> Panic
     let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
@@ -66,7 +73,12 @@ fn test_effect_panic_recovery() {
     assert!(result.is_err(), "Effect should have panicked");
 
     // verify run count increased
-    assert_eq!(*effect_run_count.lock().unwrap(), 2);
+    assert_eq!(
+        *effect_run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        2
+    );
 
     // 2. Set to 2 -> Should run again
     // If the effect is "stale" but not "pending", it won't run.
@@ -78,7 +90,9 @@ fn test_effect_panic_recovery() {
     // Verify effect ran again
     // Expected: 3 runs (0, 1[panic], 2)
     assert_eq!(
-        *effect_run_count.lock().unwrap(),
+        *effect_run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
         3,
         "Effect should have recovered and run again"
     );
@@ -95,7 +109,9 @@ fn test_effect_panic_before_tracking_leaves_zombie() {
 
     // Effect panics BEFORE reading any signal on first run.
     let _effect_handle = Effect::new(runtime.clone(), move || {
-        *run_count_clone.lock().unwrap() += 1;
+        *run_count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
 
         // We use get_untracked to check value without registering dependency.
         // If we panic here, we haven't registered any dependencies yet.
@@ -111,14 +127,24 @@ fn test_effect_panic_before_tracking_leaves_zombie() {
     });
 
     // 1. Initial run (val=0). Runs once.
-    assert_eq!(*run_count.lock().unwrap(), 1);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1
+    );
 
     // 2. Set to 1 -> Panic
     let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         write_trigger.set(1);
     }));
     assert!(result.is_err(), "Effect should have panicked");
-    assert_eq!(*run_count.lock().unwrap(), 2);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        2
+    );
 
     // 3. Set to 2 -> Should it run?
     // If it panicked before tracking, it lost its dependency on `trigger`.
@@ -129,7 +155,9 @@ fn test_effect_panic_before_tracking_leaves_zombie() {
     assert!(result.is_ok());
 
     // Verify count is still 2 (zombie)
-    let count = *run_count.lock().unwrap();
+    let count = *run_count
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert_eq!(
         count, 2,
         "Effect should be a zombie because it panicked before tracking dependency"

@@ -23,7 +23,11 @@ fn test_deadlock_poisoning() {
     let comp_a = Computed::new(runtime.clone(), move || {
         let val = r_trigger_a.get(); // Subscribe to trigger
 
-        if let Some(b) = b_handle_a.read().unwrap().as_ref() {
+        if let Some(b) = b_handle_a
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
             // Sleep to allow T2 to start computing B
             thread::sleep(Duration::from_millis(50));
             // Read B
@@ -40,7 +44,11 @@ fn test_deadlock_poisoning() {
     let comp_b = Computed::new(runtime.clone(), move || {
         let val = r_trigger_b.get();
 
-        if let Some(a) = a_handle_b.read().unwrap().as_ref() {
+        if let Some(a) = a_handle_b
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
             // Sleep to allow T1 to start computing A
             thread::sleep(Duration::from_millis(50));
             a.get() + val
@@ -50,8 +58,12 @@ fn test_deadlock_poisoning() {
     });
 
     // Link them
-    *comp_a_handle.write().unwrap() = Some(comp_a.clone());
-    *comp_b_handle.write().unwrap() = Some(comp_b.clone());
+    *comp_a_handle
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(comp_a.clone());
+    *comp_b_handle
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(comp_b.clone());
 
     // Update trigger to mark them stale
     w_trigger.set(1);

@@ -56,32 +56,58 @@ fn test_effect_self_disposal() {
     let read_c = read.clone();
     let effect = Effect::new(runtime.clone(), move || {
         let val = read_c.get();
-        *count_clone.lock().unwrap() += 1;
+        *count_clone
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
 
         if val == 1 {
             // Dispose self safely
             // Note: `dispose_effect` acquires the runtime lock.
             // `run_effect` releases the lock before running this closure.
             // So this is safe from deadlocks.
-            *handle_clone.lock().unwrap() = None;
+            *handle_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         }
     });
 
-    *effect_handle.lock().unwrap() = Some(effect);
+    *effect_handle
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(effect);
 
     // Run 0 (init)
-    assert_eq!(*run_count.lock().unwrap(), 1);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        1
+    );
 
     // Run 1 (Trigger disposal)
     write.set(1);
-    assert_eq!(*run_count.lock().unwrap(), 2);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        2
+    );
 
     // Check if disposed
-    assert!(effect_handle.lock().unwrap().is_none());
+    assert!(
+        effect_handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_none()
+    );
 
     // Run 2 (Should NOT run)
     write.set(2);
-    assert_eq!(*run_count.lock().unwrap(), 2);
+    assert_eq!(
+        *run_count
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        2
+    );
 }
 
 #[test]

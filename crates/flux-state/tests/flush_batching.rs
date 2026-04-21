@@ -19,7 +19,10 @@ fn test_flush_effects_order_and_recursion() {
     let log_clone = log.clone();
     let _e2 = Effect::new(runtime.clone(), move || {
         if read2.get() > 0 {
-            log_clone.lock().unwrap().push("E2".to_string());
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E2".to_string());
         }
     });
 
@@ -28,18 +31,26 @@ fn test_flush_effects_order_and_recursion() {
     let write2_clone = write2.clone();
     let _e1 = Effect::new(runtime.clone(), move || {
         if read1.get() > 0 {
-            log_clone.lock().unwrap().push("E1".to_string());
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E1".to_string());
             // This update should trigger E2.
             // In the current implementation (immediate recursive flush?),
             // or queued?
             // "Flush pending effects (synchronous for now)" - from runtime.rs
             write2_clone.set(1);
-            log_clone.lock().unwrap().push("E1_done".to_string());
+            log_clone
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push("E1_done".to_string());
         }
     });
 
     // Initial state: effects run once.
-    log.lock().unwrap().clear();
+    log.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear();
 
     // Update s1. This triggers E1.
     // E1 runs, updates s2. This triggers E2.
@@ -51,7 +62,10 @@ fn test_flush_effects_order_and_recursion() {
     // Let's find out.
     write1.set(1);
 
-    let recorded = log.lock().unwrap().clone();
+    let recorded = log
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     println!("Recorded: {:?}", recorded);
 
     // Based on `runtime.rs`:
@@ -95,26 +109,34 @@ fn test_flush_effects_fanout_batching() {
     let r1 = read.clone();
     let _e1 = Effect::new(runtime.clone(), move || {
         r1.get();
-        log1.lock().unwrap().push("E1".to_string());
+        log1.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("E1".to_string());
     });
 
     let log2 = log.clone();
     let r2 = read.clone();
     let _e2 = Effect::new(runtime.clone(), move || {
         r2.get();
-        log2.lock().unwrap().push("E2".to_string());
+        log2.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("E2".to_string());
     });
 
     let log3 = log.clone();
     let r3 = read.clone();
     let _e3 = Effect::new(runtime.clone(), move || {
         r3.get();
-        log3.lock().unwrap().push("E3".to_string());
+        log3.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push("E3".to_string());
     });
 
     // Initial run
     {
-        let mut recorded = log.lock().unwrap();
+        let mut recorded = log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         recorded.sort();
         assert_eq!(*recorded, vec!["E1", "E2", "E3"]);
         recorded.clear();
@@ -124,7 +146,9 @@ fn test_flush_effects_fanout_batching() {
     write.set(1);
 
     {
-        let mut recorded = log.lock().unwrap();
+        let mut recorded = log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         recorded.sort();
         // Verify all ran exactly once
         assert_eq!(*recorded, vec!["E1", "E2", "E3"]);
