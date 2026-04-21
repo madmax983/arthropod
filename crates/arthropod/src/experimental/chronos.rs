@@ -233,7 +233,10 @@ impl<T: Clone + 'static + Send + Sync> RetroSignal<T> {
         // Record to timeline
         let description = format!("Set {}", self.name);
 
-        self.timeline.lock().unwrap().record(description, op);
+        self.timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .record(description, op);
 
         // Apply change
         self.write.set(new_value);
@@ -278,7 +281,9 @@ impl Widget for ChronosDebugger {
         // For now, we'll just read the current state.
         // To make it reactive, we need to access the signal inside the lock.
         let (version, nodes) = {
-            let tl = timeline.lock().unwrap();
+            let tl = timeline
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let version = tl.version_read.get(); // Establish dependency
 
             // Collect node info for display
@@ -327,7 +332,10 @@ impl Widget for ChronosDebugger {
                     let label = format!("{}{}: {}", marker, idx, desc);
 
                     let btn = Button::new(label).on_click(move || {
-                        timeline.lock().unwrap().jump_to(idx);
+                        timeline
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .jump_to(idx);
                     });
 
                     // Style the current node differently
@@ -380,19 +388,31 @@ mod tests {
         assert_eq!(signal.get(), 20);
 
         // Undo 20 -> 10
-        timeline.lock().unwrap().undo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .undo();
         assert_eq!(signal.get(), 10);
 
         // Undo 10 -> 0
-        timeline.lock().unwrap().undo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .undo();
         assert_eq!(signal.get(), 0);
 
         // Redo 0 -> 10
-        timeline.lock().unwrap().redo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .redo();
         assert_eq!(signal.get(), 10);
 
         // Redo 10 -> 20
-        timeline.lock().unwrap().redo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .redo();
         assert_eq!(signal.get(), 20);
     }
 
@@ -406,7 +426,10 @@ mod tests {
         signal.set(20);
 
         // Undo 20 -> 10
-        timeline.lock().unwrap().undo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .undo();
         assert_eq!(signal.get(), 10);
 
         // New future: 10 -> 30 (Branch created)
@@ -414,11 +437,17 @@ mod tests {
         assert_eq!(signal.get(), 30);
 
         // Undo 30 -> 10
-        timeline.lock().unwrap().undo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .undo();
         assert_eq!(signal.get(), 10);
 
         // Redo should go to 30 (last active branch)
-        timeline.lock().unwrap().redo();
+        timeline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .redo();
         assert_eq!(signal.get(), 30);
     }
 }

@@ -5,7 +5,6 @@ use flux_state::Runtime;
 use std::thread;
 
 #[test]
-#[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
 fn test_chronos_poison() {
     let runtime = Runtime::new();
     let timeline = Timeline::new(runtime.clone());
