@@ -1,3 +1,3 @@
 //! Form state types
 
-pub use input_engine::form::{FormData, FormState, SubmitCallback};
+pub use input_engine::{FormData, FormState, SubmitCallback};

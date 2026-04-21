@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use input_engine::InputPattern;
-    use input_engine::mouse_gestures::{MouseGesture, StrokeMatcher};
+    use input_engine::{MouseGesture, StrokeMatcher};
     use plat_core::{ElementState, Modifiers, MouseButton, MouseInput, Point, WindowEvent};
     use std::f64::consts::PI;
 

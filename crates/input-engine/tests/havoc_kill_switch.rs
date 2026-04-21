@@ -1,6 +1,6 @@
 // Try fuzzing the text external update
 use flux_state::{Runtime, Signal};
-use input_engine::text::TextInputState;
+use input_engine::TextInputState;
 use proptest::prelude::*;
 
 proptest! {

@@ -3,7 +3,7 @@ mod tests {
     use flux_state::{Runtime, Signal};
     use hashbrown::HashMap;
     use indexmap::IndexMap;
-    use input_engine::{InputNodeId, form::*, text::*};
+    use input_engine::{InputNodeId, *};
 
     #[allow(dead_code)]
     fn create_text_state(initial: &str) -> TextInputState {

@@ -3,7 +3,7 @@
 use crate::{Text, Widget, WidgetContext};
 use flux_state::{ReadSignal, Signal, WriteSignal};
 use glam::Vec4;
-use input_engine::validation::Validator;
+use input_engine::Validator;
 use layout_engine::FlexDirection;
 use render_engine::{Color, NodeContent, NodeId};
 use theme_engine::DesignTokens;

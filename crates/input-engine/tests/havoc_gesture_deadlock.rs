@@ -1,5 +1,5 @@
 use flux_state::{Effect, Runtime, Signal};
-use input_engine::gestures::{SequenceMatcher, create_gesture_signal};
+use input_engine::{SequenceMatcher, create_gesture_signal};
 use plat_core::{ElementState, Key, KeyboardInput, WindowEvent};
 use std::sync::mpsc;
 use std::thread;

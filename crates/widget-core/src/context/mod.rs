@@ -83,7 +83,7 @@ use flux_state::{Computed, ReadSignal, WriteSignal};
 use glam::Vec4;
 use hashbrown::{HashMap, HashSet}; // ⚡ Bolt: Using hashbrown gives us AHash instead of SipHash which improves performance during widget tree construction
 use indexmap::IndexMap;
-use input_engine::validation::Validator;
+use input_engine::Validator;
 use layout_engine::FlexStyle;
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
 use std::any::{Any, TypeId};
@@ -585,27 +585,27 @@ impl WidgetContext {
 
     /// Send a character to focused input
     pub fn send_char(&mut self, c: char) {
-        input_engine::text::send_char(&mut self.text_input_states, self.focused_node, c);
+        input_engine::send_char(&mut self.text_input_states, self.focused_node, c);
     }
 
     /// Send backspace to focused input
     pub fn send_backspace(&mut self) {
-        input_engine::text::send_backspace(&mut self.text_input_states, self.focused_node);
+        input_engine::send_backspace(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send delete to focused input
     pub fn send_delete(&mut self) {
-        input_engine::text::send_delete(&mut self.text_input_states, self.focused_node);
+        input_engine::send_delete(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send left arrow key to focused input
     pub fn send_key_left(&mut self) {
-        input_engine::text::send_key_left(&mut self.text_input_states, self.focused_node);
+        input_engine::send_key_left(&mut self.text_input_states, self.focused_node);
     }
 
     /// Send right arrow key to focused input
     pub fn send_key_right(&mut self) {
-        input_engine::text::send_key_right(&mut self.text_input_states, self.focused_node);
+        input_engine::send_key_right(&mut self.text_input_states, self.focused_node);
     }
 
     /// Set validator for a node
@@ -690,7 +690,7 @@ impl WidgetContext {
 
     /// Get all field errors for a form
     pub fn get_form_field_errors(&self, node_id: NodeId) -> HashMap<String, String> {
-        input_engine::form::get_form_field_errors(
+        input_engine::get_form_field_errors(
             input_engine::InputNodeId(node_id.0),
             &self.form_states,
             &self.validators,
@@ -704,7 +704,7 @@ impl WidgetContext {
 
     /// Revalidate a form (check all field validators)
     pub fn revalidate_form(&mut self, node_id: NodeId) {
-        input_engine::form::revalidate_form(
+        input_engine::revalidate_form(
             input_engine::InputNodeId(node_id.0),
             &mut self.form_states,
             &self.text_input_states,
@@ -714,7 +714,7 @@ impl WidgetContext {
 
     /// Trigger form submission
     pub fn trigger_submit(&mut self, node_id: NodeId) {
-        input_engine::form::trigger_submit(
+        input_engine::trigger_submit(
             input_engine::InputNodeId(node_id.0),
             &mut self.form_states,
             &self.text_input_states,
@@ -763,7 +763,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_next(&mut self) -> Option<NodeId> {
-        input_engine::focus::focus_next(&self.text_input_states, &mut self.focused_node)
+        input_engine::focus_next(&self.text_input_states, &mut self.focused_node)
             .map(|id| NodeId(id.0))
     }
 
@@ -777,7 +777,7 @@ impl WidgetContext {
     ///
     /// The newly focused `NodeId`, or `None` if there are no focusable nodes.
     pub fn focus_prev(&mut self) -> Option<NodeId> {
-        input_engine::focus::focus_prev(&self.text_input_states, &mut self.focused_node)
+        input_engine::focus_prev(&self.text_input_states, &mut self.focused_node)
             .map(|id| NodeId(id.0))
     }
 

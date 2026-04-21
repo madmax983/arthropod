@@ -13,7 +13,7 @@
 use flux_state::{Computed, ReadSignal};
 use render_engine::Color;
 
-pub use input_engine::text::TextInputState;
+pub use input_engine::TextInputState;
 
 /// Reactive text state for a node.
 ///

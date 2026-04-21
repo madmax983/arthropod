@@ -1,11 +1,11 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use flux_state::{Runtime, Signal};
+use hashbrown::HashMap;
 use indexmap::IndexMap;
 use input_engine::InputNodeId;
-use input_engine::form::{FormState, revalidate_form};
-use input_engine::text::TextInputState;
-use input_engine::validation::ValidationState;
-use std::collections::HashMap;
+use input_engine::TextInputState;
+use input_engine::ValidationState;
+use input_engine::{FormState, revalidate_form};
 use std::sync::Arc;
 
 fn create_text_state(initial: &str) -> TextInputState {

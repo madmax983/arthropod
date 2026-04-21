@@ -21,7 +21,7 @@
 //! # Example
 //!
 //! ```
-//! use input_engine::text::TextInputState;
+//! use input_engine::TextInputState;
 //! use flux_state::{Runtime, Signal};
 //!
 //! // 1. Setup reactive state

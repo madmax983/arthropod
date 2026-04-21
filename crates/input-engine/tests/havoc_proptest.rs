@@ -1,4 +1,4 @@
-use input_engine::gestures::{InputPattern, SequenceMatcher};
+use input_engine::{InputPattern, SequenceMatcher};
 use plat_core::{ElementState, Key, KeyboardInput, WindowEvent};
 use proptest::prelude::*;
 

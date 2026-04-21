@@ -10,11 +10,11 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use flux_state::{Runtime, Signal};
+use hashbrown::HashMap;
 use indexmap::IndexMap;
 use layout_engine::{FlexDirection, FlexStyle};
 use plat_core::{ElementState, Event, Key, KeyboardInput, Modifiers, Point, WindowEvent};
 use render_engine::{Color, NodeContent, NodeId, Scene, SceneNode};
-use std::collections::HashMap;
 use widget_core::WidgetContext;
 
 use arthropod::event_dispatcher::EventDispatcher;

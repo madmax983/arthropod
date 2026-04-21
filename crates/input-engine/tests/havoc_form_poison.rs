@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use indexmap::IndexMap;
 use input_engine::InputNodeId;
-use input_engine::form::{FormState, trigger_submit};
+use input_engine::{FormState, trigger_submit};
 use std::sync::{Arc, Mutex};
 
 #[test]

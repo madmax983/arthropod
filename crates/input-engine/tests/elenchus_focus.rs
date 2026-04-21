@@ -2,8 +2,8 @@
 mod tests {
     use flux_state::{Runtime, Signal};
     use indexmap::IndexMap;
-    use input_engine::text::TextInputState;
-    use input_engine::{InputNodeId, focus::*};
+    use input_engine::TextInputState;
+    use input_engine::{InputNodeId, *};
 
     fn create_state(initial: &str) -> TextInputState {
         let runtime = Runtime::new();

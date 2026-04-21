@@ -1,5 +1,5 @@
 use flux_state::{Runtime, Signal};
-use input_engine::gestures::{InputPattern, create_gesture_signal};
+use input_engine::{InputPattern, create_gesture_signal};
 use plat_core::{ElementState, Key, KeyboardInput, WindowEvent};
 
 #[derive(Clone, Debug, PartialEq)]

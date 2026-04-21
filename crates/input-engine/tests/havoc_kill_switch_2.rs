@@ -1,5 +1,5 @@
 use flux_state::{Runtime, Signal};
-use input_engine::text::TextInputState;
+use input_engine::TextInputState;
 
 #[test]
 fn test_repro_backspace_panic() {
