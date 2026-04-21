@@ -5979,4 +5979,53 @@ tailwind.config = { theme: { extend: {
             "w-full child under fixed inset parent should match viewport width, got {width}"
         );
     }
+
+    #[test]
+    fn parse_args_rejects_invalid_viewport_dimensions() {
+        let invalid_width = parse_args([
+            "stitch_scene".to_string(),
+            "--input-html".to_string(),
+            "in.html".to_string(),
+            "--output-json".to_string(),
+            "out.json".to_string(),
+            "--viewport-width".to_string(),
+            "-100".to_string(),
+        ])
+        .expect_err("negative width should fail");
+        assert!(invalid_width.contains("viewport width must be a positive finite number"));
+
+        let invalid_height = parse_args([
+            "stitch_scene".to_string(),
+            "--input-html".to_string(),
+            "in.html".to_string(),
+            "--output-json".to_string(),
+            "out.json".to_string(),
+            "--viewport-height".to_string(),
+            "0".to_string(),
+        ])
+        .expect_err("zero height should fail");
+        assert!(invalid_height.contains("viewport height must be a positive finite number"));
+    }
+
+    #[test]
+    fn extract_theme_ignores_empty_background_image_pairs() {
+        let html = r#"
+<script id="tailwind-config">
+tailwind.config = { theme: { extend: {
+  backgroundImage: { "valid": "url('good')", "": "url('bad')", "empty": "" }
+}}}
+</script>
+"#;
+        let theme = TailwindTheme::from_html_source(html);
+        assert!(theme.background_images.contains_key("valid"));
+        assert!(!theme.background_images.contains_key(""));
+        assert!(!theme.background_images.contains_key("empty"));
+    }
+
+    #[test]
+    fn usage_returns_non_empty_string() {
+        let text = usage();
+        assert!(!text.is_empty());
+        assert!(text.contains("Usage:"));
+    }
 }

@@ -69,3 +69,17 @@ None.
 
 **Missing Coverage:**
 None.
+**[Verdict Title]** Test Quality Audit for stitch_scene.rs
+**Module:** `src/bin/stitch_scene.rs`
+**Severity:** 🟡 Suspect
+**Finding:** 5 mutants survived in `stitch_scene.rs`, primarily related to validation of viewport dimensions, parsing of empty values in `TailwindTheme::from_html_source`, and the `usage()` function.
+**Evidence:**
+- Mutation tests replacing `&&` with `||` in `!key.is_empty() && !value.is_empty()` inside `TailwindTheme::from_html_source` survived.
+- Mutation tests replacing `||` with `&&` in `!options.viewport_width.is_finite() || options.viewport_width <= 0.0` survived.
+- Mutation tests replacing `||` with `&&` in `!height.is_finite() || height <= 0.0` survived.
+- Mutation tests replacing the return value of `usage()` with `""` and `"xyzzy"` survived.
+**Recommendation:** Added test cases in `stitch_scene.rs` that verify:
+1. `parse_args` returns an error when given invalid/negative viewport width.
+2. `parse_args` returns an error when given invalid/negative viewport height.
+3. `TailwindTheme::from_html_source` correctly ignores empty keys and empty values when parsing `backgroundImage`.
+4. `usage` returns a non-empty string containing the expected help text.
