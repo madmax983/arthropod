@@ -60,7 +60,7 @@ impl VerifyRenderOutputTool {
         failures: &mut Vec<String>,
     ) {
         for (i, comp) in ["r", "g", "b", "a"].iter().enumerate() {
-            if (actual[i] - expected[i]).abs() > tolerance {
+            if !(actual[i] - expected[i]).abs().le(&tolerance) {
                 failures.push(format!(
                     "instance[{}].color.{}: expected {}, got {} (tolerance: {})",
                     idx, comp, expected[i], actual[i], tolerance
@@ -76,13 +76,13 @@ impl VerifyRenderOutputTool {
         tolerance: f32,
         failures: &mut Vec<String>,
     ) {
-        if (actual[0] - expected.x).abs() > tolerance {
+        if !(actual[0] - expected.x).abs().le(&tolerance) {
             failures.push(format!(
                 "instance[{}].position.x: expected {}, got {} (tolerance: {})",
                 idx, expected.x, actual[0], tolerance
             ));
         }
-        if (actual[1] - expected.y).abs() > tolerance {
+        if !(actual[1] - expected.y).abs().le(&tolerance) {
             failures.push(format!(
                 "instance[{}].position.y: expected {}, got {} (tolerance: {})",
                 idx, expected.y, actual[1], tolerance
@@ -97,13 +97,13 @@ impl VerifyRenderOutputTool {
         tolerance: f32,
         failures: &mut Vec<String>,
     ) {
-        if (actual[0] - expected.width).abs() > tolerance {
+        if !(actual[0] - expected.width).abs().le(&tolerance) {
             failures.push(format!(
                 "instance[{}].size.width: expected {}, got {} (tolerance: {})",
                 idx, expected.width, actual[0], tolerance
             ));
         }
-        if (actual[1] - expected.height).abs() > tolerance {
+        if !(actual[1] - expected.height).abs().le(&tolerance) {
             failures.push(format!(
                 "instance[{}].size.height: expected {}, got {} (tolerance: {})",
                 idx, expected.height, actual[1], tolerance
@@ -353,6 +353,19 @@ mod tests {
         assert!(!result.get("passed").unwrap().as_bool().unwrap());
         let failures = result.get("failures").unwrap().as_array().unwrap();
         assert!(!failures.is_empty());
+    }
+
+    #[test]
+    fn test_check_color_nan() {
+        let mut failures = Vec::new();
+        VerifyRenderOutputTool::check_color(
+            0,
+            &[1.0, 0.0, 0.0, 1.0],
+            &[std::f32::NAN, 0.0, 0.0, 1.0],
+            0.001,
+            &mut failures,
+        );
+        assert!(!failures.is_empty(), "NaN should cause a failure");
     }
 
     #[test]
