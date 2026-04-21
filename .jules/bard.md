@@ -40,3 +40,10 @@
 ## 2025-05-18 - [Documenting Arthropod ECS]
 **Confusion:** Basic `/// The signal` style documentation for internal components like `ReactiveColor`, `ReactiveOpacity`, and ECS query types fails the Bard philosophy by repeating property names without communicating architectural reasons.
 **Clarification:** Re-documented `arthropod-ecs` components to explain *why* fields exist, e.g., detailing how `last_value` enables epsilon dirty-checking and why `ReadSignal` is used to prevent cycles. Also added complete executable `## Examples` sections to all exposed constructor methods like `ProgressBarState::new` and `AccessibleNode::new`.
+## 2025-05-18 - [Documenting MCP Server Parameters]
+**Confusion:** The structs in `crates/arthropod-mcp/src/server.rs` representing JSON-RPC parameters (e.g., `GetNodeParams`, `ListNodesParams`) were missing `///` documentation on their fields, leading to `missing_docs` linter errors.
+**Clarification:** Documented the fields for all parameter structs used in the `ArthropodServer` MCP tool handlers to explain their purpose and constraints.
+
+## 2025-05-18 - [Documenting Spatial Graph Experiment]
+**Confusion:** The `experiments/spatial-graph` crate lacked module-level documentation and doc comments for its primary components (`SpatialNode`, `Viewport`, `Camera`, `Stats`), making it unclear how the 2D infinite world space mapped to the screen.
+**Clarification:** Added module-level `//!` comments to all files and explicit `///` comments with `## Examples` to the key public structs and methods to clarify the projection math.

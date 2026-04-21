@@ -1,3 +1,5 @@
+//! Utility script to pull and sync Figma design files into the project.
+
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};

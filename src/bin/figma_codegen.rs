@@ -1,3 +1,5 @@
+//! Utility script to generate Rust code from pulled Figma design files.
+
 use std::fs;
 use std::path::PathBuf;
 
