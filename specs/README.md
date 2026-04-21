@@ -45,6 +45,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [028](028-webview-widget.md) | Webview Widget | Draft |
 | [029](029-system-tray-integration.md) | System Tray Integration | Draft |
 | [030](030-date-time-picker-widget.md) | Date & Time Picker Widget | Draft |
+| [031](031-color-picker-widget.md) | Color Picker Widget | Draft |
 
 ## Lifecycle
 

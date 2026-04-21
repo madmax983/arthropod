@@ -74,3 +74,8 @@ Created `specs/029-system-tray-integration.md` to define System Tray Integration
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise applications is inputting dates, times, or date ranges. Let's spec out a **Date & Time Picker Widget** feature.
 Created `specs/030-date-time-picker-widget.md` to define the Date & Time Picker Widget. This addresses a core UX requirement for modern desktop applications and eliminates the need to rely on error-prone raw text inputs.
+
+## 2026-04-20 - [Color Picker Widget Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for creative applications and design tools is visual color selection. Let's spec out a **Color Picker Widget**.
+Created `specs/031-color-picker-widget.md` to define a Color Picker Widget. This addresses a core UX requirement for modern desktop applications focused on design and theming, reducing reliance on raw hex code inputs.
