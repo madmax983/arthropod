@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Signal registry for remote control of reactive state.
 //!
 //! Allows registering named signals that can be controlled via MCP tools.

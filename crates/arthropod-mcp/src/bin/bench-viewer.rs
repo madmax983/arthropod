@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use anyhow::{Context, Result};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},

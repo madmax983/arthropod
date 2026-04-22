@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Full MCP server implementation using official rmcp SDK.
 
 use crate::context::McpFrameworkContext;

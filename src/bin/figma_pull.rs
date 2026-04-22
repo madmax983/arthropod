@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Utility script to pull and sync Figma design files into the project.
 
 use std::collections::{BTreeSet, HashMap, HashSet};

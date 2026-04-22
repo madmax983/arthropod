@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Live app integration - TCP-based connection between MCP server and running apps
 //!
 //! Architecture:

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! # Arthropod MCP Server
 //!
 //! The Model Context Protocol (MCP) server for the Arthropod GUI framework.

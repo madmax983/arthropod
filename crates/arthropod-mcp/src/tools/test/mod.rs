@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod assert_state;
 pub mod create_scene;
 pub mod setup_reactive;

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
