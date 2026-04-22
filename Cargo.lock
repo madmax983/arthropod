@@ -1431,6 +1431,7 @@ name = "flux-state"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "hashbrown 0.15.5",
  "loom",
  "proptest",
  "serde",

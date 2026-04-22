@@ -1,7 +1,8 @@
 //! Reactive runtime with dependency tracking.
 
+/// ⚡ Bolt: Using `hashbrown::{HashMap, HashSet}` gives us AHash instead of SipHash, improving performance during state updates and dependency tracking.
+use hashbrown::{HashMap, HashSet};
 use std::any::Any;
-use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 

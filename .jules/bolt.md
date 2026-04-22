@@ -10,3 +10,7 @@
 **Reuse text string buffers during reactive updates**
 **Learning:** Updating a `String` by assignment (`last_value = new_text.clone()`) creates a new heap allocation and drops the previous one.
 **Action:** Use `last_value.clone_from(&new_text)` to reuse the existing `String` buffer capacity, eliminating a heap allocation on text updates.
+
+**Optimizing state tracking in `flux-state`**
+**Learning:** `std::collections::HashMap` and `HashSet` use SipHash, which is robust but slow for small integer keys like `NodeId` or `ThreadId`. For internal components managing deep reactive dependencies like `flux-state`, hashing overhead can become a bottleneck.
+**Action:** Replace `std::collections::{HashMap, HashSet}` with `hashbrown::{HashMap, HashSet}` to utilize the faster `AHash` algorithm for improved state update and dependency tracking performance.
