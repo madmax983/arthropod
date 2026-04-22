@@ -79,3 +79,8 @@ Created `specs/030-date-time-picker-widget.md` to define the Date & Time Picker 
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for creative applications and design tools is visual color selection. Let's spec out a **Color Picker Widget**.
 Created `specs/031-color-picker-widget.md` to define a Color Picker Widget. This addresses a core UX requirement for modern desktop applications focused on design and theming, reducing reliance on raw hex code inputs.
+
+## 2026-04-22 - [Slider Widget Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for adjusting continuous numeric values (like volume or brightness) is missing. Let's spec out a **Slider Widget**.
+Created `specs/032-slider-widget.md` to define a Slider Widget. This addresses a core UX requirement for modern desktop applications focused on intuitive visual interactions.

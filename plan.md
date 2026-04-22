@@ -1,14 +1,12 @@
-1. *Add `draggable` to `crates/arthropod/src/experimental/mod.rs`.*
-   - Register the new module in the `experimental` module tree.
-2. *Create `crates/arthropod/src/experimental/draggable.rs`.*
-   - Implement `DraggableNode` component.
-   - Implement `update_draggable_nodes` system to check if node is hovered and mouse is clicked, then update its translation using `MousePosition` and `Transform2D`.
-   - Implement `register_draggable` function.
-3. *Update `crates/arthropod/src/app/core.rs`.*
-   - Add a call to `crate::experimental::draggable::register_draggable(&mut app);` inside `App::new_with_backend` when `nova` feature is enabled.
-4. *Run tests and formatting.*
-   - Ensure `cargo test`, `cargo fmt`, and `cargo clippy` pass.
-5. *Pre commit instructions.*
-   - Run `pre_commit_instructions` tool to perform required verifications.
-6. *Commit and submit.*
-   - Create PR with title `🌟 Nova: Draggable Nodes` and appropriate description.
+1. **Create the Spec File**: `specs/032-slider-widget.md`
+   - Frame the feature as "As a [User], I want [Feature], so that [Benefit]."
+   - Define business value ("So What?").
+   - Define metric of success.
+   - Outline gap analysis.
+   - Define acceptance criteria and out of scope.
+2. **Update the Index in `specs/README.md`**:
+   - Append `[032](032-slider-widget.md) | Slider Widget | Draft` to the Index table.
+3. **Log the action to `.jules/vantage.md`**:
+   - Append the rationale and action taken, adhering to Vantage's logging format.
+4. **Pre-commit Instructions**:
+   - Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
