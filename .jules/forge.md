@@ -59,3 +59,9 @@
 **[Extracted context from build_item]**
 **Learning:** Functions such as `build_item` in `BottomNavigation` can take a large amount of parameters and require suppression using `#[allow(clippy::too_many_arguments)]`.
 **Action:** Always group parameters into a dedicated context struct like `BuildItemContext` when the parameter list grows large. Grouping parameters makes the code cleaner, type-safe, and avoids the need for clippy suppressions.
+**Refactoring import_figma_document**
+**Learning:** The `import_figma_document` function in `crates/arthropod/src/figma/schema.rs` had grown into a massive "God Function", containing parsing logic, node hierarchy resolution, interaction graph extraction, and component property resolution all in one block.
+**Action:** Extracted the sub-operations into explicitly named helper functions (`resolve_figma_nodes`, `extract_prototype_edges`, `resolve_instance_properties`) while using the `import_figma_document` function just as an orchestrator. This significantly flattened the structure and improved code clarity.
+**[Refactoring God Functions & Struct Extraction]**
+**Learning:** Breaking down massive functions into smaller helpers often leads to `clippy::too_many_arguments` warnings because you have to pass lots of local state around. Using `#[allow(clippy::too_many_arguments)]` is forbidden by Forge's guidelines.
+**Action:** Always bundle those arguments into a dedicated struct (e.g. `ResolveContext<'a>`) to fix the warning while maintaining proper encapsulation and strict Rust idioms.
