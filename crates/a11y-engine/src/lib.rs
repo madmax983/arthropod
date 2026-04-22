@@ -33,10 +33,10 @@
 //! let button_id = tree.add_node(tree.root(), button);
 //! ```
 
-pub mod focus;
-pub mod node;
+pub(crate) mod focus;
+pub(crate) mod node;
 pub mod platform;
-pub mod tree;
+pub(crate) mod tree;
 
 pub use focus::FocusManager;
 pub use node::{

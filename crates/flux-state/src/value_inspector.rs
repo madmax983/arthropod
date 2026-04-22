@@ -81,7 +81,9 @@ mod tests {
             (Arc::new(RwLock::new(42u32)), "42".to_string()),
             (Arc::new(RwLock::new(42u64)), "42".to_string()),
             (Arc::new(RwLock::new(42usize)), "42".to_string()),
+            #[allow(clippy::approx_constant)]
             (Arc::new(RwLock::new(3.14f32)), "3.14".to_string()),
+            #[allow(clippy::approx_constant)]
             (Arc::new(RwLock::new(3.14f64)), "3.14".to_string()),
             (Arc::new(RwLock::new(true)), "true".to_string()),
             (

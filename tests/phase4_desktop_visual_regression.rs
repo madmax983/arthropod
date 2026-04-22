@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-use arthropod_test::visual_test::{compare_images_with_tolerance, load_image, save_image};
+use arthropod_test::{compare_images_with_tolerance, load_image, save_image};
 use plat_core::{EventLoop, Rect, Size, WindowConfig};
 use render_engine::backend::wgpu::effects::composite_blend_over;
 use render_engine::{

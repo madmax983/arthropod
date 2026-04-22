@@ -15,9 +15,9 @@
 //! Layer 1: SystemTheme { mica_available: true, accent: Color }
 //! ```
 
-pub mod design_tokens;
+pub(crate) mod design_tokens;
 
-pub mod system_theme;
+pub(crate) mod system_theme;
 
 pub use design_tokens::{DesignTokens, TokenValue};
 

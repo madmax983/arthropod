@@ -1,7 +1,9 @@
 //! Testing and debugging utilities for Arthropod
 
-pub mod frame_capture;
-pub mod visual_test;
+pub(crate) mod frame_capture;
+pub use frame_capture::*;
+pub(crate) mod visual_test;
+pub use visual_test::*;
 
 use anyhow::Result;
 

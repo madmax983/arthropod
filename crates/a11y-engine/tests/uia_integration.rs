@@ -3,9 +3,9 @@
 //! Tests the complete flow: A11yTree → AccessKitBridge → TreeUpdate
 
 use a11y_engine::{
-    node::{A11yNode, A11yState, AccessibleName, CheckedState, Role},
+    A11yTree,
     platform::accesskit_bridge::{AccessKitBridge, a11y_node_to_accesskit},
-    tree::A11yTree,
+    {A11yNode, A11yState, AccessibleName, CheckedState, Role},
 };
 use accesskit::NodeId as AccessKitNodeId;
 use std::sync::{Arc, Mutex};

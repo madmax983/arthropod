@@ -70,7 +70,7 @@ impl AccessKitBridge {
     /// # Examples
     ///
     /// ```rust
-    /// use a11y_engine::tree::A11yTree;
+    /// use a11y_engine::A11yTree;
     /// use a11y_engine::platform::accesskit_bridge::AccessKitBridge;
     /// use std::sync::{Arc, Mutex};
     ///

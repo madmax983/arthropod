@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use arthropod_test::visual_test::save_image;
+use arthropod_test::save_image;
 use plat_core::{EventLoop, Size, WindowConfig};
 use render_engine::{Color, backend::WgpuBackend};
 

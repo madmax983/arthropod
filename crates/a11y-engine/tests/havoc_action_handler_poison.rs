@@ -1,4 +1,4 @@
-use a11y_engine::node::A11yId;
+use a11y_engine::A11yId;
 use a11y_engine::platform::action_handler::ArthropodActionHandler;
 use accesskit::{ActionHandler, ActionRequest, NodeId as AccessKitNodeId};
 use std::panic;

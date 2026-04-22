@@ -105,7 +105,7 @@ impl Default for A11yNode {
 /// ## Examples
 ///
 /// ```
-/// use a11y_engine::node::Role;
+/// use a11y_engine::Role;
 ///
 /// // A clickable interface element.
 /// let my_role = Role::Button;
@@ -189,7 +189,7 @@ pub enum AccessibleName {
 /// ## Examples
 ///
 /// ```
-/// use a11y_engine::node::{A11yState, CheckedState};
+/// use a11y_engine::{A11yState, CheckedState};
 ///
 /// let mut state = A11yState::default();
 /// state.disabled = true;
@@ -222,7 +222,7 @@ pub struct A11yState {
 /// ## Examples
 ///
 /// ```
-/// use a11y_engine::node::CheckedState;
+/// use a11y_engine::CheckedState;
 ///
 /// let completely_selected = CheckedState::Checked;
 /// let partially_selected = CheckedState::Mixed;
@@ -246,7 +246,7 @@ pub enum CheckedState {
 /// ## Examples
 ///
 /// ```
-/// use a11y_engine::node::A11yAction;
+/// use a11y_engine::A11yAction;
 ///
 /// let default_interaction = A11yAction::Click;
 /// ```
@@ -282,7 +282,7 @@ pub enum A11yAction {
 /// ## Examples
 ///
 /// ```
-/// use a11y_engine::node::{A11yRelations, A11yId};
+/// use a11y_engine::{A11yRelations, A11yId};
 ///
 /// let label_id = A11yId::new();
 /// let input_relations = A11yRelations {

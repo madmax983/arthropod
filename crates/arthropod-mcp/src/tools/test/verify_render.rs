@@ -361,7 +361,7 @@ mod tests {
         VerifyRenderOutputTool::check_color(
             0,
             &[1.0, 0.0, 0.0, 1.0],
-            &[std::f32::NAN, 0.0, 0.0, 1.0],
+            &[f32::NAN, 0.0, 0.0, 1.0],
             0.001,
             &mut failures,
         );

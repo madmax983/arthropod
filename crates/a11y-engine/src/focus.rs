@@ -23,7 +23,7 @@ impl FocusManager {
     /// # Examples
     ///
     /// ```rust
-    /// use a11y_engine::focus::FocusManager;
+    /// use a11y_engine::FocusManager;
     ///
     /// let manager = FocusManager::new();
     /// assert_eq!(manager.focused_node(), None);

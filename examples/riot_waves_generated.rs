@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use arthropod::figma_runtime::FigmaRuntime;
 use arthropod::prototype_runtime::PrototypeRuntimeEvent;
-use arthropod_test::visual_test::load_image;
+use arthropod_test::load_image;
 use plat_core::{
     Application, ControlFlow, ElementState, Event, EventLoop, MouseButton, Size, Window,
     WindowConfig, WindowEvent, WindowId,
@@ -517,7 +517,7 @@ fn load_procedural_image(source_ref: &str, roots: &[PathBuf]) -> Option<(Vec<u8>
         let (mut rgba, width, height) = load_image(&path).ok()?;
         let halftone = generate_halftone_texture(width, height);
         apply_overlay_halftone(&mut rgba, &halftone, 0.15);
-        return Some((rgba, width, height));
+        return Some((rgba.to_vec(), width, height));
     }
 
     if let Some(noise_key) = source_ref.strip_prefix("procedural://noise") {

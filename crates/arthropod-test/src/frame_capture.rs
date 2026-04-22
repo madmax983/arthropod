@@ -2,7 +2,6 @@
 
 use anyhow::{Context, Result};
 use std::path::Path;
-use wgpu;
 
 /// Captures the current framebuffer to a PNG file
 pub struct FrameCapture {

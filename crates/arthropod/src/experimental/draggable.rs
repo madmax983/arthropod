@@ -94,8 +94,10 @@ mod tests {
         entity_mut.insert(DraggableNode::default());
         entity_mut.insert(SceneNodeRef(target_id));
 
-        let mut interaction = InteractionState::default();
-        interaction.active = true; // Simulate mouse down
+        let interaction = InteractionState {
+            active: true,
+            ..Default::default()
+        }; // Simulate mouse down
         entity_mut.insert(interaction);
 
         world.insert_resource(scene);
