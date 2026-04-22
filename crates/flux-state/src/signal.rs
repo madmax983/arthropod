@@ -341,7 +341,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 .downcast_ref::<RwLock<T>>()
                 .expect("Type mismatch")
                 .read()
-                .unwrap();
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&*guard)
         } else {
             self.runtime.track(self.id);
@@ -386,7 +386,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 .downcast_ref::<RwLock<T>>()
                 .expect("Type mismatch")
                 .read()
-                .unwrap();
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&*guard)
         } else {
             let guard = self

@@ -221,7 +221,10 @@ mod tests {
         // Tick manually via system logic
         // (In a real app, systems run via ECS)
         {
-            let signals = registry.signals.lock().unwrap();
+            let signals = registry
+                .signals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             for ticker in signals.iter() {
                 ticker.tick(time.delta);
             }
@@ -234,7 +237,10 @@ mod tests {
 
         // Tick again
         {
-            let signals = registry.signals.lock().unwrap();
+            let signals = registry
+                .signals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             for ticker in signals.iter() {
                 ticker.tick(time.delta);
             }
@@ -252,16 +258,33 @@ mod tests {
 
         {
             let _signal = ElasticSignal::new(runtime.clone(), 0.0, &registry);
-            assert_eq!(registry.signals.lock().unwrap().len(), 1);
+            assert_eq!(
+                registry
+                    .signals
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .len(),
+                1
+            );
         }
         // _signal is dropped here
 
         // Run cleanup logic (retain)
         {
-            let mut signals = registry.signals.lock().unwrap();
+            let mut signals = registry
+                .signals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             signals.retain(|ticker| ticker.tick(Duration::from_millis(16)));
         }
 
-        assert_eq!(registry.signals.lock().unwrap().len(), 0);
+        assert_eq!(
+            registry
+                .signals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .len(),
+            0
+        );
     }
 }

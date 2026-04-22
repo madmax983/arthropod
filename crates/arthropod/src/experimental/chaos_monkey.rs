@@ -162,7 +162,9 @@ mod tests {
         world
             .spawn(Clickable {
                 callback: Arc::new(move || {
-                    *clicked_clone.lock().unwrap() = true;
+                    *clicked_clone
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
                 }),
             })
             .insert(SceneNodeRef(id));
@@ -175,7 +177,9 @@ mod tests {
 
         // Assert it was clicked
         assert!(
-            *clicked.lock().unwrap(),
+            *clicked
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             "Chaos Monkey should have clicked the node"
         );
     }
@@ -213,7 +217,9 @@ mod tests {
         world
             .spawn(Clickable {
                 callback: Arc::new(move || {
-                    *clicked_clone.lock().unwrap() = true;
+                    *clicked_clone
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
                 }),
             })
             .insert(SceneNodeRef(id));
@@ -226,7 +232,9 @@ mod tests {
 
         // Assert it was NOT clicked
         assert!(
-            !*clicked.lock().unwrap(),
+            !*clicked
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             "Chaos Monkey should NOT click invisible nodes"
         );
     }

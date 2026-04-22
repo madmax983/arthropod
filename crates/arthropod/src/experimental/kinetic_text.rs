@@ -94,7 +94,9 @@ where
 
     let effect = Effect::new(cx.clone(), move || {
         let target = source.get();
-        let mut state = state.lock().unwrap();
+        let mut state = state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         if target != state.last_target {
             let start = if let Some(anim) = &mut state.animation {
