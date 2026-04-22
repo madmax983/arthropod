@@ -26,3 +26,6 @@
 **2026-04-18 - Unhandled Null Pointer Exception Panic**
 **Threat:** Calling unwrap() or ? on an unhandled FFI function failure for generating a HWND could crash tests if COM API call fails.
 **Defense:** Replaced the unhandled unwraps with `.unwrap_or(HWND(0 as _))` inside test helpers returning a raw HWND to safely fall back.
+**2026-04-22 - Reachable panic in certificate revocation list parsing**
+**Threat:** Reachable panic in rustls-webpki certificate revocation list parsing (RUSTSEC-2026-0104). Could lead to DoS.
+**Defense:** Updated rustls-webpki to secure version 0.103.13.
