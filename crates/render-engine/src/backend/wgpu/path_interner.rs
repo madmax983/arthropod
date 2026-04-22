@@ -1,5 +1,5 @@
 use crate::backend::wgpu::pipelines::path_pipeline::TessellationCache;
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PathFingerprint {

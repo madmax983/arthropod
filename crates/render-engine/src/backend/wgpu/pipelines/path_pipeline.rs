@@ -2,13 +2,13 @@
 
 use crate::backend::wgpu::image_store;
 use crate::backend::wgpu::pipelines::gradient_atlas::{GradientAtlas, GradientParams};
+use hashbrown::HashMap;
 use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::{
     BuffersBuilder, FillOptions, FillRule, FillTessellator, FillVertex, LineCap, LineJoin,
     StrokeOptions, StrokeTessellator, StrokeVertex, VertexBuffers,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use style_engine::{
     Paint, PathCommand, StrokeCap, StrokeJoin, StrokeStyle, VectorPath, WindingRule,

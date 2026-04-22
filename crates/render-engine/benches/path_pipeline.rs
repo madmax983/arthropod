@@ -6,8 +6,8 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use glam::Vec2;
+use hashbrown::HashMap;
 use render_engine::backend::wgpu::pipelines::path_pipeline::{TessellationCache, tessellate_fill};
-use std::collections::HashMap;
 use style_engine::{PathCommand, StrokeAlign, StrokeStyle, VectorPath};
 
 fn circle_like_path(segments: usize, radius: f32) -> VectorPath {
