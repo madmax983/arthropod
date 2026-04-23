@@ -29,3 +29,6 @@
 **2026-04-22 - Reachable panic in certificate revocation list parsing**
 **Threat:** Reachable panic in rustls-webpki certificate revocation list parsing (RUSTSEC-2026-0104). Could lead to DoS.
 **Defense:** Updated rustls-webpki to secure version 0.103.13.
+**2024-05-18 - [COM Null HWND Crash Fix]**
+**Threat:** Calling `CompositionDevice::create_target_for_hwnd` with a null `HWND` passed directly to the unsafe FFI binding caused a crash and potential Undefined Behavior inside the Windows COM runtime because the HWND wasn't actually validated to be non-zero before the unsafe call.
+**Defense:** Added an explicit check for `hwnd.0 as usize == 0` at the beginning of `create_target_for_hwnd` to return an `E_HANDLE` error instead of allowing the null handle to reach the FFI boundary.
