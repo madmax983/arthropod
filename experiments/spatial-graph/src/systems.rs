@@ -1,3 +1,8 @@
+//! ECS Systems for updating the spatial graph.
+//!
+//! Contains the core simulation logic for culling, projecting, and maintaining statistics
+//! for the spatial nodes.
+
 use crate::components::{SpatialNode, Stats, Viewport};
 use arthropod_ecs::SceneNodeRef;
 use bevy_ecs::prelude::*;

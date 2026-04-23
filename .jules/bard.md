@@ -47,3 +47,6 @@
 ## 2025-05-18 - [Documenting Spatial Graph Experiment]
 **Confusion:** The `experiments/spatial-graph` crate lacked module-level documentation and doc comments for its primary components (`SpatialNode`, `Viewport`, `Camera`, `Stats`), making it unclear how the 2D infinite world space mapped to the screen.
 **Clarification:** Added module-level `//!` comments to all files and explicit `///` comments with `## Examples` to the key public structs and methods to clarify the projection math.
+## 2025-05-18 - [Doc-Test Imports in Workspace]
+**Confusion:** Writing doc-tests (`///`) using an assumed prefix like `use experiments_spatial_graph::...` causes the tests to fail with `unresolved module or unlinked crate` errors.
+**Clarification:** You must use the exact crate name as defined in `Cargo.toml` (with hyphens replaced by underscores), for example, `use spatial_graph::components::SpatialNode;`.
