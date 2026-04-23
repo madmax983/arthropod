@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use crate::clock::{AnimationClock, ClockEvent, PlaybackMode};
 use crate::evaluable::Evaluable;
-use crate::hold::Hold;
+
 use crate::keyframe::Keyframe;
 use crate::sequence::Sequence;
 use crate::spring_segment::SpringSegment;
@@ -119,18 +119,15 @@ impl<T: Animatable + Send + Sync + 'static> Timeline<T> {
     }
 
     /// Start building a sequence.
-    pub fn sequence() -> SequenceBuilder<T> {
-        SequenceBuilder {
-            segments: Vec::new(),
-        }
+    pub fn sequence(segments: Vec<Box<dyn Evaluable<T>>>) -> Self {
+        let seq = Sequence::new(segments);
+        Timeline::from_evaluable(Box::new(seq), PlaybackMode::Once)
     }
 
     /// Start building a stagger.
-    pub fn stagger(offset: Duration) -> StaggerBuilder<T> {
-        StaggerBuilder {
-            segments: Vec::new(),
-            offset: offset.as_secs_f32(),
-        }
+    pub fn stagger(segments: Vec<Box<dyn Evaluable<T>>>, offset: Duration) -> Self {
+        let stagger = Stagger::new(segments, offset.as_secs_f32());
+        Timeline::from_evaluable(Box::new(stagger), PlaybackMode::Once)
     }
 
     // ========== Modifiers ==========
@@ -276,112 +273,6 @@ impl<T: Animatable + Send + Sync + 'static> Timeline<T> {
     }
 }
 
-// ========== Builders ==========
-
-/// Builder for sequence timelines.
-pub struct SequenceBuilder<T: Animatable> {
-    segments: Vec<Box<dyn Evaluable<T>>>,
-}
-
-impl<T: Animatable + Send + Sync + 'static> SequenceBuilder<T> {
-    /// Append a tween segment.
-    pub fn then_tween(self, from: T, to: T, duration: Duration) -> TweenSegmentBuilder<T> {
-        TweenSegmentBuilder {
-            builder: self,
-            from,
-            to,
-            duration: duration.as_secs_f32(),
-            easing: Easing::Linear,
-        }
-    }
-
-    /// Append a hold (pause) segment.
-    pub fn then_hold(mut self, value: T, duration: Duration) -> Self {
-        self.segments
-            .push(Box::new(Hold::new(value, duration.as_secs_f32())));
-        self
-    }
-
-    /// Append a spring segment.
-    pub fn then_spring(mut self, from: T, to: T, stiffness: f32, damping: f32) -> Self {
-        self.segments
-            .push(Box::new(SpringSegment::new(from, to, stiffness, damping)));
-        self
-    }
-
-    /// Build the timeline.
-    pub fn build(self) -> Timeline<T> {
-        let seq = Sequence::new(self.segments);
-        Timeline::from_evaluable(Box::new(seq), PlaybackMode::Once)
-    }
-}
-
-/// Intermediate builder for configuring a tween segment's easing.
-pub struct TweenSegmentBuilder<T: Animatable> {
-    builder: SequenceBuilder<T>,
-    from: T,
-    to: T,
-    duration: f32,
-    easing: Easing,
-}
-
-impl<T: Animatable + Send + Sync + 'static> TweenSegmentBuilder<T> {
-    /// Set the easing for this tween segment.
-    pub fn easing(mut self, easing: Easing) -> Self {
-        self.easing = easing;
-        self
-    }
-
-    /// Append another tween segment.
-    pub fn then_tween(self, from: T, to: T, duration: Duration) -> TweenSegmentBuilder<T> {
-        let builder = self.finalize();
-        builder.then_tween(from, to, duration)
-    }
-
-    /// Append a hold segment.
-    pub fn then_hold(self, value: T, duration: Duration) -> SequenceBuilder<T> {
-        let builder = self.finalize();
-        builder.then_hold(value, duration)
-    }
-
-    /// Build the timeline.
-    pub fn build(self) -> Timeline<T> {
-        self.finalize().build()
-    }
-
-    fn finalize(mut self) -> SequenceBuilder<T> {
-        self.builder.segments.push(Box::new(Keyframe::new(
-            self.from,
-            self.to,
-            self.easing,
-            self.duration,
-        )));
-        self.builder
-    }
-}
-
-/// Builder for stagger timelines.
-pub struct StaggerBuilder<T: Animatable> {
-    segments: Vec<Box<dyn Evaluable<T>>>,
-    offset: f32,
-}
-
-impl<T: Animatable + Send + Sync + 'static> StaggerBuilder<T> {
-    /// Add segments from an iterator.
-    pub fn each(mut self, timelines: impl IntoIterator<Item = Timeline<T>>) -> Self {
-        for tl in timelines {
-            self.segments.push(tl.root);
-        }
-        self
-    }
-
-    /// Build the timeline (evaluates first child's perspective).
-    pub fn build(self) -> Timeline<T> {
-        let stagger = Stagger::new(self.segments, self.offset);
-        Timeline::from_evaluable(Box::new(stagger), PlaybackMode::Once)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,10 +395,10 @@ mod tests {
 
     #[test]
     fn timeline_sequence_evaluation() {
-        let tl = Timeline::sequence()
-            .then_tween(0.0_f32, 50.0, Duration::from_millis(50))
-            .then_tween(50.0, 100.0, Duration::from_millis(50))
-            .build();
+        let tl = Timeline::sequence(vec![
+            Box::new(Keyframe::new(0.0_f32, 50.0, Easing::Linear, 0.050)),
+            Box::new(Keyframe::new(50.0, 100.0, Easing::Linear, 0.050)),
+        ]);
 
         assert!((tl.duration() - 0.1).abs() < 1e-4);
     }
