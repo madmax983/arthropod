@@ -499,9 +499,11 @@ impl Runtime {
 
         impl<'a> Drop for FlushingGuard<'a> {
             fn drop(&mut self) {
-                if !self.was_flushing
-                    && let Ok(mut inner) = self.runtime.inner.lock()
-                {
+                if !self.was_flushing {
+                    let mut inner = match self.runtime.inner.lock() {
+                        Ok(g) => g,
+                        Err(p) => p.into_inner(),
+                    };
                     inner.flushing_thread = None;
                     self.runtime.condvar.notify_all();
                 }
