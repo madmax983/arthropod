@@ -17,3 +17,6 @@
 **Optimizing state tracking in `flux-state`**
 **Learning:** `std::collections::HashMap` and `HashSet` use SipHash, which is robust but slow for small integer keys like `NodeId` or `ThreadId`. For internal components managing deep reactive dependencies like `flux-state`, hashing overhead can become a bottleneck.
 **Action:** Replace `std::collections::{HashMap, HashSet}` with `hashbrown::{HashMap, HashSet}` to utilize the faster `AHash` algorithm for improved state update and dependency tracking performance.
+**Pre-allocating Collections in Path Boolean Ops**
+**Learning:** In `style-engine::path::to_multi_polygon`, several collections (`outer_indices`, `outer_to_poly`, `exteriors`, `holes_by_poly`) were being initialized with zero capacity in a hot path algorithm. This causes unnecessary reallocation on the heap as elements are pushed. Using `.with_capacity` based on known iteration bounds improves performance by avoiding memory reallocation loops.
+**Action:** Always scrutinize loops where vectors/hashmaps are instantiated right before being populated in bounded loops, and initialize them with `.with_capacity()`.

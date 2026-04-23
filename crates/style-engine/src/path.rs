@@ -327,20 +327,19 @@ impl VectorPath {
             }
         };
 
-        let mut outer_indices = Vec::new();
+        let mut outer_indices = Vec::with_capacity(rings.len());
         for i in 0..rings.len() {
             if !is_hole(i) {
                 outer_indices.push(i);
             }
         }
 
-        let mut outer_to_poly = std::collections::HashMap::new();
-        let mut exteriors = Vec::new();
-        let mut holes_by_poly: Vec<Vec<LineString<f64>>> = Vec::new();
+        let mut outer_to_poly = std::collections::HashMap::with_capacity(outer_indices.len());
+        let mut exteriors = Vec::with_capacity(outer_indices.len());
+        let mut holes_by_poly: Vec<Vec<LineString<f64>>> = vec![Vec::new(); outer_indices.len()];
         for (poly_idx, ring_idx) in outer_indices.iter().copied().enumerate() {
             outer_to_poly.insert(ring_idx, poly_idx);
             exteriors.push(ring_to_linestring(&rings[ring_idx].contour));
-            holes_by_poly.push(Vec::new());
         }
 
         for ring_idx in 0..rings.len() {
