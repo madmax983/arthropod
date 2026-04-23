@@ -9,6 +9,24 @@ use ratatui::{
 use render_engine::{Color, NodeContent, RendererError, Scene};
 use std::io::Stdout;
 
+/// The terminal rendering backend.
+///
+/// `TuiBackend` acts as the bridge between abstract graphical [`Scene`] structures and the terminal screen.
+/// It uses `ratatui` under the hood to draw styled rectangles, borders, and text characters representing
+/// the current visual tree.
+///
+/// ## Examples
+///
+/// ```rust,no_run
+/// use ratatui::backend::CrosstermBackend;
+/// use tui_renderer::TuiBackend;
+///
+/// # fn main() -> Result<(), render_engine::RendererError> {
+/// // Create a new default backend wrapping stdout
+/// let mut backend = TuiBackend::<CrosstermBackend<std::io::Stdout>>::new()?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct TuiBackend<B: Backend> {
     terminal: Terminal<B>,
     clear_color: Color,
@@ -25,6 +43,13 @@ impl Default for TuiBackend<CrosstermBackend<Stdout>> {
 }
 
 impl TuiBackend<CrosstermBackend<Stdout>> {
+    /// Creates a new `TuiBackend` wrapping standard output via `CrosstermBackend`.
+    ///
+    /// This is the most common initialization path and automatically attaches the `ratatui`
+    /// [`Terminal`] to `std::io::stdout()`.
+    ///
+    /// ## Errors
+    /// Returns a [`RendererError::InitializationFailed`] if the terminal cannot be initialized.
     pub fn new() -> Result<Self, RendererError> {
         let backend = CrosstermBackend::new(std::io::stdout());
         let terminal = Terminal::new(backend)
@@ -40,6 +65,12 @@ impl TuiBackend<CrosstermBackend<Stdout>> {
 }
 
 impl<B: Backend> TuiBackend<B> {
+    /// Creates a new `TuiBackend` from a pre-configured ratatui `Backend`.
+    ///
+    /// This allows injecting custom backends (such as `TestBackend`) for testing or specialized environments.
+    ///
+    /// ## Errors
+    /// Returns a [`RendererError::InitializationFailed`] if the terminal cannot be initialized.
     pub fn new_with_backend(backend: B) -> Result<Self, RendererError> {
         let terminal = Terminal::new(backend)
             .map_err(|e| RendererError::InitializationFailed(e.to_string()))?;
@@ -73,6 +104,16 @@ fn map_color(color: Color) -> TuiColor {
 }
 
 impl<B: Backend> TuiBackend<B> {
+    /// Renders the given visual [`Scene`] to the terminal buffer.
+    ///
+    /// This iterates through the scene's node tree in Z-order. It translates node bounds into integer terminal cells
+    /// and maps styles (like fills, strokes, corner radii, and text) into the closest terminal-compatible
+    /// representation using `ratatui` blocks and paragraphs.
+    ///
+    /// Nodes that are invisible, have 0 opacity, or fall outside the current terminal bounds are skipped.
+    ///
+    /// ## Errors
+    /// Returns a [`RendererError::InitializationFailed`] if the terminal draw operation fails.
     pub fn render(&mut self, scene: &Scene) -> Result<(), RendererError> {
         let clear_color = self.clear_color; // Copy for closure
 
@@ -153,11 +194,18 @@ impl<B: Backend> TuiBackend<B> {
         Ok(())
     }
 
+    /// Notifies the backend that the terminal dimensions have changed.
+    ///
+    /// The `ratatui` terminal inherently detects its own size during the next draw call, so this method
+    /// primarily updates internal tracking state if needed.
     pub fn resize(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
     }
 
+    /// Sets the background color used to clear the terminal before drawing the scene.
+    ///
+    /// The terminal frame will be filled entirely with this color at the start of the render pass.
     pub fn set_clear_color(&mut self, color: Color) {
         self.clear_color = color;
     }
