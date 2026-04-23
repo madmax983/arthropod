@@ -122,6 +122,7 @@ pub enum WebFontLoadError {
 }
 
 #[cfg(target_arch = "wasm32")]
+
 async fn fetch_font_bytes(url: &str) -> Result<Vec<u8>, WebFontLoadError> {
     use wasm_bindgen::JsCast;
 

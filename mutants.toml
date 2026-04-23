@@ -46,6 +46,7 @@ additional_test_args = ["--all-features"]
 # Exclude specific functions from mutation
 # (for generated code, unsafe blocks, or platform-specific code)
 exclude_re = [
+    "fetch_font_bytes",
     # Skip test helper functions
     "^test_.*",
     "^setup_.*",

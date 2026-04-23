@@ -575,3 +575,35 @@ mod tests {
         assert!(shaped.bounds.width > 0.0);
     }
 }
+
+#[cfg(test)]
+mod elenchus_extract_tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_shaped_text_accumulates_max_width() {
+        let mut engine = TextEngine::new();
+        // A string with multiple characters, each adding width
+        let shaped = engine.shape_text("WW", 16.0);
+
+        // A single character will have a certain width. "WW" should have ~twice the width.
+        // We want to ensure that max_width = max_width.max(x_end) works correctly,
+        // which means the total width is significantly greater than just the advance of one glyph,
+        // catching the replace + with - or * in `glyph.x + glyph.w`.
+        assert!(shaped.glyphs.len() == 2, "Should have 2 glyphs");
+        let w0 = shaped.glyphs[0].x_advance;
+        let w1 = shaped.glyphs[1].x_advance;
+        // Total expected width is roughly x of second + w of second
+        let x1 = shaped.glyphs[1].x_offset;
+        let expected_total_width = x1 + w1;
+
+        // If glyph.x + glyph.w was replaced by glyph.x - glyph.w, the max_width would be < x1.
+        assert_eq!(shaped.bounds.width, expected_total_width);
+
+        // Ensure the width is reasonably positive and the second glyph is placed after the first
+        assert!(
+            shaped.bounds.width > w0 * 1.5,
+            "Width should be roughly 2 characters wide"
+        );
+    }
+}
