@@ -20,3 +20,7 @@
 **Pre-allocating Collections in Path Boolean Ops**
 **Learning:** In `style-engine::path::to_multi_polygon`, several collections (`outer_indices`, `outer_to_poly`, `exteriors`, `holes_by_poly`) were being initialized with zero capacity in a hot path algorithm. This causes unnecessary reallocation on the heap as elements are pushed. Using `.with_capacity` based on known iteration bounds improves performance by avoiding memory reallocation loops.
 **Action:** Always scrutinize loops where vectors/hashmaps are instantiated right before being populated in bounded loops, and initialize them with `.with_capacity()`.
+
+**[AHash for Cache Collections]
+**Learning:** `std::collections::HashSet` uses `SipHash` which is cryptographically resistant but slow for local engine caches that are cleared and repopulated every frame (like `renderable_nodes_cache`).
+**Action:** Always prefer `hashbrown::HashSet` and `hashbrown::HashMap` in hot loops and systems where cryptographic resistance is not required. It gives us `AHash` for much faster insertions and lookups.

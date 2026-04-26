@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
-use render_engine::{backend::PrimitiveInstance, NodeId, Scene};
-use std::collections::HashSet;
+use hashbrown::HashSet;
+use render_engine::{backend::PrimitiveInstance, NodeId, Scene}; // ⚡ Bolt: Using hashbrown::HashSet provides AHash instead of SipHash, improving performance during render collection
 
 use crate::components::{Renderable, SceneNodeRef};
 
