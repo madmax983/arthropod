@@ -16,19 +16,6 @@ pub fn run_reactive_effects_system(runtime: Res<RuntimeResource>) {
     runtime.0.run_effects();
 }
 
-/// System that updates progress bars directly from signals
-pub fn update_progress_bar_direct_system(
-    mut query: Query<(&SceneNodeRef, &mut LayoutStyle, &mut ProgressBarState)>,
-) {
-    for (_node_ref, mut layout, mut state) in query.iter_mut() {
-        let p = state.progress.get_untracked().clamp(0.0, 1.0);
-        if (p - state.last_progress).abs() >= 0.0001 {
-            state.last_progress = p;
-            layout.0.width = Some(p * state.total_width);
-        }
-    }
-}
-
 /// System that updates interaction states based on mouse position and hit testing.
 ///
 /// Optimization: Uses `Local<HashSet>` to track hovered nodes instead of allocating
@@ -157,7 +144,7 @@ fn update_progress_bar_width(
     progress_bar: &mut Option<Mut<'_, ProgressBarState>>,
 ) {
     if let Some(val) = progress_bar.as_mut() {
-        let prog = val.progress.get_untracked();
+        let prog = val.progress.get_untracked().clamp(0.0, 1.0);
         let delta = (prog - val.last_progress).abs();
         if delta >= 0.0001 {
             let total_width = val.total_width;

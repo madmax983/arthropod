@@ -20,8 +20,7 @@ use crate::systems::{apply_reactive_changes_system, gather_reactive_changes_syst
 
 #[cfg(not(feature = "parallel-reactive"))]
 use crate::systems::{
-    update_all_reactive_system, update_interaction_state_system, update_progress_bar_direct_system,
-    update_widget_style_system,
+    update_all_reactive_system, update_interaction_state_system, update_widget_style_system,
 };
 
 /// System that increments the frame signal each frame
@@ -242,11 +241,9 @@ impl FrameworkContext {
                 update_all_reactive_system
                     .after(timeline_system::<f32>)
                     .after(timeline_system::<Color>),
-                update_progress_bar_direct_system.after(timeline_system::<f32>),
                 update_widget_style_system.after(update_interaction_state_system),
                 layout_system
                     .after(update_all_reactive_system)
-                    .after(update_progress_bar_direct_system)
                     .after(update_widget_style_system),
                 // These two overlap — different ResMut, same Res<Scene>
                 gather_a11y_bounds_system.after(layout_system),
