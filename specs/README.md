@@ -48,6 +48,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [031](031-color-picker-widget.md) | Color Picker Widget | Draft |
 | [032](032-slider-widget.md) | Slider Widget | Draft |
 | [033](033-progress-indicator-widget.md) | Progress Indicator Widget | Draft |
+| [034](034-tabs-widget.md) | Tabs Widget | Draft |
 
 ## Lifecycle
 

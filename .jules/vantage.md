@@ -88,3 +88,8 @@ Created `specs/032-slider-widget.md` to define a Slider Widget. This addresses a
 ## 2026-04-23 - [Progress Indicator Widget Spec Context]
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for enterprise applications and desktop applications is showing the status of an ongoing operation (e.g. file download, saving data, processing). Let's spec out a **Progress Indicator Widget** (Progress Bar & Spinner). This addresses a core UX requirement to provide feedback on latency, improving perceived performance.
+
+## 2026-04-26 - [Tabs Widget Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for organizing complex UI and settings panels is missing. Let's spec out a **Tabs Widget**.
+Created `specs/034-tabs-widget.md` to define a Tabs Widget. This addresses a core UX requirement for modern desktop applications focused on dense information architecture.
