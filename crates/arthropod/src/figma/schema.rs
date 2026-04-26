@@ -2999,40 +2999,7 @@ fn resolve_figma_nodes(ctx: &mut ResolveContext<'_>) {
             };
 
             if let Some(parent_id) = parent {
-                let bounds = node.resolved_bounds();
-                let mut scene_node = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(node.to_visual_style()),
-                });
-                scene_node.bounds = bounds;
-                scene_node.opacity = node.to_node_opacity();
-                if let Some(transform) = node.to_node_transform(bounds) {
-                    scene_node.transform = transform;
-                }
-                let scene_id = ctx.scene.add_node(parent_id, scene_node);
-
-                ctx.figma_to_scene.insert(node.id.as_key(), scene_id);
-                ctx.layout_styles
-                    .insert(scene_id, node.to_flex_style(bounds));
-                ctx.constraints_map.insert(scene_id, node.to_constraints());
-                if let Some(component) = node.to_component_node() {
-                    ctx.components.insert(scene_id, component);
-                }
-                if let Some(instance) = node.to_instance_node() {
-                    ctx.instances.insert(scene_id, instance);
-                }
-                let variants = node.to_variant_properties();
-                if !variants.is_empty() {
-                    ctx.variant_properties.insert(scene_id, variants);
-                }
-                let definitions = node.to_component_property_definitions();
-                if !definitions.is_empty() {
-                    ctx.component_property_definitions
-                        .insert(scene_id, definitions);
-                }
-                let overrides = node.to_instance_property_overrides();
-                if !overrides.is_empty() {
-                    ctx.instance_property_overrides.insert(scene_id, overrides);
-                }
+                process_node(ctx, node, parent_id);
                 progressed = true;
             } else {
                 unresolved.push(index);
@@ -3042,45 +3009,49 @@ fn resolve_figma_nodes(ctx: &mut ResolveContext<'_>) {
         if !progressed {
             for index in unresolved {
                 let node = &ctx.document.nodes[index];
-                let bounds = node.resolved_bounds();
-                let mut scene_node = SceneNode::new(NodeContent::Styled {
-                    style: Box::new(node.to_visual_style()),
-                });
-                scene_node.bounds = bounds;
-                scene_node.opacity = node.to_node_opacity();
-                if let Some(transform) = node.to_node_transform(bounds) {
-                    scene_node.transform = transform;
-                }
-                let scene_id = ctx.scene.add_node(ctx.root, scene_node);
-
-                ctx.figma_to_scene.insert(node.id.as_key(), scene_id);
-                ctx.layout_styles
-                    .insert(scene_id, node.to_flex_style(bounds));
-                ctx.constraints_map.insert(scene_id, node.to_constraints());
-                if let Some(component) = node.to_component_node() {
-                    ctx.components.insert(scene_id, component);
-                }
-                if let Some(instance) = node.to_instance_node() {
-                    ctx.instances.insert(scene_id, instance);
-                }
-                let variants = node.to_variant_properties();
-                if !variants.is_empty() {
-                    ctx.variant_properties.insert(scene_id, variants);
-                }
-                let definitions = node.to_component_property_definitions();
-                if !definitions.is_empty() {
-                    ctx.component_property_definitions
-                        .insert(scene_id, definitions);
-                }
-                let overrides = node.to_instance_property_overrides();
-                if !overrides.is_empty() {
-                    ctx.instance_property_overrides.insert(scene_id, overrides);
-                }
+                process_node(ctx, node, ctx.root);
             }
             break;
         }
 
         pending = unresolved;
+    }
+}
+
+fn process_node(ctx: &mut ResolveContext<'_>, node: &FigmaNode, parent_id: NodeId) {
+    let bounds = node.resolved_bounds();
+    let mut scene_node = SceneNode::new(NodeContent::Styled {
+        style: Box::new(node.to_visual_style()),
+    });
+    scene_node.bounds = bounds;
+    scene_node.opacity = node.to_node_opacity();
+    if let Some(transform) = node.to_node_transform(bounds) {
+        scene_node.transform = transform;
+    }
+    let scene_id = ctx.scene.add_node(parent_id, scene_node);
+
+    ctx.figma_to_scene.insert(node.id.as_key(), scene_id);
+    ctx.layout_styles
+        .insert(scene_id, node.to_flex_style(bounds));
+    ctx.constraints_map.insert(scene_id, node.to_constraints());
+    if let Some(component) = node.to_component_node() {
+        ctx.components.insert(scene_id, component);
+    }
+    if let Some(instance) = node.to_instance_node() {
+        ctx.instances.insert(scene_id, instance);
+    }
+    let variants = node.to_variant_properties();
+    if !variants.is_empty() {
+        ctx.variant_properties.insert(scene_id, variants);
+    }
+    let definitions = node.to_component_property_definitions();
+    if !definitions.is_empty() {
+        ctx.component_property_definitions
+            .insert(scene_id, definitions);
+    }
+    let overrides = node.to_instance_property_overrides();
+    if !overrides.is_empty() {
+        ctx.instance_property_overrides.insert(scene_id, overrides);
     }
 }
 

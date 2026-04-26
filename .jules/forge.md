@@ -65,3 +65,6 @@
 **[Refactoring God Functions & Struct Extraction]**
 **Learning:** Breaking down massive functions into smaller helpers often leads to `clippy::too_many_arguments` warnings because you have to pass lots of local state around. Using `#[allow(clippy::too_many_arguments)]` is forbidden by Forge's guidelines.
 **Action:** Always bundle those arguments into a dedicated struct (e.g. `ResolveContext<'a>`) to fix the warning while maintaining proper encapsulation and strict Rust idioms.
+**Refactoring import_figma_document**
+**Learning:** The `resolve_figma_nodes` function in `crates/arthropod/src/figma/schema.rs` had duplicated logic for converting a `FigmaNode` to a `SceneNode` inside both the normal resolution path and the fallback resolution path. This made the function long and repetitive.
+**Action:** Extracted the duplicated node processing logic into a new `process_node` helper function, which takes the target parent `NodeId` as an argument. This significantly shortened `resolve_figma_nodes` and improved code readability.
