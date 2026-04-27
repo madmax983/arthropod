@@ -89,3 +89,7 @@ pub mod gesture_feedback;
 /// Draggable nodes using ECS components and pointer inputs.
 #[cfg(feature = "nova")]
 pub mod draggable;
+
+/// Expanding visual ripples spawned from reactive triggers.
+#[cfg(feature = "nova")]
+pub mod reactive_ripples;

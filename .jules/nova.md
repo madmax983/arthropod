@@ -47,3 +47,7 @@
 **Concept:** A new ECS component `DraggableNode` that leverages the `InteractionState` and `MousePosition` resources to let users drag UI elements around the screen with their pointer. This introduces physical interactions to arbitrary widgets via the ECS.
 **Fate:** Merged
 **Lesson:** Connecting ECS input polling directly with physical node transforms creates a seamless, responsive feeling without blocking the main event dispatch loops.
+## [Reactive Ripples]
+**Concept:** A system linking a generic `ReadSignal<bool>` from `flux-state` to expanding, styled `SceneNode`s in `render_engine`. When the signal triggers, animated circular ripples visually expand and fade out from the target node, providing seamless material-design-like feedback entirely through the ECS.
+**Fate:** Merged
+**Lesson:** Bridging reactive signals directly with short-lived visual `SceneNode`s allows for zero-cost, declarative "Juice" and interactions without writing custom logic inside the widget macro declarations.
