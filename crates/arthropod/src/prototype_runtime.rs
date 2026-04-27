@@ -260,21 +260,19 @@ impl PrototypeRuntime {
         effects
     }
 
+    /// ⚡ Bolt: Removes an intermediate `.collect::<Vec<_>>()` allocation when filtering edges to execute.
     fn dispatch_trigger(
         &mut self,
         node: NodeId,
         trigger: PrototypeTrigger,
     ) -> Vec<PrototypeRuntimeEffect> {
-        let edges = self
-            .edges
-            .iter()
-            .filter(|edge| edge.from == node && edge.trigger == trigger)
-            .cloned()
-            .collect::<Vec<_>>();
-
         let mut effects = Vec::new();
-        for edge in edges {
-            effects.extend(self.execute_edge(edge));
+        for i in 0..self.edges.len() {
+            let edge = &self.edges[i];
+            if edge.from == node && edge.trigger == trigger {
+                let edge_clone = edge.clone();
+                effects.extend(self.execute_edge(edge_clone));
+            }
         }
         effects
     }
