@@ -1,7 +1,16 @@
-🚮 Smell: The `update_all_reactive_system` function in `crates/arthropod-ecs/src/systems/reactive.rs` had grown into a "God Function" (~140 lines) by manually polling and updating 8 different types of reactive components (Layout Width, ProgressBar, Flex Grow, Colors, Text, Computed Text, Transforms, Opacity) in one giant loop with deeply nested `if let` blocks. This made the function hard to read and modify.
+Severity: high
+File reference: crates/arthropod-ecs/src/systems/reactive.rs:308
 
-✨ Solution: Extracted the logic for updating each individual property type into its own dedicated, static helper function (e.g., `update_color`, `update_text`, `update_layout_width`). Each helper takes `Option<&mut T>` for the specific reactive components it cares about, allowing the main system loop to simply call each helper sequentially. Used `.and_then` and `.map` to flatten the nested options where possible.
+What can break (concrete scenario):
+A massive O(N) performance regression occurs on large, mostly-static user interfaces. The monolithic `update_all_reactive_system` queries `ReactiveQuery<'_>`, which only specifies `&SceneNodeRef` as a required component. This causes Bevy to iterate over every single node in the visual tree on every single frame, regardless of whether those nodes are actually reactive.
 
-🧼 Benefit: Dramatically reduces the cognitive load of `update_all_reactive_system`, flattening the structure and isolating the update logic for each component type into easily testable and readable units.
+Why it breaks (technical reasoning):
+In Bevy ECS, if a Query has multiple `Option<&mut T>` parameters but no explicit filter, it returns every entity that has the required base components (in this case, just `SceneNodeRef`). The previous individual systems (e.g. `update_reactive_colors_system`) naturally filtered because they required the reactive component (e.g. `&ReactiveColor`). In addition, the `update_computed_text` helper was incorrectly using `val.computed.get()` which invokes dependency tracking rather than safely reading the value untracked (`.with_untracked(|v| v.clone())`).
 
-🛡️ Verification: Tests passed. No logic changed.
+Minimal fix:
+1. Created a `ReactiveFilter` using `Or<(With<ReactiveColor>, With<ReactiveText>, ...)>` covering all 8 reactive component types.
+2. Updated the signature of `update_all_reactive_system` to `Query<ReactiveQuery<'_>, ReactiveFilter>` to restore O(reactive_nodes) iteration.
+3. Fixed `update_computed_text` to safely use `.with_untracked(|v| v.clone())` instead of `.get()`.
+
+Required tests:
+Tests verifying that the `update_all_reactive_system` accurately updates properties on entities with these components are already present. However, to explicitly verify performance invariants, a benchmark or integration test ensuring the system's runtime scales by reactive nodes rather than total scene nodes would be required.

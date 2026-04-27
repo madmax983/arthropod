@@ -122,6 +122,17 @@ pub type ReactiveQuery<'w> = (
     Option<&'w mut ProgressBarState>,
 );
 
+pub type ReactiveFilter = Or<(
+    With<ReactiveColor>,
+    With<ReactiveText>,
+    With<ReactiveComputedText>,
+    With<ReactiveTransform>,
+    With<ReactiveOpacity>,
+    With<ReactiveLayoutWidth>,
+    With<ReactiveLayoutFlexGrow>,
+    With<ProgressBarState>,
+)>;
+
 fn update_layout_width(
     layout: &mut Option<Mut<'_, LayoutStyle>>,
     width: &mut Option<Mut<'_, ReactiveLayoutWidth>>,
@@ -241,7 +252,7 @@ fn update_computed_text(
             .with_untracked(|new_text| *new_text != val.last_value);
 
         if changed {
-            let new_val = val.computed.get();
+            let new_val = val.computed.with_untracked(|v| v.clone());
             val.last_value = new_val;
 
             if let Some(text_content) = scene
@@ -294,7 +305,10 @@ fn update_opacity(
 
 /// Main system for applying all reactive component updates to the scene in one pass
 /// A monolith system applying all dirty tracked state mutations to the visual tree simultaneously, eliminating redundant `Scene` resource locks.
-pub fn update_all_reactive_system(mut query: Query<ReactiveQuery<'_>>, mut scene: ResMut<Scene>) {
+pub fn update_all_reactive_system(
+    mut query: Query<ReactiveQuery<'_>, ReactiveFilter>,
+    mut scene: ResMut<Scene>,
+) {
     for (
         node_ref,
         mut layout,
