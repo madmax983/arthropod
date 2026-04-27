@@ -24,3 +24,6 @@
 **[AHash for Cache Collections]
 **Learning:** `std::collections::HashSet` uses `SipHash` which is cryptographically resistant but slow for local engine caches that are cleared and repopulated every frame (like `renderable_nodes_cache`).
 **Action:** Always prefer `hashbrown::HashSet` and `hashbrown::HashMap` in hot loops and systems where cryptographic resistance is not required. It gives us `AHash` for much faster insertions and lookups.
+**[AHash for Interactive State Updates]
+**Learning:** `std::collections::HashSet` uses `SipHash` which can add overhead to hot loops and system runs. By using `hashbrown::HashSet` in ECS systems that track sets of `NodeId`s like `update_interaction_state_system`, we use `AHash` for faster insertions and lookups.
+**Action:** Always prefer `hashbrown::HashSet` over `std::collections::HashSet` in Bevy ECS system parameters like `Local<HashSet<T>>` to improve frame times during updates.

@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use hashbrown::HashSet;
 use render_engine::{NodeContent, Scene};
 
 use crate::components::{
@@ -25,7 +26,8 @@ pub fn update_interaction_state_system(
     mouse_pos: Res<MousePosition>,
     scene: Res<Scene>,
     mut query: Query<(Entity, &SceneNodeRef, &mut InteractionState)>,
-    mut hovered_nodes: Local<std::collections::HashSet<render_engine::NodeId>>,
+    // ⚡ Bolt: Using hashbrown::HashSet gives us AHash instead of SipHash, improving hit testing performance
+    mut hovered_nodes: Local<HashSet<render_engine::NodeId>>,
 ) {
     let hit_id = scene.hit_test(mouse_pos.0.x, mouse_pos.0.y);
 
