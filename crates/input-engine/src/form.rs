@@ -69,14 +69,15 @@ fn collect_form_data(
     form_state: &FormState,
     text_input_states: &IndexMap<InputNodeId, TextInputState>,
 ) -> FormData {
-    form_state
-        .field_mapping
-        .iter()
-        .filter_map(|(name, id)| {
-            let state = text_input_states.get(id)?;
-            Some((name.clone(), state.read_signal.get_untracked()))
-        })
-        .collect()
+    // Optimization: Pre-allocate the HashMap to avoid dynamic reallocations
+    // during collection, as `filter_map` obscures the exact size limit from the allocator.
+    let mut data = HashMap::with_capacity(form_state.field_mapping.len());
+    for (name, id) in &form_state.field_mapping {
+        if let Some(state) = text_input_states.get(id) {
+            data.insert(name.clone(), state.read_signal.get_untracked());
+        }
+    }
+    data
 }
 
 /// Revalidate a form (check all field validators)
@@ -108,15 +109,15 @@ pub fn get_form_field_errors(
         return HashMap::new();
     };
 
-    form_state
-        .field_mapping
-        .iter()
-        .filter_map(|(name, id)| {
-            // Flattened nested option handling
-            let error = validators.get(id)?.error.as_ref()?;
-            Some((name.clone(), error.clone()))
-        })
-        .collect()
+    // Optimization: Pre-allocate the HashMap to avoid dynamic reallocations
+    // during collection, as `filter_map` obscures the exact size limit from the allocator.
+    let mut errors = HashMap::with_capacity(form_state.field_mapping.len());
+    for (name, id) in &form_state.field_mapping {
+        if let Some(error) = validators.get(id).and_then(|v| v.error.as_ref()) {
+            errors.insert(name.clone(), error.clone());
+        }
+    }
+    errors
 }
 
 /// Trigger form submission
