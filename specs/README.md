@@ -49,6 +49,7 @@ These specs define the "What" and "Why" for new features, focusing on User Stori
 | [032](032-slider-widget.md) | Slider Widget | Draft |
 | [033](033-progress-indicator-widget.md) | Progress Indicator Widget | Draft |
 | [034](034-tabs-widget.md) | Tabs Widget | Draft |
+| [035](035-undo-redo-engine.md) | Undo/Redo Engine | Draft |
 
 ## Lifecycle
 

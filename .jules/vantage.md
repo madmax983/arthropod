@@ -93,3 +93,8 @@ Created `specs/032-slider-widget.md` to define a Slider Widget. This addresses a
 **Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
 **Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for organizing complex UI and settings panels is missing. Let's spec out a **Tabs Widget**.
 Created `specs/034-tabs-widget.md` to define a Tabs Widget. This addresses a core UX requirement for modern desktop applications focused on dense information architecture.
+
+## 2026-05-03 - [Undo/Redo Engine Spec Context]
+**Spec Needed:** The user has triggered the Vantage persona but hasn't provided a specific feature to spec out.
+**Action:** Since I need to create a spec without explicit input, I reviewed the existing backlog and missing features. A very common requirement for stateful enterprise applications is an undo/redo engine. Let's spec out an **Undo/Redo Engine**.
+Created `specs/035-undo-redo-engine.md` to define an Undo/Redo Engine. This addresses a core UX expectation to confidently revert actions without losing data.
