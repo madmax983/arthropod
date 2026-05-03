@@ -17,3 +17,6 @@
 **Condvar Poisoning Recovery**
 **Learning:** `Condvar::wait(guard).unwrap()` calls will panic and propagate Mutex poisoning when another thread panics while holding the same lock. This can crash unrelated background threads (like effect flushers or computation waiters) and bring down the entire reactive system.
 **Action:** Always use `.unwrap_or_else(std::sync::PoisonError::into_inner)` on `.wait()` calls for `Condvar`, just as with `.lock()`, to ensure that waiting threads can safely recover from panics in other parts of the system.
+**[flux_state::Signal Testing]
+**Learning:** `Signal::get()` doesn't exist directly on `Signal<T>`, it exists on `ReadSignal<T>`. When testing signals that represent state, call `.split()` to retrieve the `ReadSignal` portion, then call `.get()` or `.get_untracked()` to verify state changes safely.
+**Action:** When writing tests involving `flux_state::Signal`, immediately extract `(read, write) = signal.split()` to perform assertions on the `read` component rather than attempting to assert on the top-level `Signal`.
