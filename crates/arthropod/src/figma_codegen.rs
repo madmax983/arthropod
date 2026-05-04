@@ -164,13 +164,28 @@ fn normalize_line_endings(input: &str) -> String {
     normalized
 }
 
+/// ⚡ Bolt: Optimizes raw string literal generation by avoiding up to 32 heap allocations.
+/// The original version looped 16 times, constructing two new `String` objects per iteration
+/// (`"#".repeat(...)` and `format!("\"#...")`). This version uses a single reusable buffer
+/// `terminator_buf` and incrementally pushes characters, slicing it safely.
+/// Reduces heap allocations in worst cases from 32 down to 2.
 fn to_raw_string_literal(value: &str) -> String {
-    for hashes in 0..16 {
-        let fence = "#".repeat(hashes);
-        let terminator = format!("\"{fence}");
-        if !value.contains(&terminator) {
-            return format!("r{fence}\"{value}\"{fence}");
+    let mut terminator_buf = String::with_capacity(17);
+    terminator_buf.push('"');
+
+    for _ in 0..16 {
+        if !value.contains(&terminator_buf) {
+            let fence = &terminator_buf[1..];
+            let mut result = String::with_capacity(3 + fence.len() * 2 + value.len());
+            result.push('r');
+            result.push_str(fence);
+            result.push('"');
+            result.push_str(value);
+            result.push('"');
+            result.push_str(fence);
+            return result;
         }
+        terminator_buf.push('#');
     }
 
     let escaped = value
