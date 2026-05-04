@@ -180,12 +180,16 @@ fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> Strin
         }
     }
 
-    let path_text = path
-        .iter()
-        .map(usize::to_string)
-        .collect::<Vec<_>>()
-        .join(".");
-    format!("generated:{path_text}")
+    let mut result = String::with_capacity(10 + path.len() * 2);
+    result.push_str("generated:");
+    for (i, p) in path.iter().enumerate() {
+        if i > 0 {
+            result.push('.');
+        }
+        use std::fmt::Write;
+        let _ = write!(result, "{}", p);
+    }
+    result
 }
 
 fn ensure_bounds_from_xywh(object: &mut JsonMap<String, JsonValue>) {
@@ -1279,11 +1283,17 @@ fn apply_text_case(text: &str, text_case: TextCase) -> String {
         TextCase::Original => text.to_string(),
         TextCase::Upper | TextCase::SmallCaps | TextCase::SmallCapsForced => text.to_uppercase(),
         TextCase::Lower => text.to_lowercase(),
-        TextCase::Title => text
-            .split_whitespace()
-            .map(title_case_word)
-            .collect::<Vec<_>>()
-            .join(" "),
+        TextCase::Title => {
+            let words = text.split_whitespace();
+            let mut result = String::with_capacity(text.len());
+            for (i, word) in words.enumerate() {
+                if i > 0 {
+                    result.push(' ');
+                }
+                result.push_str(&title_case_word(word));
+            }
+            result
+        }
     }
 }
 

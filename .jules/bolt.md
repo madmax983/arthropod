@@ -30,3 +30,6 @@
 **HashMap filter_map allocations**
 **Learning:** Using `.filter_map(...).collect::<HashMap<_, _>>()` causes multiple dynamic heap allocations because `filter_map` obscures the exact size limit from the allocator, forcing `collect` to default to 0 capacity.
 **Action:** Replace `.filter_map(...).collect()` with an explicitly sized `HashMap::with_capacity(size)` and a `for` loop for performance-critical path collections.
+**[String join allocations]
+**Learning:** `iter.collect::<Vec<_>>().join(...)` forces intermediate heap allocations for vectors that are immediately discarded after the join string is created.
+**Action:** To eliminate unnecessary intermediate `Vec` allocations in Rust, replace iterator chain patterns like `.collect::<Vec<_>>().join(...)` with a loop that iterates over the elements and appends them directly to a string pre-allocated via `String::with_capacity()`.
