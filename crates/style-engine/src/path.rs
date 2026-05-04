@@ -179,6 +179,35 @@ impl VectorPath {
         parser.parse()
     }
 
+    /// Check if all coordinates in the path are finite numbers
+    pub fn is_finite(&self) -> bool {
+        for cmd in &self.commands {
+            match cmd {
+                PathCommand::MoveTo(p) | PathCommand::LineTo(p) => {
+                    if !p.is_finite() {
+                        return false;
+                    }
+                }
+                PathCommand::QuadraticTo { control, to } => {
+                    if !control.is_finite() || !to.is_finite() {
+                        return false;
+                    }
+                }
+                PathCommand::CubicTo {
+                    control1,
+                    control2,
+                    to,
+                } => {
+                    if !control1.is_finite() || !control2.is_finite() || !to.is_finite() {
+                        return false;
+                    }
+                }
+                PathCommand::Close => {}
+            }
+        }
+        true
+    }
+
     /// Perform a boolean operation between two paths.
     ///
     /// Curves are flattened to polylines for polygon conversion.
@@ -187,6 +216,10 @@ impl VectorPath {
         b: &VectorPath,
         op: BooleanOp,
     ) -> Result<VectorPath, VectorPathError> {
+        if !a.is_finite() || !b.is_finite() {
+            return Err(VectorPathError::InvalidBooleanOperands);
+        }
+
         let a_poly = a.to_multi_polygon();
         let b_poly = b.to_multi_polygon();
 
@@ -939,6 +972,11 @@ fn tokenize_svg_path(data: &str) -> Result<Vec<SvgToken>, VectorPathError> {
         let value = f32::from_str(raw).map_err(|_| {
             VectorPathError::InvalidSvgPathData(format!("invalid numeric value: {raw}"))
         })?;
+        if !value.is_finite() {
+            return Err(VectorPathError::InvalidSvgPathData(format!(
+                "invalid numeric value: {raw} must be finite"
+            )));
+        }
         tokens.push(SvgToken::Number(value));
     }
 
