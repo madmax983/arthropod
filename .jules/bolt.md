@@ -33,3 +33,7 @@
 **[String join allocations]
 **Learning:** `iter.collect::<Vec<_>>().join(...)` forces intermediate heap allocations for vectors that are immediately discarded after the join string is created.
 **Action:** To eliminate unnecessary intermediate `Vec` allocations in Rust, replace iterator chain patterns like `.collect::<Vec<_>>().join(...)` with a loop that iterates over the elements and appends them directly to a string pre-allocated via `String::with_capacity()`.
+
+**Pre-allocate vectors with expected capacity**
+**Learning:** Found a \`Vec::new()\` usage on a hot path during scene node collection that could unnecessarily reallocate the underlying buffer.
+**Action:** Replaced \`Vec::new()\` with \`Vec::with_capacity(expected_len)\` to ensure allocations only happen once per collection, reducing heap operations on the hot path.

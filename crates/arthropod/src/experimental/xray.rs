@@ -63,7 +63,9 @@ pub fn update_xray(
     // We also need to filter out our own debug nodes from being targets
     let debug_ids: HashSet<NodeId> = state.active_nodes.values().copied().collect();
 
-    let mut targets = Vec::new();
+    // ⚡ Bolt: Pre-allocating `targets` with exact expected capacity eliminates `Vec::new()` resizing
+    // overheads on the hot path during `xray` update iterations, saving heap allocations per frame.
+    let mut targets = Vec::with_capacity(scene.node_count().saturating_sub(debug_ids.len()));
     for (id, node) in scene.nodes() {
         if debug_ids.contains(&id) {
             continue;
