@@ -37,3 +37,7 @@
 **Pre-allocate vectors with expected capacity**
 **Learning:** Found a \`Vec::new()\` usage on a hot path during scene node collection that could unnecessarily reallocate the underlying buffer.
 **Action:** Replaced \`Vec::new()\` with \`Vec::with_capacity(expected_len)\` to ensure allocations only happen once per collection, reducing heap operations on the hot path.
+**Pre-allocating Vectors in Loops (Avoid Consuming Iterators)]\n**Learning:** When hoisting a  allocation out of a loop to reuse it via , you must ensure the vector isn't consumed by the loop's inner logic (e.g., using ), otherwise you'll get borrow checker errors.\n**Action:** Use  instead of  to borrow and copy values, preserving the pre-allocated vector for the next loop iteration.
+**[Pre-allocating Vectors in Loops (Avoid Consuming Iterators)]
+**Learning:** When hoisting a `Vec` allocation out of a loop to reuse it via `.clear()`, you must ensure the vector isn't consumed by the loop's inner logic (e.g., using `.into_iter()`), otherwise you'll get borrow checker errors.
+**Action:** Use `.iter().copied()` instead of `.into_iter()` to borrow and copy values, preserving the pre-allocated vector for the next loop iteration.

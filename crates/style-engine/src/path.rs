@@ -325,9 +325,12 @@ impl VectorPath {
             })
             .collect();
 
+        // ⚡ Bolt: Pre-allocate containing vector and reuse across outer iterations
+        // to avoid `Vec::new()` per ring in O(N^2) hot loop.
+        let mut containing: Vec<usize> = Vec::with_capacity(rings.len());
         for i in 0..rings.len() {
             let sample = first_distinct_point(&rings[i].contour).unwrap_or(Vec2::ZERO);
-            let mut containing: Vec<usize> = Vec::new();
+            containing.clear();
             for (j, ring_j) in rings.iter().enumerate() {
                 if i == j {
                     continue;
@@ -338,7 +341,7 @@ impl VectorPath {
             }
 
             rings[i].depth = containing.len();
-            rings[i].parent = containing.into_iter().min_by(|a, b| {
+            rings[i].parent = containing.iter().copied().min_by(|a, b| {
                 rings[*a]
                     .area_abs
                     .partial_cmp(&rings[*b].area_abs)
