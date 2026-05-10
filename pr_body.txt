@@ -1,16 +1,4 @@
-Severity: high
-File reference: crates/arthropod-ecs/src/systems/reactive.rs:308
-
-What can break (concrete scenario):
-A massive O(N) performance regression occurs on large, mostly-static user interfaces. The monolithic `update_all_reactive_system` queries `ReactiveQuery<'_>`, which only specifies `&SceneNodeRef` as a required component. This causes Bevy to iterate over every single node in the visual tree on every single frame, regardless of whether those nodes are actually reactive.
-
-Why it breaks (technical reasoning):
-In Bevy ECS, if a Query has multiple `Option<&mut T>` parameters but no explicit filter, it returns every entity that has the required base components (in this case, just `SceneNodeRef`). The previous individual systems (e.g. `update_reactive_colors_system`) naturally filtered because they required the reactive component (e.g. `&ReactiveColor`). In addition, the `update_computed_text` helper was incorrectly using `val.computed.get()` which invokes dependency tracking rather than safely reading the value untracked (`.with_untracked(|v| v.clone())`).
-
-Minimal fix:
-1. Created a `ReactiveFilter` using `Or<(With<ReactiveColor>, With<ReactiveText>, ...)>` covering all 8 reactive component types.
-2. Updated the signature of `update_all_reactive_system` to `Query<ReactiveQuery<'_>, ReactiveFilter>` to restore O(reactive_nodes) iteration.
-3. Fixed `update_computed_text` to safely use `.with_untracked(|v| v.clone())` instead of `.get()`.
-
-Required tests:
-Tests verifying that the `update_all_reactive_system` accurately updates properties on entities with these components are already present. However, to explicitly verify performance invariants, a benchmark or integration test ensuring the system's runtime scales by reactive nodes rather than total scene nodes would be required.
+🎯 Target: `unpack_readback_pixels` in `crates/render-engine/src/backend/wgpu/context.rs`
+💣 Risk: Catastrophic Out-Of-Memory (OOM) panic prior to bounds checking when unpacking readback pixels with maliciously or mistakenly enormous width/height values.
+🧪 Strategy: Moved the bounds check (`min_required_src_len`) up before the vector memory allocation (`try_reserve(total_size)`), allowing it to fail gracefully instead of crashing with OOM. The bounds check relies on simple padded multiplication constraints.
+🔬 Verification: `cargo test -p render-engine test_unpack_readback_pixels_oom`
