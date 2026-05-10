@@ -82,10 +82,12 @@ pub fn update_widget_style_system(
 ) {
     for (node_ref, widget_style, state, layout_style) in query.iter_mut() {
         // 1. Resolve style for current state
-        let resolved =
-            widget_style
-                .0
-                .resolve(state.hovered, state.focused, state.active, state.disabled);
+        let resolved = widget_style.0.resolve(widget_core::WidgetState {
+            hovered: state.hovered,
+            focused: state.focused,
+            active: state.active,
+            disabled: state.disabled,
+        });
 
         // 2. Update LayoutStyle component if present (triggers layout engine)
         if let Some(mut layout) = layout_style {

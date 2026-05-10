@@ -188,7 +188,7 @@ pub use primitive::image::Image;
 pub use primitive::progress_bar::ProgressBar;
 pub use primitive::text::Text;
 pub use primitive::text_input::TextInput;
-pub use style::{Padding as StylePadding, ResolvedStyle, Style, StyleOverrides};
+pub use style::{Padding as StylePadding, ResolvedStyle, Style, StyleOverrides, WidgetState};
 pub use widget_trait::{NamedWidgetTuple, Widget, WidgetTuple};
 
 // Re-export layout types for advanced use cases (manual container construction)

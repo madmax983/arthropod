@@ -131,7 +131,7 @@ impl<C: WidgetTuple> Widget for Column<C> {
             ctx.set_widget_style(node_id, style.clone());
 
             // Apply initial resolved style
-            let resolved = style.resolve(false, false, false, false);
+            let resolved = style.resolve(crate::style::WidgetState::default());
             ctx.apply_style(node_id, &resolved);
 
             if style.hover.is_some() || style.active.is_some() || style.focus.is_some() {

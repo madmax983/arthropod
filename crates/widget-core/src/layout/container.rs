@@ -274,7 +274,7 @@ impl<C: WidgetTuple> Widget for Container<C> {
             ctx.set_widget_style(node_id, style.clone());
 
             // Apply initial resolved style for backwards compatibility and immediate visual feedback
-            let resolved = style.resolve(false, false, false, false);
+            let resolved = style.resolve(crate::style::WidgetState::default());
             ctx.apply_style(node_id, &resolved);
 
             // If the style has pseudo-states, we need to track interactions

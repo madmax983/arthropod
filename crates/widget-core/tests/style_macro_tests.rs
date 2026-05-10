@@ -138,7 +138,7 @@ fn test_style_resolve_base_only() {
     };
 
     // Resolve with no states active
-    let resolved = s.resolve(false, false, false, false);
+    let resolved = s.resolve(widget_core::WidgetState::default());
     assert_eq!(resolved.opacity, 1.0);
     assert_eq!(resolved.border_radius, CornerRadii::uniform(8.0));
 }
@@ -159,7 +159,10 @@ fn test_style_resolve_hover() {
     };
 
     // Resolve with hover = true
-    let resolved = s.resolve(true, false, false, false);
+    let resolved = s.resolve(widget_core::WidgetState {
+        hovered: true,
+        ..Default::default()
+    });
     assert_eq!(resolved.opacity, 0.9);
 }
 
@@ -180,7 +183,11 @@ fn test_style_resolve_disabled_overrides_hover() {
     };
 
     // Resolve with both hover and disabled - disabled should take precedence
-    let resolved = s.resolve(true, false, false, true);
+    let resolved = s.resolve(widget_core::WidgetState {
+        hovered: true,
+        disabled: true,
+        ..Default::default()
+    });
     assert_eq!(resolved.opacity, 0.5);
 }
 
@@ -195,7 +202,10 @@ fn test_style_resolve_focus() {
     };
 
     // Resolve with focus = true
-    let resolved = s.resolve(false, true, false, false);
+    let resolved = s.resolve(widget_core::WidgetState {
+        focused: true,
+        ..Default::default()
+    });
     assert_eq!(resolved.border_radius, CornerRadii::uniform(8.0));
 }
 
@@ -210,7 +220,10 @@ fn test_style_resolve_active() {
     };
 
     // Resolve with active = true
-    let resolved = s.resolve(false, false, true, false);
+    let resolved = s.resolve(widget_core::WidgetState {
+        active: true,
+        ..Default::default()
+    });
     assert_eq!(resolved.opacity, 0.8);
 }
 
@@ -231,7 +244,11 @@ fn test_style_resolve_combined_states() {
     };
 
     // Resolve with hover and focus both true
-    let resolved = s.resolve(true, true, false, false);
+    let resolved = s.resolve(widget_core::WidgetState {
+        hovered: true,
+        focused: true,
+        ..Default::default()
+    });
     assert_eq!(resolved.opacity, 0.9);
     assert_eq!(resolved.border_radius, CornerRadii::uniform(8.0));
 }
@@ -294,7 +311,7 @@ fn test_resolved_style_default_opacity() {
         border_radius: 8.0;
     };
 
-    let resolved = s.resolve(false, false, false, false);
+    let resolved = s.resolve(widget_core::WidgetState::default());
     assert_eq!(resolved.opacity, 1.0);
 }
 

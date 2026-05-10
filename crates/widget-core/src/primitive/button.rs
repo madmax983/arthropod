@@ -239,7 +239,7 @@ impl Widget for Button {
 
         // 2. Apply Unified Style
         ctx.set_widget_style(button_node, button_style.clone());
-        let resolved = button_style.resolve(false, false, false, false);
+        let resolved = button_style.resolve(crate::style::WidgetState::default());
         ctx.apply_style(button_node, &resolved);
         ctx.add_hover_state(button_node);
 

@@ -115,6 +115,19 @@ pub struct StyleOverrides {
     pub stroke: Option<StrokeStyle>,
 }
 
+/// Represents the interaction state of a widget for style resolution
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WidgetState {
+    /// Whether the widget is currently hovered
+    pub hovered: bool,
+    /// Whether the widget currently has focus
+    pub focused: bool,
+    /// Whether the widget is currently active/pressed
+    pub active: bool,
+    /// Whether the widget is currently disabled
+    pub disabled: bool,
+}
+
 /// Fully resolved style values after applying pseudo-states
 ///
 /// All optional values are resolved to concrete values.
@@ -344,7 +357,7 @@ impl Style {
     }
 
     /// Resolve style for current widget state
-    pub fn resolve(&self, hover: bool, focus: bool, active: bool, disabled: bool) -> ResolvedStyle {
+    pub fn resolve(&self, state: WidgetState) -> ResolvedStyle {
         let mut resolved = ResolvedStyle {
             background: self.background.clone(),
             color: self.color,
@@ -366,22 +379,22 @@ impl Style {
             wrap: self.wrap.unwrap_or(FlexWrap::NoWrap),
         };
 
-        if disabled {
+        if state.disabled {
             if let Some(d) = &self.disabled {
                 d.apply_to(&mut resolved);
             }
         } else {
-            if hover {
+            if state.hovered {
                 if let Some(h) = &self.hover {
                     h.apply_to(&mut resolved);
                 }
             }
-            if focus {
+            if state.focused {
                 if let Some(f) = &self.focus {
                     f.apply_to(&mut resolved);
                 }
             }
-            if active {
+            if state.active {
                 if let Some(a) = &self.active {
                     a.apply_to(&mut resolved);
                 }

@@ -68,3 +68,6 @@
 **Refactoring import_figma_document**
 **Learning:** The `resolve_figma_nodes` function in `crates/arthropod/src/figma/schema.rs` had duplicated logic for converting a `FigmaNode` to a `SceneNode` inside both the normal resolution path and the fallback resolution path. This made the function long and repetitive.
 **Action:** Extracted the duplicated node processing logic into a new `process_node` helper function, which takes the target parent `NodeId` as an argument. This significantly shortened `resolve_figma_nodes` and improved code readability.
+**Refactoring `Style::resolve` to use `WidgetState`**
+**Learning:** The method `Style::resolve` previously took four raw boolean arguments (`hover`, `focus`, `active`, `disabled`), suffering from "boolean blindness" and making callsites unclear (e.g., `resolve(false, false, false, false)`).
+**Action:** Grouped these interaction state flags into a strongly-typed `WidgetState` struct (`{ hovered, focused, active, disabled }`). Now callers use `resolve(WidgetState::default())` or construct specific states clearly.
