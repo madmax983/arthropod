@@ -298,13 +298,15 @@ impl Default for TextEngine {
 }
 
 fn extract_shaped_text_from_buffer(buffer: &Buffer) -> ShapedText {
-    let runs: Vec<_> = buffer.layout_runs().collect();
-    let total_glyphs = runs.iter().map(|run| run.glyphs.len()).sum();
+    // ⚡ Bolt: Eliminate intermediate `Vec` allocation for layout runs.
+    // Iterating twice over `buffer.layout_runs()` is cheap, allowing us to
+    // compute total glyphs and reserve exact capacity without an extra heap allocation.
+    let total_glyphs = buffer.layout_runs().map(|run| run.glyphs.len()).sum();
     let mut glyphs = Vec::with_capacity(total_glyphs);
     let mut max_width = 0.0f32;
     let mut max_height = 0.0f32;
 
-    for run in runs {
+    for run in buffer.layout_runs() {
         let run_height = run.line_height;
 
         for glyph in run.glyphs.iter() {

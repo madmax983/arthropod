@@ -37,6 +37,9 @@
 **Pre-allocate vectors with expected capacity**
 **Learning:** Found a \`Vec::new()\` usage on a hot path during scene node collection that could unnecessarily reallocate the underlying buffer.
 **Action:** Replaced \`Vec::new()\` with \`Vec::with_capacity(expected_len)\` to ensure allocations only happen once per collection, reducing heap operations on the hot path.
+**[Text Shaping Allocation Reduction]
+**Learning:** Calling `.collect::<Vec<_>>()` on an iterator just to get its length for an allocation capacity (e.g. `Vec::with_capacity(total)`) creates a useless intermediate heap allocation. If the underlying iterator is cheap to produce (like `buffer.layout_runs()`), it's significantly faster to iterate twice: once with `.map(|x| x.len()).sum()` to compute the exact capacity, and a second time to actually process the items.
+**Action:** Replace patterns where intermediate Vectors are collected solely for length counting with a double-iteration pattern, using cheap iterator instantiation and `.sum()` to eliminate the intermediate heap allocation.
 **Pre-allocating Vectors in Loops (Avoid Consuming Iterators)]\n**Learning:** When hoisting a  allocation out of a loop to reuse it via , you must ensure the vector isn't consumed by the loop's inner logic (e.g., using ), otherwise you'll get borrow checker errors.\n**Action:** Use  instead of  to borrow and copy values, preserving the pre-allocated vector for the next loop iteration.
 **[Pre-allocating Vectors in Loops (Avoid Consuming Iterators)]
 **Learning:** When hoisting a `Vec` allocation out of a loop to reuse it via `.clear()`, you must ensure the vector isn't consumed by the loop's inner logic (e.g., using `.into_iter()`), otherwise you'll get borrow checker errors.
