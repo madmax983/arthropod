@@ -1,0 +1,5 @@
+error: expected float literal
+ --> tests/ui/invalid_float.rs:4:10
+  |
+4 | #[layout(gap = "not_a_float")]
+  |          ^^^^^^^^^^^^^^^^^^^

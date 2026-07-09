@@ -1,0 +1,7 @@
+error: WidgetEnum can only be derived for enums
+ --> tests/ui/invalid_enum_derive.rs:4:1
+  |
+4 | / pub struct NotAnEnum {
+5 | |     pub value: bool,
+6 | | }
+  | |_^

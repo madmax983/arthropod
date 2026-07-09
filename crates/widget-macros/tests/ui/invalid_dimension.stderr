@@ -1,0 +1,5 @@
+error: expected float literal
+ --> tests/ui/invalid_dimension.rs:4:9
+  |
+4 | #[style(corner_radius = true)]
+  |         ^^^^^^^^^^^^^^^^^^^^
