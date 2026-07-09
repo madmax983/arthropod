@@ -90,3 +90,34 @@ fn test_glyph_positions() {
         );
     }
 }
+
+#[test]
+fn test_multiline_shaping() {
+    let mut engine = TextEngine::new();
+    let text = "Line 1\nLine 2";
+    let shaped = engine.shape_text(text, 16.0);
+
+    // Check that we have a reasonably tall bounding box (two lines)
+    assert!(
+        shaped.bounds.height > 20.0,
+        "Height should represent at least 2 lines of text"
+    );
+
+    // Find the min y and max y to ensure there is vertical offset across lines
+    let min_y = shaped
+        .glyphs
+        .iter()
+        .map(|g| g.y_offset)
+        .fold(f32::INFINITY, f32::min);
+    let max_y = shaped
+        .glyphs
+        .iter()
+        .map(|g| g.y_offset)
+        .fold(f32::NEG_INFINITY, f32::max);
+
+    // There must be a difference in vertical placement
+    assert!(
+        max_y > min_y + 10.0,
+        "Glyphs should be placed on multiple vertical lines"
+    );
+}

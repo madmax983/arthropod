@@ -308,11 +308,11 @@ fn extract_shaped_text_from_buffer(buffer: &Buffer) -> ShapedText {
 
     for run in buffer.layout_runs() {
         let run_height = run.line_height;
+        max_height += run_height;
 
         for glyph in run.glyphs.iter() {
             let x_end = glyph.x + glyph.w;
             max_width = max_width.max(x_end);
-            max_height = max_height.max(run_height);
 
             let (cache_key, _x_bin, _y_bin) = CacheKey::new(
                 glyph.font_id,
@@ -326,7 +326,7 @@ fn extract_shaped_text_from_buffer(buffer: &Buffer) -> ShapedText {
                 cache_key,
                 glyph_id: glyph.glyph_id,
                 x_offset: glyph.x,
-                y_offset: glyph.y,
+                y_offset: run.line_y + glyph.y,
                 x_advance: glyph.w,
                 y_advance: 0.0,
                 cluster: glyph.start as u32,
