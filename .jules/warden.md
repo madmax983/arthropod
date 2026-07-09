@@ -32,3 +32,6 @@
 **2024-05-18 - [COM Null HWND Crash Fix]**
 **Threat:** Calling `CompositionDevice::create_target_for_hwnd` with a null `HWND` passed directly to the unsafe FFI binding caused a crash and potential Undefined Behavior inside the Windows COM runtime because the HWND wasn't actually validated to be non-zero before the unsafe call.
 **Defense:** Added an explicit check for `hwnd.0 as usize == 0` at the beginning of `create_target_for_hwnd` to return an `E_HANDLE` error instead of allowing the null handle to reach the FFI boundary.
+**2025-02-23 - Prevent DoS from serde_json panic**
+**Threat:** Calling `.unwrap()` on `serde_json::to_string_pretty` in the MCP server (`execute_tool_core` and `scene_list_nodes`) could lead to a server panic and Denial of Service (DoS) if serialization fails.
+**Defense:** Replaced `.unwrap()` with proper error propagation using `.map_err(|e| McpError::internal_error(e.to_string(), None))?` to return a controlled error response instead of crashing the server.

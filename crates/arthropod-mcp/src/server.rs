@@ -231,7 +231,8 @@ impl ArthropodServer {
         let result = ArthropodTool::execute(&tool, json_params, &mut ctx)
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))
     }
 
     // ========================================================================
@@ -276,7 +277,7 @@ impl ArthropodServer {
                         "nodes": filtered_nodes,
                         "count": filtered_nodes.len(),
                     }))
-                    .unwrap(),
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?,
                 );
                 return Ok(CallToolResult::success(vec![Content::text(output)]));
             }
