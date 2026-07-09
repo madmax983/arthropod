@@ -267,13 +267,19 @@ impl TextEngine {
             };
         }
 
+        let safe_font_size = if font_size.is_finite() && font_size > 0.0 {
+            font_size
+        } else {
+            1.0
+        };
+
         // Update metrics for this font size
         // Line height uses font metrics: cosmic-text calculates line height from
         // the font's ascender + descender + line gap. We pass a slightly larger
         // value to ensure proper spacing, then use the actual run.line_height below.
         // Note: Metrics::new takes (font_size, line_height) where line_height is
         // the desired line spacing for multi-line text.
-        let metrics = Metrics::new(font_size, font_size * 1.2);
+        let metrics = Metrics::new(safe_font_size, safe_font_size * 1.2);
         self.buffer.set_metrics(&mut self.font_system, metrics);
 
         // Set text and shape
@@ -400,8 +406,14 @@ pub fn shape_text_parallel_with_options(
             };
         }
 
+        let safe_font_size = if font_size.is_finite() && font_size > 0.0 {
+            font_size
+        } else {
+            1.0
+        };
+
         // Update metrics for this font size
-        let metrics = Metrics::new(font_size, font_size * 1.2);
+        let metrics = Metrics::new(safe_font_size, safe_font_size * 1.2);
         buffer.set_metrics(font_system, metrics);
 
         // Set text and shape
