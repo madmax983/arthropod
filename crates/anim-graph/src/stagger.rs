@@ -98,8 +98,12 @@ impl<T: Animatable + Send + Sync> Evaluable<T> for Stagger<T> {
     ///
     /// For multi-target stagger evaluation, use `evaluate_at(index, phase)`.
     fn evaluate(&self, phase: f32) -> Sample<T> {
-        self.evaluate_at(0, phase)
-            .unwrap_or(Sample::at_rest(T::zero()))
+        if self.segments.is_empty() {
+            Sample::at_rest(T::zero())
+        } else {
+            self.evaluate_at(0, phase)
+                .unwrap_or(Sample::at_rest(T::zero()))
+        }
     }
 
     fn natural_duration(&self) -> f32 {

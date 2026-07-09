@@ -1,4 +1,12 @@
-🎯 Target: `unpack_readback_pixels` in `crates/render-engine/src/backend/wgpu/context.rs`
-💣 Risk: Catastrophic Out-Of-Memory (OOM) panic prior to bounds checking when unpacking readback pixels with maliciously or mistakenly enormous width/height values.
-🧪 Strategy: Moved the bounds check (`min_required_src_len`) up before the vector memory allocation (`try_reserve(total_size)`), allowing it to fail gracefully instead of crashing with OOM. The bounds check relies on simple padded multiplication constraints.
-🔬 Verification: `cargo test -p render-engine test_unpack_readback_pixels_oom`
+🧨 **The Trigger:** Empty segments array causes an unconditional `.unwrap()` panic when evaluating a `Sequence` or a `Stagger` via the `Evaluable` trait.
+
+📉 **The Stack Trace:**
+```
+thread 'test_havoc_sequence_panic' panicked at crates/anim-graph/src/sequence.rs:32:9:
+Sequence must have at least one segment
+```
+(and similar panic for Stagger's `.evaluate()` fallback).
+
+🧪 **Reproduction:** Run `cargo test -p anim-graph --test havoc_sequence_panic`. A sequence with `Sequence::new(vec![])` crashes the app immediately upon evaluation.
+
+😈 **Comment:** "You assumed animations always have at least one keyframe. You were wrong. Now your render thread is dead."

@@ -27,13 +27,7 @@ pub struct Sequence<T: Animatable> {
 impl<T: Animatable> Sequence<T> {
     /// Create a sequence from a list of evaluable segments.
     ///
-    /// Panics if `segments` is empty.
     pub fn new(segments: Vec<Box<dyn Evaluable<T>>>) -> Self {
-        assert!(
-            !segments.is_empty(),
-            "Sequence must have at least one segment"
-        );
-
         let total_duration: f32 = segments.iter().map(|s| s.natural_duration()).sum();
         let mut boundaries = Vec::with_capacity(segments.len());
         let mut cursor = 0.0_f32;
@@ -57,6 +51,10 @@ impl<T: Animatable> Sequence<T> {
 
     /// Evaluate the sequence at a global phase.
     pub fn evaluate(&self, phase: f32) -> Sample<T> {
+        if self.segments.is_empty() {
+            return Sample::at_rest(T::zero());
+        }
+
         let phase = phase.clamp(0.0, 1.0);
 
         // Find which segment owns this phase
@@ -74,7 +72,11 @@ impl<T: Animatable> Sequence<T> {
         }
 
         // Fallback: evaluate last segment at end
-        self.segments.last().unwrap().evaluate(1.0)
+        if let Some(last) = self.segments.last() {
+            last.evaluate(1.0)
+        } else {
+            Sample::at_rest(T::zero())
+        }
     }
 }
 
