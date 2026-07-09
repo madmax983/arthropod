@@ -176,8 +176,8 @@ fn sample_bilinear(image: &CpuImage, uv: Vec2) -> Vec4 {
     let fx = u * max_x as f32;
     let fy = v * max_y as f32;
 
-    let x0 = fx.floor() as u32;
-    let y0 = fy.floor() as u32;
+    let x0 = (fx.floor() as u32).min(max_x);
+    let y0 = (fy.floor() as u32).min(max_y);
     let x1 = (x0 + 1).min(max_x);
     let y1 = (y0 + 1).min(max_y);
     let tx = fx - x0 as f32;
