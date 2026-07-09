@@ -32,9 +32,6 @@
 **2024-05-18 - [COM Null HWND Crash Fix]**
 **Threat:** Calling `CompositionDevice::create_target_for_hwnd` with a null `HWND` passed directly to the unsafe FFI binding caused a crash and potential Undefined Behavior inside the Windows COM runtime because the HWND wasn't actually validated to be non-zero before the unsafe call.
 **Defense:** Added an explicit check for `hwnd.0 as usize == 0` at the beginning of `create_target_for_hwnd` to return an `E_HANDLE` error instead of allowing the null handle to reach the FFI boundary.
-**2026-04-23 - Same-thread Signal deadlocks**
-**Threat:** Calling `.get()`, `.get_untracked()`, or `.set()` on a Signal from within an `.update()` closure on the same thread caused a silent deadlock due to RwLock re-entrance issues (DoS).
-**Defense:** Implemented a thread-local `LOCKED_SIGNALS` tracker via `LockTrackerGuard` to deterministically detect same-thread re-entrant `RwLock` acquisitions (e.g. read while holding write) and explicitly panic with a 'Deadlock detected' message, preventing indefinite thread hangs without impacting multi-threaded lock contention.
-**2025-02-23 - Prevent DoS from serde_json panic**
-**Threat:** Calling `.unwrap()` on `serde_json::to_string_pretty` in the MCP server (`execute_tool_core` and `scene_list_nodes`) could lead to a server panic and Denial of Service (DoS) if serialization fails.
-**Defense:** Replaced `.unwrap()` with proper error propagation using `.map_err(|e| McpError::internal_error(e.to_string(), None))?` to return a controlled error response instead of crashing the server.
+**2025-02-18 - [Figma Parser Recursion DoS]**
+**Threat:** The Figma JSON parser in `crates/arthropod/src/figma/schema.rs` used recursive functions (`flatten_document_nodes` and `normalize_enum_wrappers`) to traverse potentially untrusted JSON input. A deeply nested JSON payload could cause a stack overflow, leading to a Denial of Service (DoS) vulnerability.
+**Defense:** Added explicit recursion depth tracking during parsing with a maximum limit (`MAX_DEPTH = 256`). If the nesting exceeds this depth, the parser safely aborts and returns a new `FigmaImportError::RecursionLimitExceeded` rather than crashing the application. Added a regression test that deliberately passes deeply nested JSON to verify the limit.

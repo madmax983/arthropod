@@ -82,9 +82,11 @@ pub fn import_figma_document(json: &str) -> Result<ImportedFigmaDocument, FigmaI
     })
 }
 
+const MAX_DEPTH: usize = 256;
+
 fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
     let mut raw: JsonValue = serde_json::from_str(json)?;
-    normalize_enum_wrappers(&mut raw);
+    normalize_enum_wrappers(&mut raw, 0)?;
     let nodes = match raw {
         JsonValue::Array(nodes) => nodes,
         JsonValue::Object(mut object) => match object.remove("nodes") {
@@ -96,34 +98,39 @@ fn parse_figma_document(json: &str) -> Result<FigmaDocument, FigmaImportError> {
 
     let mut flattened = Vec::new();
     let mut path = Vec::new();
-    flatten_document_nodes(&nodes, None, &mut path, &mut flattened);
+    flatten_document_nodes(&nodes, None, &mut path, &mut flattened, 0)?;
 
     let mut normalized = JsonMap::new();
     normalized.insert("nodes".to_string(), JsonValue::Array(flattened));
     Ok(serde_json::from_value(JsonValue::Object(normalized))?)
 }
 
-fn normalize_enum_wrappers(value: &mut JsonValue) {
+fn normalize_enum_wrappers(value: &mut JsonValue, depth: usize) -> Result<(), FigmaImportError> {
+    if depth > MAX_DEPTH {
+        return Err(FigmaImportError::RecursionLimitExceeded(MAX_DEPTH));
+    }
+
     match value {
         JsonValue::Array(items) => {
             for item in items {
-                normalize_enum_wrappers(item);
+                normalize_enum_wrappers(item, depth + 1)?;
             }
         }
         JsonValue::Object(map) => {
             if map.len() == 2 && map.contains_key("__enum__") && map.contains_key("value") {
                 if let Some(mut enum_value) = map.remove("value") {
-                    normalize_enum_wrappers(&mut enum_value);
+                    normalize_enum_wrappers(&mut enum_value, depth + 1)?;
                     *value = enum_value;
                 }
-                return;
+                return Ok(());
             }
             for child in map.values_mut() {
-                normalize_enum_wrappers(child);
+                normalize_enum_wrappers(child, depth + 1)?;
             }
         }
         _ => {}
     }
+    Ok(())
 }
 
 fn flatten_document_nodes(
@@ -131,7 +138,12 @@ fn flatten_document_nodes(
     parent_id: Option<&str>,
     path: &mut Vec<usize>,
     flattened: &mut Vec<JsonValue>,
-) {
+    depth: usize,
+) -> Result<(), FigmaImportError> {
+    if depth > MAX_DEPTH {
+        return Err(FigmaImportError::RecursionLimitExceeded(MAX_DEPTH));
+    }
+
     for (index, raw_node) in nodes.iter().enumerate() {
         let JsonValue::Object(mut object) = raw_node.clone() else {
             continue;
@@ -159,9 +171,10 @@ fn flatten_document_nodes(
             .unwrap_or_default();
 
         flattened.push(JsonValue::Object(object));
-        flatten_document_nodes(&children, Some(&node_id), path, flattened);
+        flatten_document_nodes(&children, Some(&node_id), path, flattened, depth + 1)?;
         path.pop();
     }
+    Ok(())
 }
 
 fn extract_node_id(object: &JsonMap<String, JsonValue>, path: &[usize]) -> String {
@@ -3190,4 +3203,29 @@ fn resolve_instance_properties(
     }
 
     resolved_instance_properties
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_figma_document_recursion_limit() {
+        let max_depth = MAX_DEPTH + 10;
+        let mut json = String::from("[]");
+        for _ in 0..max_depth {
+            json = format!(r#"[{{"children": {}}}]"#, json);
+        }
+
+        let result = import_figma_document(&json);
+        match result {
+            Err(FigmaImportError::Parse(e))
+                if e.to_string().contains("recursion limit exceeded") => {}
+            Err(FigmaImportError::RecursionLimitExceeded(limit)) => {
+                assert_eq!(limit, MAX_DEPTH);
+            }
+            Err(e) => panic!("Expected RecursionLimitExceeded error, got: {}", e),
+            Ok(_) => panic!("Expected RecursionLimitExceeded error, but succeeded"),
+        }
+    }
 }

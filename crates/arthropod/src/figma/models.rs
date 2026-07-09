@@ -14,6 +14,8 @@ pub enum FigmaImportError {
         "invalid figma json shape: expected an array of nodes or an object with a `nodes` array"
     )]
     InvalidDocumentShape,
+    #[error("recursion limit exceeded (max depth: {0})")]
+    RecursionLimitExceeded(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
