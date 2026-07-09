@@ -14,7 +14,7 @@ pub fn validate_finite(value: f32, field_name: &str) -> Result<f32> {
 /// Validates that an f32 value is finite and within the range [min, max].
 pub fn validate_range(value: f32, min: f32, max: f32, field_name: &str) -> Result<f32> {
     validate_finite(value, field_name)?;
-    if value < min || value > max {
+    if !(value >= min && value <= max) {
         return Err(anyhow!(
             "Invalid value for {}: must be between {} and {}",
             field_name,
