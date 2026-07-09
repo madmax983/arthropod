@@ -20,7 +20,7 @@ fn havoc_rwlock_downgrade_deadlock() {
 
     let res = rx.recv_timeout(Duration::from_millis(100));
     assert!(
-        res.is_err(),
+        matches!(res, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)),
         "Test failed: ReadSignal::get inside WriteSignal::update did NOT deadlock!"
     );
 }
@@ -43,7 +43,7 @@ fn havoc_rwlock_downgrade_deadlock_untracked() {
 
     let res = rx.recv_timeout(Duration::from_millis(100));
     assert!(
-        res.is_err(),
+        matches!(res, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)),
         "Test failed: ReadSignal::get_untracked inside WriteSignal::update did NOT deadlock!"
     );
 }
@@ -66,7 +66,7 @@ fn havoc_rwlock_double_write_deadlock() {
 
     let res = rx.recv_timeout(Duration::from_millis(100));
     assert!(
-        res.is_err(),
+        matches!(res, Err(std::sync::mpsc::RecvTimeoutError::Disconnected)),
         "Test failed: WriteSignal::set inside WriteSignal::update did NOT deadlock!"
     );
 }

@@ -7,6 +7,70 @@
 use crate::runtime::{NodeId, Runtime};
 use std::sync::{Arc, RwLock};
 
+pub(crate) enum LockState {
+    Read(usize),
+    Write,
+}
+
+pub(crate) struct LockTrackerGuard {
+    id: crate::runtime::NodeId,
+    is_write: bool,
+}
+
+impl LockTrackerGuard {
+    pub fn new_read(id: crate::runtime::NodeId) -> Self {
+        LOCKED_SIGNALS.with(|locks| {
+            let mut map = locks.borrow_mut();
+            match map.get_mut(&id) {
+                Some(LockState::Write) => {
+                    panic!("Deadlock detected: recursive lock on Signal");
+                }
+                Some(LockState::Read(count)) => {
+                    *count += 1;
+                }
+                None => {
+                    map.insert(id, LockState::Read(1));
+                }
+            }
+        });
+        Self {
+            id,
+            is_write: false,
+        }
+    }
+
+    pub fn new_write(id: crate::runtime::NodeId) -> Self {
+        LOCKED_SIGNALS.with(|locks| {
+            let mut map = locks.borrow_mut();
+            if map.contains_key(&id) {
+                panic!("Deadlock detected: recursive lock on Signal");
+            }
+            map.insert(id, LockState::Write);
+        });
+        Self { id, is_write: true }
+    }
+}
+
+impl Drop for LockTrackerGuard {
+    fn drop(&mut self) {
+        LOCKED_SIGNALS.with(|locks| {
+            let mut map = locks.borrow_mut();
+            if self.is_write {
+                map.remove(&self.id);
+            } else if let Some(LockState::Read(count)) = map.get_mut(&self.id) {
+                *count -= 1;
+                if *count == 0 {
+                    map.remove(&self.id);
+                }
+            }
+        });
+    }
+}
+
+thread_local! {
+    pub(crate) static LOCKED_SIGNALS: std::cell::RefCell<std::collections::HashMap<crate::runtime::NodeId, LockState>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
 /// A reactive signal - the atomic unit of state.
 ///
 /// Signals hold a value and notify dependents when that value changes.
@@ -194,6 +258,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     ///
     pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         self.runtime.track(self.id);
+        let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
         let guard = self
             .handle
             .read()
@@ -219,6 +284,7 @@ impl<T: 'static + Send + Sync> Signal<T> {
     /// - Panics if the internal lock is poisoned.
     ///
     pub fn with_untracked<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
         let guard = self
             .handle
             .read()
@@ -337,6 +403,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 self.runtime.get_computed_handle(self.id)
             };
 
+            let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
             let guard = handle
                 .downcast_ref::<RwLock<T>>()
                 .expect("Type mismatch")
@@ -345,6 +412,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
             f(&*guard)
         } else {
             self.runtime.track(self.id);
+            let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
             let guard = self
                 .handle
                 .read()
@@ -382,6 +450,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 self.runtime.get_computed_handle(self.id)
             };
 
+            let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
             let guard = handle
                 .downcast_ref::<RwLock<T>>()
                 .expect("Type mismatch")
@@ -389,6 +458,7 @@ impl<T: 'static + Send + Sync> ReadSignal<T> {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             f(&*guard)
         } else {
+            let _lock_guard = crate::signal::LockTrackerGuard::new_read(self.id);
             let guard = self
                 .handle
                 .read()
@@ -439,6 +509,7 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     ///
     pub fn set(&self, value: T) {
         let old_value = {
+            let _lock_guard = crate::signal::LockTrackerGuard::new_write(self.id);
             let mut guard = self
                 .handle
                 .write()
@@ -476,6 +547,7 @@ impl<T: 'static + Send + Sync> WriteSignal<T> {
     ///
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         {
+            let _lock_guard = crate::signal::LockTrackerGuard::new_write(self.id);
             let mut guard = self
                 .handle
                 .write()
