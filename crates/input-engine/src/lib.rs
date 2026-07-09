@@ -15,7 +15,6 @@
 pub(crate) mod focus;
 pub(crate) mod form;
 pub(crate) mod gestures;
-pub(crate) mod input_manager;
 #[cfg(feature = "nova")]
 pub(crate) mod mouse_gestures;
 pub(crate) mod text;
@@ -24,7 +23,6 @@ pub(crate) mod validation;
 pub use gestures::{
     ChordMatcher, GestureSignal, InputPattern, SequenceMatcher, create_gesture_signal,
 };
-pub use input_manager::InputManager;
 #[cfg(feature = "nova")]
 pub use mouse_gestures::{MouseGesture, StrokeMatcher};
 

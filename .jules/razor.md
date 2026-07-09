@@ -63,3 +63,7 @@
 **Bloat:** `SpringBuilder` (Factory builder for a simple 4-parameter struct)
 **Cut:** Replaced with direct constructor `Timeline::spring(from, to, stiffness, damping)`
 **Saved:** ~30 lines of boilerplate, reduced indirection.
+## [Reduction]
+**Bloat:** `InputManager` in `input-engine` (Zombie Code)
+**Cut:** Deleted the struct and module, as they were empty shells with comments referencing an unimplemented spec.
+**Saved:** 1 file, ~20 lines, removed dead placeholder code.
